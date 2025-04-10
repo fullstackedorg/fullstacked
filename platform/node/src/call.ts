@@ -2,13 +2,16 @@ import ffi from "ffi-rs";
 import path from "path";
 import os from "os";
 
+const platform = os.platform();
 const binDirectory = path.resolve(process.cwd(), "..", "..", "core", "bin");
 const libBinary =
-    os.platform() === "darwin"
+    platform === "darwin"
         ? "macos-x86_64"
-        : os.platform() === "win32"
+        : platform === "win32"
           ? "win-x64.dll"
-          : null;
+          : platform === "linux"
+            ? "linux-x86_64"
+            : null;
 
 if (!libBinary) {
     throw "unknown platform";

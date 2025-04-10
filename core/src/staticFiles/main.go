@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"mime"
+	"net/url"
 	"path"
 	"strings"
 
@@ -15,6 +16,7 @@ import (
 )
 
 func Serve(baseDir string, filePath string) []byte {
+	filePath, _ = url.PathUnescape(filePath)
 	filePath = strings.TrimPrefix(filePath, "/")
 	filePath = strings.TrimSuffix(filePath, "/")
 

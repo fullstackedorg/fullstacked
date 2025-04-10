@@ -16,7 +16,12 @@ export async function deeplink(fullstackedUrl: string) {
     const [hostAndPath] = rest.join("//").split("?");
     url = protocol + (protocol.endsWith(":") ? "" : ":") + "//" + hostAndPath;
 
+    if(!url.endsWith(".git")) {
+        url += ".git";
+    }
+
     const runProjectIfFound = (projects: ProjectType[]) => {
+        console.log(projects, url);
         const existingProject = projects?.find(
             (p) => p.gitRepository?.url === url
         );
