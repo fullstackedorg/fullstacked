@@ -7,7 +7,7 @@ android {
     namespace = "org.fullstacked.editor"
     compileSdk = 35
 
-    ndkVersion = "26.1.10909125"
+    ndkVersion = "28.2.13676358"
 
     defaultConfig {
         applicationId = "org.fullstacked.editor"
