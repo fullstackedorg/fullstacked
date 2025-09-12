@@ -75,7 +75,7 @@ func processBuffer(buffer []byte) (*BufferSlice, error) {
 	}, nil
 }
 
-var LSPs = make(map[string]*io.PipeWriter) 
+var LSPs = make(map[string]*io.PipeWriter)
 
 func StartLSP(directory string) string {
 	transportId := utils.RandString(6)
@@ -114,16 +114,16 @@ func StartLSP(directory string) string {
 	return transportId
 }
 
-func RequestLSP(transportId string, message string){
+func RequestLSP(transportId string, message string) {
 	inWrite, ok := LSPs[transportId]
 
-	if(!ok) {
+	if !ok {
 		fmt.Println("could not find lsp for " + transportId)
 		return
 	}
 
 	messageData := []byte(message)
 	contentLength := len(messageData)
-	payload := startToken + strconv.Itoa(contentLength) + headerSplit + message;
+	payload := startToken + strconv.Itoa(contentLength) + headerSplit + message
 	inWrite.Write([]byte(payload))
 }

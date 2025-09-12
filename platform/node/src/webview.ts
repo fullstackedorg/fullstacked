@@ -146,14 +146,18 @@ function createHandler(instance: Instance) {
 }
 
 const readBodyQueue: {
-    req: http.IncomingMessage
-    resolve: (body: Uint8Array) => void
+    req: http.IncomingMessage;
+    resolve: (body: Uint8Array) => void;
 }[] = [];
 let processingRequestLock = false;
 function processRequests() {
-    if (processingRequestLock) { return }
+    if (processingRequestLock) {
+        return;
+    }
     const readBody = readBodyQueue.shift();
-    if (!readBody) { return }
+    if (!readBody) {
+        return;
+    }
     processingRequestLock = true;
     const { req, resolve } = readBody;
 
@@ -161,7 +165,7 @@ function processRequests() {
         resolve(body);
         processingRequestLock = false;
         processRequests();
-    }
+    };
 
     const contentLengthStr = req.headers["content-length"] || "0";
     const contentLength = parseInt(contentLengthStr);
@@ -181,10 +185,10 @@ function processRequests() {
 }
 
 function readBody(req: http.IncomingMessage) {
-    return new Promise<Uint8Array>(resolve => {
+    return new Promise<Uint8Array>((resolve) => {
         readBodyQueue.push({ req, resolve });
         processRequests();
-    })
+    });
 }
 
 function getNextAvailablePort(
@@ -207,11 +211,11 @@ function getNextAvailablePort(
         setTimeout(timeout, 200);
         socket.on("timeout", timeout);
 
-        socket.on("connect", function() {
+        socket.on("connect", function () {
             next();
         });
 
-        socket.on("error", function(exception) {
+        socket.on("error", function (exception) {
             if ((exception as any).code !== "ECONNREFUSED") {
                 reject(exception);
             } else {

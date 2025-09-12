@@ -15,7 +15,7 @@ import (
 
 func RunLSP(
 	directory string,
-	in *io.PipeReader, 
+	in *io.PipeReader,
 	out *io.PipeWriter,
 ) int {
 	fs := bundled.WrapFS(osvfs.FS())

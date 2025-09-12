@@ -1,7 +1,7 @@
 npx prettier . --write
 
 cd core 
-gofmt -l -w .
+find . -type f -name '*.go' | grep -v "/typescript-go/" | xargs gofmt -l -w
 cd .. 
 
 find platform/linux/src -iname '*.h' -o -iname '*.cpp' | xargs clang-format -i --verbose 

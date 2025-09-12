@@ -4,6 +4,8 @@ node_modules
 out
 demo
 
+core/typescript-go
+
 editor/views/project/prettier/plugin-liquid.js
 
 **/*.cache
