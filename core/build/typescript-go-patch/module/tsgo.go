@@ -46,7 +46,7 @@ func getGlobalTypingsCacheLocation() string {
 	switch runtime.GOOS {
 	case "windows":
 		return tspath.CombinePaths(tspath.CombinePaths(getWindowsCacheLocation(), "Microsoft/TypeScript"), core.VersionMajorMinor())
-	case "openbsd", "freebsd", "netbsd", "darwin", "linux", "android":
+	case "openbsd", "freebsd", "netbsd", "darwin", "linux", "android", "ios":
 		return tspath.CombinePaths(tspath.CombinePaths(getNonWindowsCacheLocation(), "typescript"), core.VersionMajorMinor())
 	default:
 		panic("unsupported platform: " + runtime.GOOS)

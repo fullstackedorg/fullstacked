@@ -47,6 +47,7 @@ darwin-static: darwin-x64-static darwin-arm64-static
 ###### iOS/iPadOS #######
 
 ios-arm64:
+	node ./typescript-go-patch/ios/patch.js
 	CGO_ENABLED=1 \
 	GOOS=ios \
 	GOARCH=arm64 \

@@ -75,8 +75,11 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
             return;
         }
         
+        let escapedMessage = message
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "`", with: "\\`")
         DispatchQueue.main.async() {
-            self.evaluateJavaScript("window.oncoremessage(`\(messageType)`,`\(message)`)")
+            self.evaluateJavaScript("window.oncoremessage(`\(messageType)`,`\(escapedMessage)`)")
         }
     }
     
