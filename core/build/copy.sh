@@ -1,0 +1,1 @@
+cp -r ./typescript-module ../typescript-go/cmd/module

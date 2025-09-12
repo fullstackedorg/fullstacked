@@ -2,7 +2,6 @@ package methods
 
 import (
 	"encoding/json"
-	"fmt"
 	"path"
 	"slices"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	fetch "fullstackedorg/fullstacked/src/fetch"
 	fs "fullstackedorg/fullstacked/src/fs"
 	git "fullstackedorg/fullstacked/src/git"
+	ts_lsp "fullstackedorg/fullstacked/src/lsp"
 	packages "fullstackedorg/fullstacked/src/packages"
 	serialize "fullstackedorg/fullstacked/src/serialize"
 	setup "fullstackedorg/fullstacked/src/setup"
@@ -82,7 +82,8 @@ const (
 	GIT_HAS_GIT       = 82
 	GIT_REMOTE_URL    = 83
 
-	LSP_REQUEST = 90
+	LSP_START   = 90
+	LSP_REQUEST = 91
 
 	OPEN = 100
 )
@@ -262,8 +263,10 @@ func Call(payload []byte) []byte {
 		return fs.ReadFileSerialized(filePathAbs, true)
 	case method == FULLSTACKED_MODULES_LIST:
 		return fs.ReadDirSerialized(path.Join(setup.Directories.Editor, "fullstacked_modules"), true, false, false, []string{})
+	case method == LSP_START:
+		return serialize.SerializeString(ts_lsp.StartLSP(path.Join(setup.Directories.Root, args[0].(string))))
 	case method == LSP_REQUEST:
-		fmt.Println(args[0].(string))
+		ts_lsp.RequestLSP(args[0].(string), args[1].(string))
 	}
 
 	return nil

@@ -1,5 +1,7 @@
 OUT = $(CURDIR)/../bin
 
+$(shell ./copy.sh > /dev/null)
+
 ###### MacOS #######
 
 darwin-x64-shared:
