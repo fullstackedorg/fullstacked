@@ -24,10 +24,7 @@ tsconfig.json`;
 export function setupDevFiles() {
     const tsConfigFile = path.resolve(process.cwd(), "tsconfig.json");
     if (!fs.existsSync(tsConfigFile)) {
-        fs.writeFileSync(
-            tsConfigFile,
-            JSON.stringify(tsConfig, null, 4)
-        );
+        fs.writeFileSync(tsConfigFile, JSON.stringify(tsConfig, null, 4));
     }
     const gitignoreFile = path.resolve(process.cwd(), ".gitignore");
     if (!fs.existsSync(gitignoreFile)) {
