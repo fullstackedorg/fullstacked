@@ -452,8 +452,8 @@ func Copy(src string, dst string, origin string) error {
 		}
 
 		for _, file := range files {
-			data, err := ReadFile(path.Join(src,file));
-			if(err != nil) {
+			data, err := ReadFile(path.Join(src, file))
+			if err != nil {
 				continue
 			}
 			WriteFile(path.Join(dst, file), data, origin)
