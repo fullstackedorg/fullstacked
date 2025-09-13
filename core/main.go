@@ -19,6 +19,7 @@ import (
 	fs "fullstackedorg/fullstacked/src/fs"
 	methods "fullstackedorg/fullstacked/src/methods"
 	setup "fullstackedorg/fullstacked/src/setup"
+	"path"
 	"sync"
 	"unsafe"
 )
@@ -47,6 +48,14 @@ func directories(
 	// clean tmp
 	fs.Rmdir(setup.Directories.Tmp, fileEventOrigin)
 	fs.Mkdir(setup.Directories.Tmp, fileEventOrigin)
+
+	// place fullstacked_modules for lsp
+	fs.Copy(
+		path.Join(setup.Directories.Editor, "fullstacked_modules"),
+		path.Join(setup.Directories.Root, ".fullstacked_modules"),
+		fileEventOrigin,
+	)
+
 }
 
 var cCallback = (unsafe.Pointer)(nil)

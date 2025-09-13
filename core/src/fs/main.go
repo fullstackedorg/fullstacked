@@ -5,6 +5,7 @@ import (
 	serialize "fullstackedorg/fullstacked/src/serialize"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -404,4 +405,60 @@ func Rename(oldPath string, newPath string, origin string) bool {
 
 func RenameSerialized(oldPath string, newPath string, origin string) []byte {
 	return serialize.SerializeBoolean(Rename(oldPath, newPath, origin))
+}
+
+func Copy(src string, dst string, origin string) error {
+	srcExists, srcIsFile := Exists(src)
+	if !srcExists {
+		return errors.New("ENOENT")
+	}
+
+	dstExists, dstIsFile := Exists(dst)
+
+	if dstExists {
+		if srcIsFile && !dstIsFile {
+			return errors.New("destination is directory")
+		} else if !srcIsFile && dstIsFile {
+			return errors.New("destination is file")
+		}
+	}
+
+	if srcIsFile {
+		data, err := ReadFile(src)
+		if err != nil {
+			return err
+		}
+		WriteFile(dst, data, origin)
+	} else {
+		items, err := ReadDir(src, true, false, []string{})
+		if err != nil {
+			return err
+		}
+		directories := []string{}
+		files := []string{}
+		for _, item := range items {
+			if item.IsDir {
+				directories = append(directories, item.Name)
+			} else {
+				files = append(files, item.Name)
+			}
+		}
+
+		Rmdir(dst, origin)
+		Mkdir(dst, origin)
+
+		for _, dir := range directories {
+			Mkdir(path.Join(dst, dir), origin)
+		}
+
+		for _, file := range files {
+			data, err := ReadFile(path.Join(src,file));
+			if(err != nil) {
+				continue
+			}
+			WriteFile(path.Join(dst, file), data, origin)
+		}
+	}
+
+	return nil
 }
