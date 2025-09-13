@@ -1,16 +1,10 @@
 import path from "node:path";
 import fs from "node:fs";
+import { compilerOptions } from "../../../editor/views/project/workspace/tsconfig";
 
-// file://./../../../editor/typescript/worker.ts#51
-const defaultTsConfig = {
+const tsConfig = {
     compilerOptions: {
-        esModuleInterop: true,
-        module: "ES2022",
-        target: "ES2022",
-        moduleResolution: "Node10",
-        allowJs: true,
-        lib: ["dom", "dom.iterable", "es2023"],
-        jsx: "react",
+        ...compilerOptions,
         paths: {
             "*": ["./node_modules/fullstacked/fullstacked_modules/*"]
         },
@@ -24,14 +18,15 @@ const defaultTsConfig = {
 // file://./../../../core/src/git/main.go#31
 const defaultGitignore = `node_modules
 .build
-data`;
+data
+tsconfig.json`;
 
 export function setupDevFiles() {
     const tsConfigFile = path.resolve(process.cwd(), "tsconfig.json");
     if (!fs.existsSync(tsConfigFile)) {
         fs.writeFileSync(
             tsConfigFile,
-            JSON.stringify(defaultTsConfig, null, 4)
+            JSON.stringify(tsConfig, null, 4)
         );
     }
     const gitignoreFile = path.resolve(process.cwd(), ".gitignore");
