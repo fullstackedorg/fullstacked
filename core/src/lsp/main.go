@@ -75,24 +75,53 @@ func processBuffer(buffer []byte) (*BufferSlice, error) {
 	}, nil
 }
 
-var LSPs = make(map[string]*io.PipeWriter)
+type LspInstance struct {
+	PipeWrite *io.PipeWriter
+	Directory string
+	Close     bool
+}
 
-func StartLSP(directory string) string {
+var LSPs = make(map[string]*LspInstance)
+
+func Start(directory string) string {
 	transportId := utils.RandString(6)
+
+	LSPs[transportId] = &LspInstance{
+		Directory: directory,
+	}
+
+	startWithTransportId(transportId)
+
+	return transportId
+}
+
+func startWithTransportId(transportId string) {
+	lspInstance, ok := LSPs[transportId]
+
+	if !ok {
+		fmt.Println("cannot find lsp instance")
+		return
+	}
+
+	lspInstance.Close = false
 
 	callbackMessageType := "lsp-" + transportId
 
 	inRead, inWrite := io.Pipe()
 	outRead, outWrite := io.Pipe()
 
-	LSPs[transportId] = inWrite
+	lspInstance.PipeWrite = inWrite
 
-	go tsgo.RunLSP(directory, inRead, outWrite)
+	go tsgo.RunLSP(lspInstance.Directory, inRead, outWrite)
 
 	buffer := []byte{}
 
 	go func() {
 		for {
+			if lspInstance.Close {
+				return
+			}
+
 			b := make([]byte, 1024)
 			n, _ := outRead.Read(b)
 
@@ -110,12 +139,10 @@ func StartLSP(directory string) string {
 			}
 		}
 	}()
-
-	return transportId
 }
 
-func RequestLSP(transportId string, message string) {
-	inWrite, ok := LSPs[transportId]
+func Request(transportId string, message string) {
+	lspInstance, ok := LSPs[transportId]
 
 	if !ok {
 		fmt.Println("could not find lsp for " + transportId)
@@ -125,5 +152,26 @@ func RequestLSP(transportId string, message string) {
 	messageData := []byte(message)
 	contentLength := len(messageData)
 	payload := startToken + strconv.Itoa(contentLength) + headerSplit + message
-	inWrite.Write([]byte(payload))
+	lspInstance.PipeWrite.Write([]byte(payload))
+}
+
+func stop(transportId string) {
+	lspInstance, ok := LSPs[transportId]
+
+	if !ok {
+		return
+	}
+
+	lspInstance.Close = true
+	lspInstance.PipeWrite.Close()
+}
+
+func Restart(transportId string) {
+	stop(transportId)
+	startWithTransportId(transportId)
+}
+
+func End(transportId string) {
+	stop(transportId)
+	delete(LSPs, transportId)
 }

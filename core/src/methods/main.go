@@ -84,6 +84,8 @@ const (
 
 	LSP_START   = 90
 	LSP_REQUEST = 91
+	LSP_RESTART = 92
+	LSP_END     = 93
 
 	OPEN = 100
 )
@@ -264,9 +266,14 @@ func Call(payload []byte) []byte {
 	case method == FULLSTACKED_MODULES_LIST:
 		return fs.ReadDirSerialized(path.Join(setup.Directories.Editor, "fullstacked_modules"), true, false, false, []string{})
 	case method == LSP_START:
-		return serialize.SerializeString(ts_lsp.StartLSP(path.Join(setup.Directories.Root, args[0].(string))))
+		return serialize.SerializeString(ts_lsp.Start(path.Join(setup.Directories.Root, args[0].(string))))
 	case method == LSP_REQUEST:
-		ts_lsp.RequestLSP(args[0].(string), args[1].(string))
+		ts_lsp.Request(args[0].(string), args[1].(string))
+	case method == LSP_RESTART:
+		ts_lsp.Restart(args[0].(string))
+	case method == LSP_END:
+		ts_lsp.End(args[0].(string))
+
 	}
 
 	return nil
