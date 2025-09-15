@@ -76,9 +76,7 @@ func processBuffer(buffer []byte) (*BufferSlice, error) {
 }
 
 type LspInstance struct {
-	PipeWrite *io.PipeWriter
-	Directory string
-	Close     bool
+	PipeWriter *io.PipeWriter
 }
 
 var LSPs = make(map[string]*LspInstance)
@@ -86,59 +84,55 @@ var LSPs = make(map[string]*LspInstance)
 func Start(directory string) string {
 	transportId := utils.RandString(6)
 
-	LSPs[transportId] = &LspInstance{
-		Directory: directory,
-	}
-
-	startWithTransportId(transportId)
-
-	return transportId
-}
-
-func startWithTransportId(transportId string) {
-	lspInstance, ok := LSPs[transportId]
-
-	if !ok {
-		fmt.Println("cannot find lsp instance")
-		return
-	}
-
-	lspInstance.Close = false
+	end := make(chan struct{})
 
 	callbackMessageType := "lsp-" + transportId
 
 	inRead, inWrite := io.Pipe()
 	outRead, outWrite := io.Pipe()
 
-	lspInstance.PipeWrite = inWrite
+	LSPs[transportId] = &LspInstance{
+		PipeWriter: inWrite,
+	}
 
-	go tsgo.RunLSP(lspInstance.Directory, inRead, outWrite)
+	fmt.Println("STARTING ", transportId)
+	go tsgo.RunLSP(
+		directory,
+		inRead,
+		outWrite,
+		end,
+	)
 
 	buffer := []byte{}
 
 	go func() {
 		for {
-			if lspInstance.Close {
+			select {
+			case <-end:
+				fmt.Println("CLOSING ", transportId)
+				setup.Callback("", "lsp-close", transportId)
 				return
-			}
+			default:
+				b := make([]byte, 1024)
+				n, _ := outRead.Read(b)
 
-			b := make([]byte, 1024)
-			n, _ := outRead.Read(b)
-
-			if n > 0 {
-				buffer = append(buffer, b[0:n]...)
-				bSlice, err := processBuffer(buffer)
-				if err != nil {
-					panic(err)
-				}
-				if bSlice != nil {
-					message := string(buffer[bSlice.From:bSlice.To])
-					setup.Callback("", callbackMessageType, message)
-					buffer = buffer[bSlice.To:]
+				if n > 0 {
+					buffer = append(buffer, b[0:n]...)
+					bSlice, err := processBuffer(buffer)
+					if err != nil {
+						panic(err)
+					}
+					if bSlice != nil {
+						message := string(buffer[bSlice.From:bSlice.To])
+						setup.Callback("", callbackMessageType, message)
+						buffer = buffer[bSlice.To:]
+					}
 				}
 			}
 		}
 	}()
+
+	return transportId
 }
 
 func Request(transportId string, message string) {
@@ -152,26 +146,16 @@ func Request(transportId string, message string) {
 	messageData := []byte(message)
 	contentLength := len(messageData)
 	payload := startToken + strconv.Itoa(contentLength) + headerSplit + message
-	lspInstance.PipeWrite.Write([]byte(payload))
+	lspInstance.PipeWriter.Write([]byte(payload))
 }
 
-func stop(transportId string) {
+func End(transportId string) {
 	lspInstance, ok := LSPs[transportId]
 
 	if !ok {
 		return
 	}
 
-	lspInstance.Close = true
-	lspInstance.PipeWrite.Close()
-}
-
-func Restart(transportId string) {
-	stop(transportId)
-	startWithTransportId(transportId)
-}
-
-func End(transportId string) {
-	stop(transportId)
+	lspInstance.PipeWriter.Close()
 	delete(LSPs, transportId)
 }

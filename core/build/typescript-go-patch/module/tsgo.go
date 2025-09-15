@@ -17,6 +17,7 @@ func RunLSP(
 	directory string,
 	in *io.PipeReader,
 	out *io.PipeWriter,
+	end chan struct{},
 ) int {
 	fs := bundled.WrapFS(osvfs.FS())
 	defaultLibraryPath := bundled.LibPath()
@@ -32,13 +33,16 @@ func RunLSP(
 		TypingsLocation:    typingsLocation,
 	})
 
+	fmt.Println("LSP START")
 	if err := s.Run(); err != nil {
 
 		fmt.Println(err)
 		// return 1
 	}
 
-	fmt.Println("LSP OUT")
+	close(end)
+	out.Write([]byte{})
+	fmt.Println("LSP END")
 	return 0
 }
 

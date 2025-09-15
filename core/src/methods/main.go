@@ -84,8 +84,7 @@ const (
 
 	LSP_START   = 90
 	LSP_REQUEST = 91
-	LSP_RESTART = 92
-	LSP_END     = 93
+	LSP_END     = 92
 
 	OPEN = 100
 )
@@ -269,8 +268,6 @@ func Call(payload []byte) []byte {
 		return serialize.SerializeString(ts_lsp.Start(path.Join(setup.Directories.Root, args[0].(string))))
 	case method == LSP_REQUEST:
 		ts_lsp.Request(args[0].(string), args[1].(string))
-	case method == LSP_RESTART:
-		ts_lsp.Restart(args[0].(string))
 	case method == LSP_END:
 		ts_lsp.End(args[0].(string))
 
