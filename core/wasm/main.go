@@ -18,6 +18,13 @@ func directories(this js.Value, args []js.Value) interface{} {
 		args[2].String(),
 		args[3].String(),
 	)
+
+	fs.Copy(
+		setup.Directories.Editor+"/fullstacked_modules",
+		setup.Directories.Root+"/.fullstacked_modules",
+		"setup",
+	)
+
 	return nil
 }
 

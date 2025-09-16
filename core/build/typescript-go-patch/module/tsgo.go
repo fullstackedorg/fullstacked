@@ -10,26 +10,54 @@ import (
 	"github.com/microsoft/typescript-go/internal/core"
 	"github.com/microsoft/typescript-go/internal/lsp"
 	"github.com/microsoft/typescript-go/internal/tspath"
-	"github.com/microsoft/typescript-go/internal/vfs/osvfs"
 	"github.com/microsoft/typescript-go/internal/vfs"
+	"github.com/microsoft/typescript-go/internal/vfs/osvfs"
 )
 
 type (
-	FsEntries = vfs.Entries
-	FsFileInfo = vfs.FileInfo
+	FsEntries     = vfs.Entries
+	FsFileInfo    = vfs.FileInfo
 	FsWalkDirFunc = vfs.WalkDirFunc
 )
 
 func RunLSP(
+	directory string,
+	in *io.PipeReader,
+	out *io.PipeWriter,
+	end chan struct{},
+) int {
+	return runLSP(
+		osvfs.FS(),
+		directory,
+		in,
+		out,
+		end,
+	)
+}
+
+func RunLSP_WASM(
 	suppliedFS vfs.FS,
 	directory string,
 	in *io.PipeReader,
 	out *io.PipeWriter,
 	end chan struct{},
 ) int {
-	if(suppliedFS == nil) {
-		suppliedFS = osvfs.FS() 
-	}
+	return runLSP(
+		suppliedFS,
+		directory,
+		in,
+		out,
+		end,
+	)
+}
+
+func runLSP(
+	suppliedFS vfs.FS,
+	directory string,
+	in *io.PipeReader,
+	out *io.PipeWriter,
+	end chan struct{},
+) int {
 	fs := bundled.WrapFS(suppliedFS)
 	defaultLibraryPath := bundled.LibPath()
 	typingsLocation := getGlobalTypingsCacheLocation()

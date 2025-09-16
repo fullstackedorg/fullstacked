@@ -55,7 +55,6 @@ func directories(
 		path.Join(setup.Directories.Root, ".fullstacked_modules"),
 		fileEventOrigin,
 	)
-
 }
 
 var cCallback = (unsafe.Pointer)(nil)

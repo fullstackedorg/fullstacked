@@ -98,19 +98,22 @@ func Start(directory string) string {
 
 	fmt.Println("STARTING ", transportId)
 
-	suppliedFS := (*WasmFS)(nil)
-
 	if fs.WASM {
-		suppliedFS = &WasmFS{}
+		go tsgo.RunLSP_WASM(
+			&WasmFS{},
+			directory,
+			inRead,
+			outWrite,
+			end,
+		)
+	} else {
+		go tsgo.RunLSP(
+			directory,
+			inRead,
+			outWrite,
+			end,
+		)
 	}
-
-	go tsgo.RunLSP(
-		suppliedFS,
-		directory,
-		inRead,
-		outWrite,
-		end,
-	)
 
 	buffer := []byte{}
 

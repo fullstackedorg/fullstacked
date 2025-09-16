@@ -30,7 +30,7 @@ func vReadFile(path string) ([]byte, error) {
 }
 
 func vWriteFile(path string, data []byte) error {
-	path = strings.TrimPrefix(path, "/")
+	path = strings.TrimLeft(path, "/")
 
 	if VirtFS[path] == nil {
 		VirtFS[path] = &vFile{
@@ -44,11 +44,15 @@ func vWriteFile(path string, data []byte) error {
 }
 
 func vUnlink(path string) error {
+	path = strings.TrimLeft(path, "/")
+
 	delete(VirtFS, path)
 	return nil
 }
 
 func vMkdir(path string) error {
+	path = strings.TrimLeft(path, "/")
+
 	path = strings.TrimSpace(path)
 	for string(path[len(path)-1]) == "/" {
 		path = strings.Trim(path, "/")
@@ -73,6 +77,8 @@ func vMkdir(path string) error {
 }
 
 func vRmdir(path string) error {
+	path = strings.TrimLeft(path, "/")
+
 	indexesToRemove := []int{}
 
 	for i, dir := range VirtDirs {
@@ -115,6 +121,8 @@ func vExists(path string) (bool, bool) {
 }
 
 func vStat(path string) *FileInfo2 {
+	path = strings.TrimLeft(path, "/")
+
 	f := VirtFS[path]
 	d := false
 
@@ -148,6 +156,9 @@ func vStat(path string) *FileInfo2 {
 }
 
 func vRename(oldPath string, newPath string) error {
+	oldPath = strings.TrimLeft(oldPath, "/")
+	newPath = strings.TrimLeft(newPath, "/")
+
 	for i, dir := range VirtDirs {
 		if strings.HasPrefix(dir, oldPath) {
 			VirtDirs[i] = strings.Replace(dir, oldPath, newPath, 1)
@@ -211,6 +222,8 @@ func pathIsChildOfPath(childPath string, parentPath string) bool {
 //
 // path: projects/node_modules/react
 func vReadDir(path string, recursive bool, filesOnly bool, skip []string) []FileInfo2 {
+	path = strings.TrimLeft(path, "/")
+
 	items := []FileInfo2{}
 
 	pathComponents := splitPath(path)

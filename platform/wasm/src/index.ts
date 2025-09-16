@@ -184,6 +184,8 @@ if (!unzipResult) {
     console.error("Failed to unzip editor");
 }
 
+directories(dirs.root, dirs.config, dirs.editor, dirs.root + "/.tmp");
+
 async function staticFileServing(projectId: string, pathname: string) {
     const projectIdData = te.encode(projectId);
     const pathnameData = te.encode(pathname);
@@ -222,7 +224,7 @@ async function initProjectWindow(projectId: string) {
         url = url.trim();
         if (url.startsWith("http")) {
             if (url.startsWith("https://github.com")) {
-                if(options.method === "HEAD" && url.endsWith(".git")) {
+                if (options.method === "HEAD" && url.endsWith(".git")) {
                     url = url.slice(0, 0 - ".git".length);
                 }
 
