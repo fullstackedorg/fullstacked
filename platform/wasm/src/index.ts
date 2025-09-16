@@ -222,6 +222,10 @@ async function initProjectWindow(projectId: string) {
         url = url.trim();
         if (url.startsWith("http")) {
             if (url.startsWith("https://github.com")) {
+                if(options.method === "HEAD" && url.endsWith(".git")) {
+                    url = url.slice(0, 0 - ".git".length);
+                }
+
                 url = `${gitProxy}?url=${encodeURIComponent(url)}`;
             }
 
