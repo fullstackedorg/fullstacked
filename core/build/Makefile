@@ -123,7 +123,7 @@ wasm:
 	GOOS=js \
 	GOARCH=wasm \
 	go build -o $(OUT)/wasm.wasm -v ../wasm && \
-	cp $(shell go env GOROOT)/misc/wasm/wasm_exec.js $(OUT)/wasm.js
+	cp -rf $(shell find $(HOME)/go -name "wasm_exec.js" | grep misc) $(OUT)/wasm.js
 
 
 ###### Clean #######

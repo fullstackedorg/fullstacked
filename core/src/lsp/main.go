@@ -3,6 +3,7 @@ package ts_lsp
 import (
 	"errors"
 	"fmt"
+	"fullstackedorg/fullstacked/src/fs"
 	"fullstackedorg/fullstacked/src/setup"
 	"fullstackedorg/fullstacked/src/utils"
 	"io"
@@ -96,7 +97,15 @@ func Start(directory string) string {
 	}
 
 	fmt.Println("STARTING ", transportId)
+
+	suppliedFS := (*WasmFS)(nil)
+
+	if fs.WASM {
+		suppliedFS = &WasmFS{}
+	}
+
 	go tsgo.RunLSP(
+		suppliedFS,
 		directory,
 		inRead,
 		outWrite,

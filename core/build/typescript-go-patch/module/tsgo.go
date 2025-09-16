@@ -11,15 +11,26 @@ import (
 	"github.com/microsoft/typescript-go/internal/lsp"
 	"github.com/microsoft/typescript-go/internal/tspath"
 	"github.com/microsoft/typescript-go/internal/vfs/osvfs"
+	"github.com/microsoft/typescript-go/internal/vfs"
+)
+
+type (
+	FsEntries = vfs.Entries
+	FsFileInfo = vfs.FileInfo
+	FsWalkDirFunc = vfs.WalkDirFunc
 )
 
 func RunLSP(
+	suppliedFS vfs.FS,
 	directory string,
 	in *io.PipeReader,
 	out *io.PipeWriter,
 	end chan struct{},
 ) int {
-	fs := bundled.WrapFS(osvfs.FS())
+	if(suppliedFS == nil) {
+		suppliedFS = osvfs.FS() 
+	}
+	fs := bundled.WrapFS(suppliedFS)
 	defaultLibraryPath := bundled.LibPath()
 	typingsLocation := getGlobalTypingsCacheLocation()
 
@@ -50,7 +61,7 @@ func getGlobalTypingsCacheLocation() string {
 	switch runtime.GOOS {
 	case "windows":
 		return tspath.CombinePaths(tspath.CombinePaths(getWindowsCacheLocation(), "Microsoft/TypeScript"), core.VersionMajorMinor())
-	case "openbsd", "freebsd", "netbsd", "darwin", "linux", "android", "ios":
+	case "openbsd", "freebsd", "netbsd", "darwin", "linux", "android", "ios", "js":
 		return tspath.CombinePaths(tspath.CombinePaths(getNonWindowsCacheLocation(), "typescript"), core.VersionMajorMinor())
 	default:
 		panic("unsupported platform: " + runtime.GOOS)
