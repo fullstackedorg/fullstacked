@@ -83,6 +83,7 @@ func (w *WasmFS) Remove(path string) error {
 
 // Stat implements vfs.FS.
 func (w *WasmFS) Stat(path string) tsgo.FsFileInfo {
+	fmt.Println("Stat")
 	return nil
 }
 

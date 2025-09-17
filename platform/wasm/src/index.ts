@@ -152,13 +152,13 @@ const result = (await WebAssembly.instantiate(
 go.run(result.instance);
 
 const dirs = {
-    root: "projects",
-    config: "config",
-    nodeModules: "node_modules",
-    editor: "editor"
+    root: "/projects",
+    config: "/config",
+    editor: "/editor",
+    tmp: "/.tmp"
 };
 
-directories(dirs.root, dirs.config, dirs.editor, dirs.root + "/.tmp");
+directories(dirs.root, dirs.config, dirs.editor, dirs.tmp);
 
 const te = new TextEncoder();
 const editorDir = te.encode(dirs.editor);

@@ -97,10 +97,6 @@ func Build(
 	entryPointJS := findEntryPoint(projectDirectory)
 	entryPointAbsCSS := filepath.ToSlash(path.Join(projectDirectory, ".build", "index.css"))
 
-	if fs.WASM {
-		entryPointAbsCSS = "/" + entryPointAbsCSS
-	}
-
 	// create tmp that imports bridge and entryPoint if any
 	tmpFile := path.Join(setup.Directories.Tmp, utils.RandString(10)+".js")
 	if entryPointJS == nil {
@@ -111,10 +107,6 @@ func Build(
 		`), fileEventOrigin)
 	} else {
 		entryPointAbs := filepath.ToSlash(path.Join(projectDirectory, *entryPointJS))
-
-		if fs.WASM {
-			entryPointAbs = "/" + entryPointAbs
-		}
 
 		fs.WriteFile(tmpFile, []byte(`
 			import "`+entryPointAbsCSS+`";
@@ -127,8 +119,6 @@ func Build(
 	// add WASM fixture plugin
 	plugins := []esbuild.Plugin{}
 	if fs.WASM {
-		tmpFile = "/" + tmpFile
-
 		wasmFS := esbuild.Plugin{
 			Name: "wasm-fs",
 			Setup: func(build esbuild.PluginBuild) {
