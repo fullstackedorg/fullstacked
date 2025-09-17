@@ -6,6 +6,7 @@ import {
     serializeArgs
 } from "../bridge/serialization";
 import core_message from "../core_message";
+import { ar } from "zod/v4/locales";
 
 const te = new TextEncoder();
 
@@ -140,6 +141,8 @@ function receivedResponse2(base64Data: string) {
 
     if (!request) return;
 
+    console.log(id, args);
+
     if (request.resolveStream) {
         const [done, chunk] = args.slice(1);
         request.resolveStream({ done, chunk });
@@ -182,6 +185,7 @@ function receivedResponse2(base64Data: string) {
 
     const readBody = async () => {
         if (!ok) {
+            console.log(statusText);
             return te.encode(statusText);
         }
         let body = new Uint8Array();
@@ -242,6 +246,7 @@ export async function core_fetch2(
     options?: RequestInit
 ): Promise<Response> {
     if (!addedListener2) {
+        console.log("ici");
         core_message.addListener("fetch2-response", receivedResponse2);
         addedListener2 = true;
     }
