@@ -45,7 +45,9 @@ const cleanup = () => {
         cwd: localGitServerDir,
         stdio: "inherit"
     });
+    editorProcess?.stdin?.end();
     editorProcess?.kill();
+    editorProcess2?.stdin?.end();
     editorProcess2?.kill();
     kioskProcess?.kill();
 };
@@ -271,6 +273,11 @@ const projectTitle = await (
 
 assert.equal(await projectTitle.jsonValue(), repoName);
 
+const editorPage2Back = await editorPage2.waitForSelector(".back-button");
+await editorPage2Back.click();
+
+await sleep(2000);
+
 await editorPage2.close();
 
 kioskProcess = child_process.exec(`node index.js --kiosk ${repoName}`, {
@@ -343,6 +350,13 @@ assert.deepEqual(await getTitleAndColor(kioskPage), {
     currentTitle: testId,
     currentColor: [0, 255, 0]
 });
+
+await editorPage.bringToFront();
+
+const editorPageBack = await editorPage.waitForSelector(".back-button");
+await editorPageBack.click();
+
+await sleep(2000);
 
 cleanup();
 process.exit(0);

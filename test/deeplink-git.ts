@@ -8,7 +8,9 @@ import os from "node:os";
 let editorProcess1: ChildProcess, editorProcess2: ChildProcess;
 
 const cleanup = () => {
+    editorProcess1?.stdin?.end();
     editorProcess1?.kill();
+    editorProcess2?.stdin?.end();
     editorProcess2?.kill();
 };
 
@@ -129,6 +131,11 @@ if (actualDemoTitle !== DEMO_TITLE) {
         `Didn't find the right title for Demo opened by deep link. Expected [${DEMO_TITLE}] Found [${actualDemoTitle}]`
     );
 }
+
+const back = await page.waitForSelector(".back-button");
+await back.click();
+
+await sleep(2000);
 
 cleanup();
 process.exit(0);
