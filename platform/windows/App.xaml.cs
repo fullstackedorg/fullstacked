@@ -49,10 +49,10 @@ namespace FullStacked
             this.InitializeComponent();
             this.registerDeepLinking();
 
-            setDirectories();
-
             cb = new Lib.CallbackDelegate(onCallback);
             App.lib.setCallback(cb);
+
+            setDirectories();
 
             this.didConstruct = true;
             this.launch();
@@ -219,8 +219,6 @@ namespace FullStacked
             string config = Path.Combine(userDir, ".config", "fullstacked");
             string editor = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledPath, "editor");
             string tmp = Path.Combine(root, ".tmp");
-
-            Thread.Sleep(3000);
 
             byte[] rootBytes = Encoding.UTF8.GetBytes(root);
             byte[] configBytes = Encoding.UTF8.GetBytes(config);
