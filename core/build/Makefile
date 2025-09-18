@@ -1,5 +1,7 @@
 OUT = $(CURDIR)/../bin
 
+$(shell node ./typescript-go-patch/patch.js)
+
 ###### MacOS #######
 
 darwin-x64-shared:
@@ -45,6 +47,7 @@ darwin-static: darwin-x64-static darwin-arm64-static
 ###### iOS/iPadOS #######
 
 ios-arm64:
+	node ./typescript-go-patch/ios/patch.js
 	CGO_ENABLED=1 \
 	GOOS=ios \
 	GOARCH=arm64 \
@@ -120,7 +123,7 @@ wasm:
 	GOOS=js \
 	GOARCH=wasm \
 	go build -o $(OUT)/wasm.wasm -v ../wasm && \
-	cp $(shell go env GOROOT)/misc/wasm/wasm_exec.js $(OUT)/wasm.js
+	cp -rf $(shell find $(HOME)/go -name "wasm_exec.js" | grep misc) $(OUT)/wasm.js
 
 
 ###### Clean #######

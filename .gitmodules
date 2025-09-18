@@ -4,3 +4,6 @@
 [submodule "editor"]
 	path = editor
 	url = https://github.com/fullstackedorg/editor.git
+[submodule "core/typescript-go"]
+	path = core/typescript-go
+	url = https://github.com/microsoft/typescript-go.git

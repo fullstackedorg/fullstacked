@@ -17,8 +17,8 @@ import (
 
 func Serve(baseDir string, filePath string) []byte {
 	filePath, _ = url.PathUnescape(filePath)
-	filePath = strings.TrimPrefix(filePath, "/")
-	filePath = strings.TrimSuffix(filePath, "/")
+	filePath = strings.TrimLeft(filePath, "/")
+	filePath = strings.TrimRight(filePath, "/")
 
 	// check if file exists
 	filePathAbs := path.Join(baseDir, filePath)

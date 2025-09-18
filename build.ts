@@ -41,10 +41,7 @@ async function processScss(entryPoint: string, out: string) {
 
 await processScss("editor/index.scss", `editor/index.css`);
 
-const toBuild = [
-    ["editor/index.ts", "index"],
-    ["editor/typescript/worker.ts", "worker-ts"]
-];
+const toBuild = [["editor/index.ts", "index"]];
 
 for (const [input, output] of toBuild) {
     esbuild.buildSync({

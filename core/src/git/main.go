@@ -29,11 +29,12 @@ import (
 	utils "fullstackedorg/fullstacked/src/utils"
 )
 
-var ignoredDirectories = []string{
+var ignored = []string{
 	"/.build",
 	"/data",
 	"/node_modules",
 	"/chat",
+	"/tsconfig.json",
 }
 
 type GitMessageJSON struct {
@@ -67,7 +68,7 @@ func getRepo(directory string, wg *sync.WaitGroup) (*git.Repository, error) {
 	}
 
 	repoStorage := newStorage(directory, wg)
-	repoFs := NewBillyFS(repoStorage, ignoredDirectories)
+	repoFs := NewBillyFS(repoStorage, ignored)
 
 	repo, err = git.Open(filesystem.NewStorage(gitFs, cache.NewObjectLRUDefault()), repoFs)
 
@@ -86,8 +87,8 @@ func getWorktree(repo *git.Repository) (*git.Worktree, error) {
 	}
 
 	// always ignore FullStacked artifacts
-	for _, d := range ignoredDirectories {
-		worktree.Excludes = append(worktree.Excludes, gitignore.ParsePattern("/"+d, []string{}))
+	for _, d := range ignored {
+		worktree.Excludes = append(worktree.Excludes, gitignore.ParsePattern(d, []string{}))
 	}
 
 	return worktree, nil
@@ -274,7 +275,7 @@ func Clone(into string, url string) {
 	}
 
 	repoStorage := newStorage(into, &wg)
-	repoFs := NewBillyFS(repoStorage, ignoredDirectories)
+	repoFs := NewBillyFS(repoStorage, ignored)
 
 	storage := filesystem.NewStorage(gitFs, cache.NewObjectLRUDefault())
 

@@ -3,7 +3,7 @@ import net from "net";
 import open from "open";
 import fastQueryString from "fast-querystring";
 import { Duplex } from "stream";
-import ws, { WebSocketServer } from "ws";
+import ws, { WebSocket, WebSocketServer } from "ws";
 import { createInstance } from "./instance";
 import { platform } from ".";
 import {
@@ -85,7 +85,7 @@ function createHandler(instance: Instance) {
             return res.end(platform);
         } else if (pathname === "/call") {
             const payload = await readBody(req);
-            const data = await instance.call(payload);
+            const data = instance.call(payload);
             res.writeHead(200, {
                 "content-type": "application/octet-stream",
                 "content-length": data.length,
@@ -93,23 +93,6 @@ function createHandler(instance: Instance) {
             });
             return res.end(data);
         }
-
-        // Editor Only
-
-        if (instance.isEditor && pathname === "/call-sync") {
-            const parsedQuery = fastQueryString.parse(query);
-            const payloadBase64 = decodeURIComponent(parsedQuery.payload);
-            const payload = toByteArray(payloadBase64);
-            const data = await instance.call(payload);
-            res.writeHead(200, {
-                "content-type": "application/octet-stream",
-                "content-length": data.length,
-                "cache-control": "no-cache"
-            });
-            return res.end(data);
-        }
-
-        // End Editor Only
 
         // Serve Static File
 
@@ -145,24 +128,49 @@ function createHandler(instance: Instance) {
     };
 }
 
+const readBodyQueue: {
+    req: http.IncomingMessage;
+    resolve: (body: Uint8Array) => void;
+}[] = [];
+let processingRequestLock = false;
+function processRequests() {
+    if (processingRequestLock) {
+        return;
+    }
+    const readBody = readBodyQueue.shift();
+    if (!readBody) {
+        return;
+    }
+    processingRequestLock = true;
+    const { req, resolve } = readBody;
+
+    const end = (body: Uint8Array) => {
+        resolve(body);
+        processingRequestLock = false;
+        processRequests();
+    };
+
+    const contentLengthStr = req.headers["content-length"] || "0";
+    const contentLength = parseInt(contentLengthStr);
+    if (!contentLength) {
+        return end(new Uint8Array());
+    }
+
+    const body = new Uint8Array(contentLength);
+    let i = 0;
+    req.on("data", (chunk: Buffer) => {
+        for (let j = 0; j < chunk.byteLength; j++) {
+            body[j + i] = chunk[j];
+        }
+        i += chunk.length;
+    });
+    req.on("end", () => end(body));
+}
+
 function readBody(req: http.IncomingMessage) {
     return new Promise<Uint8Array>((resolve) => {
-        const contentLengthStr = req.headers["content-length"] || "0";
-        const contentLength = parseInt(contentLengthStr);
-        if (!contentLength) {
-            resolve(new Uint8Array());
-            return;
-        }
-
-        const body = new Uint8Array(contentLength);
-        let i = 0;
-        req.on("data", (chunk: Buffer) => {
-            for (let j = 0; j < chunk.byteLength; j++) {
-                body[j + i] = chunk[j];
-            }
-            i += chunk.length;
-        });
-        req.on("end", () => resolve(body));
+        readBodyQueue.push({ req, resolve });
+        processRequests();
     });
 }
 
@@ -209,13 +217,13 @@ function createWebSocketServer(
         onSocketClose: () => void;
     }
 ) {
-    const webSockets = new Set<ws.WebSocket>();
+    const webSockets = new Set<WebSocket>();
     const wss = new WebSocketServer({ noServer: true });
-    const onClose = (ws: ws.WebSocket) => {
+    const onClose = (ws: WebSocket) => {
         webSockets.delete(ws);
         cb.onSocketClose();
     };
-    const handleUpgrade = (ws: ws.WebSocket) => {
+    const handleUpgrade = (ws: WebSocket) => {
         webSockets.add(ws);
         cb.onSocketOpen();
 

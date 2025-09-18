@@ -3,6 +3,8 @@ package utils
 import (
 	"math/rand"
 	"net/http"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -56,4 +58,12 @@ func IsReacheable(url string) bool {
 	_, err := client.Head(url)
 
 	return err == nil
+}
+
+func RemoveDriveLetter(p string) string {
+	volume := filepath.VolumeName(p)
+	if volume != "" {
+		return strings.TrimPrefix(p, volume)
+	}
+	return p
 }

@@ -26,12 +26,6 @@ Response Instance::onRequest(std::string url_str) {
         responseData = std::vector<unsigned char>(
             (unsigned char *)platform.data(),
             (unsigned char *)platform.data() + platform.size());
-    } else if (isEditor && url.path == "/call-sync") {
-        int pos = url.query.find_last_of("=");
-        std::string b64Encoded = url.query.substr(pos + 1, url.query.npos);
-        std::string b64 = base64_decode(uri_decode(uri_decode(b64Encoded)));
-        responseType = "application/octet-stream";
-        responseData = callLib(b64.data(), b64.size());
     } else {
         char *payloadHeader = new char[2];
         payloadHeader[0] = 1; // Static File Serving

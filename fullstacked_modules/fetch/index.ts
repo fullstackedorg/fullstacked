@@ -6,6 +6,7 @@ import {
     serializeArgs
 } from "../bridge/serialization";
 import core_message from "../core_message";
+import { ar } from "zod/v4/locales";
 
 const te = new TextEncoder();
 
@@ -182,7 +183,7 @@ function receivedResponse2(base64Data: string) {
 
     const readBody = async () => {
         if (!ok) {
-            return te.encode(statusText);
+            return te.encode(statusText) as Uint8Array<ArrayBuffer>;
         }
         let body = new Uint8Array();
         for await (const chunk of responseIterator) {

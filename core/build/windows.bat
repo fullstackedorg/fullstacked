@@ -1,5 +1,8 @@
 @REM download this compiler and add to PATH env
 @REM https://github.com/mstorsjo/llvm-mingw
+@REM Last tested: llvm-mingw-20250613-ucrt
+
+node ./typescript-go-patch/patch.js
 
 @ECHO off
 SET CGO_ENABLED=1

@@ -96,7 +96,7 @@ for (let i = 0; i < testFileName.length; i++) {
     await page.keyboard.press(testFileName[i] as KeyInput);
 }
 await page.keyboard.press("Enter");
-let tries = 3;
+let tries = 10;
 while (tries) {
     tries--;
     const getFileTreeItemsTitle = () =>
@@ -125,7 +125,7 @@ const getDialogHeadingText = () =>
 
 // wait for dependencies to load
 let caughtDependencies = false;
-tries = 3;
+tries = 20;
 while (tries) {
     tries--;
 
@@ -133,7 +133,7 @@ while (tries) {
     if (dependenciesDialogTitle === "Dependencies") {
         caughtDependencies = true;
     } else {
-        await sleep(500);
+        await sleep(100);
     }
 
     if (caughtDependencies) {
@@ -152,6 +152,11 @@ while (tries) {
         break;
     }
 }
+
+const back = await page.waitForSelector(".back-button");
+await back.click();
+
+await sleep(2000);
 
 // try to go to launched demo
 tries = 3;

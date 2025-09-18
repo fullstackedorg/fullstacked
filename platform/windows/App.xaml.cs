@@ -1,17 +1,20 @@
-﻿using Microsoft.UI.Xaml;
-using System.Runtime.InteropServices;
+﻿using Microsoft.UI;
+using Microsoft.UI.Windowing;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.Win32;
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Diagnostics;
-using System.Collections.Generic;
-using Microsoft.UI;
-using Microsoft.UI.Windowing;
-using Windows.UI;
-using Microsoft.Win32;
-using System.Security.Principal;
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Security.Principal;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using Windows.UI;
 
 namespace FullStacked
 {
@@ -20,6 +23,14 @@ namespace FullStacked
     {
         static Lib lib;
         static int callId = 0;
+
+
+        bool kiosk = false;
+        string startId = "";
+        string deeplink = "";
+
+        bool didLaunch = false;
+        bool didConstruct = false;
 
         public App()
         {
@@ -37,6 +48,25 @@ namespace FullStacked
 
             this.InitializeComponent();
             this.registerDeepLinking();
+
+            cb = new Lib.CallbackDelegate(onCallback);
+            App.lib.setCallback(cb);
+
+            setDirectories();
+
+            this.didConstruct = true;
+            this.launch();
+        }
+
+        private void launch() {
+            if (!this.didLaunch || !this.didConstruct) return;
+
+            WebView editor = new WebView(new Instance(this.startId, this.startId == ""));
+            this.bringToFront(editor);
+            if (this.deeplink != "" && this.startId == "")
+            {
+                editor.onMessage("deeplink", this.deeplink);
+            }
         }
 
         public static void restartAsAdmin() {
@@ -75,19 +105,15 @@ namespace FullStacked
                 key.Close();
             }
         }
-
-        bool kiosk = false;
-        string startId = "";
             
         protected override void OnLaunched(LaunchActivatedEventArgs args)
         {
-            string deeplink = "";
             string[] launchArgs = Environment.GetCommandLineArgs();
             for (int i = 0; i < launchArgs.Length; i++)
             {
                 if (launchArgs[i].StartsWith("fullstacked://"))
                 {
-                    deeplink = launchArgs[i];
+                    this.deeplink = launchArgs[i];
                 }
                 else if (launchArgs[i] == "--kiosk")
                 {
@@ -98,17 +124,8 @@ namespace FullStacked
                 }
             }
 
-            setDirectories();
-
-            cb = new Lib.CallbackDelegate(onCallback);
-            App.lib.setCallback(cb);
-
-            WebView editor = new WebView(new Instance(this.startId, this.startId == ""));
-            this.bringToFront(editor);
-            if (deeplink != "" && this.startId == "")
-            {
-                editor.onMessage("deeplink", deeplink);
-            }
+            this.didLaunch = true;
+            this.launch();
         }
         private readonly Dictionary<string, (Window, WebView)> webviews = new();
         private Lib.CallbackDelegate cb;
@@ -194,7 +211,6 @@ namespace FullStacked
 
            
         }
-
 
         public static void setDirectories()
         {

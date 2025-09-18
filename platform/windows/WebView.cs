@@ -78,25 +78,6 @@ namespace FullStacked
                     args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", string.Join("\r\n", headersPlatform));
                     return;
                 }
-                else if (pathname == "/call-sync")
-                {
-                    NameValueCollection queryDictionary = HttpUtility.ParseQueryString(uri.Query);
-                    byte[] syncPayload = Convert.FromBase64String(HttpUtility.UrlDecode(queryDictionary.Get("payload")));
-                    byte[] libResponse = this.instance.callLib(syncPayload);
-                    IRandomAccessStream syncResStream = new MemoryStream(libResponse).AsRandomAccessStream();
-                    string[] headersSync = {
-                        "Content-Type: application/octet-stream",
-                        "Content-Length: " + libResponse.Length,
-                        "Cache-Control: no-cache"
-                    };
-                    args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(
-                        syncResStream,
-                        200,
-                        "OK",
-                        string.Join("\r\n", headersSync)
-                    );
-                    return;
-                }
 
                 // static file serving
 
@@ -166,6 +147,9 @@ namespace FullStacked
                 this.messageToBeSent.Add((type, message));
                 return;
             }
+            message = message
+                .Replace("\\", "\\\\")
+                .Replace("`", "\\`");
             this.webview.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.High, () =>
             {
                 _ = this.webview.CoreWebView2.ExecuteScriptAsync("window.oncoremessage(`" + type + "`, `" + message + "`)");

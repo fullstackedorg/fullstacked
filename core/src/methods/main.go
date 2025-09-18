@@ -3,6 +3,8 @@ package methods
 import (
 	"encoding/json"
 	"path"
+	"path/filepath"
+	"slices"
 	"strings"
 
 	archive "fullstackedorg/fullstacked/src/archive"
@@ -12,10 +14,12 @@ import (
 	fetch "fullstackedorg/fullstacked/src/fetch"
 	fs "fullstackedorg/fullstacked/src/fs"
 	git "fullstackedorg/fullstacked/src/git"
+	ts_lsp "fullstackedorg/fullstacked/src/lsp"
 	packages "fullstackedorg/fullstacked/src/packages"
 	serialize "fullstackedorg/fullstacked/src/serialize"
 	setup "fullstackedorg/fullstacked/src/setup"
 	staticFiles "fullstackedorg/fullstacked/src/staticFiles"
+	"fullstackedorg/fullstacked/src/utils"
 )
 
 const (
@@ -50,6 +54,8 @@ const (
 
 	SET_TITLE = 40
 
+	DIRECTORY_ROOT = 45
+
 	CONFIG_GET  = 50
 	CONFIG_SAVE = 51
 
@@ -78,6 +84,10 @@ const (
 	GIT_HAS_GIT       = 82
 	GIT_REMOTE_URL    = 83
 
+	LSP_START   = 90
+	LSP_REQUEST = 91
+	LSP_END     = 92
+
 	OPEN = 100
 )
 
@@ -88,6 +98,8 @@ var EDITOR_ONLY = []int{
 	ESBUILD_VERSION,
 	// ESBUILD_BUILD,
 	ESBUILD_SHOULD_BUILD,
+
+	DIRECTORY_ROOT,
 
 	PACKAGE_INSTALL,
 	// PACKAGE_INSTALL_QUICK,
@@ -135,10 +147,8 @@ func Call(payload []byte) []byte {
 		baseDir = setup.Directories.Root
 	}
 
-	for _, m := range EDITOR_ONLY {
-		if m == method && !isEditor {
-			return nil
-		}
+	if slices.Contains(EDITOR_ONLY, method) && !isEditor {
+		return nil
 	}
 
 	switch {
@@ -192,6 +202,8 @@ func Call(payload []byte) []byte {
 		return nil
 	case method >= 30 && method <= 37:
 		return archiveSwitch(isEditor, method, baseDir, args)
+	case method == DIRECTORY_ROOT:
+		return serialize.SerializeString(utils.RemoveDriveLetter(filepath.ToSlash(setup.Directories.Root)))
 	case method == CONFIG_GET:
 		return config.GetSerialized(args[0].(string))
 	case method == CONFIG_SAVE:
@@ -254,6 +266,13 @@ func Call(payload []byte) []byte {
 		return fs.ReadFileSerialized(filePathAbs, true)
 	case method == FULLSTACKED_MODULES_LIST:
 		return fs.ReadDirSerialized(path.Join(setup.Directories.Editor, "fullstacked_modules"), true, false, false, []string{})
+	case method == LSP_START:
+		return serialize.SerializeString(ts_lsp.Start(path.Join(setup.Directories.Root, args[0].(string))))
+	case method == LSP_REQUEST:
+		ts_lsp.Request(args[0].(string), args[1].(string))
+	case method == LSP_END:
+		ts_lsp.End(args[0].(string))
+
 	}
 
 	return nil

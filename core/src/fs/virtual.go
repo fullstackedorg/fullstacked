@@ -18,8 +18,6 @@ var VirtFS = make(map[string]*vFile)
 var VirtDirs = []string{}
 
 func vReadFile(path string) ([]byte, error) {
-	path = strings.TrimLeft(path, "/")
-
 	f := VirtFS[path]
 
 	if f == nil {
@@ -30,8 +28,6 @@ func vReadFile(path string) ([]byte, error) {
 }
 
 func vWriteFile(path string, data []byte) error {
-	path = strings.TrimPrefix(path, "/")
-
 	if VirtFS[path] == nil {
 		VirtFS[path] = &vFile{
 			Data:    []byte{},
@@ -50,9 +46,7 @@ func vUnlink(path string) error {
 
 func vMkdir(path string) error {
 	path = strings.TrimSpace(path)
-	for string(path[len(path)-1]) == "/" {
-		path = strings.Trim(path, "/")
-	}
+	path = strings.TrimRight(path, "/")
 
 	pathComponents := strings.Split(path, "/")
 	for i := range pathComponents {
@@ -97,8 +91,6 @@ func vRmdir(path string) error {
 }
 
 func vExists(path string) (bool, bool) {
-	path = strings.TrimLeft(path, "/")
-
 	for _, dir := range VirtDirs {
 		if path == dir {
 			return true, false

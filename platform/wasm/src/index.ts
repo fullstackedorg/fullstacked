@@ -152,13 +152,13 @@ const result = (await WebAssembly.instantiate(
 go.run(result.instance);
 
 const dirs = {
-    root: "projects",
-    config: "config",
-    nodeModules: "node_modules",
-    editor: "editor"
+    root: "/projects",
+    config: "/config",
+    editor: "/editor",
+    tmp: "/.tmp"
 };
 
-directories(dirs.root, dirs.config, dirs.editor, dirs.root + "/.tmp");
+directories(dirs.root, dirs.config, dirs.editor, dirs.tmp);
 
 const te = new TextEncoder();
 const editorDir = te.encode(dirs.editor);
@@ -183,6 +183,8 @@ const unzipResult = deserializeArgs(toByteArray(await call(payload))).at(0);
 if (!unzipResult) {
     console.error("Failed to unzip editor");
 }
+
+directories(dirs.root, dirs.config, dirs.editor, dirs.root + "/.tmp");
 
 async function staticFileServing(projectId: string, pathname: string) {
     const projectIdData = te.encode(projectId);
@@ -222,6 +224,10 @@ async function initProjectWindow(projectId: string) {
         url = url.trim();
         if (url.startsWith("http")) {
             if (url.startsWith("https://github.com")) {
+                if (options.method === "HEAD" && url.endsWith(".git")) {
+                    url = url.slice(0, 0 - ".git".length);
+                }
+
                 url = `${gitProxy}?url=${encodeURIComponent(url)}`;
             }
 

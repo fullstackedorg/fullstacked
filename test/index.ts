@@ -2,6 +2,16 @@ import child_process from "node:child_process";
 import esbuild from "esbuild";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
+
+if (os.platform() === "darwin") {
+    for (let port = 9000; port <= 9005; port++) {
+        try {
+            const pid = child_process.execSync(`lsof -t -i:${port}`).toString();
+            if (pid) child_process.execSync(`kill -9 ${pid}`);
+        } catch (e) {}
+    }
+}
 
 const cacheDirectory = path.resolve("test", ".cache");
 
