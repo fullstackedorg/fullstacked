@@ -136,16 +136,10 @@ void WebkitGTKWindow::initWindow() {
 }
 
 // source: https://www.studyplan.dev/pro-cpp/std-string/q/replace-all-substrings
-std::string replace_all(
-    std::string str,
-    const std::string& from,
-    const std::string& to
-) {
+std::string replace_all(std::string str, const std::string &from,
+                        const std::string &to) {
     size_t start_pos{0};
-    while (
-        (start_pos = str.find(from, start_pos))
-        != std::string::npos
-    ) {
+    while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
         str.replace(start_pos, from.length(), to);
 
         // In case 'to' contains 'from', like
@@ -158,6 +152,7 @@ std::string replace_all(
 void WebkitGTKWindow::onMessage(std::string type, std::string message) {
     message = replace_all(message, "\\", "\\\\");
     message = replace_all(message, "`", "\\`");
+    
     std::string script =
         "window.oncoremessage(`" + type + "`, `" + message + "`);";
 
