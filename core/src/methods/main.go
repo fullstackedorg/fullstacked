@@ -19,6 +19,7 @@ import (
 	serialize "fullstackedorg/fullstacked/src/serialize"
 	setup "fullstackedorg/fullstacked/src/setup"
 	staticFiles "fullstackedorg/fullstacked/src/staticFiles"
+	"fullstackedorg/fullstacked/src/utils"
 )
 
 const (
@@ -202,7 +203,7 @@ func Call(payload []byte) []byte {
 	case method >= 30 && method <= 37:
 		return archiveSwitch(isEditor, method, baseDir, args)
 	case method == DIRECTORY_ROOT:
-		return serialize.SerializeString(filepath.ToSlash(setup.Directories.Root))
+		return serialize.SerializeString(utils.RemoveDriveLetter(filepath.ToSlash(setup.Directories.Root)))
 	case method == CONFIG_GET:
 		return config.GetSerialized(args[0].(string))
 	case method == CONFIG_SAVE:

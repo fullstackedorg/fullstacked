@@ -456,7 +456,10 @@ func Copy(src string, dst string, origin string) error {
 			if err != nil {
 				continue
 			}
-			WriteFile(path.Join(dst, file), data, origin)
+			err = WriteFile(path.Join(dst, file), data, origin)
+			if err != nil {
+				continue
+			}
 		}
 	}
 

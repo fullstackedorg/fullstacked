@@ -1,6 +1,5 @@
 OUT = $(CURDIR)/../bin
 
-$(shell ./copy.sh > /dev/null)
 $(shell node ./typescript-go-patch/patch.js)
 
 ###### MacOS #######
