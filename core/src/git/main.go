@@ -88,7 +88,7 @@ func getWorktree(repo *git.Repository) (*git.Worktree, error) {
 
 	// always ignore FullStacked artifacts
 	for _, d := range ignored {
-		worktree.Excludes = append(worktree.Excludes, gitignore.ParsePattern("/"+d, []string{}))
+		worktree.Excludes = append(worktree.Excludes, gitignore.ParsePattern(d, []string{}))
 	}
 
 	return worktree, nil

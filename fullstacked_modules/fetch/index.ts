@@ -141,8 +141,6 @@ function receivedResponse2(base64Data: string) {
 
     if (!request) return;
 
-    console.log(id, args);
-
     if (request.resolveStream) {
         const [done, chunk] = args.slice(1);
         request.resolveStream({ done, chunk });
@@ -185,8 +183,7 @@ function receivedResponse2(base64Data: string) {
 
     const readBody = async () => {
         if (!ok) {
-            console.log(statusText);
-            return te.encode(statusText);
+            return te.encode(statusText) as Uint8Array<ArrayBuffer>;
         }
         let body = new Uint8Array();
         for await (const chunk of responseIterator) {
@@ -246,7 +243,6 @@ export async function core_fetch2(
     options?: RequestInit
 ): Promise<Response> {
     if (!addedListener2) {
-        console.log("ici");
         core_message.addListener("fetch2-response", receivedResponse2);
         addedListener2 = true;
     }
