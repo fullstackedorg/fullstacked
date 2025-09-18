@@ -152,7 +152,7 @@ std::string replace_all(std::string str, const std::string &from,
 void WebkitGTKWindow::onMessage(std::string type, std::string message) {
     message = replace_all(message, "\\", "\\\\");
     message = replace_all(message, "`", "\\`");
-    
+
     std::string script =
         "window.oncoremessage(`" + type + "`, `" + message + "`);";
 
