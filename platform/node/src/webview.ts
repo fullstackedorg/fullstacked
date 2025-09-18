@@ -94,23 +94,6 @@ function createHandler(instance: Instance) {
             return res.end(data);
         }
 
-        // Editor Only
-
-        if (instance.isEditor && pathname === "/call-sync") {
-            const parsedQuery = fastQueryString.parse(query);
-            const payloadBase64 = decodeURIComponent(parsedQuery.payload);
-            const payload = toByteArray(payloadBase64);
-            const data = await instance.call(payload);
-            res.writeHead(200, {
-                "content-type": "application/octet-stream",
-                "content-length": data.length,
-                "cache-control": "no-cache"
-            });
-            return res.end(data);
-        }
-
-        // End Editor Only
-
         // Serve Static File
 
         const pathnameData = te.encode(pathname);

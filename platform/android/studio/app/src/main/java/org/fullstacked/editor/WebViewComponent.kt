@@ -62,8 +62,11 @@ class WebViewComponent(
         }
         val mainLooper = Looper.getMainLooper()
         val handler = Handler(mainLooper)
+        val messageEscaped = message
+            .replace("\\", "\\\\")
+            .replace("`", "\\`")
         handler.post {
-            this.webView.evaluateJavascript("window.oncoremessage(`$messageType`, `$message`)", null)
+            this.webView.evaluateJavascript("window.oncoremessage(`$messageType`, `$messageEscaped`)", null)
         }
     }
 
@@ -100,20 +103,7 @@ class WebViewComponent(
                 "utf-8",
                 "android".byteInputStream()
             )
-        } else if(this.instance.isEditor && pathname == "/call-sync") {
-            val payloadBase64 = URLDecoder.decode(request.url.getQueryParameter("payload"), "utf-8")
-            val payload = Base64.getDecoder().decode(payloadBase64)
-            val response = this.instance.callLib(payload)
-            return WebResourceResponse(
-                "application/octet-stream",
-                "",
-                200,
-                "OK",
-                mapOf("cache-control" to "no-cache"),
-                response.inputStream()
-            )
         }
-
 
         // static file serving
 

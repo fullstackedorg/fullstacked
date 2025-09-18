@@ -166,18 +166,7 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
                       mimeType: "text/plain",
                       data: data)
             return
-        } else if(self.instance.isEditor && pathname == "call-sync") {
-            let uri = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)
-            let payloadBase64 = uri?.queryItems?.first(where: {$0.name == "payload"})?.value?.removingPercentEncoding
-            let payload = Data(base64Encoded: payloadBase64!)
-            let response = self.instance.callLib(payload: payload!)
-            self.send(urlSchemeTask: urlSchemeTask,
-                      url: request.url!,
-                      statusCode: 200,
-                      mimeType: "application/octet-stream",
-                      data: response)
-            return
-        }
+        } 
         
         // static file serving
         
