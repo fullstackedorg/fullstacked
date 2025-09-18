@@ -166,7 +166,7 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
                       mimeType: "text/plain",
                       data: data)
             return
-        } 
+        }
         
         // static file serving
         

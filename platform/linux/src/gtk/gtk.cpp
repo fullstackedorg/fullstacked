@@ -136,6 +136,9 @@ void WebkitGTKWindow::initWindow() {
 }
 
 void WebkitGTKWindow::onMessage(std::string type, std::string message) {
+    std::replace(message.begin(), message.end(), "\\", "\\\\");
+    std::replace(message.begin(), message.end(), "`", "\\`");
+
     std::string script =
         "window.oncoremessage(`" + type + "`, `" + message + "`);";
 

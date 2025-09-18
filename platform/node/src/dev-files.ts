@@ -6,12 +6,9 @@ const tsConfig = {
     compilerOptions: {
         ...compilerOptions,
         paths: {
-            "*": ["./node_modules/fullstacked/fullstacked_modules/*"]
+            "*": ["./.fullstacked_modules/*"]
         },
-        typeRoots: [
-            "./node_modules/fullstacked/fullstacked_modules",
-            "./node_modules/@types"
-        ]
+        typeRoots: ["./.fullstacked_modules", "./node_modules/@types"]
     }
 };
 
@@ -19,7 +16,8 @@ const tsConfig = {
 const defaultGitignore = `node_modules
 .build
 data
-tsconfig.json`;
+tsconfig.json
+.fullstacked_modules`;
 
 export function setupDevFiles() {
     const tsConfigFile = path.resolve(process.cwd(), "tsconfig.json");
