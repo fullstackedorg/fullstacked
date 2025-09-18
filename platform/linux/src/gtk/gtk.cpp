@@ -135,10 +135,29 @@ void WebkitGTKWindow::initWindow() {
     webkit_web_view_load_uri(webview, (scheme + "://localhost").c_str());
 }
 
-void WebkitGTKWindow::onMessage(std::string type, std::string message) {
-    std::replace(message.begin(), message.end(), "\\", "\\\\");
-    std::replace(message.begin(), message.end(), "`", "\\`");
+// source: https://www.studyplan.dev/pro-cpp/std-string/q/replace-all-substrings
+std::string replace_all(
+    std::string str,
+    const std::string& from,
+    const std::string& to
+) {
+    size_t start_pos{0};
+    while (
+        (start_pos = str.find(from, start_pos))
+        != std::string::npos
+    ) {
+        str.replace(start_pos, from.length(), to);
 
+        // In case 'to' contains 'from', like
+        // replacing 'x' with 'yx'
+        start_pos += to.length();
+    }
+    return str;
+}
+
+void WebkitGTKWindow::onMessage(std::string type, std::string message) {
+    message = replace_all(message, "\\", "\\\\");
+    message = replace_all(message, "`", "\\`");
     std::string script =
         "window.oncoremessage(`" + type + "`, `" + message + "`);";
 
