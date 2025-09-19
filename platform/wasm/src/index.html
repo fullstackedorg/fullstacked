@@ -1,7 +1,7 @@
 <html>
     <head>
         <meta charset="utf-8" />
-        <script src="bin/wasm.js"></script>
+        <script src="/wasm_exec.js"></script>
         <script type="module" src="index.js"></script>
         <link rel="stylesheet" href="index.css" />
         <title>FullStacked WASM</title>
@@ -77,17 +77,25 @@
             }
 
             p {
-                margin: 0;
+                margin: 0 0 5px;
             }
 
-            main > div {
+            #progress {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 5px;
+                text-align: center;
+                font-size: smaller;
+            }
+
+            #progress > .bar {
                 border: 1px solid #404958;
                 width: 250px;
                 height: 8px;
                 border-radius: 5px;
             }
-
-            #progress {
+            #progress > .bar > div {
                 height: 100%;
                 width: 0%;
                 background-color: #007aff;
@@ -97,8 +105,9 @@
         <main>
             <img height="100px" width="100px" src="dev-icon.png" />
             <p>Loading FullStacked WASM...</p>
-            <div>
-                <div id="progress"></div>
+            <div id="progress">
+                <div class="bar"><div></div></div>
+                <div class="text"></div>
             </div>
         </main>
     </body>

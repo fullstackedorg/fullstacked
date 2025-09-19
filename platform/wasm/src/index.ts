@@ -6,6 +6,7 @@ import {
     numberTo4Bytes
 } from "../../../fullstacked_modules/bridge/serialization";
 import { toByteArray } from "../../../fullstacked_modules/base64";
+import prettyBytes from "pretty-bytes";
 
 const gitProxy = "https://p.fullstacked.org";
 
@@ -91,7 +92,7 @@ function createWindow(projectId: string) {
     initProjectWindow(projectId);
 }
 
-globalThis.onmessageWASM = function (
+globalThis.onmessageWASM = function(
     projectId: string,
     messageType: string,
     message: string
@@ -115,10 +116,25 @@ globalThis.onmessageWASM = function (
     }
 };
 
+function updateProgress(received: number, total: number) {
+    const el = document.querySelector("#progress");
+    const bar = el?.querySelector(".bar");
+    const barInner = bar?.querySelector("div");
+    if (barInner) {
+        barInner.style.width =
+            (received / total) * 100 + "%";
+    }
+
+    const text = el?.querySelector<HTMLDivElement>(".text");
+    if(text) {
+        text.innerText = prettyBytes(received) + "/" + prettyBytes(total);
+    }
+}
+
 const expectedWasmSize = parseInt(process.env.wasmSize);
 
-async function dowloadWASM(): Promise<Uint8Array> {
-    const response = await fetch("bin/wasm.wasm");
+async function downloadWASM(): Promise<Uint8Array> {
+    const response = await fetch("/fullstacked.wasm");
     let data = new Uint8Array(expectedWasmSize * 1.3);
     const reader = response.body.getReader();
     let readCount = 0;
@@ -133,12 +149,7 @@ async function dowloadWASM(): Promise<Uint8Array> {
 
         data.set(value, readCount);
         readCount += value.byteLength;
-        const progressElement =
-            document.querySelector<HTMLDivElement>("#progress");
-        if (progressElement) {
-            progressElement.style.width =
-                (readCount / expectedWasmSize) * 100 + "%";
-        }
+        updateProgress(readCount, expectedWasmSize)
     }
     reader.releaseLock();
     return data;
@@ -146,7 +157,7 @@ async function dowloadWASM(): Promise<Uint8Array> {
 
 const go = new Go();
 const result = (await WebAssembly.instantiate(
-    await dowloadWASM(),
+    await downloadWASM(),
     go.importObject
 )) as unknown as WebAssembly.WebAssemblyInstantiatedSource;
 go.run(result.instance);
@@ -213,7 +224,7 @@ async function initProjectWindow(projectId: string) {
     if (!webview) return;
 
     webview.window.originalFetch = webview.window.fetch;
-    webview.window.fetch = async function (
+    webview.window.fetch = async function(
         url: string | Request,
         options: any
     ) {

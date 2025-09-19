@@ -1,6 +1,10 @@
 import path from "node:path";
 import url from "node:url";
 import child_process from "node:child_process";
+import fs from "node:fs";
+import version from "../../version.js";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import dotenv from "dotenv";
 
 const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(currentDirectory, "..", "..");
@@ -26,9 +30,46 @@ child_process.execSync("npm run build", {
     stdio: "inherit"
 });
 
-// upload to CF Pages
+// upload to R2
 
-child_process.execSync("npx wrangler pages deploy out", {
-    cwd: currentDirectory,
-    stdio: "inherit"
+const credentialsCF = dotenv.parse(
+    fs.readFileSync(path.resolve(currentDirectory, "CLOUDFLARE.env"))
+);
+
+const s3Client = new S3Client({
+    region: "auto", // CloudFlare R2 uses 'auto' as the region
+    endpoint: `https://${credentialsCF.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+        accessKeyId: credentialsCF.R2_ACCESS_KEY_ID,
+        secretAccessKey: credentialsCF.R2_SECRET_ACCESS_KEY
+    }
 });
+
+const versionStr = `${version.major}.${version.minor}.${version.patch}`;
+
+const baseKey = `wasm/${versionStr}/${version.build}`;
+
+async function uploadFile(filename, ContentType) {
+    const Key = `${baseKey}/${filename}`;
+
+    const Body = await fs.readFileSync(path.resolve(currentDirectory, "out", filename))
+    
+    // Create the upload command
+    const uploadCommand = new PutObjectCommand({
+        Bucket: credentialsCF.R2_BUCKET_NAME,
+        Key,
+        Body,
+        ContentType
+    });
+
+    // Execute the upload
+    await s3Client.send(uploadCommand);
+
+    console.log(`Successfully uploaded ${filename} to R2 at key: ${Key}`);
+}
+
+await Promise.all([
+    uploadFile("fullstacked.wasm"),
+    uploadFile("wasm_exec.js"),
+    uploadFile("editor.zip")
+]);

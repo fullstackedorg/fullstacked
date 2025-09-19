@@ -122,8 +122,8 @@ linux-arm64-static:
 wasm:
 	GOOS=js \
 	GOARCH=wasm \
-	go build -o $(OUT)/wasm.wasm -v ../wasm && \
-	cp -rf $(shell find $(HOME)/go -name "wasm_exec.js" | grep misc) $(OUT)/wasm.js
+	go build -o $(OUT)/fullstacked.wasm -v ../wasm && \
+	cp -rf $(shell find $(HOME)/go -name "wasm_exec.js" | grep misc) $(OUT)/wasm_exec.js
 
 
 ###### Clean #######
