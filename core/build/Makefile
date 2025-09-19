@@ -123,7 +123,7 @@ wasm:
 	GOOS=js \
 	GOARCH=wasm \
 	go build -o $(OUT)/fullstacked.wasm -v ../wasm && \
-	cp -rf $(shell find $(HOME)/go -name "wasm_exec.js" | grep misc) $(OUT)/wasm_exec.js
+	cp -rf $(shell find $(HOME)/go -name "wasm_exec.js" | grep lib) $(OUT)/wasm_exec.js
 
 
 ###### Clean #######
