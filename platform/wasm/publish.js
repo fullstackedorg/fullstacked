@@ -53,8 +53,10 @@ const baseKey = `wasm/${versionStr}/${version.build}`;
 async function uploadFile(filename, ContentType) {
     const Key = `${baseKey}/${filename}`;
 
-    const Body = fs.readFileSync(path.resolve(currentDirectory, "out", "bin", filename))
-    
+    const Body = fs.readFileSync(
+        path.resolve(currentDirectory, "out", "bin", filename)
+    );
+
     // Create the upload command
     const uploadCommand = new PutObjectCommand({
         Bucket: credentialsCF.R2_BUCKET_NAME,
@@ -66,7 +68,9 @@ async function uploadFile(filename, ContentType) {
     // Execute the upload
     await s3Client.send(uploadCommand);
 
-    console.log(`Successfully uploaded ${filename} (${prettyBytes(Body.byteLength)}) to R2 at key: ${Key}`);
+    console.log(
+        `Successfully uploaded ${filename} (${prettyBytes(Body.byteLength)}) to R2 at key: ${Key}`
+    );
 }
 
 await uploadFile("fullstacked.wasm", "application/octet-stream");
@@ -80,4 +84,4 @@ const uploadCommand = new PutObjectCommand({
     Body: JSON.stringify(version, null, 2),
     ContentType: "text/plain"
 });
-await s3Client.send(uploadCommand); 
+await s3Client.send(uploadCommand);

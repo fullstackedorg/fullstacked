@@ -41,7 +41,7 @@ const hanlder = (req, res) => {
 
     try {
         stats = fs.statSync(pathname);
-    } catch (e) { }
+    } catch (e) {}
 
     if (!stats || stats.isDirectory()) {
         res.writeHead(notFound.code, notFound.headers);

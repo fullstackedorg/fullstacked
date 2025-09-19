@@ -93,7 +93,7 @@ function createWindow(projectId: string) {
     initProjectWindow(projectId);
 }
 
-globalThis.onmessageWASM = function(
+globalThis.onmessageWASM = function (
     projectId: string,
     messageType: string,
     message: string
@@ -122,28 +122,31 @@ const createProgressBar = (filename: string) => {
     container.classList.add("progress");
 
     const bar = document.createElement("div");
-    bar.classList.add("bar")
+    bar.classList.add("bar");
     const barInner = document.createElement("div");
-    bar.append(barInner)
+    bar.append(barInner);
 
     const text = document.createElement("div");
     text.classList.add("text");
 
-    text.innerText = `Downloading ${filename}`
+    text.innerText = `Downloading ${filename}`;
 
     container.append(bar, text);
 
-    document.querySelector("#download")?.append(container)
+    document.querySelector("#download")?.append(container);
 
     return {
         setProgress(received: number, total: number) {
             barInner.style.width = (received / total) * 100 + "%";
             text.innerText = `Downloading ${filename} (${prettyBytes(received) + "/" + prettyBytes(total)})`;
         }
-    }
-}
+    };
+};
 
-async function download(baseUrl: string, filename: string): Promise<Uint8Array> {
+async function download(
+    baseUrl: string,
+    filename: string
+): Promise<Uint8Array> {
     const progress = createProgressBar(filename);
 
     const fileUrl = baseUrl + "/" + filename;
@@ -163,27 +166,31 @@ async function download(baseUrl: string, filename: string): Promise<Uint8Array> 
 
         data.set(value, readCount);
         readCount += value.byteLength;
-        progress.setProgress(readCount, expectedSize)
+        progress.setProgress(readCount, expectedSize);
     }
     reader.releaseLock();
 
     return data;
 }
 
-async function getAssetsBaseUrl(){
-    if(process.env.baseUrl) {
+async function getAssetsBaseUrl() {
+    if (process.env.baseUrl) {
         return process.env.baseUrl;
     }
 
-    const versionFile = window.location.host.split(".").find(part => part === "demo")
+    const versionFile = window.location.host
+        .split(".")
+        .find((part) => part === "demo")
         ? "release.txt"
         : "beta.txt";
-    const response = await fetch(`https://files.fullstacked.org/wasm/${versionFile}`);
+    const response = await fetch(
+        `https://files.fullstacked.org/wasm/${versionFile}`
+    );
     const version: {
-        major: number,
-        minor: number,
-        patch: number,
-        build: number
+        major: number;
+        minor: number;
+        patch: number;
+        build: number;
     } = await response.json();
 
     return `https://files.fullstacked.org/wasm/${version.major}.${version.minor}.${version.patch}/${version.build}`;
@@ -192,23 +199,19 @@ async function getAssetsBaseUrl(){
 async function downloadAssets() {
     const baseUrl = await getAssetsBaseUrl();
 
-    const [
-        wasm,
-        editor,
-        wasmExec
-    ] = await Promise.all([
+    const [wasm, editor, wasmExec] = await Promise.all([
         download(baseUrl, "fullstacked.wasm"),
         download(baseUrl, "editor.zip"),
-        download(baseUrl, "wasm_exec.js"),
+        download(baseUrl, "wasm_exec.js")
     ]);
 
-    return new Promise<[Uint8Array, Uint8Array]>(res => {
-        const wasmExecBlob = new Blob([wasmExec], {type: "text/javascript"});
+    return new Promise<[Uint8Array, Uint8Array]>((res) => {
+        const wasmExecBlob = new Blob([wasmExec], { type: "text/javascript" });
         const wasmExecUrl = URL.createObjectURL(wasmExecBlob);
         const script = document.createElement("script");
         script.onload = () => {
             res([editor, wasm]);
-        }
+        };
         script.src = wasmExecUrl;
         document.body.append(script);
     });
@@ -226,7 +229,6 @@ async function init() {
     go.run(result.instance);
 }
 await init();
-
 
 const dirs = {
     root: "/projects",
@@ -287,7 +289,7 @@ async function initProjectWindow(projectId: string) {
     if (!webview) return;
 
     webview.window.originalFetch = webview.window.fetch;
-    webview.window.fetch = async function(
+    webview.window.fetch = async function (
         url: string | Request,
         options: any
     ) {
