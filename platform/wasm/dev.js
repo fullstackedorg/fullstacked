@@ -11,8 +11,6 @@ const notFound = {
     body: "Not Found"
 };
 
-const basedir = "out";
-
 const existsAndIsFile = (pathname) => {
     let stat;
     try {
@@ -29,6 +27,8 @@ const hanlder = (req, res) => {
 
     if (pathname.startsWith("/")) pathname = pathname.slice(1);
     if (pathname.endsWith("/")) pathname = pathname.slice(0, -1);
+
+    const basedir = "out" + (pathname.startsWith("bin") ? "" : "/site");
 
     pathname = basedir + "/" + pathname;
 

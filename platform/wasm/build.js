@@ -5,27 +5,26 @@ if (fs.existsSync("out")) {
     fs.rmSync("out", { recursive: true });
 }
 fs.mkdirSync("out/bin", { recursive: true });
+fs.mkdirSync("out/site", { recursive: true });
 
-fs.cpSync("../../core/bin/wasm.wasm", "out/bin/wasm.wasm");
-fs.cpSync("../../core/bin/wasm.js", "out/bin/wasm.js");
-
-const wasmSize = fs.statSync("out/bin/wasm.wasm").size;
+fs.cpSync("../../core/bin/fullstacked.wasm", "out/bin/fullstacked.wasm");
+fs.cpSync("../../core/bin/wasm_exec.js", "out/bin/wasm_exec.js");
 
 const editorZipFileName = fs
     .readdirSync("../../out/zip")
     .find((item) => item.startsWith("editor"));
-fs.cpSync(`../../out/zip/${editorZipFileName}`, "out/editor.zip");
+fs.cpSync(`../../out/zip/${editorZipFileName}`, "out/bin/editor.zip");
 
 esbuild.buildSync({
     entryPoints: ["src/index.ts"],
-    outfile: "out/index.js",
+    outfile: "out/site/index.js",
     bundle: true,
     format: "esm",
     define: {
-        "process.env.wasmSize": wasmSize.toString()
+        "process.env.baseUrl": `"${process.argv.includes("dev") ? "http://localhost:9000/bin" : ""}"`
     }
 });
 
 ["src/dev-icon.png", "src/index.html"].forEach((f) =>
-    fs.cpSync(f, "out" + f.slice("src".length))
+    fs.cpSync(f, "out/site" + f.slice("src".length))
 );
