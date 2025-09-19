@@ -12,7 +12,7 @@ extension Color {
 
 func setDirectories(){
     let paths = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true);
-    let root = paths.first!
+    let root = isMacOS ? paths.first! : ("/private" + paths.first!)
     let config = root + "/.config"
     let editor = Bundle.main.path(forResource: "editor", ofType: nil)!
     let tmp = root + "/.tmp"
