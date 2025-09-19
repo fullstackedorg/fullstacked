@@ -7,6 +7,7 @@ import {
 } from "../../../fullstacked_modules/bridge/serialization";
 import { toByteArray } from "../../../fullstacked_modules/base64";
 import prettyBytes from "pretty-bytes";
+import { doc } from "prettier";
 
 const gitProxy = "https://p.fullstacked.org";
 
@@ -116,51 +117,116 @@ globalThis.onmessageWASM = function(
     }
 };
 
-function updateProgress(received: number, total: number) {
-    const el = document.querySelector("#progress");
-    const bar = el?.querySelector(".bar");
-    const barInner = bar?.querySelector("div");
-    if (barInner) {
-        barInner.style.width =
-            (received / total) * 100 + "%";
-    }
+const createProgressBar = (filename: string) => {
+    const container = document.createElement("div");
+    container.classList.add("progress");
 
-    const text = el?.querySelector<HTMLDivElement>(".text");
-    if(text) {
-        text.innerText = prettyBytes(received) + "/" + prettyBytes(total);
+    const bar = document.createElement("div");
+    bar.classList.add("bar")
+    const barInner = document.createElement("div");
+    bar.append(barInner)
+
+    const text = document.createElement("div");
+    text.classList.add("text");
+
+    text.innerText = `Downloading ${filename}`
+
+    container.append(bar, text);
+
+    document.querySelector("#download")?.append(container)
+
+    return {
+        setProgress(received: number, total: number) {
+            barInner.style.width = (received / total) * 100 + "%";
+            text.innerText = `Downloading ${filename} (${prettyBytes(received) + "/" + prettyBytes(total)})`;
+        }
     }
 }
 
-const expectedWasmSize = parseInt(process.env.wasmSize);
+async function download(baseUrl: string, filename: string): Promise<Uint8Array> {
+    const progress = createProgressBar(filename);
 
-async function downloadWASM(): Promise<Uint8Array> {
-    const response = await fetch("/fullstacked.wasm");
-    let data = new Uint8Array(expectedWasmSize * 1.3);
+    const fileUrl = baseUrl + "/" + filename;
+
+    const response = await fetch(fileUrl);
+    const expectedSize = parseInt(response.headers.get("content-length"));
+    let data = new Uint8Array(expectedSize * 1.3);
     const reader = response.body.getReader();
     let readCount = 0;
     while (true) {
         const { done, value } = await reader.read();
 
         if (done) {
-            // resize to actual byteLength
             data = data.slice(0, readCount);
             break;
         }
 
         data.set(value, readCount);
         readCount += value.byteLength;
-        updateProgress(readCount, expectedWasmSize)
+        progress.setProgress(readCount, expectedSize)
     }
     reader.releaseLock();
+
     return data;
 }
 
-const go = new Go();
-const result = (await WebAssembly.instantiate(
-    await downloadWASM(),
-    go.importObject
-)) as unknown as WebAssembly.WebAssemblyInstantiatedSource;
-go.run(result.instance);
+async function getAssetsBaseUrl(){
+    if(process.env.baseUrl) {
+        return process.env.baseUrl;
+    }
+
+    const versionFile = window.location.host.split(".").find(part => part === "demo")
+        ? "release.txt"
+        : "beta.txt";
+    const response = await fetch(`https://files.fullstacked.org/wasm/${versionFile}`);
+    const version: {
+        major: number,
+        minor: number,
+        patch: number,
+        build: number
+    } = await response.json();
+
+    return `https://files.fullstacked.org/wasm/${version.major}.${version.minor}.${version.patch}/${version.build}`;
+}
+
+async function downloadAssets() {
+    const baseUrl = await getAssetsBaseUrl();
+
+    const [
+        wasm,
+        editor,
+        wasmExec
+    ] = await Promise.all([
+        download(baseUrl, "fullstacked.wasm"),
+        download(baseUrl, "editor.zip"),
+        download(baseUrl, "wasm_exec.js"),
+    ]);
+
+    return new Promise<[Uint8Array, Uint8Array]>(res => {
+        const wasmExecBlob = new Blob([wasmExec], {type: "text/javascript"});
+        const wasmExecUrl = URL.createObjectURL(wasmExecBlob);
+        const script = document.createElement("script");
+        script.onload = () => {
+            res([editor, wasm]);
+        }
+        script.src = wasmExecUrl;
+        document.body.append(script);
+    });
+}
+
+let go: Go, editorZip: Uint8Array;
+async function init() {
+    const [editor, wasm] = await downloadAssets();
+    editorZip = editor;
+    go = new Go();
+    const result = (await WebAssembly.instantiate(
+        wasm,
+        go.importObject
+    )) as unknown as WebAssembly.WebAssemblyInstantiatedSource;
+    go.run(result.instance);
+}
+await init();
+
 
 const dirs = {
     root: "/projects",
@@ -173,9 +239,6 @@ directories(dirs.root, dirs.config, dirs.editor, dirs.tmp);
 
 const te = new TextEncoder();
 const editorDir = te.encode(dirs.editor);
-const editorZip = new Uint8Array(
-    await (await fetch("editor.zip")).arrayBuffer()
-);
 let payload = new Uint8Array([
     1, // isEditor
     ...numberTo4Bytes(0), // no project id

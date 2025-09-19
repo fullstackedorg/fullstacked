@@ -1,8 +1,8 @@
 {
     "scripts": {
         "build": "node build.js",
-        "start": "npm run build && node dev.js",
-        "deploy": "npm run build && npx wrangler pages deploy out"
+        "start": "npm run build -- dev && node dev.js",
+        "deploy": "npm run build && npx wrangler pages deploy out/site --project-name"
     },
     "type": "module",
     "dependencies": {

@@ -5,6 +5,7 @@ import fs from "node:fs";
 import version from "../../version.js";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import dotenv from "dotenv";
+import prettyBytes from "pretty-bytes";
 
 const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(currentDirectory, "..", "..");
@@ -52,7 +53,7 @@ const baseKey = `wasm/${versionStr}/${version.build}`;
 async function uploadFile(filename, ContentType) {
     const Key = `${baseKey}/${filename}`;
 
-    const Body = await fs.readFileSync(path.resolve(currentDirectory, "out", filename))
+    const Body = fs.readFileSync(path.resolve(currentDirectory, "out", "bin", filename))
     
     // Create the upload command
     const uploadCommand = new PutObjectCommand({
@@ -65,11 +66,18 @@ async function uploadFile(filename, ContentType) {
     // Execute the upload
     await s3Client.send(uploadCommand);
 
-    console.log(`Successfully uploaded ${filename} to R2 at key: ${Key}`);
+    console.log(`Successfully uploaded ${filename} (${prettyBytes(Body.byteLength)}) to R2 at key: ${Key}`);
 }
 
-await Promise.all([
-    uploadFile("fullstacked.wasm"),
-    uploadFile("wasm_exec.js"),
-    uploadFile("editor.zip")
-]);
+await uploadFile("fullstacked.wasm", "application/octet-stream");
+await uploadFile("wasm_exec.js", "application/octet-stream");
+await uploadFile("editor.zip", "application/octet-stream");
+
+// set beta version to current
+const uploadCommand = new PutObjectCommand({
+    Bucket: credentialsCF.R2_BUCKET_NAME,
+    Key: `wasm/beta.txt`,
+    Body: JSON.stringify(version, null, 2),
+    ContentType: "text/plain"
+});
+await s3Client.send(uploadCommand); 

@@ -11,8 +11,6 @@ const notFound = {
     body: "Not Found"
 };
 
-const basedir = "out";
-
 const existsAndIsFile = (pathname) => {
     let stat;
     try {
@@ -30,6 +28,8 @@ const hanlder = (req, res) => {
     if (pathname.startsWith("/")) pathname = pathname.slice(1);
     if (pathname.endsWith("/")) pathname = pathname.slice(0, -1);
 
+    const basedir = "out" + (pathname.startsWith("bin") ? "" : "/site");
+
     pathname = basedir + "/" + pathname;
 
     if (!existsAndIsFile(pathname)) {
@@ -41,7 +41,7 @@ const hanlder = (req, res) => {
 
     try {
         stats = fs.statSync(pathname);
-    } catch (e) {}
+    } catch (e) { }
 
     if (!stats || stats.isDirectory()) {
         res.writeHead(notFound.code, notFound.headers);
