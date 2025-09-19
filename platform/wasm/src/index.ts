@@ -146,7 +146,7 @@ const createProgressBar = (filename: string) => {
 async function download(
     baseUrl: string,
     filename: string
-): Promise<Uint8Array> {
+): Promise<Uint8Array<ArrayBuffer>> {
     const progress = createProgressBar(filename);
 
     const fileUrl = baseUrl + "/" + filename;
