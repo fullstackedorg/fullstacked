@@ -172,7 +172,6 @@ func End(transportId string) {
 	delete(LSPs, transportId)
 }
 
-
 func Version() string {
 	return tsgo.Version()
 }
