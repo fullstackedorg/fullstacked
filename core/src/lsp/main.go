@@ -171,3 +171,8 @@ func End(transportId string) {
 	lspInstance.PipeWriter.Close()
 	delete(LSPs, transportId)
 }
+
+
+func Version() string {
+	return tsgo.Version()
+}

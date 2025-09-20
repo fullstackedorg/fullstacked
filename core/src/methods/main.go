@@ -87,6 +87,7 @@ const (
 	LSP_START   = 90
 	LSP_REQUEST = 91
 	LSP_END     = 92
+	LSP_VERSION = 93
 
 	OPEN = 100
 )
@@ -272,7 +273,8 @@ func Call(payload []byte) []byte {
 		ts_lsp.Request(args[0].(string), args[1].(string))
 	case method == LSP_END:
 		ts_lsp.End(args[0].(string))
-
+	case method == LSP_VERSION:
+		return serialize.SerializeString(ts_lsp.Version())
 	}
 
 	return nil

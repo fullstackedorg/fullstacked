@@ -20,6 +20,10 @@ type (
 	FsWalkDirFunc = vfs.WalkDirFunc
 )
 
+func Version() string {
+	return core.Version()
+}
+
 func RunLSP(
 	directory string,
 	in *io.PipeReader,

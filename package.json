@@ -41,7 +41,7 @@
         "pretty-bytes": "^7.0.1",
         "pretty-ms": "^9.2.0",
         "puppeteer": "^24.18.0",
-        "sass": "^1.92.0",
+        "sass": "^1.93.0",
         "slugify": "^1.6.6",
         "typescript": "^5.9.2"
     },
