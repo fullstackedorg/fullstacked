@@ -45,9 +45,10 @@ func (c *Channel) start() {
 		return
 	}
 
+	reader := bufio.NewReader(c.conn);
 	for {
 		buf := make([]byte, 1024)
-		size, err := bufio.NewReader(c.conn).Read(buf)
+		size, err := reader.Read(buf)
 		if err != nil {
 			fmt.Println(err.Error())
 			return
