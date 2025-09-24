@@ -1,7 +1,6 @@
 package connect
 
 import (
-	"bufio"
 	"encoding/base64"
 	"fmt"
 	"fullstackedorg/fullstacked/src/serialize"
@@ -47,7 +46,7 @@ func (c *Channel) start() {
 
 	for {
 		buf := make([]byte, 1024)
-		size, err := bufio.NewReader(c.conn).Read(buf)
+		size, err := c.conn.Read(buf)
 		if err != nil {
 			fmt.Println(err.Error())
 			return
