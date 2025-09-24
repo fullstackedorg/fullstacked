@@ -24,7 +24,7 @@
         "@aws-sdk/client-s3": "^3.879.0",
         "@codemirror/lsp-client": "^6.1.2",
         "@codemirror/theme-one-dark": "^6.1.3",
-        "@fullstacked/ai-agent": "github:fullstackedorg/ai-agent#b096940e1d2ae567a02f268eaddf7677604a0b27",
+        "@fullstacked/ai-agent": "github:fullstackedorg/ai-agent#fde79da83283fe3801638896d2526633ec9f725d",
         "@fullstacked/codemirror-view": "github:fullstackedorg/codemirror-view#9f6affd1d51629babedd06f4adf247b9f0821120",
         "@fullstacked/file-tree": "github:fullstackedorg/file-tree#8fc6d5e587507c631a68525659745eeda414bcf3",
         "@fullstacked/stack-navigation": "github:fullstackedorg/stack-navigation#888302a680bcc501639dfdb0a6aede3da91f06ff",
