@@ -11,6 +11,8 @@
 		9C5A1EDD2CDB9AB9009B4A20 /* Instance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5A1EDC2CDB9AB4009B4A20 /* Instance.swift */; };
 		9C5A1EDF2CDB9ADB009B4A20 /* WebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5A1EDE2CDB9AD6009B4A20 /* WebView.swift */; };
 		9C7E8A632BAA038500CE9660 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9C7E8A622BA9BF1600CE9660 /* PrivacyInfo.xcprivacy */; };
+		9C8003192E85B87E003D0FBA /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 9C8003182E85B87E003D0FBA /* AppIcon.icon */; };
+		9C80031A2E85B87E003D0FBA /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 9C8003182E85B87E003D0FBA /* AppIcon.icon */; };
 		9C8C8A2E2D2CEA1400C4B8AD /* FullStacked.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C8C8A2D2D2CEA1400C4B8AD /* FullStacked.swift */; };
 		9C8C8A302D2CEAD600C4B8AD /* FullStacked.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C8C8A2D2D2CEA1400C4B8AD /* FullStacked.swift */; };
 		9C91B3C22E0CFAFD00CF54B7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9C91B3BF2E0CF89200CF54B7 /* Assets.xcassets */; };
@@ -34,6 +36,7 @@
 		9C5A1EDE2CDB9AD6009B4A20 /* WebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebView.swift; sourceTree = "<group>"; };
 		9C7081332BE6CBA100EF0A6B /* FullStacked.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FullStacked.entitlements; sourceTree = "<group>"; };
 		9C7E8A622BA9BF1600CE9660 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		9C8003182E85B87E003D0FBA /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		9C8C8A2D2D2CEA1400C4B8AD /* FullStacked.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullStacked.swift; sourceTree = "<group>"; };
 		9C91B3BF2E0CF89200CF54B7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9C9902662CE792E80039D1F0 /* mac-catalyst-x86_64.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "mac-catalyst-x86_64.a"; path = "../../../core/bin/mac-catalyst-x86_64.a"; sourceTree = "<group>"; };
@@ -109,6 +112,7 @@
 		9CA03E4E2B5715AA002D2D9F /* FullStacked */ = {
 			isa = PBXGroup;
 			children = (
+				9C8003182E85B87E003D0FBA /* AppIcon.icon */,
 				9C5A1ED82CDB998F009B4A20 /* bin */,
 				9C7081332BE6CBA100EF0A6B /* FullStacked.entitlements */,
 				9CB389902B863B0A00FB783E /* editor */,
@@ -208,6 +212,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9C7E8A632BAA038500CE9660 /* PrivacyInfo.xcprivacy in Resources */,
+				9C80031A2E85B87E003D0FBA /* AppIcon.icon in Resources */,
 				9C91B3C22E0CFAFD00CF54B7 /* Assets.xcassets in Resources */,
 				9CB389912B863B0A00FB783E /* editor in Resources */,
 			);
@@ -218,6 +223,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9CDBCDA92CF7F8070035BF46 /* PrivacyInfo.xcprivacy in Resources */,
+				9C8003192E85B87E003D0FBA /* AppIcon.icon in Resources */,
 				9C91B3C32E0CFAFD00CF54B7 /* Assets.xcassets in Resources */,
 				9CDBCDAA2CF7F8070035BF46 /* editor in Resources */,
 			);
