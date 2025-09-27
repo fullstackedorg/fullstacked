@@ -71,7 +71,7 @@ export async function buildSASS(
                         contents
                     };
                 },
-                canonicalize: (path) => new URL(path, window.location.href)
+                canonicalize: (path) => new URL(path, "http://localhost")
             }
         });
     } catch (e) {
