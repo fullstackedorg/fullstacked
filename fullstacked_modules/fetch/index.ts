@@ -182,9 +182,6 @@ function receivedResponse2(base64Data: string) {
     };
 
     const readBody = async () => {
-        if (!ok) {
-            return te.encode(statusText) as Uint8Array<ArrayBuffer>;
-        }
         let body = new Uint8Array();
         for await (const chunk of responseIterator) {
             const buffer = new Uint8Array(body.byteLength + chunk.byteLength);
