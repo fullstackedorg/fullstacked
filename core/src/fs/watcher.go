@@ -30,6 +30,9 @@ var debounce = utils.NewDebouncer(time.Millisecond * 100) // 100ms
 
 var sendEvents = func() func() {
 	return func() {
+		if setup.Callback == nil {
+			return
+		}
 		jsonData, _ := json.Marshal(eventsBuf)
 		setup.Callback("", "file-event", string(jsonData))
 		eventsBuf = []FileEvent{}
