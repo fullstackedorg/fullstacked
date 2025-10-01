@@ -22,7 +22,7 @@
                 "opacity": 0.5
             },
             "translucency": {
-                "enabled": true,
+                "enabled": false,
                 "value": 0.5
             }
         },
@@ -42,7 +42,7 @@
                 "opacity": 0.5
             },
             "translucency": {
-                "enabled": true,
+                "enabled": false,
                 "value": 0.5
             }
         },
@@ -62,7 +62,7 @@
                 "opacity": 0.5
             },
             "translucency": {
-                "enabled": true,
+                "enabled": false,
                 "value": 0.5
             }
         }
