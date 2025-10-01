@@ -7,6 +7,7 @@ import {
 } from "../bridge/serialization";
 import core_message from "../core_message";
 import { ar } from "zod/v4/locales";
+import platform, { Platform } from "../platform";
 
 const te = new TextEncoder();
 
@@ -122,14 +123,44 @@ export default function core_fetch(
     });
 }
 
-const activeFetch2Requests = new Map<
-    number,
-    {
-        url: string;
-        resolveResponse(response: Response): void;
-        resolveStream?(param: { done: boolean; chunk: Uint8Array }): void;
-    }
->();
+type ActiveRequest = {
+    url: string;
+    resolveResponse(response: Response): void;
+    resolveStream?: (param: { done: boolean; chunk: Uint8Array }) => void;
+};
+
+const activeFetch2Requests = new Map<number, ActiveRequest>();
+
+// in WASM everything in synchronous and calling
+// resolveStream on the next event loop assures the promise is well set
+//
+// this is call at a very high pace, so it's better to avoid the "if" at every streamed bit
+const processStream =
+    platform === Platform.WASM
+        ? function (
+              id: number,
+              request: ActiveRequest,
+              done: boolean,
+              chunk: Uint8Array
+          ) {
+              setTimeout(() => {
+                  request.resolveStream({ done, chunk });
+                  if (done) {
+                      activeFetch2Requests.delete(id);
+                  }
+              });
+          }
+        : function (
+              id: number,
+              request: ActiveRequest,
+              done: boolean,
+              chunk: Uint8Array
+          ) {
+              request.resolveStream({ done, chunk });
+              if (done) {
+                  activeFetch2Requests.delete(id);
+              }
+          };
 
 let addedListener2 = false;
 function receivedResponse2(base64Data: string) {
@@ -143,10 +174,7 @@ function receivedResponse2(base64Data: string) {
 
     if (request.resolveStream) {
         const [done, chunk] = args.slice(1);
-        request.resolveStream({ done, chunk });
-        if (done) {
-            activeFetch2Requests.delete(id);
-        }
+        processStream(id, request, done, chunk);
         return;
     }
 

@@ -25,7 +25,12 @@ export function createToolFS(opts?: Partial<ToolFSOptions>) {
             schema: z.object({
                 path: z.string()
             }),
-            fn: ({ path }) => fs.mkdir(fixPath(path)),
+            fn: async ({ path }) => {
+                const success = await fs.mkdir(fixPath(path));
+                return success
+                    ? `Successfully created directory ${path}.`
+                    : `Failed to create directory ${path}.`;
+            },
             message: ({ path }) => `Creating directory \`${path}\``
         }),
         createTool({
@@ -53,7 +58,12 @@ export function createToolFS(opts?: Partial<ToolFSOptions>) {
                 path: z.string(),
                 contents: z.string()
             }),
-            fn: ({ path, contents }) => fs.writeFile(fixPath(path), contents),
+            fn: async ({ path, contents }) => {
+                const success = await fs.writeFile(fixPath(path), contents);
+                return success
+                    ? `Successfully written ${contents.length} characters to ${path}.`
+                    : `Failed to write to ${path}.`;
+            },
             message: ({ path }) => `Writing to \`${path}\``
         })
     ];

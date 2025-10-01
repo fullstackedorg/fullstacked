@@ -32,7 +32,7 @@ export function writeFile(
 
     const payload = new Uint8Array([3, ...serializeArgs([path, data, origin])]);
 
-    return bridge(payload, ([success]) => success);
+    return bridge(payload, ([errMessage]) => !errMessage);
 }
 
 // 4
