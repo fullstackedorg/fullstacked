@@ -19,7 +19,7 @@
             },
             "shadow": {
                 "kind": "neutral",
-                "opacity": 0.5
+                "opacity": 1
             },
             "translucency": {
                 "enabled": false,
@@ -39,7 +39,7 @@
             },
             "shadow": {
                 "kind": "neutral",
-                "opacity": 0.5
+                "opacity": 1
             },
             "translucency": {
                 "enabled": false,
@@ -59,7 +59,7 @@
             },
             "shadow": {
                 "kind": "neutral",
-                "opacity": 0.5
+                "opacity": 1
             },
             "translucency": {
                 "enabled": false,
