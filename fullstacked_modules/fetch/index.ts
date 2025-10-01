@@ -154,7 +154,7 @@ function receivedResponse2(base64Data: string) {
 
     const ok = status <= 299;
 
-    let finished = false;
+    let finished = statusText === "Failed fetch";
     const read = async () => {
         if (finished) {
             return { done: true };
