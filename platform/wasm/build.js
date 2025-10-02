@@ -25,6 +25,6 @@ esbuild.buildSync({
     }
 });
 
-["src/dev-icon.png", "src/index.html"].forEach((f) =>
+["src/index.html"].forEach((f) =>
     fs.cpSync(f, "out/site" + f.slice("src".length))
 );
