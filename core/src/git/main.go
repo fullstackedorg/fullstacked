@@ -426,6 +426,15 @@ func Pull(directory string, isEditor bool, projectId string) {
 		return
 	}
 
+	remote, err := repo.Remote("origin")
+
+	if err != nil {
+		progress.Error(err.Error())
+		return
+	}
+
+	progress.Url = remote.Config().URLs[0]
+
 	worktree, err := getWorktree(repo)
 
 	if err != nil {
@@ -453,16 +462,7 @@ func Pull(directory string, isEditor bool, projectId string) {
 		return
 	}
 
-	remote, err := repo.Remote("origin")
-
-	if err != nil {
-		progress.Error(err.Error())
-		return
-	}
-
 	wg.Wait()
-
-	progress.Url = remote.Config().URLs[0]
 
 	if !utils.IsReacheable(progress.Url) {
 		progress.Error("unreacheable")
