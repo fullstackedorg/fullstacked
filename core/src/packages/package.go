@@ -271,6 +271,11 @@ func (p *Package) Install(
 ) {
 	defer wg.Done()
 
+	// fullstacked must never install fullstacked
+	if(p.Name == "fullstacked") {
+		return
+	}
+
 	pLocation := path.Join(directory, p.Name)
 	pDir := path.Join(i.BaseDirectory, pLocation)
 
