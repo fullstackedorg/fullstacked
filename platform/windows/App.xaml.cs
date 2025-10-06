@@ -1,7 +1,6 @@
 ﻿using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
 using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
@@ -12,8 +11,6 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Windows.UI;
 
 namespace FullStacked
@@ -163,7 +160,7 @@ namespace FullStacked
             titleBar.ButtonBackgroundColor = primarycolor;
             titleBar.ButtonHoverBackgroundColor = ColorHelper.FromArgb(1, 64, 73, 88);
 
-            newWindow.AppWindow.SetIcon("Assets/Icon-16.ico");
+            newWindow.AppWindow.SetIcon("Assets/Window-Icon.ico");
 
             newWindow.Content = webview.webview;
             newWindow.Activate();

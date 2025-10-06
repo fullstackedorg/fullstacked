@@ -78,7 +78,7 @@ func runLSP(
 
 	fmt.Println("LSP START")
 	if err := s.Run(); err != nil {
-		if(err.Error() == "context canceled") {
+		if err.Error() == "context canceled" {
 			os.Exit(0)
 		} else {
 			fmt.Println(err)

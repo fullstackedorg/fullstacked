@@ -40,7 +40,7 @@ void registerDesktopApp() {
     std::string localIconsDir =
         std::string(getenv("HOME")) + "/.local/share/icons";
     std::filesystem::create_directories(localIconsDir);
-    std::string appIconFile = getEditorDir() + "/assets/dev-icon.png";
+    std::string appIconFile = getEditorDir() + "/assets/icon.png";
     std::filesystem::copy_file(
         appIconFile, localIconsDir + "/fullstacked.png",
         std::filesystem::copy_options::overwrite_existing);
