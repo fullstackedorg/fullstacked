@@ -272,7 +272,7 @@ func (p *Package) Install(
 	defer wg.Done()
 
 	// fullstacked must never install fullstacked
-	if(p.Name == "fullstacked") {
+	if p.Name == "fullstacked" {
 		return
 	}
 
