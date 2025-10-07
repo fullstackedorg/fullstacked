@@ -12,11 +12,11 @@ extension Color {
 
 func setDirectories(){
     let paths = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true);
-    let root = isMacOS ? paths.first! : ("/private" + paths.first!)
+    let root = (isMacOS || isSimulator) ? paths.first! : ("/private" + paths.first!)
     let config = root + "/.config"
     let editor = Bundle.main.path(forResource: "editor", ofType: nil)!
     let tmp = root + "/.tmp"
-    
+
     directories(
         root.ptr(),
         config.ptr(),
@@ -212,6 +212,12 @@ let isIPadOS = false
 #else
 let isMacOS = false
 let isIPadOS = WebViewRepresentable.isIPadOS
+#endif
+
+#if targetEnvironment(simulator)
+let isSimulator = true
+#else
+let isSimulator = false
 #endif
 
 
