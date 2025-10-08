@@ -1,18 +1,11 @@
 package org.fullstacked.editor
 
 import android.annotation.SuppressLint
-import android.app.UiModeManager
-import android.content.Context.UI_MODE_SERVICE
 import android.content.Intent
-import android.content.res.Configuration.UI_MODE_TYPE_DESK
 import android.graphics.Color
-import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
-import android.view.ViewGroup
-import android.view.ViewGroup.LayoutParams
-import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -20,13 +13,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.Space
-import androidx.annotation.DrawableRes
 import androidx.core.content.ContextCompat.startActivity
-import androidx.core.graphics.drawable.DrawableCompat
-import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.util.Base64

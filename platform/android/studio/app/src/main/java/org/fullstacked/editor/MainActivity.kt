@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.UiModeManager
 import android.content.Intent
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener
+import android.content.res.Configuration
 import android.content.res.Configuration.UI_MODE_TYPE_DESK
 import android.net.Uri
 import android.os.Bundle
@@ -65,7 +66,7 @@ class MainActivity : ComponentActivity() {
                     editor.putLong(message, ts)
                     editor.apply()
 
-                    if(this.isSamsungDexOrChromeOsOrDeskMode()) {
+                    if(this.useMultiWindow()) {
                         this.openProjectInAdjacentWindow(message)
                     } else {
                         if(stackedProjectWebViewComponent != null) {
@@ -103,6 +104,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        this.addCallback(callbackId)
+
         val root = this.filesDir.absolutePath + "/projects"
         val config = this.filesDir.absolutePath + "/.config"
         val editor = this.filesDir.absolutePath + "/editor"
@@ -115,7 +118,6 @@ class MainActivity : ComponentActivity() {
             tmp
         )
 
-        addCallback(callbackId)
 
         var deeplink: String? = null
         var projectIdExternal: String? = null
@@ -327,7 +329,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun isSamsungDexOrChromeOsOrDeskMode(): Boolean {
+    private fun useMultiWindow(): Boolean {
         // Samsung DeX
         // source: https://developer.samsung.com/samsung-dex/modify-optimizing.html
         val enabled: Boolean
@@ -349,7 +351,16 @@ class MainActivity : ComponentActivity() {
             return true
         }
 
+        // Check if the UI is in DESK mode
         val uim = this.getSystemService(UI_MODE_SERVICE) as UiModeManager
-        return uim.currentModeType == UI_MODE_TYPE_DESK
+        if(uim.currentModeType == UI_MODE_TYPE_DESK) {
+            return true
+        }
+
+        // use multi-window if larger thant normal screen size layout
+        // source: https://stackoverflow.com/a/19256468
+        var screenLayout: Int = this.resources.configuration.screenLayout
+        screenLayout = screenLayout and Configuration.SCREENLAYOUT_SIZE_MASK
+        return screenLayout > Configuration.SCREENLAYOUT_SIZE_NORMAL
     }
 }
