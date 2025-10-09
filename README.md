@@ -1,4 +1,4 @@
-<img height=100 width=100 src="https://fullstacked.org/images/app-icon-dev.png" />
+<img height=100 width=100 src="https://files.fullstacked.org/app-icon.svg" />
 
 # FullStacked
 
@@ -8,7 +8,7 @@ Create, run and share projects built with web technologies in a fully cross-plat
 
 [Documentation](https://docs.fullstacked.org) | [Demo](https://demo.fullstacked.org) | [Roadmap](https://fullstacked.notion.site/FullStacked-Editor-Roadmap-ebfcb685b77446c7a7898c05b219215e) | [Figma](https://www.figma.com/design/xb3JBRCvEWpbwGda03T5QQ/Mockups)
 
-![FullStacked](https://img.fullstacked.org/fullstacked.png)
+![FullStacked](https://files.fullstacked.org/fullstacked.png)
 
 ## Installation
 
@@ -24,13 +24,35 @@ You can always find those links and access to the beta apps on FullStacked [down
 
 #### Requirements
 
-- Go `1.23.1`
+- Go `>=1.25`
 - NodeJS `>=20`
 
-1. Install npm dependencies `npm install`
-2. Build the core. Move to the `core/build` directory and use `make` on UNIX-like (MacOS/Linux) or `./windows.bat` on Windows.
-3. Run `npm start` at the root of the repository.
+1. Clone this repo and enter the directory
+```
+git clone https://github.com/fullstackedorg/fullstacked.git
+cd fullstacked
+```
+2. Init the submodules.
+```
+git submodule update --init
+```
+3. Go to the `core/build` directory and build the **shared** library for your current platform.
+```
+cd core/build
+make darwin-arm64-shared
+```
+For windows users, use the batch file.
+```
+cd core/build
+./windows.bat
+```
+4. Return to the root directory, install the dependencies and start.
+```
+cd ../..
+npm install
+npm start
+```
 
 ## License
 
-[MIT](https://github.com/fullstackedorg/fullstacked/blob/main/LICENSE)
+FullStacked has the [MIT](https://github.com/fullstackedorg/fullstacked/blob/main/LICENSE) license, but the Editor has the [GPL-3](https://github.com/fullstackedorg/editor/blob/main/LICENSE) license. [Read more.](https://docs.fullstacked.org/#/license)
