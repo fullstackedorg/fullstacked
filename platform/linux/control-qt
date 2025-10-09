@@ -1,6 +1,6 @@
 Package: fullstacked
-Version: 0.11.2
+Version: 0.12.0
 Maintainer: cplepage
 Architecture:
 Description: FullStacked
-Depends: qt6-base-dev (>= 6.8.3), qt6-webengine-dev (>= 6.8.3)
+Depends: qt6-base-dev (>= 6.8.0), qt6-webengine-dev (>= 6.8.0)
