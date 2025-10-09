@@ -55,4 +55,4 @@ npm start
 
 ## License
 
-FullStacked has the [MIT](https://github.com/fullstackedorg/fullstacked/blob/main/LICENSE) license, but the Editor has the [GPL-3](https://github.com/fullstackedorg/editor/blob/main/LICENSE) license. [Read more.](https://docs.fullstacked.org/#/license)
+FullStacked is licensed under [MIT](https://github.com/fullstackedorg/fullstacked/blob/main/LICENSE), but the Editor is under [GPL-3](https://github.com/fullstackedorg/editor/blob/main/LICENSE). [Read more.](https://docs.fullstacked.org/#/license)
