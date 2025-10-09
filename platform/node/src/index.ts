@@ -28,15 +28,23 @@ if (process.argv.at(-1).startsWith("http")) {
     deeplink = process.argv.at(-1);
 }
 
-function parseArgsForPath(arg: string, fallback: string = process.cwd()) {
+export function getEnvVar(arg: string) {
     const envFlag = `FULLSTACKED_${arg.toUpperCase()}`;
     if (typeof process.env[envFlag] === "string") {
         return process.env[envFlag];
     }
 
     const indexOfArg = process.argv.indexOf(`--${arg}`);
-    if (indexOfArg === -1) return fallback;
-    const definedPath = process.argv.at(indexOfArg + 1);
+    if (indexOfArg === -1) return null;
+    return process.argv.at(indexOfArg + 1);
+}
+
+function parseArgsForPath(arg: string, fallback: string = process.cwd()) {
+    const definedPath = getEnvVar(arg);
+    if (!definedPath) {
+        return fallback;
+    }
+
     if (definedPath.startsWith("~/")) {
         return path.resolve(os.homedir(), definedPath.slice(2));
     } else if (definedPath.startsWith("/")) {

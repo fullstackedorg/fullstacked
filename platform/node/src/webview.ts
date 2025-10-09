@@ -5,7 +5,7 @@ import fastQueryString from "fast-querystring";
 import { Duplex } from "stream";
 import ws, { WebSocket, WebSocketServer } from "ws";
 import { createInstance } from "./instance";
-import { platform } from ".";
+import { platform, getEnvVar } from ".";
 import {
     deserializeArgs,
     numberTo4Bytes
@@ -14,6 +14,11 @@ import { toByteArray } from "../../../fullstacked_modules/base64";
 
 type Instance = ReturnType<typeof createInstance>;
 
+export let mainPort = parseInt(getEnvVar("port"));
+if (!mainPort || isNaN(mainPort)) {
+    mainPort = 9000;
+}
+
 const te = new TextEncoder();
 
 export async function createWebView(
@@ -21,7 +26,7 @@ export async function createWebView(
     onClose?: () => void,
     onFirstConnection?: () => void
 ) {
-    const port = await getNextAvailablePort();
+    const port = await getNextAvailablePort(mainPort);
     const server = http.createServer(createHandler(instance));
 
     const close = () => {
