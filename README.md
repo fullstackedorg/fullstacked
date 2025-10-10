@@ -20,9 +20,9 @@ Create, run and share projects built with web technologies in a fully cross-plat
 
 You can always find those links and access to the beta apps on FullStacked [download page](https://fullstacked.org/download)
 
-### Build from source
+## Build from source
 
-#### Requirements
+### Requirements
 
 - Go `>=1.25`
 - NodeJS `>=20`
@@ -55,4 +55,4 @@ npm start
 
 ## License
 
-FullStacked is licensed under [MIT](https://github.com/fullstackedorg/fullstacked/blob/main/LICENSE), but the Editor is under [GPL-3](https://github.com/fullstackedorg/editor/blob/main/LICENSE). [Read more.](https://docs.fullstacked.org/#/license)
+FullStacked is licensed under [MIT](https://github.com/fullstackedorg/fullstacked/blob/main/LICENSE), but the Editor is under [GPL-3](https://github.com/fullstackedorg/editor/blob/main/LICENSE). [Read more](https://docs.fullstacked.org/license)
