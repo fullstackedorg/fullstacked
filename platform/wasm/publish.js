@@ -77,11 +77,14 @@ await uploadFile("fullstacked.wasm", "application/octet-stream");
 await uploadFile("wasm_exec.js", "application/octet-stream");
 await uploadFile("editor.zip", "application/octet-stream");
 
-// set beta version to current
+// set version to current
+const isRelease = process.argv.includes("--release");
+
 const uploadCommand = new PutObjectCommand({
     Bucket: credentialsCF.R2_BUCKET_NAME,
-    Key: `wasm/beta.txt`,
+    Key: isRelease ? `wasm/release.txt` : `wasm/beta.txt`,
     Body: JSON.stringify(version, null, 2),
     ContentType: "text/plain"
 });
+
 await s3Client.send(uploadCommand);
