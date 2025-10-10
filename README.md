@@ -28,25 +28,34 @@ You can always find those links and access to the beta apps on FullStacked [down
 - NodeJS `>=20`
 
 1. Clone this repo and enter the directory
+
 ```
 git clone https://github.com/fullstackedorg/fullstacked.git
 cd fullstacked
 ```
+
 2. Init the submodules.
+
 ```
 git submodule update --init
 ```
+
 3. Go to the `core/build` directory and build the **shared** library for your current platform.
+
 ```
 cd core/build
 make darwin-arm64-shared
 ```
+
 For windows users, use the batch file.
+
 ```
 cd core/build
 ./windows.bat
 ```
+
 4. Return to the root directory, install the dependencies and start.
+
 ```
 cd ../..
 npm install
