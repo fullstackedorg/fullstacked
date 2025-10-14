@@ -29,8 +29,8 @@ func RunLSP(
 	in *io.PipeReader,
 	out *io.PipeWriter,
 	end chan struct{},
-) int {
-	return runLSP(
+) {
+	runLSP(
 		osvfs.FS(),
 		directory,
 		in,
@@ -45,8 +45,8 @@ func RunLSP_WASM(
 	in *io.PipeReader,
 	out *io.PipeWriter,
 	end chan struct{},
-) int {
-	return runLSP(
+) {
+	runLSP(
 		suppliedFS,
 		directory,
 		in,
@@ -61,7 +61,7 @@ func runLSP(
 	in *io.PipeReader,
 	out *io.PipeWriter,
 	end chan struct{},
-) int {
+) {
 	fs := bundled.WrapFS(suppliedFS)
 	defaultLibraryPath := bundled.LibPath()
 	typingsLocation := getGlobalTypingsCacheLocation()
@@ -88,7 +88,6 @@ func runLSP(
 	close(end)
 	out.Write([]byte{})
 	fmt.Println("LSP END")
-	return 0
 }
 
 func getGlobalTypingsCacheLocation() string {
