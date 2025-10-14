@@ -31,5 +31,4 @@ const version = {
     branch,
     hash
 };
-
 export default version;
