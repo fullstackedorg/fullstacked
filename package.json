@@ -28,7 +28,7 @@
         "@fullstacked/codemirror-view": "github:fullstackedorg/codemirror-view#e7e02c9c26bdc19f0e6cb5cee7d38c8d958e54e6",
         "@fullstacked/file-tree": "github:fullstackedorg/file-tree#8fc6d5e587507c631a68525659745eeda414bcf3",
         "@fullstacked/stack-navigation": "github:fullstackedorg/stack-navigation#888302a680bcc501639dfdb0a6aede3da91f06ff",
-        "@fullstacked/ui": "github:fullstackedorg/ui#d7337b186abd9129e3dcbe9d849e70b9658cc31b",
+        "@fullstacked/ui": "github:fullstackedorg/ui#7a7018cb1e22ba3e53ce43a4f6435c445bf92ab9",
         "@types/adm-zip": "^0.5.7",
         "@types/node": "^24.5.2",
         "@types/semver": "^7.7.1",
