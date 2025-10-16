@@ -174,8 +174,12 @@ namespace FullStacked
             }
         }
 
-        public void onCallback(string projectId, string messageType, string message)
+        public void onCallback(string projectId, string messageType, IntPtr messageData, int messageLength)
         {
+            byte[] byteArray = new byte[messageLength];
+            Marshal.Copy(messageData, byteArray, 0, messageLength);
+            string message = Encoding.UTF8.GetString(byteArray);
+
             if (projectId == "*")
             {
                 foreach (var item in webviews.Values)

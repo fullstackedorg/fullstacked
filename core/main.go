@@ -4,9 +4,9 @@ package main
 #include <stdlib.h>
 #include <string.h>
 
-typedef void (*Callback)(char *projectId, char* type, char *msg);
-static inline void CallMyFunction(void *callback, char *projectId, char * type, char *msg) {
-    ((Callback)callback)(projectId, type, msg);
+typedef void (*Callback)(char *projectId, char* type, void *msg, int msgLength);
+static inline void CallMyFunction(void *callback, char *projectId, char * type, void *msg, int msgLength) {
+    ((Callback)callback)(projectId, type, msg, msgLength);
 }
 
 static inline void write_bytes_array(void *data, int size, void *ptr) {
@@ -66,13 +66,17 @@ func callback(cb unsafe.Pointer) {
 	setup.Callback = func(projectId string, messageType string, message string) {
 		projectIdPtr := C.CString(projectId)
 		messageTypePtr := C.CString(messageType)
-		messagePtr := C.CString(message)
+
+		messageData := []byte(message)
+		messagePtr := C.CBytes(messageData)
+		messageLength := (C.int)(len(messageData))
 
 		C.CallMyFunction(
 			cCallback,
 			projectIdPtr,
 			messageTypePtr,
 			messagePtr,
+			messageLength,
 		)
 
 		C.free(unsafe.Pointer(projectIdPtr))

@@ -25,10 +25,16 @@ func setDirectories(){
     )
 }
 
-func CallbackC(projectIdPtr: UnsafeMutablePointer<Int8>, messageTypePtr: UnsafeMutablePointer<Int8>, messagePtr: UnsafeMutablePointer<Int8>) {
+func CallbackC(
+    projectIdPtr: UnsafeMutablePointer<Int8>,
+    messageTypePtr: UnsafeMutablePointer<Int8>,
+    msgPtr: UnsafeMutablePointer<Int8>,
+    msgLength: Int
+) {
     let projectId = String(cString: projectIdPtr)
     let messageType = String(cString: messageTypePtr)
-    let message = String(cString: messagePtr)
+    let messageData = Data(bytes: msgPtr, count: msgLength)
+    let message = String(data: messageData, encoding: .utf8) ?? ""
     
     if(projectId == "*") {
         FullStackedApp.singleton?.webViews.getEditor().onMessage(messageType: messageType, message: message)
@@ -55,7 +61,11 @@ func CallbackC(projectIdPtr: UnsafeMutablePointer<Int8>, messageTypePtr: UnsafeM
 }
 
 func setCallback(){
-    let cb: @convention(c) (UnsafeMutablePointer<Int8>,UnsafeMutablePointer<Int8>,UnsafeMutablePointer<Int8>) -> Void = CallbackC
+    let cb: @convention(c) (UnsafeMutablePointer<Int8>,
+                            UnsafeMutablePointer<Int8>,
+                            UnsafeMutablePointer<Int8>,
+                            Int
+    ) -> Void = CallbackC
     let cbPtr = unsafeBitCast(cb, to: UnsafeMutableRawPointer.self)
     callback(cbPtr)
 }

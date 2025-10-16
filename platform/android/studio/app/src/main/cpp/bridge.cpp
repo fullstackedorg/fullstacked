@@ -54,7 +54,7 @@ struct CallbackResponder {
 };
 std::vector<CallbackResponder> responders = {};
 
-void goCallback(char* projectId, char* messageType, char* message) {
+void goCallback(char* projectId, char* messageType, void* msg, int msgLength) {
     __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.editor.core", "goCallback responders count [%zu]", responders.size());
 
     for(CallbackResponder responder : responders) {
@@ -67,7 +67,8 @@ void goCallback(char* projectId, char* messageType, char* message) {
             // callback
             jstring jstr = env->NewStringUTF(projectId);
             jstring jstr2 = env->NewStringUTF(messageType);
-            jstring jstr3 = env->NewStringUTF(message);
+            std::string cppString(reinterpret_cast<char*>(msg), msgLength);
+            jstring jstr3 = env->NewStringUTF(cppString.c_str());
             env->CallVoidMethod(responder.activity, methodid, jstr, jstr2, jstr3);
         }
     }

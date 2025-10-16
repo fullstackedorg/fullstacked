@@ -92,7 +92,7 @@ ipcMain.handle("bridge", async (event, payload) => {
 });
 
 const te = new TextEncoder();
-const platform = te.encode("electron");
+const platform = te.encode("electron") as Uint8Array<ArrayBuffer>;
 
 async function protocolHandler(request: Request): Promise<Response> {
     const url = new URL(request.url);
