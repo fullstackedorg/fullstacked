@@ -33,7 +33,7 @@ void setDirectories() {
 }
 
 void libCallback(char *projectId, char *type, void *msgData, int msgLength) {
-    std::string msg(static_cast<const char*>(msgData), msgLength);
+    std::string msg(static_cast<const char *>(msgData), msgLength);
     App::instance->onMessage(projectId, type, msg);
 }
 
