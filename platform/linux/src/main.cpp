@@ -32,7 +32,8 @@ void setDirectories() {
     directories(root.data(), config.data(), editor.data(), tmp.data());
 }
 
-void libCallback(char *projectId, char *type, char *msg) {
+void libCallback(char *projectId, char *type, void *msgData, int msgLength) {
+    std::string msg(static_cast<const char*>(msgData), msgLength);
     App::instance->onMessage(projectId, type, msg);
 }
 

@@ -56,8 +56,10 @@ std::map<int, CallbackMessage> callbackMessages{};
 std::mutex callbackMessagesMutex;
 int callbackId = 0;
 
-void n_callback(char *arg1, char *arg2, char *arg3) {
-    CallbackMessage msg = {arg1, arg2, arg3};
+void n_callback(char *arg1, char *arg2, void *arg3, int arg4) {
+    std::string message(static_cast<const char*>(arg3), arg4);
+
+    CallbackMessage msg = {arg1, arg2, message};
     int id = callbackId++;
 
     callbackMessagesMutex.lock();
