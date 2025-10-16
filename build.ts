@@ -7,6 +7,7 @@ import version from "./version";
 
 const production = process.argv.includes("--production");
 
+const editorDir = "editor";
 const outDir = "out";
 const outDirEditor = `${outDir}/editor`;
 const outDirFullStackedModules = `${outDirEditor}/fullstacked_modules`;
@@ -39,9 +40,9 @@ async function processScss(entryPoint: string, out: string) {
     await fs.promises.writeFile(out, css);
 }
 
-await processScss("editor/index.scss", `editor/index.css`);
+await processScss(`${editorDir}/index.scss`, `${editorDir}/index.css`);
 
-const toBuild = [["editor/index.ts", "index"]];
+const toBuild = [[`${editorDir}/index.ts`, "index"]];
 
 for (const [input, output] of toBuild) {
     esbuild.buildSync({
@@ -61,15 +62,15 @@ for (const [input, output] of toBuild) {
     });
 }
 
-fs.rmSync("editor/index.css");
+fs.rmSync(`${editorDir}/index.css`);
 
-fs.cpSync("editor/index.html", `${outDirEditor}/index.html`);
-fs.cpSync("editor/assets", `${outDirEditor}/assets`, {
+fs.cpSync(`${editorDir}/index.html`, `${outDirEditor}/index.html`);
+fs.cpSync(`${editorDir}/assets`, `${outDirEditor}/assets`, {
     recursive: true
 });
 
-await processScss("editor/style/windows.scss", `${outDirEditor}/windows.css`);
-await processScss("editor/style/apple.scss", `${outDirEditor}/apple.css`);
+await processScss(`${editorDir}/style/windows.scss`, `${outDirEditor}/windows.css`);
+await processScss(`${editorDir}/style/apple.scss`, `${outDirEditor}/apple.css`);
 
 fs.cpSync("node_modules/@fullstacked/ui/icons", `${outDirEditor}/icons`, {
     recursive: true
@@ -82,9 +83,6 @@ if (fs.existsSync(sampleDemoDir)) {
     zip.writeZip(`${outDirEditor}/Demo.zip`);
 }
 
-fs.cpSync("node_modules/typescript/lib", outDirEditor + "/tsLib", {
-    recursive: true
-});
 fs.cpSync("fullstacked_modules", outDirFullStackedModules, {
     recursive: true,
     filter: (s) => !s.endsWith(".scss")
