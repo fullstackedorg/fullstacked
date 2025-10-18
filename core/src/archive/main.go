@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	fs "fullstackedorg/fullstacked/src/fs"
-	serialize "fullstackedorg/fullstacked/src/serialize"
+	fs "fullstackedorg/fullstacked/core/src/fs"
+	serialize "fullstackedorg/fullstacked/core/src/serialize"
 )
 
 var fileEventOrigin = "archive"

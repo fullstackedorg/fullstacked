@@ -3,9 +3,9 @@ package ts_lsp
 import (
 	"errors"
 	"fmt"
-	"fullstackedorg/fullstacked/src/fs"
-	"fullstackedorg/fullstacked/src/setup"
-	"fullstackedorg/fullstacked/src/utils"
+	"fullstackedorg/fullstacked/core/src/fs"
+	"fullstackedorg/fullstacked/core/src/setup"
+	"fullstackedorg/fullstacked/core/src/utils"
 	"io"
 	"slices"
 	"strconv"

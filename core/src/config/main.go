@@ -1,9 +1,9 @@
 package config
 
 import (
-	fs "fullstackedorg/fullstacked/src/fs"
-	serialize "fullstackedorg/fullstacked/src/serialize"
-	setup "fullstackedorg/fullstacked/src/setup"
+	fs "fullstackedorg/fullstacked/core/src/fs"
+	serialize "fullstackedorg/fullstacked/core/src/serialize"
+	setup "fullstackedorg/fullstacked/core/src/setup"
 	"path"
 )
 

@@ -22,11 +22,11 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/storage/filesystem"
 
-	config "fullstackedorg/fullstacked/src/config"
-	fs "fullstackedorg/fullstacked/src/fs"
-	serialize "fullstackedorg/fullstacked/src/serialize"
-	setup "fullstackedorg/fullstacked/src/setup"
-	utils "fullstackedorg/fullstacked/src/utils"
+	config "fullstackedorg/fullstacked/core/src/config"
+	fs "fullstackedorg/fullstacked/core/src/fs"
+	serialize "fullstackedorg/fullstacked/core/src/serialize"
+	setup "fullstackedorg/fullstacked/core/src/setup"
+	utils "fullstackedorg/fullstacked/core/src/utils"
 )
 
 var ignored = []string{

@@ -1,13 +1,11 @@
 package esbuild
 
 import (
-	"encoding/base64"
 	"encoding/json"
-	fs "fullstackedorg/fullstacked/src/fs"
-	"fullstackedorg/fullstacked/src/git"
-	serialize "fullstackedorg/fullstacked/src/serialize"
-	setup "fullstackedorg/fullstacked/src/setup"
-	utils "fullstackedorg/fullstacked/src/utils"
+	fs "fullstackedorg/fullstacked/core/src/fs"
+	"fullstackedorg/fullstacked/core/src/git"
+	setup "fullstackedorg/fullstacked/core/src/setup"
+	utils "fullstackedorg/fullstacked/core/src/utils"
 	"path"
 	"path/filepath"
 	"runtime/debug"
@@ -88,11 +86,16 @@ func ShouldBuild(projectDirectory string) bool {
 	return string(lastBuildCommit) != currentCommit
 }
 
+type BuildResult struct {
+	Id     float64           `json:"id"`
+	Errors []esbuild.Message `json:"errors"`
+}
+
 func Build(
 	projectId string,
 	projectDirectory string,
 	buildId float64,
-) {
+) BuildResult {
 	// find entryPoints
 	entryPointJS := findEntryPoint(projectDirectory)
 	entryPointAbsCSS := filepath.ToSlash(path.Join(projectDirectory, ".build", "index.css"))
@@ -195,15 +198,14 @@ func Build(
 		}
 	}
 
-	// don't try to directly send JSON string.
-	// apple platform and probably others
-	// have issues with escaping some chars going through bridge
-	payload := serialize.SerializeNumber(buildId)
-	jsonMessagesData, _ := json.Marshal(result.Errors)
-	jsonMessagesStr := string(jsonMessagesData)
-	jsonMessageSerialized := serialize.SerializeString(jsonMessagesStr)
-	payload = append(payload, jsonMessageSerialized...)
+	buildResult := BuildResult{
+		Id:     buildId,
+		Errors: result.Errors,
+	}
+	jsonMessages, _ := json.Marshal(buildResult)
 
-	setup.Callback(projectId, "build", base64.StdEncoding.EncodeToString(payload))
+	setup.Callback(projectId, "build", string(jsonMessages))
 	fs.Unlink(tmpFile, fileEventOrigin)
+
+	return buildResult
 }
