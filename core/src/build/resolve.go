@@ -1,10 +1,10 @@
 // https://nodejs.org/api/modules.html#all-together
-package esbuild
+package build
 
 import (
 	"encoding/json"
-	fs "fullstackedorg/fullstacked/core/src/fs"
-	setup "fullstackedorg/fullstacked/core/src/setup"
+	fs "fullstackedorg/fullstacked/src/fs"
+	setup "fullstackedorg/fullstacked/src/setup"
 	"path"
 	"strings"
 

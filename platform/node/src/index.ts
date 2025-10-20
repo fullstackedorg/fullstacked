@@ -7,8 +7,8 @@ import { createWebView } from "./webview";
 import { createInstance } from "./instance";
 import { buildLocalProject } from "./build";
 import { getLibPath } from "./lib";
-import { createRequire } from "node:module";
 import { setupDevFiles } from "./dev-files";
+import { createRequire } from "node:module";
 globalThis.require = createRequire(import.meta.url);
 
 const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));

@@ -2,7 +2,7 @@ package fs
 
 import (
 	"errors"
-	serialize "fullstackedorg/fullstacked/core/src/serialize"
+	serialize "fullstackedorg/fullstacked/src/serialize"
 	"io/fs"
 	"os"
 	"path"

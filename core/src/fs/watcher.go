@@ -2,8 +2,8 @@ package fs
 
 import (
 	"encoding/json"
-	"fullstackedorg/fullstacked/core/src/setup"
-	"fullstackedorg/fullstacked/core/src/utils"
+	"fullstackedorg/fullstacked/src/setup"
+	"fullstackedorg/fullstacked/src/utils"
 	"path/filepath"
 	"time"
 )

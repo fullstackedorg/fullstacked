@@ -5,7 +5,7 @@ import (
 	"net"
 	"strconv"
 
-	"fullstackedorg/fullstacked/core/src/serialize"
+	"fullstackedorg/fullstacked/src/serialize"
 )
 
 type DataServer struct {

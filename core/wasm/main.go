@@ -3,9 +3,9 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
-	fs "fullstackedorg/fullstacked/core/src/fs"
-	methods "fullstackedorg/fullstacked/core/src/methods"
-	setup "fullstackedorg/fullstacked/core/src/setup"
+	fs "fullstackedorg/fullstacked/src/fs"
+	methods "fullstackedorg/fullstacked/src/methods"
+	setup "fullstackedorg/fullstacked/src/setup"
 	"strings"
 
 	"syscall/js"

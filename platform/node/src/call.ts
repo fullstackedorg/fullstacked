@@ -1,5 +1,6 @@
 import os from "node:os";
 import path from "node:path";
+import fs from "node:fs";
 let core: any;
 
 export function load(libPath: string, bindingDir?: string) {
@@ -7,6 +8,9 @@ export function load(libPath: string, bindingDir?: string) {
     const p = bindingDir
         ? path.resolve(bindingDir, bindingFileName)
         : `./${bindingFileName}`;
+    if(!fs.existsSync(p)) {
+        throw `Cannot find core library binding file at ${p}`
+    }
     core = require(p);
     core.load(libPath);
 }

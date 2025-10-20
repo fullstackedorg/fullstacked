@@ -20,4 +20,9 @@ go build -buildmode=c-shared -o ../bin/win32-x64.dll -v ..
 
 xcopy ..\bin\win32-x64.dll ..\..\platform\windows /y /q
 xcopy ..\bin\win32-arm64.dll ..\..\platform\windows /y /q
-xcopy ..\..\out\editor ..\..\platform\windows\editor /y /s /e /q
+
+SET "TARGET_DIR=..\..\platform\windows\editor"
+IF EXIST "%TARGET_DIR%" (
+    RD /S /Q "%TARGET_DIR%"
+)
+xcopy ..\..\out\editor "%TARGET_DIR%"\ /y /s /e /q

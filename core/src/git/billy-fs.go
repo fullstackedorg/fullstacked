@@ -25,7 +25,7 @@ import (
 	"github.com/go-git/go-billy/v5/helper/chroot"
 	"github.com/go-git/go-billy/v5/util"
 
-	realFs "fullstackedorg/fullstacked/core/src/fs"
+	realFs "fullstackedorg/fullstacked/src/fs"
 )
 
 const separator = filepath.Separator

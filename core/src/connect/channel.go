@@ -3,8 +3,8 @@ package connect
 import (
 	"encoding/base64"
 	"fmt"
-	"fullstackedorg/fullstacked/core/src/serialize"
-	"fullstackedorg/fullstacked/core/src/setup"
+	"fullstackedorg/fullstacked/src/serialize"
+	"fullstackedorg/fullstacked/src/setup"
 	"net"
 	"strconv"
 	"time"

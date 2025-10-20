@@ -2,7 +2,7 @@ package ts_lsp
 
 import (
 	"fmt"
-	"fullstackedorg/fullstacked/core/src/fs"
+	"fullstackedorg/fullstacked/src/fs"
 	"strings"
 	"time"
 

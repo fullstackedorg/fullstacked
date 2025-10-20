@@ -2,7 +2,7 @@ package client
 
 import (
 	"fmt"
-	"fullstackedorg/fullstacked/core/src/serialize"
+	"fullstackedorg/fullstacked/src/serialize"
 	"net"
 	"strconv"
 )

@@ -7,19 +7,19 @@ import (
 	"slices"
 	"strings"
 
-	archive "fullstackedorg/fullstacked/core/src/archive"
-	config "fullstackedorg/fullstacked/core/src/config"
-	"fullstackedorg/fullstacked/core/src/connect"
-	esbuild "fullstackedorg/fullstacked/core/src/esbuild"
-	fetch "fullstackedorg/fullstacked/core/src/fetch"
-	fs "fullstackedorg/fullstacked/core/src/fs"
-	git "fullstackedorg/fullstacked/core/src/git"
-	ts_lsp "fullstackedorg/fullstacked/core/src/lsp"
-	packages "fullstackedorg/fullstacked/core/src/packages"
-	serialize "fullstackedorg/fullstacked/core/src/serialize"
-	setup "fullstackedorg/fullstacked/core/src/setup"
-	staticFiles "fullstackedorg/fullstacked/core/src/staticFiles"
-	"fullstackedorg/fullstacked/core/src/utils"
+	archive "fullstackedorg/fullstacked/src/archive"
+	build "fullstackedorg/fullstacked/src/build"
+	config "fullstackedorg/fullstacked/src/config"
+	"fullstackedorg/fullstacked/src/connect"
+	fetch "fullstackedorg/fullstacked/src/fetch"
+	fs "fullstackedorg/fullstacked/src/fs"
+	git "fullstackedorg/fullstacked/src/git"
+	ts_lsp "fullstackedorg/fullstacked/src/lsp"
+	packages "fullstackedorg/fullstacked/src/packages"
+	serialize "fullstackedorg/fullstacked/src/serialize"
+	setup "fullstackedorg/fullstacked/src/setup"
+	staticFiles "fullstackedorg/fullstacked/src/staticFiles"
+	"fullstackedorg/fullstacked/src/utils"
 )
 
 const (
@@ -59,9 +59,10 @@ const (
 	CONFIG_GET  = 50
 	CONFIG_SAVE = 51
 
-	ESBUILD_VERSION      = 55
-	ESBUILD_BUILD        = 56
-	ESBUILD_SHOULD_BUILD = 57
+	ESBUILD_VERSION     = 55
+	BUILD_PROJECT       = 56
+	BUILD_SHOULD_BUILD  = 57
+	BUILD_SASS_RESPONSE = 58
 
 	PACKAGE_INSTALL       = 60
 	PACKAGE_INSTALL_QUICK = 61
@@ -97,8 +98,8 @@ var EDITOR_ONLY = []int{
 	CONFIG_SAVE,
 
 	ESBUILD_VERSION,
-	// ESBUILD_BUILD,
-	ESBUILD_SHOULD_BUILD,
+	// BUILD_PROJECT,
+	BUILD_SHOULD_BUILD,
 
 	DIRECTORY_ROOT,
 
@@ -210,22 +211,26 @@ func Call(payload []byte) []byte {
 	case method == CONFIG_SAVE:
 		return config.SaveSerialized(args[0].(string), args[1].(string))
 	case method == ESBUILD_VERSION:
-		return serialize.SerializeString(esbuild.Version())
-	case method == ESBUILD_BUILD:
-		directory := path.Join(setup.Directories.Root, projectId)
+		return serialize.SerializeString(build.EsbuildVersion())
+	case method == BUILD_PROJECT:
+		buildProjectId := projectId
 		buildId := 0.0
 
 		if isEditor {
-			directory = path.Join(setup.Directories.Root, args[0].(string))
+			buildProjectId = args[0].(string)
 			buildId = args[1].(float64)
 		} else {
 			buildId = args[0].(float64)
 		}
 
-		go esbuild.Build(projectId, directory, buildId)
-	case method == ESBUILD_SHOULD_BUILD:
+		go build.Build(buildProjectId, buildId)
+	case method == BUILD_SASS_RESPONSE:
+		styleBuildResult := build.StyleBuildResult{}
+		json.Unmarshal([]byte(args[1].(string)), styleBuildResult)
+		build.StyleBuildResponse(args[0].(string), styleBuildResult)
+	case method == BUILD_SHOULD_BUILD:
 		projectDirectory := setup.Directories.Root + "/" + args[0].(string)
-		return serialize.SerializeBoolean(esbuild.ShouldBuild(projectDirectory))
+		return serialize.SerializeBoolean(build.ShouldBuild(projectDirectory))
 	case method == PACKAGE_INSTALL:
 		projectDirectory := setup.Directories.Root + "/" + args[0].(string)
 		installationId := args[1].(float64)

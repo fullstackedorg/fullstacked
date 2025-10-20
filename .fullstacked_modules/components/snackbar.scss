@@ -1,0 +1,52 @@
+@use "../../node_modules/@fullstacked/ui/values/spacing.scss";
+@use "../../node_modules/@fullstacked/ui/values/colors.scss";
+@use "../../node_modules/@fullstacked/ui/values/typography.scss";
+
+.snack-bars-container {
+    display: flex;
+    flex-direction: column;
+    gap: spacing.$small;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    z-index: 100;
+    padding: 0 spacing.$medium spacing.$medium;
+    align-items: flex-start;
+    width: 100%;
+    pointer-events: none;
+    text-align: left;
+    font-family: typography.$fonts;
+    font-size: typography.$medium;
+
+    max-width: 450px;
+    @media (max-width: 450px) {
+        align-items: center;
+    }
+
+    .snack-bar {
+        pointer-events: all;
+
+        background-color: colors.$gray-dark;
+        border-radius: spacing.$x-small;
+        color: colors.$light;
+
+        min-height: 42px;
+        max-width: 100%;
+        width: max-content;
+
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: spacing.$small;
+
+        padding: spacing.$x-small spacing.$small;
+
+        box-shadow: 0px 4px 10px colors.opacity(colors.$dark, 60);
+
+        > div:first-child {
+            padding: spacing.$x-small 0;
+            width: 100%;
+            overflow-wrap: break-word;
+        }
+    }
+}
