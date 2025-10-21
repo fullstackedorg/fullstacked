@@ -9,7 +9,6 @@ import { createInstance } from "./platform/node/src/instance";
 import { serializeArgs } from "./fullstacked_modules/bridge/serialization";
 import { buildSASS } from "./fullstacked_modules/build/sass";
 import version from "./version";
-import { esbuildVersion } from "./fullstacked_modules/build";
 import esbuild from "esbuild";
 globalThis.require = createRequire(import.meta.url);
 
@@ -32,13 +31,12 @@ setCallback(async (_, messageType, message) => {
                 encoding: "utf8"
             }),
             {
-                canonicalize: (filePath) =>
-                    filePath.startsWith("file://")
-                        ? new URL(filePath)
-                        : new URL(
-                              path.resolve(process.cwd(), projectId, filePath),
-                              "file://"
-                          ),
+                canonicalize: (filePath) => filePath.startsWith("file://")
+                    ? new URL(filePath)
+                    : new URL(
+                        "file://" + path.resolve(process.cwd(), projectId, filePath)
+                            .replace(/\\/g, "/")
+                    ),
                 load: (url) => fs.readFileSync(url, { encoding: "utf8" })
             }
         );
@@ -63,10 +61,10 @@ setCallback(async (_, messageType, message) => {
 });
 
 setDirectories({
-    root: process.cwd(),
+    root: process.cwd().replace(/\\/g, "/"),
     config: "",
     editor: "",
-    tmp: path.resolve(process.cwd(), ".cache")
+    tmp: path.resolve(process.cwd(), ".cache").replace(/\\/g, "/")
 });
 
 const instance = createInstance("", true);

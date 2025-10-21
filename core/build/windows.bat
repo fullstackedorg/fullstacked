@@ -8,21 +8,31 @@ node ./typescript-go-patch/patch.js
 SET CGO_ENABLED=1
 SET GOOS=windows
 
-SET CC=aarch64-w64-mingw32-gcc
-SET CXX=aarch64-w64-mingw32-g++
-SET GOARCH=arm64
-go build -buildmode=c-shared -o ../bin/win32-arm64.dll -v ..
+set arg1=%1
 
-SET CC=x86_64-w64-mingw32-gcc
-SET CXX=x86_64-w64-mingw32-g++
-SET GOARCH=amd64
-go build -buildmode=c-shared -o ../bin/win32-x64.dll -v ..
-
-xcopy ..\bin\win32-x64.dll ..\..\platform\windows /y /q
-xcopy ..\bin\win32-arm64.dll ..\..\platform\windows /y /q
-
-SET "TARGET_DIR=..\..\platform\windows\editor"
-IF EXIST "%TARGET_DIR%" (
-    RD /S /Q "%TARGET_DIR%"
+IF "%arg1%" == "arm64" (
+    SET CC=aarch64-w64-mingw32-gcc
+    SET CXX=aarch64-w64-mingw32-g++
+    SET GOARCH=arm64
+    go build -buildmode=c-shared -o ../bin/win32-arm64.dll -v ..
+    xcopy ..\bin\win32-arm64.dll ..\..\platform\windows /y /q
 )
-xcopy ..\..\out\editor "%TARGET_DIR%"\ /y /s /e /q
+
+IF "%arg1%" == "x64" (
+    SET CC=x86_64-w64-mingw32-gcc
+    SET CXX=x86_64-w64-mingw32-g++
+    SET GOARCH=amd64
+    go build -buildmode=c-shared -o ../bin/win32-x64.dll -v ..
+    xcopy ..\bin\win32-x64.dll ..\..\platform\windows /y /q
+)
+
+IF "%arg1%" == "copy" (
+    SET "SOURCE_DIR=..\..\out\build"
+    SET "TARGET_DIR=..\..\platform\windows\build"
+    IF EXIST "%TARGET_DIR%" (
+        RD /S /Q "%TARGET_DIR%"
+    )
+    IF EXIST "%SOURCE_DIR%" (
+        xcopy "%SOURCE_DIR%" "%TARGET_DIR%"\ /y /s /e /q
+    )
+)

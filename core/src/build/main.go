@@ -175,7 +175,11 @@ func (p *ProjectBuild) buildStyle(entryPoint string) StyleBuildResult {
 	return styleBuild.Result
 }
 
-func (p *ProjectBuild) buildJS(entryPoint string, styleEntryPoint *string) esbuild.BuildResult {
+func (p *ProjectBuild) buildJS(
+	entryPoint string,
+	styleEntryPoint *string,
+	tmpBuildDirectory string,
+) esbuild.BuildResult {
 	intermediateFilePath := path.Join(setup.Directories.Tmp, utils.RandString(10)+".js")
 	entryPointJSPath := path.Join(setup.Directories.Root, p.ProjectID, entryPoint)
 
@@ -254,7 +258,7 @@ func (p *ProjectBuild) buildJS(entryPoint string, styleEntryPoint *string) esbui
 		}},
 		AllowOverwrite: true,
 		Splitting:      !fs.WASM,
-		Outdir:         "/",
+		Outdir:         tmpBuildDirectory,
 		Bundle:         true,
 		Format:         esbuild.FormatESModule,
 		Sourcemap:      esbuild.SourceMapInlineAndExternal,
@@ -345,12 +349,16 @@ func (p *ProjectBuild) Build() BuildResult {
 	})
 
 	if entryPointJS != nil {
-		jsBuild := p.buildJS(*entryPointJS, entryPointStyleBuiltPtr)
+		jsBuild := p.buildJS(
+			*entryPointJS,
+			entryPointStyleBuiltPtr,
+			tmpBuildDirectory,
+		)
 		if len(jsBuild.Errors) > 0 {
 			result.Errors = append(result.Errors, jsBuild.Errors...)
 		}
 		for _, file := range jsBuild.OutputFiles {
-			fs.WriteFile(path.Join(tmpBuildDirectory, file.Path), file.Contents, fileEventOrigin)
+			fs.WriteFile(file.Path, file.Contents, fileEventOrigin)
 		}
 	}
 
@@ -367,17 +375,17 @@ func (p *ProjectBuild) Build() BuildResult {
 	outDirectory := path.Join(projectDirectory, ".build")
 
 	if len(result.Errors) == 0 {
-		fs.Mkdir(outDirectory, fileEventOrigin)
-		fs.Rmdir(outDirectory, fileEventOrigin)
-		fs.Rename(tmpBuildDirectory, outDirectory, fileEventOrigin)
-
 		if git.HasGit(outDirectory) {
 			head, err := git.Head(outDirectory)
 			if err == nil {
-				cacheCommitFile := path.Join(outDirectory, ".commit")
+				cacheCommitFile := path.Join(tmpBuildDirectory, ".commit")
 				fs.WriteFile(cacheCommitFile, []byte(head.Hash().String()), fileEventOrigin)
 			}
 		}
+
+		fs.Mkdir(outDirectory, fileEventOrigin)
+		fs.Rmdir(outDirectory, fileEventOrigin)
+		fs.Rename(tmpBuildDirectory, outDirectory, fileEventOrigin)
 	}
 
 	resultJson, _ := json.Marshal(result)

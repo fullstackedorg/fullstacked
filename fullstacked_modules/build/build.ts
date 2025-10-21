@@ -1,8 +1,6 @@
 import { Project } from "../../editor/types";
-import { toByteArray } from "../base64";
 import { bridge } from "../bridge";
 import {
-    deserializeArgs,
     getLowestKeyIdAvailable,
     serializeArgs
 } from "../bridge/serialization";

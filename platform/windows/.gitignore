@@ -7,3 +7,4 @@ Package.StoreAssociation.xml
 win32-*.dll
 publish
 AppPackages
+build

@@ -22,10 +22,10 @@ export function setDirectories(directories: {
     tmp: string;
 }) {
     core.directories(
-        directories.root,
-        directories.config,
-        directories.editor,
-        directories.tmp
+        directories.root.replace(/\\/g, "/"),
+        directories.config.replace(/\\/g, "/"),
+        directories.editor.replace(/\\/g, "/"),
+        directories.tmp.replace(/\\/g, "/")
     );
 }
 
