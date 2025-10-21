@@ -8,10 +8,11 @@ import {
 } from "../bridge/serialization";
 import type { Message } from "esbuild";
 import core_message from "../core_message";
-import { buildSASS } from "../../build-sass";
+import { buildSASS } from "./sass";
 import fs from "../fs";
 
 core_message.addListener("build-style", async (messageStr) => {
+    console.log(messageStr)
     const { id, entryPoint, projectId } = JSON.parse(messageStr);
     const result = await buildSASS(await fs.readFile(projectId + "/" + entryPoint, { encoding: "utf8" }), {
         canonicalize: (filePath) => new URL(filePath, "file://"),
@@ -54,7 +55,7 @@ function buildResponse(buildResult: string) {
 core_message.addListener("build", buildResponse);
 
 // 55
-export function version(): Promise<string> {
+export function esbuildVersion(): Promise<string> {
     const payload = new Uint8Array([55]);
     return bridge(payload, ([str]) => str);
 }

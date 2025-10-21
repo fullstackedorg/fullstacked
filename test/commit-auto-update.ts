@@ -71,7 +71,7 @@ editorProcess = child_process.exec(`node index.js ${repo}`, {
         FULLSTACKED_LIB: path.resolve(process.cwd(), "core", "bin"),
         FULLSTACKED_ROOT: path.resolve(testDirectory, "root"),
         FULLSTACKED_CONFIG: path.resolve(testDirectory, "config"),
-        FULLSTACKED_EDITOR: path.resolve(process.cwd(), "out", "editor")
+        FULLSTACKED_EDITOR: path.resolve(process.cwd(), "out", "build")
     }
 });
 editorProcess.stdout.pipe(process.stdout);
@@ -123,6 +123,8 @@ async function writeFileContent(file: string, content: string) {
         }
     }
 }
+
+await sleep(1000);
 
 const sampleProjectDir = path.resolve("test", "sample-project");
 const sampleProjectItems = fs.readdirSync(sampleProjectDir);
@@ -256,7 +258,7 @@ editorProcess2 = child_process.exec(`node index.js ${repo}`, {
         FULLSTACKED_LIB: path.resolve(process.cwd(), "core", "bin"),
         FULLSTACKED_ROOT: path.resolve(testDirectory2, "root"),
         FULLSTACKED_CONFIG: path.resolve(testDirectory2, "config"),
-        FULLSTACKED_EDITOR: path.resolve(process.cwd(), "out", "editor")
+        FULLSTACKED_EDITOR: path.resolve(process.cwd(), "out", "build")
     }
 });
 editorProcess2.stdout.pipe(process.stdout);
@@ -273,6 +275,8 @@ const projectTitle = await (
 
 assert.equal(await projectTitle.jsonValue(), repoName);
 
+await sleep(1000)
+
 const editorPage2Back = await editorPage2.waitForSelector(".back-button");
 await editorPage2Back.click();
 
@@ -288,7 +292,7 @@ kioskProcess = child_process.exec(`node index.js --kiosk ${repoName}`, {
         FULLSTACKED_LIB: path.resolve(process.cwd(), "core", "bin"),
         FULLSTACKED_ROOT: path.resolve(testDirectory2, "root"),
         FULLSTACKED_CONFIG: path.resolve(testDirectory2, "config"),
-        FULLSTACKED_EDITOR: path.resolve(process.cwd(), "out", "editor")
+        FULLSTACKED_EDITOR: path.resolve(process.cwd(), "out", "build")
     }
 });
 kioskProcess.stdout.pipe(process.stdout);

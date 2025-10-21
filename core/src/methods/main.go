@@ -10,7 +10,7 @@ import (
 	archive "fullstackedorg/fullstacked/src/archive"
 	build "fullstackedorg/fullstacked/src/build"
 	config "fullstackedorg/fullstacked/src/config"
-	"fullstackedorg/fullstacked/src/connect"
+	connect "fullstackedorg/fullstacked/src/connect"
 	fetch "fullstackedorg/fullstacked/src/fetch"
 	fs "fullstackedorg/fullstacked/src/fs"
 	git "fullstackedorg/fullstacked/src/git"
@@ -19,7 +19,7 @@ import (
 	serialize "fullstackedorg/fullstacked/src/serialize"
 	setup "fullstackedorg/fullstacked/src/setup"
 	staticFiles "fullstackedorg/fullstacked/src/staticFiles"
-	"fullstackedorg/fullstacked/src/utils"
+	utils "fullstackedorg/fullstacked/src/utils"
 )
 
 const (

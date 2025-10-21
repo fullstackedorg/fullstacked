@@ -35,7 +35,7 @@ editorProcess1 = child_process.exec("node index.js", {
             ".config",
             "fullstacked"
         ),
-        FULLSTACKED_EDITOR: path.resolve(process.cwd(), "out", "editor")
+        FULLSTACKED_EDITOR: path.resolve(process.cwd(), "out", "build")
     }
 });
 editorProcess1.stdout.pipe(process.stdout);
@@ -108,7 +108,7 @@ editorProcess2 = child_process.exec(
                 ".config",
                 "fullstacked"
             ),
-            FULLSTACKED_EDITOR: path.resolve(process.cwd(), "out", "editor")
+            FULLSTACKED_EDITOR: path.resolve(process.cwd(), "out", "build")
         }
     }
 );

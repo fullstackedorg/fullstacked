@@ -7,8 +7,10 @@ import { createRequire } from "node:module";
 import { buildCore } from "./build-core";
 import { createInstance } from "./platform/node/src/instance";
 import { serializeArgs } from "./fullstacked_modules/bridge/serialization";
-import { buildSASS } from "./build-sass";
+import { buildSASS } from "./fullstacked_modules/build/sass";
 import version from "./version";
+import { esbuildVersion } from "./fullstacked_modules/build";
+import esbuild from "esbuild";
 globalThis.require = createRequire(import.meta.url);
 
 const exit = () => process.exit();
@@ -71,9 +73,22 @@ const instance = createInstance("", true);
 instance.call(new Uint8Array([56, ...serializeArgs([project, 0])]));
 
 const outDir = "out";
-const assetsDir = [
+const assets = [
     [`${project}/assets`, "assets"],
-    ["node_modules/@fullstacked/ui/icons", "icons"]
+    ["node_modules/@fullstacked/ui/icons", "icons"],
+    ["fullstacked_modules", "fullstacked_modules"],
+    [
+        "node_modules/@fullstacked/ai-agent",
+        "fullstacked_modules/@fullstacked/ai-agent"
+    ],
+    ["node_modules/zod", "fullstacked_modules/zod"]
+];
+const toBundle = [
+    ["node_modules/sass/sass.default.js", "fullstacked_modules/sass/index.js"],
+    [
+        "node_modules/@fullstacked/ui/ui.ts",
+        "fullstacked_modules/@fullstacked/ui/index.js"
+    ]
 ];
 
 function postBuild() {
@@ -83,9 +98,19 @@ function postBuild() {
     fs.mkdirSync(outDir);
     fs.renameSync(`${project}/.build`, `${outDir}/build`);
 
-    assetsDir.forEach(([form, to]) => {
+    assets.forEach(([form, to]) => {
         fs.cpSync(form, `${outDir}/build/${to}`, { recursive: true });
     });
+
+    toBundle.forEach(([from, to]) =>
+        esbuild.buildSync({
+            entryPoints: [from],
+            outfile: `${outDir}/build/${to}`,
+            bundle: true,
+            platform: "browser",
+            format: "esm"
+        })
+    );
 
     fs.writeFileSync(`${outDir}/build/version.json`, JSON.stringify(version));
 

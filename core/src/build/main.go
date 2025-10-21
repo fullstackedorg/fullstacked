@@ -149,10 +149,15 @@ func (p *ProjectBuild) buildStyle(entryPoint string) StyleBuildResult {
 		}
 	}
 
+	projectId := p.ProjectID
+	if p.ProjectID == p.OriginID {
+		projectId = ""
+	}
+
 	wg := &sync.WaitGroup{}
 	styleBuild := StyleBuild{
 		ID:         utils.RandString(6),
-		ProjectID:  p.ProjectID,
+		ProjectID:  projectId,
 		EntryPoint: entryPoint,
 		Wg:         wg,
 	}
