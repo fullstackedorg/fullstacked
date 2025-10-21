@@ -1,18 +1,21 @@
 import * as sass from "sass";
 
-export async function buildSASS(entryData: string, opts: {
-    canonicalize: (filePath: string) => URL | Promise<URL>,
-    load: (url: URL) => string | Promise<string>
-}) {
+export async function buildSASS(
+    entryData: string,
+    opts: {
+        canonicalize: (filePath: string) => URL | Promise<URL>;
+        load: (url: URL) => string | Promise<string>;
+    }
+) {
     try {
         const { css } = await sass.compileStringAsync(entryData, {
             importer: {
-                load: async url => ({
+                load: async (url) => ({
                     syntax: url.pathname.endsWith(".sass")
                         ? "indented"
                         : url.pathname.endsWith(".scss")
-                            ? "scss"
-                            : "css",
+                          ? "scss"
+                          : "css",
                     contents: await opts.load(url)
                 }),
                 canonicalize: opts.canonicalize
@@ -23,7 +26,7 @@ export async function buildSASS(entryData: string, opts: {
             errors: []
         };
     } catch (e) {
-        console.log(e)
+        console.log(e);
         const File = e.span.url?.pathname;
         const Line = e.span.start.line + 1;
         const Column = e.span.start.column;

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
 	"os/signal"
+	"runtime"
 	"syscall"
 
 	"github.com/microsoft/typescript-go/internal/bundled"
@@ -95,7 +95,7 @@ func runLSP(
 	}
 	close(end)
 	out.Write([]byte{})
-	fmt.Println("LSP END")	
+	fmt.Println("LSP END")
 }
 
 func getGlobalTypingsCacheLocation() string {
