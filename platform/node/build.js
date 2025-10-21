@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import url from "node:url";
 import fs from "node:fs";
-import { buildNodeBinding } from "./build-binding.js"
+import { buildNodeBinding } from "./build-binding.js";
 
 const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(currentDirectory, "..", "..");
@@ -33,4 +33,4 @@ fs.cpSync(
     { recursive: true }
 );
 
-buildNodeBinding(currentDirectory) 
+buildNodeBinding(currentDirectory);

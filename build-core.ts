@@ -8,13 +8,13 @@ export function buildCore() {
         child_process.execSync("./window.bat", {
             stdio: "inherit",
             cwd: "core/build"
-        })
+        });
     } else {
         const arch = os.arch();
         const target_name = platform + "-" + arch + "-shared";
         child_process.execSync(`make ${target_name}`, {
             stdio: "inherit",
             cwd: "core/build"
-        })
+        });
     }
-} 
+}

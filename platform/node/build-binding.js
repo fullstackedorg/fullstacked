@@ -1,4 +1,3 @@
-
 import os from "node:os";
 import path from "node:path";
 import url from "node:url";
@@ -18,7 +17,10 @@ export function buildNodeBinding(directory) {
         targets: [
             {
                 target_name,
-                sources: ["bridge.cc", platform === "win32" ? "win.cc" : "unix.cc"],
+                sources: [
+                    "bridge.cc",
+                    platform === "win32" ? "win.cc" : "unix.cc"
+                ],
                 include_dirs: [
                     "<!@(node -p \"require('node-addon-api').include\")"
                 ],

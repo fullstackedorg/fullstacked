@@ -8,13 +8,11 @@ import { buildCore } from "./build-core";
 import { createInstance } from "./platform/node/src/instance";
 import { serializeArgs } from "./fullstacked_modules/bridge/serialization";
 import { buildSASS } from "./build-sass";
-import version from "./version"
+import version from "./version";
 globalThis.require = createRequire(import.meta.url);
 
 const exit = () => process.exit();
-["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) =>
-    process.on(signal, exit)
-);
+["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => process.on(signal, exit));
 
 buildCore();
 
@@ -26,41 +24,37 @@ setCallback((_, messageType, message) => {
     if (messageType === "build-style") {
         const { id, entryPoint } = JSON.parse(message);
         const result = buildSASS(entryPoint);
-        instance.call(new Uint8Array([
-            58,
-            ...serializeArgs([id, JSON.stringify(result)])
-        ]))
+        instance.call(
+            new Uint8Array([58, ...serializeArgs([id, JSON.stringify(result)])])
+        );
     } else if (messageType === "build") {
-        const { errors } = JSON.parse(message)
+        const { errors } = JSON.parse(message);
 
         if (errors.length) {
-            errors.forEach(e => {
-                console.log(`${e.Location.File}#${e.Location.Line}`)
-                console.log(e.Text + "\n")
+            errors.forEach((e) => {
+                console.log(`${e.Location.File}#${e.Location.Line}`);
+                console.log(e.Text + "\n");
             });
-            throw "failed"
+            throw "failed";
         } else {
             postBuild();
         }
 
         exit();
     }
-})
+});
 
 setDirectories({
     root: process.cwd(),
     config: "",
     editor: "",
     tmp: path.resolve(process.cwd(), ".cache")
-})
+});
 
 const project = "editor";
 
 const instance = createInstance("", true);
-instance.call(new Uint8Array([
-    56,
-    ...serializeArgs([project, 0])
-]))
+instance.call(new Uint8Array([56, ...serializeArgs([project, 0])]));
 
 const outDir = "out";
 const assetsDir = [
@@ -70,28 +64,32 @@ const assetsDir = [
 
 function postBuild() {
     if (fs.existsSync(outDir)) {
-        fs.rmSync(outDir, { recursive: true })
+        fs.rmSync(outDir, { recursive: true });
     }
     fs.mkdirSync(outDir);
-    fs.renameSync(`${project}/.build`, `${outDir}/build`)
+    fs.renameSync(`${project}/.build`, `${outDir}/build`);
 
     assetsDir.forEach(([form, to]) => {
         fs.cpSync(form, `${outDir}/build/${to}`, { recursive: true });
-    })
+    });
 
     fs.writeFileSync(`${outDir}/build/version.json`, JSON.stringify(version));
-    
+
     // zip demo
-    instance.call(new Uint8Array([
-        36,
-        ...serializeArgs([`demo`, `${outDir}/build/demo.zip`])
-    ]))
+    instance.call(
+        new Uint8Array([
+            36,
+            ...serializeArgs([`demo`, `${outDir}/build/demo.zip`])
+        ])
+    );
 
     // zip build
-    instance.call(new Uint8Array([
-        36,
-        ...serializeArgs([`${outDir}/build`, `${outDir}/build.zip`])
-    ]))
+    instance.call(
+        new Uint8Array([
+            36,
+            ...serializeArgs([`${outDir}/build`, `${outDir}/build.zip`])
+        ])
+    );
 
-    console.log("Success")
-} 
+    console.log("Success");
+}
