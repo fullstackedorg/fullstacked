@@ -113,6 +113,7 @@ type StyleBuildResult struct {
 
 type StyleBuild struct {
 	ID         string           `json:"id"`
+	ProjectID  string           `json:"projectId"`
 	EntryPoint string           `json:"entryPoint"`
 	Wg         *sync.WaitGroup  `json:"-"`
 	Result     StyleBuildResult `json:"result"`
@@ -151,7 +152,8 @@ func (p *ProjectBuild) buildStyle(entryPoint string) StyleBuildResult {
 	wg := &sync.WaitGroup{}
 	styleBuild := StyleBuild{
 		ID:         utils.RandString(6),
-		EntryPoint: filePath,
+		ProjectID:  p.ProjectID,
+		EntryPoint: entryPoint,
 		Wg:         wg,
 	}
 	activeStyleBuild[styleBuild.ID] = &styleBuild
@@ -374,7 +376,7 @@ func (p *ProjectBuild) Build() BuildResult {
 	}
 
 	resultJson, _ := json.Marshal(result)
-	setup.Callback(p.ProjectID, "build", string(resultJson))
+	setup.Callback(p.OriginID, "build", string(resultJson))
 	fs.Rmdir(tmpBuildDirectory, fileEventOrigin)
 
 	return result

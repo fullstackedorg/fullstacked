@@ -1,10 +1,13 @@
 package tsgo
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"runtime"
+	"os/signal"
+	"syscall"
 
 	"github.com/microsoft/typescript-go/internal/bundled"
 	"github.com/microsoft/typescript-go/internal/core"
@@ -74,20 +77,25 @@ func runLSP(
 		FS:                 fs,
 		DefaultLibraryPath: defaultLibraryPath,
 		TypingsLocation:    typingsLocation,
+		NpmInstall: func(cwd string, args []string) ([]byte, error) {
+			return nil, nil
+		},
 	})
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	fmt.Println("LSP START")
-	if err := s.Run(); err != nil {
+	if err := s.Run(ctx); err != nil {
 		if err.Error() == "context canceled" {
 			os.Exit(0)
 		} else {
 			fmt.Println(err)
 		}
 	}
-
 	close(end)
 	out.Write([]byte{})
-	fmt.Println("LSP END")
+	fmt.Println("LSP END")	
 }
 
 func getGlobalTypingsCacheLocation() string {

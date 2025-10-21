@@ -20,10 +20,17 @@ buildNodeBinding("platform/node");
 
 load(await getLibPath("core/bin"), "platform/node");
 
-setCallback((_, messageType, message) => {
+const project = "editor";
+
+setCallback(async (_, messageType, message) => {
     if (messageType === "build-style") {
-        const { id, entryPoint } = JSON.parse(message);
-        const result = buildSASS(entryPoint);
+        const { id, entryPoint, projectId } = JSON.parse(message);
+        const result = await buildSASS(fs.readFileSync(path.join(projectId, entryPoint), { encoding: "utf8" }), {
+            canonicalize: (filePath) => filePath.startsWith("file://")
+                ? new URL(filePath)
+                : new URL(path.resolve(process.cwd(), projectId, filePath), "file://"),
+            load: (url) => fs.readFileSync(url, { encoding: "utf8" })
+        });
         instance.call(
             new Uint8Array([58, ...serializeArgs([id, JSON.stringify(result)])])
         );
@@ -50,8 +57,6 @@ setDirectories({
     editor: "",
     tmp: path.resolve(process.cwd(), ".cache")
 });
-
-const project = "editor";
 
 const instance = createInstance("", true);
 instance.call(new Uint8Array([56, ...serializeArgs([project, 0])]));
