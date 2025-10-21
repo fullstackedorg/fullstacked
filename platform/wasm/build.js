@@ -10,10 +10,7 @@ fs.mkdirSync("out/site", { recursive: true });
 fs.cpSync("../../core/bin/fullstacked.wasm", "out/bin/fullstacked.wasm");
 fs.cpSync("../../core/bin/wasm_exec.js", "out/bin/wasm_exec.js");
 
-const editorZipFileName = fs
-    .readdirSync("../../out/zip")
-    .find((item) => item.startsWith("editor"));
-fs.cpSync(`../../out/zip/${editorZipFileName}`, "out/bin/editor.zip");
+fs.cpSync(`../../out/build.zip`, "out/bin/editor.zip");
 
 esbuild.buildSync({
     entryPoints: ["src/index.ts"],

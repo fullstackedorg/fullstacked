@@ -257,7 +257,6 @@ func (p *ProjectBuild) buildJS(
 			OutputPath: "index",
 		}},
 		AllowOverwrite: true,
-		Splitting:      !fs.WASM,
 		Outdir:         tmpBuildDirectory,
 		Bundle:         true,
 		Format:         esbuild.FormatESModule,
