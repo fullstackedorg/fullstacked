@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"path"
 	"path/filepath"
@@ -210,7 +209,6 @@ func DirectoryToFileEntries(in string, skip []string) ([]FileEntry, error) {
 }
 
 func ZipFileToFileSerialized(in string, out string, skip []string) []byte {
-	fmt.Println(in, out)
 	entries, err := DirectoryToFileEntries(in, skip)
 
 	if err != nil {

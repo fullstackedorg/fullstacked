@@ -223,10 +223,10 @@ func Call(payload []byte) []byte {
 			buildId = args[0].(float64)
 		}
 
-		go build.Build(buildProjectId, buildId)
+		go build.Build(buildProjectId, buildId, projectId)
 	case method == BUILD_SASS_RESPONSE:
 		styleBuildResult := build.StyleBuildResult{}
-		json.Unmarshal([]byte(args[1].(string)), styleBuildResult)
+		json.Unmarshal([]byte(args[1].(string)), &styleBuildResult)
 		build.StyleBuildResponse(args[0].(string), styleBuildResult)
 	case method == BUILD_SHOULD_BUILD:
 		projectDirectory := setup.Directories.Root + "/" + args[0].(string)

@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import url from "node:url";
 import fs from "node:fs";
-import {buildNodeBinding} from "./build-binding.js"
+import { buildNodeBinding } from "./build-binding.js"
 
 const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(currentDirectory, "..", "..");
@@ -28,9 +28,9 @@ if (fs.existsSync(fullstackedModulesDirectory)) {
 }
 
 fs.cpSync(
-    path.resolve(rootDirectory, "out", "editor", "fullstacked_modules"),
+    path.resolve(rootDirectory, "fullstacked_modules"),
     fullstackedModulesDirectory,
     { recursive: true }
 );
 
-buildNodeBinding(currentDirectory)
+buildNodeBinding(currentDirectory) 

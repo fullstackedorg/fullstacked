@@ -8,7 +8,6 @@ import {
 import { toByteArray } from "../../../fullstacked_modules/base64";
 import { cbListener } from ".";
 import type { Message } from "esbuild";
-import { buildSASS } from "../../../fullstacked_modules/esbuild/sass";
 
 function quickInstallPacakge(editorHeader: Uint8Array) {
     return new Promise<void>((resolve) => {
@@ -57,20 +56,6 @@ export async function buildLocalProject() {
             }
         };
         cbListener.add(cb);
-
-        // build sasss
-        await buildSASS({
-            mkdir: async (p) => {
-                await promises.mkdir(p, { recursive: true });
-                return true;
-            },
-            readdir: promises.readdir,
-            writeFile: async (p, d) => {
-                await promises.writeFile(p, d);
-                return true;
-            },
-            readFile: promises.readFile
-        });
 
         // esbuild build
         callLib(

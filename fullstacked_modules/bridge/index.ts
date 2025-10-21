@@ -9,11 +9,10 @@ import { BridgeNode, initCallbackNode } from "./platform/node";
 import { BridgeWasm } from "./platform/wasm";
 import { BridgeWindows, initRespondWindows } from "./platform/windows";
 import git from "../git";
-import esbuild from "../esbuild";
+import build from "../build";
 import { SnackBar } from "../components/snackbar";
 import { Button } from "@fullstacked/ui";
 import { serializeArgs } from "./serialization";
-import { buildSASS } from "../esbuild/sass";
 import fs from "../fs";
 import packages from "../packages";
 
@@ -106,8 +105,7 @@ if (await git.hasGit()) {
 
 async function update() {
     await packages.installQuick();
-    await buildSASS(fs);
-    return esbuild.build();
+    return build.buildProject();
 }
 
 // 40

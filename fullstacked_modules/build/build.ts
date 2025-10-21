@@ -22,6 +22,7 @@ const activeBuilds = new Map<
 >();
 
 function buildResponse(buildResult: string) {
+    console.log(buildResult)
     const responseData = toByteArray(buildResult);
     const [id, errorsStr] = deserializeArgs(responseData);
     const activeBuild = activeBuilds.get(id);
@@ -29,19 +30,19 @@ function buildResponse(buildResult: string) {
     if (!errorsStr) {
         activeBuild.resolve([]);
     } else {
-        const errors = JSON.parse(errorsStr);
+        const { errors } = JSON.parse(errorsStr);
         const messages = errors?.map(uncapitalizeKeys).map((error) => ({
             ...error,
             location: error.location
                 ? {
-                      ...error.location,
-                      file: error.location.file.includes(activeBuild.project.id)
-                          ? activeBuild.project.id +
-                            error.location.file
-                                .split(activeBuild.project.id)
-                                .pop()
-                          : error.location.file
-                  }
+                    ...error.location,
+                    file: error.location.file.includes(activeBuild.project.id)
+                        ? activeBuild.project.id +
+                        error.location.file
+                            .split(activeBuild.project.id)
+                            .pop()
+                        : error.location.file
+                }
                 : null
         }));
         activeBuild.resolve(messages);
@@ -51,7 +52,7 @@ function buildResponse(buildResult: string) {
 }
 
 // 56
-export function build(project?: Project): Promise<Message[]> {
+export function buildProject(project?: Project): Promise<Message[]> {
     if (!addedListener) {
         core_message.addListener("build", buildResponse);
         addedListener = true;
@@ -63,7 +64,7 @@ export function build(project?: Project): Promise<Message[]> {
     args.push(buildId);
 
     const payload = new Uint8Array([56, ...serializeArgs(args)]);
-
+    
     return new Promise((resolve) => {
         activeBuilds.set(buildId, {
             project,

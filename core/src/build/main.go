@@ -10,7 +10,6 @@ import (
 	"path"
 	"path/filepath"
 	"runtime/debug"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -32,7 +31,7 @@ func EsbuildVersion() string {
 }
 
 func findEntryPoint(directory string, filenames []string) *string {
-	items, _ := fs.ReadDir(directory, false, true, []string{})
+	items, _ := fs.ReadDir(directory, false, false, []string{})
 
 	entryPoint := (*string)(nil)
 
@@ -85,6 +84,7 @@ func ShouldBuild(projectDirectory string) bool {
 type ProjectBuild struct {
 	BuildID   float64
 	ProjectID string
+	OriginID  string
 }
 
 type BuildResult struct {
@@ -92,10 +92,15 @@ type BuildResult struct {
 	Errors []esbuild.Message `json:"errors"`
 }
 
-func Build(projectId string, buildId float64) BuildResult {
+func Build(
+	projectId string,
+	buildId float64,
+	originId string,
+) BuildResult {
 	projectBuild := ProjectBuild{
 		BuildID:   buildId,
 		ProjectID: projectId,
+		OriginID:  originId,
 	}
 
 	return projectBuild.Build()
@@ -156,7 +161,7 @@ func (p *ProjectBuild) buildStyle(entryPoint string) StyleBuildResult {
 
 	jsonData, _ := json.Marshal(styleBuild)
 	jsonStr := string(jsonData)
-	setup.Callback(p.ProjectID, "build-style", jsonStr)
+	setup.Callback(p.OriginID, "build-style", jsonStr)
 
 	styleBuild.Wg.Wait()
 
@@ -230,6 +235,11 @@ func (p *ProjectBuild) buildJS(entryPoint string, styleEntryPoint *string) esbui
 	}
 
 	// build
+	fullstackedModulesDir := findEntryPoint(setup.Directories.Root, []string{
+		"fullstacked_modules",
+		".fullstacked_modules",
+	})
+
 	result := esbuild.Build(esbuild.BuildOptions{
 		EntryPointsAdvanced: []esbuild.EntryPoint{{
 			InputPath:  filepath.ToSlash(intermediateFilePath),
@@ -244,7 +254,7 @@ func (p *ProjectBuild) buildJS(entryPoint string, styleEntryPoint *string) esbui
 		Write:          false,
 		Plugins:        plugins,
 		NodePaths: []string{
-			path.Join(setup.Directories.Root, ".fullstacked_modules"),
+			path.Join(setup.Directories.Root, *fullstackedModulesDir),
 			path.Join(projectDirectory, "node_modules"),
 		},
 	})
@@ -292,7 +302,7 @@ func (p *ProjectBuild) Build() BuildResult {
 		Errors: []esbuild.Message{},
 	}
 
-	tmpBuildDirectory := path.Join(setup.Directories.Tmp, strconv.Itoa(int(p.BuildID)))
+	tmpBuildDirectory := path.Join(setup.Directories.Tmp, utils.RandString(6))
 
 	exists, _ := fs.Exists(tmpBuildDirectory)
 	if exists {
