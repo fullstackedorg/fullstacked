@@ -14,7 +14,7 @@ const arch = os.arch();
 
 // build editor
 
-child_process.execSync("npm run build -- -- --production", {
+child_process.execSync("npm run build", {
     cwd: rootDirectory,
     stdio: "inherit"
 });

@@ -17,14 +17,24 @@ const rootDirectory = path.resolve(currentDirectory, "..", "..");
 
 // build editor
 
-child_process.execSync("npm run build -- -- --production", {
+child_process.execSync("npm run build", {
     cwd: rootDirectory,
     stdio: "inherit"
 });
 
 // build core
 
-child_process.execSync("cmd.exe /c windows.bat", {
+child_process.execSync("call ./windows.bat arm64", {
+    cwd: path.resolve(rootDirectory, "core", "build"),
+    stdio: "inherit"
+});
+
+child_process.execSync("call ./windows.bat x64", {
+    cwd: path.resolve(rootDirectory, "core", "build"),
+    stdio: "inherit"
+});
+
+child_process.execSync("call ./windows.bat copy", {
     cwd: path.resolve(rootDirectory, "core", "build"),
     stdio: "inherit"
 });
