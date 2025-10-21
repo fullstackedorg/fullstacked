@@ -18,11 +18,11 @@
 		9C91B3C22E0CFAFD00CF54B7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9C91B3BF2E0CF89200CF54B7 /* Assets.xcassets */; };
 		9C91B3C32E0CFAFD00CF54B7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9C91B3BF2E0CF89200CF54B7 /* Assets.xcassets */; };
 		9CA03E522B5715AA002D2D9F /* Main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CA03E512B5715AA002D2D9F /* Main.swift */; };
-		9CB389912B863B0A00FB783E /* editor in Resources */ = {isa = PBXBuildFile; fileRef = 9CB389902B863B0A00FB783E /* editor */; };
+		9CBD6C842EA813A9000C96BC /* build in Resources */ = {isa = PBXBuildFile; fileRef = 9CBD6C832EA8137B000C96BC /* build */; };
+		9CBD6C852EA81431000C96BC /* build in Resources */ = {isa = PBXBuildFile; fileRef = 9CBD6C832EA8137B000C96BC /* build */; };
 		9CDBCDA32CF7F8070035BF46 /* WebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5A1EDE2CDB9AD6009B4A20 /* WebView.swift */; };
 		9CDBCDA42CF7F8070035BF46 /* Instance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5A1EDC2CDB9AB4009B4A20 /* Instance.swift */; };
 		9CDBCDA92CF7F8070035BF46 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9C7E8A622BA9BF1600CE9660 /* PrivacyInfo.xcprivacy */; };
-		9CDBCDAA2CF7F8070035BF46 /* editor in Resources */ = {isa = PBXBuildFile; fileRef = 9CB389902B863B0A00FB783E /* editor */; };
 		9CDBCDB32CF7F9BF0035BF46 /* WebViewUIKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CDBCDB12CF7F9B00035BF46 /* WebViewUIKit.swift */; };
 		9CDBCDB82CF7F9F50035BF46 /* WebViewAppKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CDBCDB52CF7F9F50035BF46 /* WebViewAppKit.swift */; };
 		9CDBCDB92CF7FAB80035BF46 /* Main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CA03E512B5715AA002D2D9F /* Main.swift */; };
@@ -42,7 +42,7 @@
 		9C9902662CE792E80039D1F0 /* mac-catalyst-x86_64.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "mac-catalyst-x86_64.a"; path = "../../../core/bin/mac-catalyst-x86_64.a"; sourceTree = "<group>"; };
 		9CA03E4C2B5715AA002D2D9F /* FullStacked.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FullStacked.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9CA03E512B5715AA002D2D9F /* Main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Main.swift; sourceTree = "<group>"; };
-		9CB389902B863B0A00FB783E /* editor */ = {isa = PBXFileReference; lastKnownFileType = folder; name = editor; path = ../../../out/editor; sourceTree = "<group>"; };
+		9CBD6C832EA8137B000C96BC /* build */ = {isa = PBXFileReference; lastKnownFileType = folder; name = build; path = ../../../out/build; sourceTree = "<group>"; };
 		9CDBCDAF2CF7F8070035BF46 /* FullStacked.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FullStacked.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9CDBCDB12CF7F9B00035BF46 /* WebViewUIKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewUIKit.swift; sourceTree = "<group>"; };
 		9CDBCDB52CF7F9F50035BF46 /* WebViewAppKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewAppKit.swift; sourceTree = "<group>"; };
@@ -115,10 +115,10 @@
 				9C8003182E85B87E003D0FBA /* AppIcon.icon */,
 				9C5A1ED82CDB998F009B4A20 /* bin */,
 				9C7081332BE6CBA100EF0A6B /* FullStacked.entitlements */,
-				9CB389902B863B0A00FB783E /* editor */,
 				9CE2142E2B5E17AA00B3F646 /* Info.plist */,
 				9C8C8A2D2D2CEA1400C4B8AD /* FullStacked.swift */,
 				9CA03E512B5715AA002D2D9F /* Main.swift */,
+				9CBD6C832EA8137B000C96BC /* build */,
 				9C5A1EDE2CDB9AD6009B4A20 /* WebView.swift */,
 				9CDBCDB12CF7F9B00035BF46 /* WebViewUIKit.swift */,
 				9CDBCDB52CF7F9F50035BF46 /* WebViewAppKit.swift */,
@@ -211,10 +211,10 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9CBD6C852EA81431000C96BC /* build in Resources */,
 				9C7E8A632BAA038500CE9660 /* PrivacyInfo.xcprivacy in Resources */,
 				9C80031A2E85B87E003D0FBA /* AppIcon.icon in Resources */,
 				9C91B3C22E0CFAFD00CF54B7 /* Assets.xcassets in Resources */,
-				9CB389912B863B0A00FB783E /* editor in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -222,10 +222,10 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9CBD6C842EA813A9000C96BC /* build in Resources */,
 				9CDBCDA92CF7F8070035BF46 /* PrivacyInfo.xcprivacy in Resources */,
 				9C8003192E85B87E003D0FBA /* AppIcon.icon in Resources */,
 				9C91B3C32E0CFAFD00CF54B7 /* Assets.xcassets in Resources */,
-				9CDBCDAA2CF7F8070035BF46 /* editor in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
