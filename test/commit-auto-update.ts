@@ -275,7 +275,7 @@ const projectTitle = await (
 
 assert.equal(await projectTitle.jsonValue(), repoName);
 
-await sleep(1000)
+await sleep(1000);
 
 const editorPage2Back = await editorPage2.waitForSelector(".back-button");
 await editorPage2Back.click();

@@ -31,12 +31,19 @@ setCallback(async (_, messageType, message) => {
                 encoding: "utf8"
             }),
             {
-                canonicalize: (filePath) => filePath.startsWith("file://")
-                    ? new URL(filePath)
-                    : new URL(
-                        "file://" + path.resolve(process.cwd(), projectId, filePath)
-                            .replace(/\\/g, "/")
-                    ),
+                canonicalize: (filePath) =>
+                    filePath.startsWith("file://")
+                        ? new URL(filePath)
+                        : new URL(
+                              "file://" +
+                                  path
+                                      .resolve(
+                                          process.cwd(),
+                                          projectId,
+                                          filePath
+                                      )
+                                      .replace(/\\/g, "/")
+                          ),
                 load: (url) => fs.readFileSync(url, { encoding: "utf8" })
             }
         );
