@@ -152,7 +152,7 @@ std::vector<unsigned char> Instance::callLib(char *data, int size) {
     return response;
 }
 
-void Instance::onMessage(char *type, char *message) {
+void Instance::onMessage(char *type, std::string message) {
     if (isEditor && std::string(type) == "open") {
         App::instance->open(std::string(message), false);
         return;

@@ -5,7 +5,7 @@ App::App() {
     App::instance = this;
 }
 
-void App::onMessage(char *projectId, char *type, char *message) {
+void App::onMessage(char *projectId, char *type, std::string message) {
     auto exists = activeWindows.find(projectId);
     if (exists != activeWindows.end()) {
         exists->second->onMessage(type, message);

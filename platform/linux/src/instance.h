@@ -21,7 +21,7 @@ class Instance {
 
         std::string onBridge(std::string payload);
 
-        void onMessage(char *type, char *message);
+        void onMessage(char *type, std::string message);
 };
 
 #endif
