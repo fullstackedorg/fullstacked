@@ -12,7 +12,7 @@ import fs from "../fs";
 core_message.addListener("build-style", async (messageStr) => {
     console.log(messageStr)
     const { id, entryPoint, projectId } = JSON.parse(messageStr);
-    const result = await buildSASS(await fs.readFile(projectId + "/" + entryPoint, { encoding: "utf8" }), {
+    const result = await buildSASS(entryPoint, {
         canonicalize: (filePath) => new URL(filePath, "file://"),
         load: (url) => fs.readFile(projectId + url.pathname, { encoding: "utf8" })
     })

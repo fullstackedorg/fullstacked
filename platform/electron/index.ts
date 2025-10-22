@@ -4,7 +4,7 @@ import {
     deserializeArgs,
     numberTo4Bytes
 } from "../../fullstacked_modules/bridge/serialization";
-import { load, setCallback, setDirectories } from "../node/src/call";
+import { load, setDirectories,CoreCallbackListeners } from "../node/src/call";
 import path from "node:path";
 import os from "node:os";
 import { getLibPath } from "../node/src/lib";
@@ -29,11 +29,14 @@ async function init() {
         }
 
         const window = instances.get(projectId)?.window;
+        message = message
+                .replace(/\\/g, "\\\\")
+                .replace(/`/g, "\\`");
         window?.webContents?.executeJavaScript(
             `window.oncoremessage( \`${messageType}\`, \`${message}\` )`
         );
     };
-    setCallback(cb);
+    CoreCallbackListeners.add(cb);
 
     const root = path.resolve(os.homedir(), "FullStacked");
     const editorDirectory = path.resolve(

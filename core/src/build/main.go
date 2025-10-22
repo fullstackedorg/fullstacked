@@ -176,25 +176,24 @@ func (p *ProjectBuild) buildStyle(entryPoint string) StyleBuildResult {
 }
 
 func (p *ProjectBuild) buildJS(
-	entryPoint string,
+	entryPoint *string,
 	styleEntryPoint *string,
 	tmpBuildDirectory string,
 ) esbuild.BuildResult {
 	intermediateFilePath := path.Join(setup.Directories.Tmp, utils.RandString(10)+".js")
-	entryPointJSPath := path.Join(setup.Directories.Root, p.ProjectID, entryPoint)
 
-	if styleEntryPoint == nil {
-		fs.WriteFile(intermediateFilePath, []byte(`
-			import "bridge";
-			import "`+entryPointJSPath+`"
-		`), fileEventOrigin)
-	} else {
-		fs.WriteFile(intermediateFilePath, []byte(`
-			import "`+*styleEntryPoint+`";
-			import "bridge";
-			import "`+entryPointJSPath+`";
-		`), fileEventOrigin)
+	fileTemplate := "import \"bridge\";\nimport \"components/snackbar.css\";\n"
+
+	if entryPoint != nil {
+		entryPointJSPath := path.Join(setup.Directories.Root, p.ProjectID, *entryPoint)
+		fileTemplate += "import \"" + entryPointJSPath + "\";\n"
 	}
+
+	if styleEntryPoint != nil {
+		fileTemplate += "import \"" + *styleEntryPoint + "\";\n"
+	}
+
+	fs.WriteFile(intermediateFilePath, []byte(fileTemplate), fileEventOrigin)
 
 	projectDirectory := path.Join(setup.Directories.Root, p.ProjectID)
 
@@ -347,18 +346,16 @@ func (p *ProjectBuild) Build() BuildResult {
 		"index.tsx",
 	})
 
-	if entryPointJS != nil {
-		jsBuild := p.buildJS(
-			*entryPointJS,
-			entryPointStyleBuiltPtr,
-			tmpBuildDirectory,
-		)
-		if len(jsBuild.Errors) > 0 {
-			result.Errors = append(result.Errors, jsBuild.Errors...)
-		}
-		for _, file := range jsBuild.OutputFiles {
-			fs.WriteFile(file.Path, file.Contents, fileEventOrigin)
-		}
+	jsBuild := p.buildJS(
+		entryPointJS,
+		entryPointStyleBuiltPtr,
+		tmpBuildDirectory,
+	)
+	if len(jsBuild.Errors) > 0 {
+		result.Errors = append(result.Errors, jsBuild.Errors...)
+	}
+	for _, file := range jsBuild.OutputFiles {
+		fs.WriteFile(file.Path, file.Contents, fileEventOrigin)
 	}
 
 	htmlBuild := p.BuildHTML()

@@ -2,7 +2,7 @@
 import path from "node:path";
 import os from "node:os";
 import url from "node:url";
-import { load, setCallback, setDirectories } from "./call";
+import { load, setDirectories, CoreCallbackListeners } from "./call";
 import { createWebView } from "./webview";
 import { createInstance } from "./instance";
 import { buildLocalProject } from "./build";
@@ -20,7 +20,7 @@ if (libArgIndex !== -1) {
 } else if (typeof process.env.FULLSTACKED_LIB === "string") {
     libDirectory = process.env.FULLSTACKED_LIB;
 }
-load(await getLibPath(libDirectory));
+load(await getLibPath(libDirectory), currentDirectory);
 
 let deeplink: string = null,
     deeplinkMessaged = false;
@@ -53,10 +53,8 @@ function parseArgsForPath(arg: string, fallback: string = process.cwd()) {
     return path.resolve(process.cwd(), definedPath);
 }
 
-export const cbListener = new Set<typeof cb>();
-const cb = (projectId: string, messageType: string, message: string) => {
-    cbListener.forEach((c) => c(projectId, messageType, message));
 
+const cb = (projectId: string, messageType: string, message: string) => {
     if (projectId === "*") {
         for (const w of webViews.values()) {
             w.message(messageType, message);
@@ -70,7 +68,7 @@ const cb = (projectId: string, messageType: string, message: string) => {
     const webview = webViews.get(projectId);
     webview?.message(messageType, message);
 };
-setCallback(cb);
+CoreCallbackListeners.add(cb);
 
 const root = parseArgsForPath("root", process.cwd());
 setDirectories({
@@ -79,7 +77,7 @@ setDirectories({
     editor: parseArgsForPath("editor", currentDirectory),
     tmp:
         process.argv.includes("--root") ||
-        typeof process.env["FULLSTACKED_ROOT"] === "string"
+            typeof process.env["FULLSTACKED_ROOT"] === "string"
             ? path.resolve(root, ".tmp")
             : path.resolve(currentDirectory, ".tmp")
 });
@@ -103,14 +101,14 @@ async function openProject(id: string) {
 
 const mainInstanceId =
     process.argv.includes("--editor") ||
-    typeof process.env.FULLSTACKED_EDITOR === "string"
+        typeof process.env.FULLSTACKED_EDITOR === "string"
         ? process.argv.includes("--kiosk")
             ? process.argv.at(process.argv.indexOf("--kiosk") + 1)
             : ""
         : ".";
 
 if (mainInstanceId === ".") {
-    await buildLocalProject();
+    await buildLocalProject(mainInstanceId);
     setupDevFiles();
 }
 

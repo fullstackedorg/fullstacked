@@ -30,7 +30,7 @@ if (process.argv.includes("--binding")) {
     }
 
     fs.cpSync(
-        path.resolve(rootDirectory, "fullstacked_modules"),
+        path.resolve(rootDirectory, "out", "build", "fullstacked_modules"),
         fullstackedModulesDirectory,
         { recursive: true }
     );
