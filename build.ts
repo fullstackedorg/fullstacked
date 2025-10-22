@@ -131,9 +131,10 @@ function postBuild() {
     instance.call(
         new Uint8Array([
             36,
-            ...serializeArgs([`${outDir}/build`, `${outDir}/build.zip`])
+            ...serializeArgs([`${outDir}/build`, `${outDir}/zip/build.zip`])
         ])
     );
+    fs.writeFileSync(`${outDir}/zip/build.txt`, Date.now().toString());
 
     console.log("Success");
 }
