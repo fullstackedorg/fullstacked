@@ -41,7 +41,7 @@ async function init() {
         "..",
         "..",
         "out",
-        "editor"
+        "build"
     );
     setDirectories({
         root,

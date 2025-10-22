@@ -35,15 +35,15 @@ setCallback(async (_, messageType, message) => {
                     filePath.startsWith("file://")
                         ? new URL(filePath)
                         : new URL(
-                              "file://" +
-                                  path
-                                      .resolve(
-                                          process.cwd(),
-                                          projectId,
-                                          filePath
-                                      )
-                                      .replace(/\\/g, "/")
-                          ),
+                            "file://" +
+                            path
+                                .resolve(
+                                    process.cwd(),
+                                    projectId,
+                                    filePath
+                                )
+                                .replace(/\\/g, "/")
+                        ),
                 load: (url) => fs.readFileSync(url, { encoding: "utf8" })
             }
         );
@@ -93,6 +93,10 @@ const toBundle = [
     [
         "node_modules/@fullstacked/ui/ui.ts",
         "fullstacked_modules/@fullstacked/ui/index.js"
+    ],
+    [
+        "node_modules/@fullstacked/ai-agent/src/index.ts",
+        "fullstacked_modules/@fullstacked/ai-agent/ai-agent.js"
     ]
 ];
 
@@ -113,9 +117,12 @@ function postBuild() {
             outfile: `${outDir}/build/${to}`,
             bundle: true,
             platform: "browser",
-            format: "esm"
+            format: "esm",
+            external: ["fetch"]
         })
     );
+
+    updateAiAgentPackageJSON()
 
     fs.writeFileSync(`${outDir}/build/version.json`, JSON.stringify(version));
 
@@ -137,4 +144,13 @@ function postBuild() {
     fs.writeFileSync(`${outDir}/zip/build.txt`, Date.now().toString());
 
     console.log("Success");
+}
+
+function updateAiAgentPackageJSON() {
+    const filePath = `${outDir}/build/fullstacked_modules/@fullstacked/ai-agent/package.json`;
+    const pacakgeJSON = JSON.parse(fs.readFileSync(filePath, { encoding: "utf8" }));
+    pacakgeJSON.exports = {
+        ".": "./ai-agent.js"
+    }
+    fs.writeFileSync(filePath, JSON.stringify(pacakgeJSON, null, 2))
 }
