@@ -85,7 +85,7 @@ function postbuild() {
     assets.forEach(([form, to]) => {
         fs.cpSync(form, `${outDir}/build/${to}`, { recursive: true });
     });
-
+    
     toBundle.forEach(([from, to]) =>
         esbuild.buildSync({
             entryPoints: [from],
