@@ -26,9 +26,10 @@ IF "%arg1%" == "x64" (
     xcopy ..\bin\win32-x64.dll ..\..\platform\windows /y /q
 )
 
-IF "%arg1%" == "copy" (
-    SET "SOURCE_DIR=..\..\out\build"
-    SET "TARGET_DIR=..\..\platform\windows\build"
+SET SOURCE_DIR="..\..\out\build"
+SET TARGET_DIR="..\..\platform\windows\build"
+
+IF "%arg1%" == "copy" (    
     IF EXIST "%TARGET_DIR%" (
         RD /S /Q "%TARGET_DIR%"
     )

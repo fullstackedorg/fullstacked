@@ -95,7 +95,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="editor\**">
+    <None Update="build\**">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>

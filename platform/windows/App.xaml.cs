@@ -218,7 +218,7 @@ namespace FullStacked
             string userDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string root = Path.Combine(userDir, "FullStacked");
             string config = Path.Combine(userDir, ".config", "fullstacked");
-            string editor = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledPath, "editor");
+            string editor = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledPath, "build");
             string tmp = Path.Combine(root, ".tmp");
 
             byte[] rootBytes = Encoding.UTF8.GetBytes(root);
