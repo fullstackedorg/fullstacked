@@ -43,7 +43,9 @@ console.log("Success");
 exit();
 
 function prebuild() {
-    const { css } = sass.compile("fullstacked_modules/components/snackbar.scss");
+    const { css } = sass.compile(
+        "fullstacked_modules/components/snackbar.scss"
+    );
     fs.writeFileSync("fullstacked_modules/components/snackbar.css", css);
 }
 
@@ -60,7 +62,10 @@ function postbuild() {
         ["node_modules/zod", "fullstacked_modules/zod"]
     ];
     const toBundle = [
-        ["node_modules/sass/sass.default.js", "fullstacked_modules/sass/index.js"],
+        [
+            "node_modules/sass/sass.default.js",
+            "fullstacked_modules/sass/index.js"
+        ],
         [
             "node_modules/@fullstacked/ui/ui.ts",
             "fullstacked_modules/@fullstacked/ui/index.js"
@@ -93,11 +98,13 @@ function postbuild() {
     );
 
     const filePath = `${outDir}/build/fullstacked_modules/@fullstacked/ai-agent/package.json`;
-    const pacakgeJSON = JSON.parse(fs.readFileSync(filePath, { encoding: "utf8" }));
+    const pacakgeJSON = JSON.parse(
+        fs.readFileSync(filePath, { encoding: "utf8" })
+    );
     pacakgeJSON.exports = {
         ".": "./ai-agent.js"
-    }
-    fs.writeFileSync(filePath, JSON.stringify(pacakgeJSON, null, 2))
+    };
+    fs.writeFileSync(filePath, JSON.stringify(pacakgeJSON, null, 2));
 
     fs.writeFileSync(`${outDir}/build/version.json`, JSON.stringify(version));
 
@@ -127,4 +134,4 @@ function postbuild() {
     fs.writeFileSync(`${outDir}/zip/build.txt`, Date.now().toString());
 
     fs.rmSync("fullstacked_modules/components/snackbar.css");
-} 
+}

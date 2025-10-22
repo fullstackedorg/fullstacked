@@ -5,7 +5,7 @@ let core: any;
 
 export const CoreCallbackListeners = new Set<typeof callback>();
 function callback(projectId: string, messageType: string, message: string) {
-    CoreCallbackListeners.forEach(cb => cb(projectId, messageType, message))
+    CoreCallbackListeners.forEach((cb) => cb(projectId, messageType, message));
 }
 
 export function load(libPath: string, bindingDir: string) {

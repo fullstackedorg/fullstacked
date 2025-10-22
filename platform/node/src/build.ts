@@ -21,7 +21,11 @@ function quickInstallPackage(editorHeader: Uint8Array, directory: string) {
 
         // package install quick
         callLib(
-            new Uint8Array([...editorHeader, 61, ...serializeArgs([directory, 0])])
+            new Uint8Array([
+                ...editorHeader,
+                61,
+                ...serializeArgs([directory, 0])
+            ])
         );
     });
 }
@@ -38,27 +42,28 @@ export async function buildLocalProject(directory: string) {
         const cb = async (_: string, messageType: string, message: string) => {
             if (messageType === "build-style") {
                 const { id, entryPoint, projectId } = JSON.parse(message);
-                const result = await buildSASS(
-                    entryPoint,
-                    {
-                        canonicalize: (filePath) =>
-                            filePath.startsWith("file://")
-                                ? new URL(filePath)
-                                : new URL(
-                                    "file://" +
-                                    path
-                                        .resolve(
-                                            process.cwd(),
-                                            projectId,
-                                            filePath
-                                        )
-                                        .replace(/\\/g, "/")
-                                ),
-                        load: (url) => fs.readFileSync(url, { encoding: "utf8" })
-                    }
-                );
+                const result = await buildSASS(entryPoint, {
+                    canonicalize: (filePath) =>
+                        filePath.startsWith("file://")
+                            ? new URL(filePath)
+                            : new URL(
+                                  "file://" +
+                                      path
+                                          .resolve(
+                                              process.cwd(),
+                                              projectId,
+                                              filePath
+                                          )
+                                          .replace(/\\/g, "/")
+                              ),
+                    load: (url) => fs.readFileSync(url, { encoding: "utf8" })
+                });
                 callLib(
-                    new Uint8Array([...editorHeader, 58, ...serializeArgs([id, JSON.stringify(result)])])
+                    new Uint8Array([
+                        ...editorHeader,
+                        58,
+                        ...serializeArgs([id, JSON.stringify(result)])
+                    ])
                 );
             } else if (messageType === "build") {
                 const { errors } = JSON.parse(message);
@@ -68,9 +73,9 @@ export async function buildLocalProject(directory: string) {
                         console.log(`${e.Location.File}#${e.Location.Line}`);
                         console.log(e.Text + "\n");
                     });
-                    reject()
-                }  else {
-                    resolve()
+                    reject();
+                } else {
+                    resolve();
                 }
             }
         };
@@ -78,7 +83,11 @@ export async function buildLocalProject(directory: string) {
 
         // build project
         callLib(
-            new Uint8Array([...editorHeader, 56, ...serializeArgs([directory, 0])])
+            new Uint8Array([
+                ...editorHeader,
+                56,
+                ...serializeArgs([directory, 0])
+            ])
         );
     });
 }

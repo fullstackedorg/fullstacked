@@ -53,7 +53,6 @@ function parseArgsForPath(arg: string, fallback: string = process.cwd()) {
     return path.resolve(process.cwd(), definedPath);
 }
 
-
 const cb = (projectId: string, messageType: string, message: string) => {
     if (projectId === "*") {
         for (const w of webViews.values()) {
@@ -77,7 +76,7 @@ setDirectories({
     editor: parseArgsForPath("editor", currentDirectory),
     tmp:
         process.argv.includes("--root") ||
-            typeof process.env["FULLSTACKED_ROOT"] === "string"
+        typeof process.env["FULLSTACKED_ROOT"] === "string"
             ? path.resolve(root, ".tmp")
             : path.resolve(currentDirectory, ".tmp")
 });
@@ -101,7 +100,7 @@ async function openProject(id: string) {
 
 const mainInstanceId =
     process.argv.includes("--editor") ||
-        typeof process.env.FULLSTACKED_EDITOR === "string"
+    typeof process.env.FULLSTACKED_EDITOR === "string"
         ? process.argv.includes("--kiosk")
             ? process.argv.at(process.argv.indexOf("--kiosk") + 1)
             : ""
