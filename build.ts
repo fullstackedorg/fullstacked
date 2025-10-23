@@ -1,138 +1,137 @@
-import fs from "node:fs";
-import * as sass from "sass";
-import esbuild from "esbuild";
-import AdmZip from "adm-zip";
 import path from "node:path";
+import fs from "node:fs";
+import { getLibPath } from "./platform/node/src/lib";
+import { load, setDirectories, callLib } from "./platform/node/src/call";
+import { buildNodeBinding } from "./platform/node/build-binding";
+import { createRequire } from "node:module";
+import { buildCore } from "./build-core";
+import { createPayloadHeader } from "./platform/node/src/instance";
+import { serializeArgs } from "./fullstacked_modules/bridge/serialization";
+import { buildSASS } from "./fullstacked_modules/build/sass";
 import version from "./version";
+import esbuild from "esbuild";
+import { buildLocalProject } from "./platform/node/src/build";
+import * as sass from "sass";
+globalThis.require = createRequire(import.meta.url);
 
-const production = process.argv.includes("--production");
+const exit = () => process.exit();
+["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => process.on(signal, exit));
 
-const editorDir = "editor";
-const outDir = "out";
-const outDirEditor = `${outDir}/editor`;
-const outDirFullStackedModules = `${outDirEditor}/fullstacked_modules`;
+buildCore();
 
-if (fs.existsSync(outDir)) {
-    fs.rmSync(outDir, { recursive: true });
+buildNodeBinding("platform/node");
+
+load(await getLibPath("core/bin"), "platform/node");
+
+const project = "editor";
+
+setDirectories({
+    root: process.cwd(),
+    config: "",
+    editor: "",
+    tmp: path.resolve(process.cwd(), ".cache")
+});
+
+prebuild();
+
+await buildLocalProject(project);
+
+postbuild();
+
+console.log("Success");
+
+exit();
+
+function prebuild() {
+    const { css } = sass.compile(
+        "fullstacked_modules/components/snackbar.scss"
+    );
+    fs.writeFileSync("fullstacked_modules/components/snackbar.css", css);
 }
 
-async function processScss(entryPoint: string, out: string) {
-    const { css } = await sass.compileAsync(entryPoint, {
-        style: production ? "compressed" : "expanded",
-        importers: [
-            {
-                findFileUrl(urlStr, _) {
-                    if (urlStr.startsWith("../node_modules")) {
-                        return new URL(
-                            path
-                                .resolve(process.cwd(), urlStr.slice(1))
-                                .replace(/\\/g, "/")
-                                .split(":")
-                                .pop(),
-                            `file://`
-                        );
-                    }
-                    return null;
-                }
-            }
-        ]
-    });
-    await fs.promises.writeFile(out, css);
-}
-
-await processScss(`${editorDir}/index.scss`, `${editorDir}/index.css`);
-
-const toBuild = [[`${editorDir}/index.ts`, "index"]];
-
-for (const [input, output] of toBuild) {
-    esbuild.buildSync({
-        entryPoints: [
-            {
-                in: input,
-                out: output
-            }
+function postbuild() {
+    const outDir = "out";
+    const assets = [
+        [`${project}/assets`, "assets"],
+        ["node_modules/@fullstacked/ui/icons", "icons"],
+        ["fullstacked_modules", "fullstacked_modules"],
+        [
+            "node_modules/@fullstacked/ai-agent",
+            "fullstacked_modules/@fullstacked/ai-agent"
         ],
-        bundle: true,
-        format: "esm",
-        outdir: outDirEditor,
-        sourcemap: production ? false : "external",
-        splitting: false,
-        minify: production,
-        nodePaths: ["node_modules", "fullstacked_modules"]
+        ["node_modules/zod", "fullstacked_modules/zod"]
+    ];
+    const toBundle = [
+        [
+            "node_modules/sass/sass.default.js",
+            "fullstacked_modules/sass/index.js"
+        ],
+        [
+            "node_modules/@fullstacked/ui/ui.ts",
+            "fullstacked_modules/@fullstacked/ui/index.js"
+        ],
+        [
+            "node_modules/@fullstacked/ai-agent/src/index.ts",
+            "fullstacked_modules/@fullstacked/ai-agent/ai-agent.js"
+        ]
+    ];
+
+    if (fs.existsSync(outDir)) {
+        fs.rmSync(outDir, { recursive: true });
+    }
+    fs.mkdirSync(outDir);
+    fs.renameSync(`${project}/.build`, `${outDir}/build`);
+
+    assets.forEach(([form, to]) => {
+        fs.cpSync(form, `${outDir}/build/${to}`, { recursive: true });
     });
-}
 
-fs.rmSync(`${editorDir}/index.css`);
+    toBundle.forEach(([from, to]) =>
+        esbuild.buildSync({
+            entryPoints: [from],
+            outfile: `${outDir}/build/${to}`,
+            bundle: true,
+            platform: "browser",
+            format: "esm",
+            external: ["fetch"]
+        })
+    );
 
-fs.cpSync(`${editorDir}/index.html`, `${outDirEditor}/index.html`);
-fs.cpSync(`${editorDir}/assets`, `${outDirEditor}/assets`, {
-    recursive: true
-});
+    const filePath = `${outDir}/build/fullstacked_modules/@fullstacked/ai-agent/package.json`;
+    const pacakgeJSON = JSON.parse(
+        fs.readFileSync(filePath, { encoding: "utf8" })
+    );
+    pacakgeJSON.exports = {
+        ".": "./ai-agent.js"
+    };
+    fs.writeFileSync(filePath, JSON.stringify(pacakgeJSON, null, 2));
 
-await processScss(`${editorDir}/style/windows.scss`, `${outDirEditor}/windows.css`);
-await processScss(`${editorDir}/style/apple.scss`, `${outDirEditor}/apple.css`);
+    fs.writeFileSync(`${outDir}/build/version.json`, JSON.stringify(version));
 
-fs.cpSync("node_modules/@fullstacked/ui/icons", `${outDirEditor}/icons`, {
-    recursive: true
-});
+    // zip demo
+    callLib(
+        new Uint8Array([
+            ...createPayloadHeader({
+                id: "",
+                isEditor: true
+            }),
+            36,
+            ...serializeArgs([`demo`, `${outDir}/build/demo.zip`])
+        ])
+    );
 
-const sampleDemoDir = "demo";
-if (fs.existsSync(sampleDemoDir)) {
-    const zip = new AdmZip();
-    zip.addLocalFolder(sampleDemoDir, "", (file) => !file.startsWith(".git"));
-    zip.writeZip(`${outDirEditor}/Demo.zip`);
-}
+    // zip build
+    callLib(
+        new Uint8Array([
+            ...createPayloadHeader({
+                id: "",
+                isEditor: true
+            }),
+            36,
+            ...serializeArgs([`${outDir}/build`, `${outDir}/zip/build.zip`])
+        ])
+    );
+    fs.writeFileSync(`${outDir}/zip/build.txt`, Date.now().toString());
 
-fs.cpSync("fullstacked_modules", outDirFullStackedModules, {
-    recursive: true,
-    filter: (s) => !s.endsWith(".scss")
-});
-
-esbuild.buildSync({
-    entryPoints: [outDirFullStackedModules + "/ai/index.ts"],
-    outfile: outDirFullStackedModules + "/ai/index.js",
-    format: "esm",
-    bundle: true,
-    external: ["fetch", "fs"]
-});
-
-const neededModules = ["@fullstacked/ai-agent", "@fullstacked/ui", "zod"];
-neededModules.forEach((m) => {
-    fs.cpSync("node_modules/" + m, outDirFullStackedModules + "/" + m, {
-        recursive: true,
-        filter: (n) =>
-            !n.endsWith(".js") &&
-            !n.endsWith(".cjs") &&
-            !n.startsWith("node_modules/" + m + "/node_modules")
-    });
-});
-
-esbuild.buildSync({
-    entryPoints: ["node_modules/sass/sass.default.js"],
-    outfile: outDirFullStackedModules + "/sass/index.js",
-    format: "esm",
-    bundle: true,
-    platform: "node"
-});
-
-const dummyDts = ["@fullstacked", "sass"];
-
-dummyDts.forEach((dir) =>
-    fs.writeFileSync(outDirFullStackedModules + "/" + dir + "/index.d.ts", "")
-);
-
-await processScss(
-    "fullstacked_modules/components/snackbar.scss",
-    `${outDirEditor}/fullstacked_modules/components/snackbar.css`
-);
-
-fs.writeFileSync(`${outDirEditor}/version.json`, JSON.stringify(version));
-
-if (!process.argv.includes("--no-zip")) {
-    const outZipDir = `${outDir}/zip`;
-    const outZip = `${outZipDir}/editor-${production ? version.build : Date.now()}.zip`;
-    const zip = new AdmZip();
-    zip.addLocalFolder(outDirEditor);
-    fs.mkdirSync(outZipDir, { recursive: true });
-    zip.writeZip(outZip);
+    fs.rmSync("fullstacked_modules/components/snackbar.css");
 }

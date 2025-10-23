@@ -20,7 +20,7 @@ import java.io.File
 
 val buildTimestampPreferenceKey = "project-build-ts"
 
-class MainActivity : ComponentActivity() {
+class MainActivity() : ComponentActivity() {
     companion object {
         init {
             System.loadLibrary("editor-core")
@@ -32,6 +32,11 @@ class MainActivity : ComponentActivity() {
     val projectsIdsInExternal = mutableListOf<String>()
 
     var onSharedPreferenceChangeListeners = mutableMapOf<String, OnSharedPreferenceChangeListener>()
+
+    private lateinit var root: String
+    private lateinit var config: String
+    private lateinit var editor: String
+    private lateinit var tmp: String
 
     private external fun directories(
         root: String,
@@ -101,23 +106,27 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
 
-        this.addCallback(callbackId)
-
-        val root = this.filesDir.absolutePath + "/projects"
-        val config = this.filesDir.absolutePath + "/.config"
-        val editor = this.filesDir.absolutePath + "/editor"
-        val tmp = this.filesDir.absolutePath + "/.tmp"
-
+    private fun setDirectories(){
         this.directories(
             root,
             config,
             editor,
             tmp
         )
+    }
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        root = this.filesDir.absolutePath + "/projects"
+        config = this.filesDir.absolutePath + "/.config"
+        editor = this.filesDir.absolutePath + "/editor"
+        tmp = this.filesDir.absolutePath + "/.tmp"
+
+        this.addCallback(callbackId)
+
+        this.setDirectories()
 
         var deeplink: String? = null
         var projectIdExternal: String? = null
@@ -137,7 +146,13 @@ class MainActivity : ComponentActivity() {
         if(projectIdExternal == null) {
             val editorInstance = Instance( "", true)
             this.editorWebViewComponent = WebViewComponent(this, editorInstance)
-            this.extractEditorFiles(editorInstance, editor)
+
+            // after editor update,
+            // make sure to set directories to re-run setup fn
+            if(this.extractEditorFiles(editorInstance, editor)){
+                this.setDirectories()
+            }
+
             this.fileChooserResultLauncher = this.createFileChooserResultLauncher()
             this.setContentView(this.editorWebViewComponent?.webView)
             if(deeplink != null) {
@@ -206,43 +221,38 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun shouldExtractEditorFromZip(editorDir: String) : String? {
+    private fun shouldExtractEditorFromZip(editorDir: String) : Boolean {
         val currentEditorDir = File(editorDir)
         val currentEditorDirContents = currentEditorDir.listFiles()
         val currentEditorBuildFile = currentEditorDirContents?.find { it.name == "build.txt" }
 
-        val assetContents = this.assets.list("")
-        assetContents?.forEach { println(it) }
-        val editorZipFileName = assetContents?.find { it.startsWith("editor") }
-        val editorZipNumber = editorZipFileName?.split("-")?.last()?.split(".")?.first()
-        println("EDITOR VERSION BUILD $editorZipNumber")
-
         if(currentEditorBuildFile == null) {
             println("EDITOR VERSION NO CURRENT BUILD FILE")
-            return editorZipNumber
+            return true
         }
 
         val currentEditorBuildNumber = currentEditorBuildFile.readText()
+        val zipEditorBuildNumber = this.assets.open("build.txt").readBytes().decodeToString()
 
-        println("EDITOR VERSION CURRENT BUILD $currentEditorBuildNumber")
-
-        if(editorZipNumber != currentEditorBuildNumber) {
-            return editorZipNumber
+        if(currentEditorBuildNumber == zipEditorBuildNumber) {
+            println("EDITOR VERSION SAME")
+            return false
         }
 
-        return null
+        println("EDITOR VERSION DIFFERENT")
+        return true
     }
 
-    private fun extractEditorFiles(instanceEditor: Instance, editorDir: String) {
-        val editorZipNumber = this.shouldExtractEditorFromZip(editorDir)
+    private fun extractEditorFiles(instanceEditor: Instance, editorDir: String) : Boolean {
+        val shouldExtract = this.shouldExtractEditorFromZip(editorDir)
 
-        if(editorZipNumber == null) {
+        if(!shouldExtract) {
             println("UNZIP SKIPPED !")
-            return
+            return false
         }
 
         val destination = editorDir.toByteArray()
-        val zipData = this.assets.open("editor-$editorZipNumber.zip").readBytes()
+        val zipData = this.assets.open("build.zip").readBytes()
 
         var payload = byteArrayOf(
             30, // UNZIP_BIN_TO_FILE
@@ -274,10 +284,12 @@ class MainActivity : ComponentActivity() {
         val unzipped = deserializeArgs(instanceEditor.callLib(payload))[0] as Boolean
         if(unzipped) {
             println("UNZIPPED !")
-            File("$editorDir/build.txt").writeText(editorZipNumber)
-        } else {
-            println("FAILED TO UNZIPPED")
+            File("$editorDir/build.txt").writeBytes(this.assets.open("build.txt").readBytes())
+            return true
         }
+
+        println("FAILED TO UNZIPPED")
+        return false
     }
 
     fun removeStackedProject(){

@@ -1,7 +1,6 @@
 import http from "http";
 import net from "net";
 import open from "open";
-import fastQueryString from "fast-querystring";
 import { Duplex } from "stream";
 import ws, { WebSocket, WebSocketServer } from "ws";
 import { createInstance } from "./instance";

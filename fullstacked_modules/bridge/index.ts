@@ -8,14 +8,7 @@ import { BridgeElectron } from "./platform/electron";
 import { BridgeNode, initCallbackNode } from "./platform/node";
 import { BridgeWasm } from "./platform/wasm";
 import { BridgeWindows, initRespondWindows } from "./platform/windows";
-import git from "../git";
-import esbuild from "../esbuild";
-import { SnackBar } from "../components/snackbar";
-import { Button } from "@fullstacked/ui";
 import { serializeArgs } from "./serialization";
-import { buildSASS } from "../esbuild/sass";
-import fs from "../fs";
-import packages from "../packages";
 
 export type Bridge = (
     payload: Uint8Array,
@@ -60,56 +53,6 @@ switch (platform) {
 console.log("FullStacked");
 bridge(new Uint8Array([0]));
 
-let lastUpdateCheck = 0;
-const updateCheckDelay = 1000 * 10; // 10sec;
-let updating = false;
-async function checkForUpdates() {
-    window.requestAnimationFrame(checkForUpdates);
-
-    const now = Date.now();
-    if (now - lastUpdateCheck < updateCheckDelay || updating) {
-        return;
-    }
-
-    lastUpdateCheck = now;
-
-    if ((await git.pull()) !== git.PullResponse.DID_PULL) {
-        return;
-    }
-
-    let preventReload = false;
-    const preventReloadButton = Button({
-        text: "Stop"
-    });
-    preventReloadButton.onclick = () => {
-        preventReload = true;
-        snackbar.dismiss();
-    };
-
-    const snackbar = SnackBar({
-        message: "Project has updated. Rebuilding...",
-        button: preventReloadButton
-    });
-
-    updating = true;
-    update().then(() => {
-        updating = false;
-        snackbar.dismiss();
-
-        if (preventReload) return;
-        window.location.reload();
-    });
-}
-if (await git.hasGit()) {
-    checkForUpdates();
-}
-
-async function update() {
-    await packages.installQuick();
-    await buildSASS(fs);
-    return esbuild.build();
-}
-
 // 40
 function setTitle(title: string) {
     const payload = new Uint8Array([40, ...serializeArgs([title])]);
@@ -125,3 +68,5 @@ setInterval(() => {
     }
     lastTitleSeen = document.title;
 }, 500);
+
+import("../auto_update");

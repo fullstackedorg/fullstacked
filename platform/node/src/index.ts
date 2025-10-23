@@ -2,13 +2,13 @@
 import path from "node:path";
 import os from "node:os";
 import url from "node:url";
-import { load, setCallback, setDirectories } from "./call";
+import { load, setDirectories, CoreCallbackListeners } from "./call";
 import { createWebView } from "./webview";
 import { createInstance } from "./instance";
 import { buildLocalProject } from "./build";
 import { getLibPath } from "./lib";
-import { createRequire } from "node:module";
 import { setupDevFiles } from "./dev-files";
+import { createRequire } from "node:module";
 globalThis.require = createRequire(import.meta.url);
 
 const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
@@ -20,7 +20,7 @@ if (libArgIndex !== -1) {
 } else if (typeof process.env.FULLSTACKED_LIB === "string") {
     libDirectory = process.env.FULLSTACKED_LIB;
 }
-load(await getLibPath(libDirectory));
+load(await getLibPath(libDirectory), currentDirectory);
 
 let deeplink: string = null,
     deeplinkMessaged = false;
@@ -53,10 +53,7 @@ function parseArgsForPath(arg: string, fallback: string = process.cwd()) {
     return path.resolve(process.cwd(), definedPath);
 }
 
-export const cbListener = new Set<typeof cb>();
 const cb = (projectId: string, messageType: string, message: string) => {
-    cbListener.forEach((c) => c(projectId, messageType, message));
-
     if (projectId === "*") {
         for (const w of webViews.values()) {
             w.message(messageType, message);
@@ -70,7 +67,7 @@ const cb = (projectId: string, messageType: string, message: string) => {
     const webview = webViews.get(projectId);
     webview?.message(messageType, message);
 };
-setCallback(cb);
+CoreCallbackListeners.add(cb);
 
 const root = parseArgsForPath("root", process.cwd());
 setDirectories({
@@ -110,7 +107,7 @@ const mainInstanceId =
         : ".";
 
 if (mainInstanceId === ".") {
-    await buildLocalProject();
+    await buildLocalProject(mainInstanceId);
     setupDevFiles();
 }
 

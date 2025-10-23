@@ -1,5 +1,5 @@
 // https://nodejs.org/api/modules.html#all-together
-package esbuild
+package build
 
 import (
 	"encoding/json"

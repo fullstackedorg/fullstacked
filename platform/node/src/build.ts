@@ -1,80 +1,93 @@
 import { promises } from "node:fs";
 import { createPayloadHeader } from "./instance";
-import { callLib } from "./call";
-import {
-    deserializeArgs,
-    serializeArgs
-} from "../../../fullstacked_modules/bridge/serialization";
-import { toByteArray } from "../../../fullstacked_modules/base64";
-import { cbListener } from ".";
-import type { Message } from "esbuild";
-import { buildSASS } from "../../../fullstacked_modules/esbuild/sass";
+import { callLib, CoreCallbackListeners } from "./call";
+import { buildSASS } from "../../../fullstacked_modules/build/sass";
+import fs from "node:fs";
+import path from "node:path";
+import { serializeArgs } from "../../../fullstacked_modules/bridge/serialization";
 
-function quickInstallPacakge(editorHeader: Uint8Array) {
+function quickInstallPackage(editorHeader: Uint8Array, directory: string) {
     return new Promise<void>((resolve) => {
         const cb = (_: string, messageType: string, message: string) => {
             if (messageType === "packages-installation") {
                 const { duration } = JSON.parse(message);
                 if (typeof duration !== "undefined") {
-                    cbListener.delete(cb);
+                    CoreCallbackListeners.delete(cb);
                     resolve();
                 }
             }
         };
-        cbListener.add(cb);
+        CoreCallbackListeners.add(cb);
 
         // package install quick
         callLib(
-            new Uint8Array([...editorHeader, 61, ...serializeArgs([".", 0])])
+            new Uint8Array([
+                ...editorHeader,
+                61,
+                ...serializeArgs([directory, 0])
+            ])
         );
     });
 }
 
-export async function buildLocalProject() {
+export async function buildLocalProject(directory: string) {
     const editorHeader = createPayloadHeader({
         id: "",
         isEditor: true
     });
 
-    await quickInstallPacakge(editorHeader);
+    await quickInstallPackage(editorHeader, directory);
 
-    return new Promise<void>(async (resolve) => {
-        const cb = (_: string, messageType: string, message: string) => {
-            if (messageType === "build") {
-                cbListener.delete(cb);
-                const data = toByteArray(message);
-                const [_, errorsStr] = deserializeArgs(data);
-                let buildErrors: Message[];
-                try {
-                    buildErrors = JSON.parse(errorsStr);
-                    if (buildErrors === null) {
-                        resolve();
-                        return;
-                    }
-                } catch (e) {}
-                console.log(buildErrors || errorsStr);
-                process.exit(1);
+    return new Promise<void>(async (resolve, reject) => {
+        const cb = async (_: string, messageType: string, message: string) => {
+            if (messageType === "build-style") {
+                const { id, entryPoint, projectId } = JSON.parse(message);
+                const result = await buildSASS(entryPoint, {
+                    canonicalize: (filePath) =>
+                        filePath.startsWith("file://")
+                            ? new URL(filePath)
+                            : new URL(
+                                  "file://" +
+                                      path
+                                          .resolve(
+                                              process.cwd(),
+                                              projectId,
+                                              filePath
+                                          )
+                                          .replace(/\\/g, "/")
+                              ),
+                    load: (url) => fs.readFileSync(url, { encoding: "utf8" })
+                });
+                callLib(
+                    new Uint8Array([
+                        ...editorHeader,
+                        58,
+                        ...serializeArgs([id, JSON.stringify(result)])
+                    ])
+                );
+            } else if (messageType === "build") {
+                const { errors } = JSON.parse(message);
+
+                if (errors.length) {
+                    errors.forEach((e) => {
+                        console.log(`${e.Location.File}#${e.Location.Line}`);
+                        console.log(e.Text + "\n");
+                    });
+                    reject();
+                } else {
+                    resolve();
+                }
             }
         };
-        cbListener.add(cb);
+        CoreCallbackListeners.add(cb);
 
-        // build sasss
-        await buildSASS({
-            mkdir: async (p) => {
-                await promises.mkdir(p, { recursive: true });
-                return true;
-            },
-            readdir: promises.readdir,
-            writeFile: async (p, d) => {
-                await promises.writeFile(p, d);
-                return true;
-            },
-            readFile: promises.readFile
-        });
-
-        // esbuild build
+        // build project
         callLib(
-            new Uint8Array([...editorHeader, 56, ...serializeArgs([".", 0])])
+            new Uint8Array([
+                ...editorHeader,
+                56,
+                ...serializeArgs([directory, 0])
+            ])
         );
     });
 }

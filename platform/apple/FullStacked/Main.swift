@@ -14,7 +14,7 @@ func setDirectories(){
     let paths = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true);
     let root = (isMacOS || isSimulator) ? paths.first! : ("/private" + paths.first!)
     let config = root + "/.config"
-    let editor = Bundle.main.path(forResource: "editor", ofType: nil)!
+    let editor = Bundle.main.path(forResource: "build", ofType: nil)!
     let tmp = root + "/.tmp"
 
     directories(

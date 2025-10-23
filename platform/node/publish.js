@@ -17,7 +17,7 @@ const rootDirectory = path.resolve(currentDirectory, "..", "..");
 
 // build editor
 
-child_process.execSync("npm run build -- -- --production", {
+child_process.execSync("npm run build", {
     cwd: rootDirectory,
     stdio: "inherit"
 });
@@ -39,7 +39,7 @@ const platform = os.platform();
 const currentArch = os.arch();
 let command =
     platform === "win32"
-        ? "cmd.exe /c windows.bat"
+        ? "call ./windows.bat arm64 && call ./windows.bat x64"
         : platform === "linux"
           ? `make ${platform}-${currentArch}-shared -j4`
           : `make ${platform}-x64-shared ${platform}-arm64-shared -j4`;
@@ -51,14 +51,14 @@ child_process.execSync(command, {
 
 // build node bindings for current platform
 
-child_process.execSync(`node ./build.js --arch ${currentArch}`, {
+child_process.execSync(`node ./build.js --binding --arch ${currentArch}`, {
     cwd: currentDirectory,
     stdio: "inherit"
 });
 
 if (platform !== "linux") {
     child_process.execSync(
-        `node ./build.js --arch ${currentArch === "x64" ? "arm64" : "x64"}`,
+        `node ./build.js --binding --arch ${currentArch === "x64" ? "arm64" : "x64"}`,
         {
             cwd: currentDirectory,
             stdio: "inherit"

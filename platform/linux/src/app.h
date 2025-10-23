@@ -26,7 +26,7 @@ class App {
 
         App();
 
-        void onMessage(char *projectId, char *type, char *message);
+        void onMessage(char *projectId, char *type, std::string message);
 
         void open(std::string projectId, bool isEditor);
 

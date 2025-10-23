@@ -45,7 +45,7 @@ process.env.FULLSTACKED_EDITOR = path.resolve(
     "..",
     "..",
     "out",
-    "editor"
+    "build"
 );
 
 await import(process.cwd().replace(/\\/g, "/").split(":").pop() + "/index.js");
@@ -75,7 +75,7 @@ await sleep(500);
 const importProjectFileInput = (await page.waitForSelector(
     `#${IMPORT_PROJECT_FILE_INPUT_ID}`
 )) as ElementHandle<HTMLInputElement>;
-await importProjectFileInput.uploadFile("../../out/editor/Demo.zip");
+await importProjectFileInput.uploadFile("../../out/build/demo.zip");
 
 await sleep(2000);
 

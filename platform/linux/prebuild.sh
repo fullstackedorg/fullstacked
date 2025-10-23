@@ -6,7 +6,7 @@ cp -r ../../core/bin .
 cp -f bin/linux-$1.h bin/linux.h
 
 mkdir -p ./out/usr/share/fullstacked
-cp -r ../../out/editor ./out/usr/share/fullstacked
+cp -r ../../out/build ./out/usr/share/fullstacked/editor
 
 FRAMEWORK=$2
 

@@ -1,5 +1,7 @@
 package setup
 
+import "path/filepath"
+
 type DirectoriesStruct struct {
 	Root   string
 	Config string
@@ -16,9 +18,9 @@ func SetupDirectories(
 	tmp string,
 ) {
 	Directories = &DirectoriesStruct{
-		Root:   root,
-		Config: config,
-		Editor: editor,
-		Tmp:    tmp,
+		Root:   filepath.ToSlash(root),
+		Config: filepath.ToSlash(config),
+		Editor: filepath.ToSlash(editor),
+		Tmp:    filepath.ToSlash(tmp),
 	}
 }
