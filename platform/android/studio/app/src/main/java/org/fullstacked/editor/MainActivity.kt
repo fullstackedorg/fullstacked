@@ -20,7 +20,7 @@ import java.io.File
 
 val buildTimestampPreferenceKey = "project-build-ts"
 
-class MainActivity : ComponentActivity() {
+class MainActivity() : ComponentActivity() {
     companion object {
         init {
             System.loadLibrary("editor-core")
@@ -32,6 +32,11 @@ class MainActivity : ComponentActivity() {
     val projectsIdsInExternal = mutableListOf<String>()
 
     var onSharedPreferenceChangeListeners = mutableMapOf<String, OnSharedPreferenceChangeListener>()
+
+    private lateinit var root: String
+    private lateinit var config: String
+    private lateinit var editor: String
+    private lateinit var tmp: String
 
     private external fun directories(
         root: String,
@@ -101,22 +106,27 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
 
-        this.addCallback(callbackId)
-
-        val root = this.filesDir.absolutePath + "/projects"
-        val config = this.filesDir.absolutePath + "/.config"
-        val editor = this.filesDir.absolutePath + "/editor"
-        val tmp = this.filesDir.absolutePath + "/.tmp"
-
+    private fun setDirectories(){
         this.directories(
             root,
             config,
             editor,
             tmp
         )
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        root = this.filesDir.absolutePath + "/projects"
+        config = this.filesDir.absolutePath + "/.config"
+        editor = this.filesDir.absolutePath + "/editor"
+        tmp = this.filesDir.absolutePath + "/.tmp"
+
+        this.addCallback(callbackId)
+
+        this.setDirectories()
 
         var deeplink: String? = null
         var projectIdExternal: String? = null
@@ -136,7 +146,13 @@ class MainActivity : ComponentActivity() {
         if(projectIdExternal == null) {
             val editorInstance = Instance( "", true)
             this.editorWebViewComponent = WebViewComponent(this, editorInstance)
-            this.extractEditorFiles(editorInstance, editor)
+
+            // after editor update,
+            // make sure to set directories to re-run setup fn
+            if(this.extractEditorFiles(editorInstance, editor)){
+                this.setDirectories()
+            }
+
             this.fileChooserResultLauncher = this.createFileChooserResultLauncher()
             this.setContentView(this.editorWebViewComponent?.webView)
             if(deeplink != null) {
@@ -227,12 +243,12 @@ class MainActivity : ComponentActivity() {
         return true
     }
 
-    private fun extractEditorFiles(instanceEditor: Instance, editorDir: String) {
+    private fun extractEditorFiles(instanceEditor: Instance, editorDir: String) : Boolean {
         val shouldExtract = this.shouldExtractEditorFromZip(editorDir)
 
         if(!shouldExtract) {
             println("UNZIP SKIPPED !")
-            return
+            return false
         }
 
         val destination = editorDir.toByteArray()
@@ -269,9 +285,11 @@ class MainActivity : ComponentActivity() {
         if(unzipped) {
             println("UNZIPPED !")
             File("$editorDir/build.txt").writeBytes(this.assets.open("build.txt").readBytes())
-        } else {
-            println("FAILED TO UNZIPPED")
+            return true
         }
+
+        println("FAILED TO UNZIPPED")
+        return false
     }
 
     fun removeStackedProject(){
