@@ -15,7 +15,7 @@ const isRelease = process.argv.includes("--release");
 const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(currentDirectory, "..", "..");
 
-// build editor
+// build editor (for the fullstacked_modules)
 
 child_process.execSync("npm run build", {
     cwd: rootDirectory,
