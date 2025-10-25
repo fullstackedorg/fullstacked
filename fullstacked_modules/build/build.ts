@@ -10,7 +10,6 @@ import { buildSASS } from "./sass";
 import fs from "../fs";
 
 core_message.addListener("build-style", async (messageStr) => {
-    console.log(messageStr)
     const { id, entryPoint, projectId } = JSON.parse(messageStr);
     const result = await buildSASS(entryPoint, {
         canonicalize: (filePath) => new URL(filePath, "file://"),
