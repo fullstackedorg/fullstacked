@@ -12,10 +12,14 @@ import fs from "../fs";
 core_message.addListener("build-style", async (messageStr) => {
     const { id, entryPoint, projectId } = JSON.parse(messageStr);
     const result = await buildSASS(entryPoint, {
+        projectId,
         canonicalize: (filePath) => new URL(filePath, "file://"),
-        load: (url) => fs.readFile(projectId + url.pathname, { encoding: "utf8" })
-    })
-    bridge(new Uint8Array([58, ...serializeArgs([id, JSON.stringify(result)])]))
+        load: (url) =>
+            fs.readFile(projectId + url.pathname, { encoding: "utf8" })
+    });
+    bridge(
+        new Uint8Array([58, ...serializeArgs([id, JSON.stringify(result)])])
+    );
 });
 
 const activeBuilds = new Map<
@@ -34,14 +38,14 @@ function buildResponse(buildResult: string) {
             ...error,
             location: error.location
                 ? {
-                    ...error.location,
-                    file: error.location.file.includes(activeBuild.project.id)
-                        ? activeBuild.project.id +
-                        error.location.file
-                            .split(activeBuild.project.id)
-                            .pop()
-                        : error.location.file
-                }
+                      ...error.location,
+                      file: error.location.file.includes(activeBuild.project.id)
+                          ? activeBuild.project.id +
+                            error.location.file
+                                .split(activeBuild.project.id)
+                                .pop()
+                          : error.location.file
+                  }
                 : null
         }));
         activeBuild.resolve(messages);
@@ -65,7 +69,7 @@ export function buildProject(project?: Project): Promise<Message[]> {
     args.push(buildId);
 
     const payload = new Uint8Array([56, ...serializeArgs(args)]);
-    
+
     return new Promise((resolve) => {
         activeBuilds.set(buildId, {
             project,
