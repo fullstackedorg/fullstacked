@@ -24,11 +24,11 @@
         "@aws-sdk/client-s3": "^3.896.0",
         "@codemirror/lsp-client": "^6.1.2",
         "@codemirror/theme-one-dark": "^6.1.3",
-        "@fullstacked/ai-agent": "github:fullstackedorg/ai-agent#c0dfb6df91860d2349fb4355f93d1b339157f62d",
+        "@fullstacked/ai-agent": "github:fullstackedorg/ai-agent#c7f057b8773660560cf757c8a476916ea3e08a84",
         "@fullstacked/codemirror-view": "github:fullstackedorg/codemirror-view#31c56be75d3080b15905584380dd05ea07b2d88d",
         "@fullstacked/file-tree": "github:fullstackedorg/file-tree#8fc6d5e587507c631a68525659745eeda414bcf3",
         "@fullstacked/stack-navigation": "github:fullstackedorg/stack-navigation#888302a680bcc501639dfdb0a6aede3da91f06ff",
-        "@fullstacked/ui": "github:fullstackedorg/ui#7a7018cb1e22ba3e53ce43a4f6435c445bf92ab9",
+        "@fullstacked/ui": "github:fullstackedorg/ui#d322cb4fb7f572023e4c2031d2106f68bcacb6ea",
         "@types/node": "^24.5.2",
         "@types/semver": "^7.7.1",
         "dotenv": "^17.2.2",
@@ -43,8 +43,5 @@
         "semver": "^7.7.3",
         "slugify": "^1.6.6",
         "typescript": "^5.9.3"
-    },
-    "overrides": {
-        "zod": "^3.25.76"
     }
 }
