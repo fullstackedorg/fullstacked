@@ -81,7 +81,10 @@ async function postbuild() {
     await fs.rename(`${project}/.build`, `${outDir}/build`);
 
     for (const [from, to] of assets) {
-        await fs.cp(from, `${outDir}/build/${to}`, { recursive: true, force: true })
+        await fs.cp(from, `${outDir}/build/${to}`, {
+            recursive: true,
+            force: true
+        });
     }
 
     const bundlePromises = toBundle.map(([from, to]) =>
@@ -94,7 +97,7 @@ async function postbuild() {
             external: ["fetch"]
         })
     );
-    await Promise.all(bundlePromises)
+    await Promise.all(bundlePromises);
 
     const filePath = `${outDir}/build/fullstacked_modules/@fullstacked/ai-agent/package.json`;
     const pacakgeJSON = JSON.parse(
