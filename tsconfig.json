@@ -4,7 +4,8 @@
         "module": "ES2022",
         "target": "ES2022",
         "moduleResolution": "bundler",
-        "skipLibCheck": true
+        "skipLibCheck": true,
+        "jsx": "react"
     },
     "exclude": [
         "demo",
