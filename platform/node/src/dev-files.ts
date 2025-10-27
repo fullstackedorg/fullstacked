@@ -1,6 +1,6 @@
 import path from "node:path";
 import fs from "node:fs";
-import { compilerOptions } from "../../../editor/views/project/workspace/tsconfig";
+import { compilerOptions } from "./tsconfig";
 
 const tsConfig = {
     compilerOptions: {
