@@ -1,5 +1,5 @@
 import path from "node:path";
-import fs from "node:fs";
+import { promises as fs } from "node:fs";
 import { getLibPath } from "./platform/node/src/lib";
 import { load, setDirectories, callLib } from "./platform/node/src/call";
 import { buildNodeBinding } from "./platform/node/build-binding";
@@ -7,7 +7,6 @@ import { createRequire } from "node:module";
 import { buildCore } from "./build-core";
 import { createPayloadHeader } from "./platform/node/src/instance";
 import { serializeArgs } from "./fullstacked_modules/bridge/serialization";
-import { buildSASS } from "./fullstacked_modules/build/sass";
 import version from "./version";
 import esbuild from "esbuild";
 import { buildLocalProject } from "./platform/node/src/build";
@@ -32,24 +31,25 @@ setDirectories({
     tmp: path.resolve(process.cwd(), ".cache")
 });
 
-prebuild();
+await prebuild();
 
 await buildLocalProject(project);
 
-postbuild();
+await postbuild();
 
 console.log("Success");
 
 exit();
 
-function prebuild() {
-    const { css } = sass.compile(
+async function prebuild() {
+    const { css } = await sass.compileAsync(
         "fullstacked_modules/components/snackbar.scss"
     );
-    fs.writeFileSync("fullstacked_modules/components/snackbar.css", css);
+
+    await fs.writeFile("fullstacked_modules/components/snackbar.css", css);
 }
 
-function postbuild() {
+async function postbuild() {
     const outDir = "out";
     const assets = [
         [`${project}/assets`, "assets"],
@@ -76,18 +76,16 @@ function postbuild() {
         ]
     ];
 
-    if (fs.existsSync(outDir)) {
-        fs.rmSync(outDir, { recursive: true });
+    await fs.rm(outDir, { recursive: true, force: true });
+    await fs.mkdir(outDir, { recursive: true });
+    await fs.rename(`${project}/.build`, `${outDir}/build`);
+
+    for (const [from, to] of assets) {
+        await fs.cp(from, `${outDir}/build/${to}`, { recursive: true, force: true })
     }
-    fs.mkdirSync(outDir);
-    fs.renameSync(`${project}/.build`, `${outDir}/build`);
 
-    assets.forEach(([form, to]) => {
-        fs.cpSync(form, `${outDir}/build/${to}`, { recursive: true });
-    });
-
-    toBundle.forEach(([from, to]) =>
-        esbuild.buildSync({
+    const bundlePromises = toBundle.map(([from, to]) =>
+        esbuild.build({
             entryPoints: [from],
             outfile: `${outDir}/build/${to}`,
             bundle: true,
@@ -96,17 +94,18 @@ function postbuild() {
             external: ["fetch"]
         })
     );
+    await Promise.all(bundlePromises)
 
     const filePath = `${outDir}/build/fullstacked_modules/@fullstacked/ai-agent/package.json`;
     const pacakgeJSON = JSON.parse(
-        fs.readFileSync(filePath, { encoding: "utf8" })
+        await fs.readFile(filePath, { encoding: "utf8" })
     );
     pacakgeJSON.exports = {
         ".": "./ai-agent.js"
     };
-    fs.writeFileSync(filePath, JSON.stringify(pacakgeJSON, null, 2));
+    await fs.writeFile(filePath, JSON.stringify(pacakgeJSON, null, 2));
 
-    fs.writeFileSync(`${outDir}/build/version.json`, JSON.stringify(version));
+    await fs.writeFile(`${outDir}/build/version.json`, JSON.stringify(version));
 
     // zip demo
     callLib(
@@ -131,7 +130,7 @@ function postbuild() {
             ...serializeArgs([`${outDir}/build`, `${outDir}/zip/build.zip`])
         ])
     );
-    fs.writeFileSync(`${outDir}/zip/build.txt`, Date.now().toString());
+    await fs.writeFile(`${outDir}/zip/build.txt`, Date.now().toString());
 
-    fs.rmSync("fullstacked_modules/components/snackbar.css");
+    await fs.rm("fullstacked_modules/components/snackbar.css");
 }
