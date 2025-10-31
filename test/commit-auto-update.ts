@@ -16,7 +16,7 @@ import {
 
 const cacheDirectory = path.resolve("test", ".cache");
 
-const testId = crypto.randomUUID();
+const testId = crypto.randomUUID().split("-").at(0);
 
 const testDirectory = path.resolve(cacheDirectory, testId);
 
@@ -246,7 +246,7 @@ const pushButton = await editorPage.waitForSelector(
 );
 await pushButton.click();
 
-const testId2 = crypto.randomUUID();
+const testId2 = crypto.randomUUID().split("-").at(0);
 
 const testDirectory2 = path.resolve(cacheDirectory, testId2);
 
@@ -348,7 +348,7 @@ await sleep(1000);
 
 await kioskPage.bringToFront();
 
-await sleep(1000 * 12);
+await sleep(1000 * 20);
 
 assert.deepEqual(await getTitleAndColor(kioskPage), {
     currentTitle: testId,
