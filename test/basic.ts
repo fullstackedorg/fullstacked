@@ -1,4 +1,6 @@
 import child_process from "node:child_process";
+import path from "node:path";
+import os from "node:os";
 import puppeteer, { ElementHandle, KeyInput } from "puppeteer";
 import {
     IMPORT_PROJECT_FILE_INPUT_ID,
@@ -10,8 +12,6 @@ import {
     RUN_PROJECT_ID
 } from "../editor/constants";
 import { sleep, throwError, waitForStackNavigation } from "./utils";
-import path from "node:path";
-import os from "node:os";
 
 // test build
 child_process.execSync("npm run build", {

@@ -38,19 +38,19 @@ type ChannelRaw = {
 const channels = new Map<string, Channel | ChannelRaw>();
 
 // 20
-export default function connect(
+export function connect(
     name: string,
     port: number,
     host?: string,
     raw?: false
 ): Promise<DataChannel>;
-export default function connect(
+export function connect(
     name: string,
     port: number,
     host: string,
     raw: true
 ): Promise<DataChannelRaw>;
-export default function connect(
+export function connect(
     name: string,
     port: number,
     host = "localhost",
@@ -123,3 +123,5 @@ function send(channelId: string, data: Uint8Array) {
 
     return bridge(payload);
 }
+
+export default connect;

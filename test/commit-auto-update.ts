@@ -1,6 +1,9 @@
 import child_process from "node:child_process";
 import path from "node:path";
 import os from "node:os";
+import crypto from "node:crypto";
+import fs from "node:fs";
+import assert from "node:assert";
 import { sleep, throwError } from "./utils";
 import puppeteer, { KeyInput, Page } from "puppeteer";
 import {
@@ -8,13 +11,10 @@ import {
     PROJECT_VIEW_ID,
     RUN_PROJECT_ID
 } from "../editor/constants";
-import { randomUUID } from "node:crypto";
-import fs from "node:fs";
-import assert from "node:assert";
 
 const cacheDirectory = path.resolve("test", ".cache");
 
-const testId = randomUUID();
+const testId = crypto.randomUUID();
 
 const testDirectory = path.resolve(cacheDirectory, testId);
 
@@ -246,7 +246,7 @@ const pushButton = await editorPage.waitForSelector(
 );
 await pushButton.click();
 
-const testId2 = randomUUID();
+const testId2 = crypto.randomUUID();
 
 const testDirectory2 = path.resolve(cacheDirectory, testId2);
 
