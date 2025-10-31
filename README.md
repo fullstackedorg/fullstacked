@@ -24,40 +24,31 @@ You can always find those links and access to the beta apps on FullStacked [down
 
 ### Requirements
 
-- Go `>=1.25`
-- NodeJS `>=20`
+*   [Go](https://go.dev) `>=1.25`
+*   [NodeJS](https://nodejs.org) `>=20`
 
-1. Clone this repo and enter the directory
+#### Windows Requirements
+
+* [llvm-mingw](https://github.com/mstorsjo/llvm-mingw) `=20250613`
+
+### Steps
+
+Clone and enter the directory
 
 ```
 git clone https://github.com/fullstackedorg/fullstacked.git
 cd fullstacked
 ```
 
-2. Init the submodules.
+Checkout the submodules
 
 ```
 git submodule update --init
 ```
 
-3. Go to the `core/build` directory and build the **shared** library for your current platform.
+Install the dependencies and start.
 
 ```
-cd core/build
-make darwin-arm64-shared
-```
-
-For windows users, use the batch file.
-
-```
-cd core/build
-./windows.bat
-```
-
-4. Return to the root directory, install the dependencies and start.
-
-```
-cd ../..
 npm install
 npm start
 ```
