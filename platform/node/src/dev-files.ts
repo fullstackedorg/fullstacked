@@ -5,10 +5,7 @@ import { compilerOptions } from "./tsconfig";
 const tsConfig = {
     compilerOptions: {
         ...compilerOptions,
-        paths: {
-            "*": ["./.fullstacked_modules/*"]
-        },
-        typeRoots: ["./.fullstacked_modules", "./node_modules/@types"]
+        typeRoots: ["./.fullstacked_modules/@types", "./node_modules/@types"]
     }
 };
 
