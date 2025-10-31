@@ -12,13 +12,13 @@ Create, run and share projects built with web technologies in a fully cross-plat
 
 ## Installation
 
-### Latest stable release is available on all major app marketplaces
+### The latest stable release is available on all major app marketplaces.
 
 - [Apple App Store](https://apps.apple.com/ca/app/fullstacked/id6477835950) (MacOS, iOS, iPadOS)
 - [Google Play](https://play.google.com/store/apps/details?id=org.fullstacked.editor) (Android, Chromebook)
 - [Microsoft Store](https://apps.microsoft.com/detail/9p987qm508vc?hl=en-us) (Windows 10/11)
 
-You can always find those links and access to the beta apps on FullStacked [download page](https://fullstacked.org/download)
+You can always find those links and access to the beta apps on FullStacked [download page](https://fullstacked.org/download).
 
 ## Build from source
 
@@ -33,14 +33,14 @@ You can always find those links and access to the beta apps on FullStacked [down
 
 ### Steps
 
-Clone and enter the directory
+Clone and enter the directory.
 
 ```
 git clone https://github.com/fullstackedorg/fullstacked.git
 cd fullstacked
 ```
 
-Checkout the submodules
+Checkout the submodules.
 
 ```
 git submodule update --init
