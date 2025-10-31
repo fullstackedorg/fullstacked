@@ -11,7 +11,8 @@ import {
     PROJECTS_VIEW_ID,
     RUN_PROJECT_ID
 } from "../editor/constants";
-import { sleep, throwError, waitForStackNavigation } from "./utils";
+import { createBrowser,
+    sleep, throwError, waitForStackNavigation } from "./utils";
 
 // test build
 child_process.execSync("npm run build", {
@@ -51,10 +52,8 @@ process.env.FULLSTACKED_EDITOR = path.resolve(
 await import(process.cwd().replace(/\\/g, "/").split(":").pop() + "/index.js");
 
 // Launch the browser
-const browser = await puppeteer.launch({
-    headless: false
-});
-const page = await browser.newPage();
+const { browser, createPage } = await createBrowser()
+const page = await createPage();
 await page.goto("http://localhost:9000");
 
 // Check the Projects Title

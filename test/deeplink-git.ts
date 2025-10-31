@@ -2,7 +2,9 @@ import child_process, { ChildProcess } from "node:child_process";
 import path from "node:path";
 import os from "node:os";
 import puppeteer from "puppeteer";
-import { sleep, throwError } from "./utils";
+import {
+    createBrowser,
+    sleep, throwError } from "./utils";
 import { PROJECT_VIEW_ID, RUN_PROJECT_ID } from "../editor/constants";
 
 let editorProcess1: ChildProcess, editorProcess2: ChildProcess;
@@ -44,10 +46,8 @@ editorProcess1.on("error", onError);
 await sleep(7000);
 
 // Lets go delete our Demo projects
-const browser = await puppeteer.launch({
-    headless: false
-});
-let page = await browser.newPage();
+const { browser, createPage } = await createBrowser();
+let page = await createPage();
 await page.goto("http://localhost:9000");
 
 // wait for title
@@ -87,7 +87,7 @@ await page.evaluate(async () => {
 await sleep(3000);
 
 await page.close();
-page = await browser.newPage();
+page = await createPage();
 
 editorProcess1.kill();
 

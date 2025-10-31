@@ -4,7 +4,9 @@ import os from "node:os";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import assert from "node:assert";
-import { sleep, throwError } from "./utils";
+import {
+    createBrowser,
+    sleep, throwError } from "./utils";
 import puppeteer, { KeyInput, Page } from "puppeteer";
 import {
     NEW_FILE_ID,
@@ -79,10 +81,8 @@ editorProcess.stderr.pipe(process.stderr);
 
 await sleep(3000);
 
-const browser = await puppeteer.launch({
-    headless: false
-});
-const editorPage = await browser.newPage();
+const { browser, createPage } = await createBrowser();
+const editorPage = await createPage();
 await editorPage.goto("http://localhost:9000");
 await editorPage.waitForSelector(`#${RUN_PROJECT_ID}`);
 await editorPage.waitForSelector(`#${PROJECT_VIEW_ID} h1`);
@@ -152,7 +152,7 @@ await runProjectButton.click();
 
 await sleep(2000);
 
-const appPage = await browser.newPage();
+const appPage = await createPage();
 await appPage.goto("http://localhost:9001");
 
 await sleep(2000);
@@ -168,7 +168,7 @@ async function getTitleAndColor(page: Page) {
                 currentColor: [number, number, number];
             }>((res) => {
                 const image = new Image();
-                image.onload = function () {
+                image.onload = function() {
                     const canvas = document.createElement("canvas");
                     canvas.width = image.width;
                     canvas.height = image.height;
@@ -266,7 +266,7 @@ editorProcess2.stderr.pipe(process.stderr);
 
 await sleep(3000);
 
-const editorPage2 = await browser.newPage();
+const editorPage2 = await createPage();
 await editorPage2.goto("http://localhost:9002");
 await editorPage2.waitForSelector(`#${RUN_PROJECT_ID}`);
 const projectTitle = await (
@@ -300,7 +300,7 @@ kioskProcess.stderr.pipe(process.stderr);
 
 await sleep(3000);
 
-const kioskPage = await browser.newPage();
+const kioskPage = await createPage();
 await kioskPage.goto("http://localhost:9003");
 
 assert.deepEqual(await getTitleAndColor(kioskPage), {
