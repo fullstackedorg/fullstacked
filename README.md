@@ -24,12 +24,12 @@ You can always find those links and access to the beta apps on FullStacked [down
 
 ### Requirements
 
-*   [Go](https://go.dev) `>=1.25`
-*   [NodeJS](https://nodejs.org) `>=20`
+- [Go](https://go.dev) `>=1.25`
+- [NodeJS](https://nodejs.org) `>=20`
 
 #### Windows Requirements
 
-* [llvm-mingw](https://github.com/mstorsjo/llvm-mingw) `=20250613`
+- [llvm-mingw](https://github.com/mstorsjo/llvm-mingw) `=20250613`
 
 ### Steps
 
