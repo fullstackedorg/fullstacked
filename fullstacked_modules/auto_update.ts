@@ -26,7 +26,9 @@ async function checkForUpdates() {
 
     lastUpdateCheck = now;
 
-    if ((await git.pull()) !== git.PullResponse.DID_PULL) {
+    const pullResponse = await git.pull();
+    console.log(`Pull Response: [${pullResponse}]`)
+    if (pullResponse !== git.PullResponse.DID_PULL) {
         return;
     }
 
