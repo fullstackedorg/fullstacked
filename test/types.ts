@@ -1,4 +1,5 @@
 import child_process from "child_process";
+import "../declarations";
 
 // typecheck
 child_process.execSync("npm run typecheck", {
