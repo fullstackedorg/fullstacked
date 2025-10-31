@@ -6,3 +6,4 @@ bin
 out
 .vscode
 ./build.js
+fullstacked_modules/@types

@@ -1,7 +1,7 @@
-import { bridge } from "../bridge";
-import { serializeArgs } from "../bridge/serialization";
-import core_message from "../core_message";
-import { Project } from "../../editor/types";
+import { bridge } from "./bridge";
+import { serializeArgs } from "./bridge/serialization";
+import core_message from "./core_message";
+import { Project } from "./../editor/types";
 
 const pullPromises = new Map<
     string,
@@ -221,3 +221,23 @@ export function remoteUrl(project?: Project) {
 
     return bridge(payload, ([url]) => url);
 }
+
+const git = {
+    PullResponse,
+    gitAuthResponse,
+    clone,
+    head,
+    status,
+    pull,
+    restore,
+    checkout,
+    fetch,
+    commit,
+    branches,
+    push,
+    branchDelete,
+    hasGit,
+    remoteUrl
+};
+
+export default git;

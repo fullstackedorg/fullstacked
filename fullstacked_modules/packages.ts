@@ -1,10 +1,7 @@
-import { Project } from "../../editor/types";
-import { bridge } from "../bridge";
-import {
-    getLowestKeyIdAvailable,
-    serializeArgs
-} from "../bridge/serialization";
-import core_message from "../core_message";
+import { Project } from "./../editor/types";
+import { bridge } from "./bridge";
+import { getLowestKeyIdAvailable, serializeArgs } from "./bridge/serialization";
+import core_message from "./core_message";
 
 const activeInstallations = new Map<
     number,
@@ -140,3 +137,9 @@ export function installQuick(
         bridge(payload);
     });
 }
+
+const packages = {
+    install,
+    installQuick
+};
+export default packages;

@@ -1,5 +1,5 @@
-import { bridge } from "../bridge";
-import { serializeArgs } from "../bridge/serialization";
+import { bridge } from "./bridge";
+import { serializeArgs } from "./bridge/serialization";
 
 const te = new TextEncoder();
 
@@ -168,3 +168,16 @@ export function stat(path: string): Promise<FileStats> {
 
     return bridge(payload, transformer);
 }
+
+const fs = {
+    readFile,
+    writeFile,
+    unlink,
+    readdir,
+    mkdir,
+    rmdir,
+    exists,
+    rename,
+    stat
+};
+export default fs;

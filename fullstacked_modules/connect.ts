@@ -1,11 +1,11 @@
-import { bridge } from "../bridge";
+import { bridge } from "./bridge";
 import {
     deserializeArgs,
     numberTo4Bytes,
     serializeArgs
-} from "../bridge/serialization";
-import core_message from "../core_message";
-import { toByteArray } from "../base64";
+} from "./bridge/serialization";
+import core_message from "./core_message";
+import { toByteArray } from "./base64";
 
 export type Data = string | number | boolean | Uint8Array;
 
@@ -38,19 +38,19 @@ type ChannelRaw = {
 const channels = new Map<string, Channel | ChannelRaw>();
 
 // 20
-export function connect(
+export default function connect(
     name: string,
     port: number,
     host?: string,
     raw?: false
 ): Promise<DataChannel>;
-export function connect(
+export default function connect(
     name: string,
     port: number,
     host: string,
     raw: true
 ): Promise<DataChannelRaw>;
-export function connect(
+export default function connect(
     name: string,
     port: number,
     host = "localhost",

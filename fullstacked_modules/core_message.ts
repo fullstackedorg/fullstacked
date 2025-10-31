@@ -1,4 +1,4 @@
-import { SnackBar } from "../components/snackbar";
+import { SnackBar } from "./components/snackbar";
 
 const coreMessageListeners = new Map<string, Set<(message: string) => void>>();
 export const addListener = (
@@ -55,3 +55,9 @@ addListener("alert", (message) => {
         autoDismissTimeout: 4000
     });
 });
+
+const core_message = {
+    addListener,
+    removeListener
+};
+export default core_message;

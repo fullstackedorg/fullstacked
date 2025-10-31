@@ -6,8 +6,5 @@ export const compilerOptions = {
     allowJs: true,
     lib: ["dom", "dom.iterable", "es2023"],
     jsx: "react",
-    paths: {
-        "*": ["../.fullstacked_modules/*"]
-    },
-    typeRoots: ["../.fullstacked_modules", "./node_modules/@types"]
+    typeRoots: ["../.fullstacked_modules/@types", "./node_modules/@types"]
 };

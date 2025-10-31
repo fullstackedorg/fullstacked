@@ -1,7 +1,7 @@
-import { bridge } from "../bridge";
-import { serializeArgs } from "../bridge/serialization";
+import { bridge } from "./bridge";
+import { serializeArgs } from "./bridge/serialization";
 
-type FileEntries<T extends string | Uint8Array> = {
+export type FileEntries<T extends string | Uint8Array> = {
     [filePath: string]: {
         isDir: boolean;
         contents: T;
@@ -138,3 +138,10 @@ export function zip(
 
     return bridge(payload, transformer);
 }
+
+const archive = {
+    unzip,
+    zip
+};
+
+export default archive;
