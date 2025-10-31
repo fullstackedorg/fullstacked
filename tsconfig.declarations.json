@@ -1,0 +1,17 @@
+{
+    "compilerOptions": {
+        "esModuleInterop": true,
+        "module": "ES2022",
+        "target": "ES2022",
+        "moduleResolution": "bundler",
+        "skipLibCheck": true,
+        "lib": ["dom", "dom.iterable", "es2023"],
+        "declaration": true,
+        "declarationDir": "declarations",
+        "emitDeclarationOnly": true,
+        "paths": {
+            "*": ["./fullstacked_modules/*"]
+        }
+    },
+    "include": ["fullstacked_modules"]
+}

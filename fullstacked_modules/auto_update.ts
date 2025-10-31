@@ -1,8 +1,8 @@
-import git from "../git";
+import git from "./git";
 import { Button } from "@fullstacked/ui";
-import { SnackBar } from "../components/snackbar";
-import packages from "../packages";
-import build from "../build";
+import { SnackBar } from "./components/snackbar";
+import packages from "./packages";
+import build from "./build";
 
 let lastUpdateCheck = 0;
 const updateCheckDelay = 1000 * 10; // 10sec;
@@ -43,7 +43,6 @@ async function checkForUpdates() {
         message: "Project has updated. Rebuilding...",
         button: preventReloadButton
     });
-    console.log("ICICI2");
 
     updating = true;
     update().then(() => {
@@ -59,8 +58,6 @@ if (await git.hasGit()) {
 }
 
 async function update() {
-    console.log("ICICI1");
     await packages.installQuick();
-    console.log("ICICI");
     return build.buildProject();
 }

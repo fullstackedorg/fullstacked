@@ -5,7 +5,10 @@
         "target": "ES2022",
         "moduleResolution": "bundler",
         "skipLibCheck": true,
-        "jsx": "react"
+        "jsx": "react",
+        "paths": {
+            "*": ["./fullstacked_modules/*"]
+        }
     },
     "exclude": [
         "demo",

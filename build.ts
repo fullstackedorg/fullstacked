@@ -13,6 +13,8 @@ import { buildLocalProject } from "./platform/node/src/build";
 import * as sass from "sass";
 globalThis.require = createRequire(import.meta.url);
 
+await import("./declarations.js");
+
 const exit = () => process.exit();
 ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => process.on(signal, exit));
 
@@ -54,12 +56,7 @@ async function postbuild() {
     const assets = [
         [`${project}/assets`, "assets"],
         ["node_modules/@fullstacked/ui/icons", "icons"],
-        ["fullstacked_modules", "fullstacked_modules"],
-        [
-            "node_modules/@fullstacked/ai-agent",
-            "fullstacked_modules/@fullstacked/ai-agent"
-        ],
-        ["node_modules/zod", "fullstacked_modules/zod"]
+        ["fullstacked_modules", "fullstacked_modules"]
     ];
     const toBundle = [
         [
@@ -69,10 +66,6 @@ async function postbuild() {
         [
             "node_modules/@fullstacked/ui/ui.ts",
             "fullstacked_modules/@fullstacked/ui/index.js"
-        ],
-        [
-            "node_modules/@fullstacked/ai-agent/src/index.ts",
-            "fullstacked_modules/@fullstacked/ai-agent/ai-agent.js"
         ]
     ];
 
@@ -98,15 +91,6 @@ async function postbuild() {
         })
     );
     await Promise.all(bundlePromises);
-
-    const filePath = `${outDir}/build/fullstacked_modules/@fullstacked/ai-agent/package.json`;
-    const pacakgeJSON = JSON.parse(
-        await fs.readFile(filePath, { encoding: "utf8" })
-    );
-    pacakgeJSON.exports = {
-        ".": "./ai-agent.js"
-    };
-    await fs.writeFile(filePath, JSON.stringify(pacakgeJSON, null, 2));
 
     await fs.writeFile(`${outDir}/build/version.json`, JSON.stringify(version));
 
