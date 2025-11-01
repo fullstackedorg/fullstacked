@@ -189,9 +189,9 @@ func ReadDir(path string, recursive bool, filesOnly bool, skip []string) ([]File
 			}
 
 			for _, item := range entries {
-				info, _ := item.Info()
+				info, err := item.Info()
 
-				if filesOnly && item.IsDir() {
+				if (filesOnly && item.IsDir()) || err != nil {
 					continue
 				}
 
