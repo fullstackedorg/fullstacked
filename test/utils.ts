@@ -30,7 +30,6 @@ export const waitForStackNavigation = (page: Page, selector: string) => {
     });
 };
 
-
 export async function createBrowser() {
     const browser = await puppeteer.launch({
         headless: false
@@ -40,12 +39,20 @@ export async function createBrowser() {
         browser,
         async createPage() {
             const page = await browser.newPage();
-            page
-                .on('console', message => console.log(`[${page.url()}] ${message.type()} ${message.text()}`))
-                .on('pageerror', ({ message }) => console.log(`[${page.url()}] ERROR ${message}`))
-                .on('requestfailed', request =>
-                    console.log(`[${page.url()}] ${request.failure().errorText} ${request.url()}`))
+            page.on("console", (message) =>
+                console.log(
+                    `[${page.url()}] ${message.type()} ${message.text()}`
+                )
+            )
+                .on("pageerror", ({ message }) =>
+                    console.log(`[${page.url()}] ERROR ${message}`)
+                )
+                .on("requestfailed", (request) =>
+                    console.log(
+                        `[${page.url()}] ${request.failure().errorText} ${request.url()}`
+                    )
+                );
             return page;
-        },
-    }
-} 
+        }
+    };
+}

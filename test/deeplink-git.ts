@@ -2,9 +2,7 @@ import child_process, { ChildProcess } from "node:child_process";
 import path from "node:path";
 import os from "node:os";
 import puppeteer from "puppeteer";
-import {
-    createBrowser,
-    sleep, throwError } from "./utils";
+import { createBrowser, sleep, throwError } from "./utils";
 import { PROJECT_VIEW_ID, RUN_PROJECT_ID } from "../editor/constants";
 
 let editorProcess1: ChildProcess, editorProcess2: ChildProcess;

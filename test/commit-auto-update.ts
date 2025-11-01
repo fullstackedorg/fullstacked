@@ -4,9 +4,7 @@ import os from "node:os";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import assert from "node:assert";
-import {
-    createBrowser,
-    sleep, throwError } from "./utils";
+import { createBrowser, sleep, throwError } from "./utils";
 import puppeteer, { KeyInput, Page } from "puppeteer";
 import {
     NEW_FILE_ID,
@@ -168,7 +166,7 @@ async function getTitleAndColor(page: Page) {
                 currentColor: [number, number, number];
             }>((res) => {
                 const image = new Image();
-                image.onload = function() {
+                image.onload = function () {
                     const canvas = document.createElement("canvas");
                     canvas.width = image.width;
                     canvas.height = image.height;

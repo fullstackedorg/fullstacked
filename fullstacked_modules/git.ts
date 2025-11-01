@@ -5,17 +5,22 @@ import { Project } from "./../editor/types";
 
 const pullPromises = new Map<
     string,
-    ((pullResponse: PullResponse) => void)[]
+    {
+        resolve: (p: PullResponse) => void;
+        reject: (p: PullResponse) => void;
+    }[]
 >();
 let addedListener = false;
 function setListenerOnce() {
     if (addedListener) return;
 
     core_message.addListener("git-pull", (message) => {
-        const { url, data, finished } = JSON.parse(message);
+        const { url, data, error, finished } = JSON.parse(message);
         if (!finished) return;
         const promises = pullPromises.get(url);
-        promises?.forEach((resolve) => resolve(data));
+        promises?.forEach(({ resolve, reject }) =>
+            error ? resolve(data) : reject(data)
+        );
         pullPromises.delete(url);
     });
     addedListener = true;
@@ -109,8 +114,8 @@ export async function pull(project?: Project): Promise<PullResponse> {
         pullPromises.set(url, p);
     }
 
-    return new Promise((resolve) => {
-        p.push(resolve);
+    return new Promise((resolve, reject) => {
+        p.push({ resolve, reject });
         bridge(payload);
     });
 }
