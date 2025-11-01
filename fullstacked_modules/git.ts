@@ -19,7 +19,7 @@ function setListenerOnce() {
         if (!finished) return;
         const promises = pullPromises.get(url);
         promises?.forEach(({ resolve, reject }) =>
-            error ? resolve(data) : reject(data)
+            error ? reject(data) : resolve(data)
         );
         pullPromises.delete(url);
     });
