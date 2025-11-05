@@ -1,4 +1,5 @@
 import CSS from "csstype";
+import { maxWidth } from "../editor/style/spacing.s";
 
 export const propertiesDefaultingToPx = {
     padding: true,
@@ -14,7 +15,10 @@ export const propertiesDefaultingToPx = {
     marginLeft: true,
 
     width: true,
+    maxWidth: true,
+
     height: true,
+    maxHeight: true,
 
     top: true,
     right: true,
