@@ -66,6 +66,15 @@ var defaultHTMLElements = []DefaultHTMLElement{
 		},
 	},
 	{
+		Text:   `<link rel="stylesheet" href="/style.css" />`,
+		InHead: true,
+		Atom:   atom.Link,
+		Attr: map[string][]string{
+			"rel":  {"stylesheet"},
+			"href": {"style.css", "/style.css"},
+		},
+	},
+	{
 		Text: `<script type="module" src="/index.js"></script>`,
 		Atom: atom.Script,
 		Attr: map[string][]string{

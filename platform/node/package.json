@@ -13,6 +13,7 @@
     "type": "module",
     "dependencies": {
         "cli-progress": "^3.12.0",
+        "jsdom": "^27.1.0",
         "open": "^10.2.0",
         "pretty-bytes": "^7.1.0",
         "sass": "^1.93.2",
@@ -21,6 +22,7 @@
     },
     "devDependencies": {
         "@types/cli-progress": "^3.11.6",
+        "@types/jsdom": "^27.0.0",
         "@types/tar-stream": "^3.1.4",
         "@types/ws": "^8.18.1",
         "node-addon-api": "^8.5.0"

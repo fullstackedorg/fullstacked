@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"sync"
 
@@ -197,8 +198,23 @@ func (p *ProjectBuild) buildJS(
 
 	projectDirectory := path.Join(setup.Directories.Root, p.ProjectID)
 
+	// gather all .s.ts files to build css styles
+	styleFiles := []string{}
+	plugins := []esbuild.Plugin{
+		esbuild.Plugin{
+			Name: "style",
+			Setup: func(build esbuild.PluginBuild) {
+				build.OnLoad(esbuild.OnLoadOptions{Filter: `.*\.s\.ts`}, func(args esbuild.OnLoadArgs) (esbuild.OnLoadResult, error) {
+					if !slices.Contains(styleFiles, args.Path) {
+						styleFiles = append(styleFiles, args.Path)
+					}
+					return esbuild.OnLoadResult{}, nil
+				})
+			},
+		},
+	}
+
 	// add WASM fixture plugin
-	plugins := []esbuild.Plugin{}
 	if fs.WASM {
 		wasmFS := esbuild.Plugin{
 			Name: "wasm-fs",
@@ -267,6 +283,48 @@ func (p *ProjectBuild) buildJS(
 			path.Join(projectDirectory, "node_modules"),
 		},
 	})
+
+	if len(styleFiles) > 0 {
+		styleFileName := utils.RandString(10)
+		projectStyleFile := path.Join(".build", styleFileName+".js")
+		styleFileTemplate := path.Join(setup.Directories.Tmp, styleFileName+".ts")
+		styleFileEntrypoint := path.Join(projectDirectory, projectStyleFile)
+		styleFileContents := ""
+		for _, f := range styleFiles {
+			styleFileContents = styleFileContents + "import \"" + f + "\";\n"
+		}
+		styleFileContents = styleFileContents + "export { exportStyles } from \"style\";"
+		fs.WriteFile(styleFileTemplate, []byte(styleFileContents), fileEventOrigin)
+		styleResult := esbuild.Build(esbuild.BuildOptions{
+			EntryPoints:    []string{styleFileTemplate},
+			AllowOverwrite: true,
+			Outfile:        styleFileEntrypoint,
+			Bundle:         true,
+			Write:          true,
+			Format:         esbuild.FormatESModule,
+			Alias: map[string]string{
+				"style": "style/build",
+			},
+			NodePaths: []string{
+				path.Join(setup.Directories.Root, *fullstackedModulesDir),
+				path.Join(projectDirectory, "node_modules"),
+			},
+		})
+
+		result.Errors = append(result.Errors, styleResult.Errors...)
+		result.Warnings = append(result.Warnings, styleResult.Warnings...)
+
+		fs.Unlink(styleFileTemplate, fileEventOrigin)
+
+		if len(styleResult.Errors) == 0 {
+			styleBuild := p.buildStyle(projectStyleFile)
+			result.Errors = append(result.Errors, styleBuild.Errors...)
+			result.OutputFiles = append(result.OutputFiles, esbuild.OutputFile{
+				Path:     path.Join(tmpBuildDirectory, "style.css"),
+				Contents: []byte(styleBuild.Css),
+			})
+		}
+	}
 
 	fs.Unlink(intermediateFilePath, fileEventOrigin)
 	if styleEntryPoint != nil {

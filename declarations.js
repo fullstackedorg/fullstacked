@@ -21,7 +21,25 @@ if (fs.existsSync(outTypesDirectory)) {
     fs.rmSync(outTypesDirectory, { recursive: true });
 }
 
-const declaredModules = ["archive", "connect", "fs", "fetch", "platform"];
+const declaredModules = [
+    "archive",
+    "connect",
+    "fs",
+    "fetch",
+    "platform",
+    "style"
+];
+
+function makeDeclaredModule(moduleName, filePath) {
+    const contents = fs.readFileSync(filePath, { encoding: "utf-8" });
+    const moduleDeclaration = `declare module "${moduleName}" { 
+    ${contents} 
+    }`;
+    return prettier.format(moduleDeclaration, {
+        filepath: filePath,
+        tabWidth: 4
+    });
+}
 
 const generationPromises = declaredModules.map(async (m) => {
     const declarationFile = path.resolve(
@@ -29,20 +47,26 @@ const generationPromises = declaredModules.map(async (m) => {
         fullstackedModulesDir,
         `${m}.d.ts`
     );
-    const declaration = fs.readFileSync(declarationFile, { encoding: "utf-8" });
-    const moduleDeclaration = `declare module "${m}" { 
-    ${declaration} 
-    }`;
+    const moduleDeclaration = await makeDeclaredModule(m, declarationFile);
     const typeDirectory = path.resolve(outTypesDirectory, m);
     fs.mkdirSync(typeDirectory, { recursive: true });
     const moduleDeclarationFile = path.resolve(typeDirectory, "index.d.ts");
-    const formatted = await prettier.format(moduleDeclaration, {
-        filepath: moduleDeclarationFile,
-        tabWidth: 4
-    });
-    fs.writeFileSync(moduleDeclarationFile, formatted);
+
+    fs.writeFileSync(moduleDeclarationFile, moduleDeclaration);
 });
 
 await Promise.all(generationPromises);
 
 fs.rmSync(declarationsDir, { recursive: true });
+
+// csstype
+
+const typeFile = path.resolve("node_modules", "csstype", "index.d.ts");
+const declaredModule = await makeDeclaredModule("csstype", typeFile);
+const directory = path.resolve(
+    fullstackedModulesDir,
+    typesDirectory,
+    "csstype"
+);
+fs.mkdirSync(directory, { recursive: true });
+fs.writeFileSync(path.resolve(directory, "index.d.ts"), declaredModule);

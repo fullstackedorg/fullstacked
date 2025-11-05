@@ -1,10 +1,10 @@
-import { promises } from "node:fs";
 import { createPayloadHeader } from "./instance";
 import { callLib, CoreCallbackListeners } from "./call";
 import { buildSASS } from "../../../fullstacked_modules/build/sass";
 import fs from "node:fs";
 import path from "node:path";
 import { serializeArgs } from "../../../fullstacked_modules/bridge/serialization";
+import jsdom from "jsdom";
 
 function quickInstallPackage(editorHeader: Uint8Array, directory: string) {
     return new Promise<void>((resolve) => {
@@ -30,6 +30,14 @@ function quickInstallPackage(editorHeader: Uint8Array, directory: string) {
     });
 }
 
+async function buildStyle(entrypoint: string) {
+    globalThis.document = new jsdom.JSDOM().window.document;
+    return {
+        css: (await import(entrypoint)).exportStyles(),
+        errors: []
+    };
+}
+
 export async function buildLocalProject(directory: string) {
     const editorHeader = createPayloadHeader({
         id: "",
@@ -42,22 +50,27 @@ export async function buildLocalProject(directory: string) {
         const cb = async (_: string, messageType: string, message: string) => {
             if (messageType === "build-style") {
                 const { id, entryPoint, projectId } = JSON.parse(message);
-                const result = await buildSASS(entryPoint, {
-                    canonicalize: (filePath) =>
-                        filePath.startsWith("file://")
-                            ? new URL(filePath)
-                            : new URL(
-                                  "file://" +
-                                      path
-                                          .resolve(
-                                              process.cwd(),
-                                              projectId,
-                                              filePath
-                                          )
-                                          .replace(/\\/g, "/")
-                              ),
-                    load: (url) => fs.readFileSync(url, { encoding: "utf8" })
-                });
+                const result = entryPoint.endsWith(".js")
+                    ? await buildStyle(
+                          path.resolve(process.cwd(), projectId, entryPoint)
+                      )
+                    : await buildSASS(entryPoint, {
+                          canonicalize: (filePath) =>
+                              filePath.startsWith("file://")
+                                  ? new URL(filePath)
+                                  : new URL(
+                                        "file://" +
+                                            path
+                                                .resolve(
+                                                    process.cwd(),
+                                                    projectId,
+                                                    filePath
+                                                )
+                                                .replace(/\\/g, "/")
+                                    ),
+                          load: (url) =>
+                              fs.readFileSync(url, { encoding: "utf8" })
+                      });
                 callLib(
                     new Uint8Array([
                         ...editorHeader,
@@ -70,8 +83,14 @@ export async function buildLocalProject(directory: string) {
 
                 if (errors.length) {
                     errors.forEach((e) => {
-                        console.log(`${e.Location.File}#${e.Location.Line}`);
-                        console.log(e.Text + "\n");
+                        try {
+                            console.log(
+                                `${e.Location.File}#${e.Location.Line}`
+                            );
+                            console.log(e.Text + "\n");
+                        } catch (_) {
+                            console.log(e);
+                        }
                     });
                     reject();
                 } else {
