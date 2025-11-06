@@ -10,7 +10,6 @@ import { serializeArgs } from "./fullstacked_modules/bridge/serialization";
 import version from "./version";
 import esbuild from "esbuild";
 import { buildLocalProject } from "./platform/node/src/build";
-import * as sass from "sass";
 globalThis.require = createRequire(import.meta.url);
 
 await import("./declarations.js");
@@ -33,8 +32,6 @@ setDirectories({
     tmp: path.resolve(process.cwd(), ".cache")
 });
 
-await prebuild();
-
 await buildLocalProject(project);
 
 await postbuild();
@@ -42,14 +39,6 @@ await postbuild();
 console.log("Success");
 
 exit();
-
-async function prebuild() {
-    const { css } = await sass.compileAsync(
-        "fullstacked_modules/components/snackbar.scss"
-    );
-
-    await fs.writeFile("fullstacked_modules/components/snackbar.css", css);
-}
 
 async function postbuild() {
     const outDir = "out";
@@ -118,6 +107,4 @@ async function postbuild() {
         ])
     );
     await fs.writeFile(`${outDir}/zip/build.txt`, Date.now().toString());
-
-    await fs.rm("fullstacked_modules/components/snackbar.css");
 }

@@ -9,14 +9,28 @@ import core_message from "../core_message";
 import { buildSASS } from "./sass";
 import fs from "../fs";
 
+async function buildStyle(projectId: string, entrypoint: string) {
+    const modulePath = projectId ? `/${projectId}/${entrypoint}` : entrypoint;
+    const contents = await fs.readFile(modulePath);
+    const urlObj = URL.createObjectURL(new Blob([contents as Uint8Array<ArrayBuffer>], {type: "text/javascript"}))
+    const css = (await import(urlObj)).exportStyles()
+    URL.revokeObjectURL(urlObj);
+    return {
+        css,
+        errors: []
+    }
+}
+
 core_message.addListener("build-style", async (messageStr) => {
     const { id, entryPoint, projectId } = JSON.parse(messageStr);
-    const result = await buildSASS(entryPoint, {
-        projectId,
-        canonicalize: (filePath) => new URL(filePath, "file://"),
-        load: (url) =>
-            fs.readFile(projectId + url.pathname, { encoding: "utf8" })
-    });
+    const result = entryPoint.endsWith(".js") 
+        ? await buildStyle(projectId, entryPoint)
+        : await buildSASS(entryPoint, {
+            projectId,
+            canonicalize: (filePath) => new URL(filePath, "file://"),
+            load: (url) =>
+                fs.readFile(projectId + url.pathname, { encoding: "utf8" })
+        });
     bridge(
         new Uint8Array([58, ...serializeArgs([id, JSON.stringify(result)])])
     );
@@ -38,14 +52,14 @@ function buildResponse(buildResult: string) {
             ...error,
             location: error.location
                 ? {
-                      ...error.location,
-                      file: error.location.file.includes(activeBuild.project.id)
-                          ? activeBuild.project.id +
-                            error.location.file
-                                .split(activeBuild.project.id)
-                                .pop()
-                          : error.location.file
-                  }
+                    ...error.location,
+                    file: error.location.file.includes(activeBuild.project.id)
+                        ? activeBuild.project.id +
+                        error.location.file
+                            .split(activeBuild.project.id)
+                            .pop()
+                        : error.location.file
+                }
                 : null
         }));
         activeBuild.resolve(messages);

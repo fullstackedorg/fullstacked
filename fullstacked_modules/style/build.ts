@@ -7,7 +7,7 @@ for (const property in document.body.style) {
 }
 
 type StyleItem = {
-    cssString?: string;
+    element: HTMLElement;
     order: number;
     children: StyleTree;
 };
@@ -27,31 +27,24 @@ function getOrCreateParentFromPath(path: string[], parent = styles): StyleTree {
     const child = path.shift();
     if (!parent[child]) {
         parent[child] = {
+            element: document.createElement("div"),
+            order: order++,
             children: {},
-            order: order++
         };
     }
 
     return getOrCreateParentFromPath(path, parent[child].children);
 }
 
-function createStyle(cssProperties: CSSProperties, path: string[]): StyleItem {
-    const styleItem = {
-        cssString: "",
+function createStyle(cssProperties: CSSProperties, path: string[], existing: StyleItem): StyleItem {
+    const styleItem = existing || {
+        element: document.createElement("div"),
         order: order++,
         children: {}
     };
 
-    const tempElement = document.createElement("div");
-
     Object.entries(cssProperties).forEach(([property, value]) => {
-        if (
-            propertiesDefaultingToPxArr.includes(property) &&
-            value &&
-            typeof value === "number"
-        ) {
-            value = value + "px";
-        } else if (!allCSSProperties.includes(property)) {
+        if (!allCSSProperties.includes(property)) {
             if (property.startsWith("@media")) {
                 const parentPath = [property, ...path];
                 _createClass(
@@ -62,13 +55,18 @@ function createStyle(cssProperties: CSSProperties, path: string[]): StyleItem {
             } else {
                 _createClass([...path, property], value, styleItem.children);
             }
+        } else {
+            if (
+                propertiesDefaultingToPxArr.includes(property) &&
+                value &&
+                typeof value === "number"
+            ) {
+                value = value + "px";
+            }
+
+            styleItem.element.style[property] = value;
         }
-
-        tempElement.style[property] = value;
     });
-
-    styleItem.cssString = tempElement.style.cssText;
-    tempElement.remove();
 
     return styleItem;
 }
@@ -78,7 +76,7 @@ function _createClass(
     cssProperties: CSSProperties,
     parent = styles
 ) {
-    parent[path.at(-1)] = createStyle(cssProperties, path);
+    parent[path.at(-1)] = createStyle(cssProperties, path, parent[path.at(-1)]);
 }
 
 export function createClass(name: string, cssProperties: CSSProperties) {
@@ -102,8 +100,10 @@ function generateStyleRecusively(path: string[] = [], parent = styles) {
 
             const currentPath = [...path, tag];
 
-            if (styleItem.cssString) {
-                css += `${constructClassName(currentPath)} { ${styleItem.cssString} } `;
+            const cssString = styleItem.element.style.cssText;
+
+            if (cssString) {
+                css += `${constructClassName(currentPath)} { ${cssString} } `;
             }
 
             if (styleItem.children) {
@@ -119,6 +119,8 @@ function generateStyleRecusively(path: string[] = [], parent = styles) {
                     );
                 }
             }
+
+            styleItem.element.remove();
 
             return css;
         })

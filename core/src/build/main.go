@@ -183,7 +183,7 @@ func (p *ProjectBuild) buildJS(
 ) esbuild.BuildResult {
 	intermediateFilePath := path.Join(setup.Directories.Tmp, utils.RandString(10)+".js")
 
-	fileTemplate := "import \"bridge\";\nimport \"components/snackbar.css\";\n"
+	fileTemplate := "import \"bridge\";\n"
 
 	if entryPoint != nil {
 		entryPointJSPath := path.Join(setup.Directories.Root, p.ProjectID, *entryPoint)

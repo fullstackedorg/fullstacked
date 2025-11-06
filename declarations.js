@@ -7,6 +7,20 @@ const declarationsDir = "declarations";
 const fullstackedModulesDir = "fullstacked_modules";
 const typesDirectory = "@types";
 
+// csstype
+
+const typeFile = path.resolve("node_modules", "csstype", "index.d.ts");
+const declaredModule = await makeDeclaredModule("csstype", typeFile);
+const directory = path.resolve(
+    fullstackedModulesDir,
+    typesDirectory,
+    "csstype"
+);
+fs.mkdirSync(directory, { recursive: true });
+fs.writeFileSync(path.resolve(directory, "index.d.ts"), declaredModule);
+
+// end csstype
+
 if (fs.existsSync(declarationsDir)) {
     fs.rmSync(declarationsDir, { recursive: true });
 }
@@ -59,14 +73,3 @@ await Promise.all(generationPromises);
 
 fs.rmSync(declarationsDir, { recursive: true });
 
-// csstype
-
-const typeFile = path.resolve("node_modules", "csstype", "index.d.ts");
-const declaredModule = await makeDeclaredModule("csstype", typeFile);
-const directory = path.resolve(
-    fullstackedModulesDir,
-    typesDirectory,
-    "csstype"
-);
-fs.mkdirSync(directory, { recursive: true });
-fs.writeFileSync(path.resolve(directory, "index.d.ts"), declaredModule);
