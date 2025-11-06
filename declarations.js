@@ -72,4 +72,3 @@ const generationPromises = declaredModules.map(async (m) => {
 await Promise.all(generationPromises);
 
 fs.rmSync(declarationsDir, { recursive: true });
-

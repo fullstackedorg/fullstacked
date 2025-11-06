@@ -29,14 +29,18 @@ function getOrCreateParentFromPath(path: string[], parent = styles): StyleTree {
         parent[child] = {
             element: document.createElement("div"),
             order: order++,
-            children: {},
+            children: {}
         };
     }
 
     return getOrCreateParentFromPath(path, parent[child].children);
 }
 
-function createStyle(cssProperties: CSSProperties, path: string[], existing: StyleItem): StyleItem {
+function createStyle(
+    cssProperties: CSSProperties,
+    path: string[],
+    existing: StyleItem
+): StyleItem {
     const styleItem = existing || {
         element: document.createElement("div"),
         order: order++,
