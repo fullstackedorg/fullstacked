@@ -29,6 +29,18 @@ function opacity(color: string, opacity: number) {
     return `rgba(${parseInt(color.slice(1, 3), 16)}, ${parseInt(color.slice(3, 5), 16)}, ${parseInt(color.slice(5), 16)}, ${opacity / 100})`;
 }
 
+const typography = {
+    h1: 36,
+    h2: 30,
+    h3: 24,
+    m: 16,
+    s: 12,
+    xs: 9
+};
+
+const fontFamily =
+    'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif';
+
 export const snackBarClass = "snack-bar";
 
 export const snackBarsContainerClass = style.createClass(
@@ -46,10 +58,10 @@ export const snackBarsContainerClass = style.createClass(
         width: "100%",
         pointerEvents: "none",
         textAlign: "left",
-        // font-family: typography.$fonts;
-        // font-size: typography.$medium;
-
+        fontFamily,
+        fontSize: typography.m,
         maxWidth: 450,
+
         [`@media (max-width: 450px)`]: {
             alignItems: "center"
         },
