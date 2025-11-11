@@ -29,7 +29,13 @@ export const propertiesDefaultingToPx = {
     gap: true,
 
     fontSize: true,
-    borderRadius: true
+    borderRadius: true,
+    borderTopLeftRadius: true,
+    borderTopRightRadius: true,
+    borderBottomLeftRadius: true,
+    borderBottomRightRadius: true,
+
+    outlineOffset: true
 } as const;
 
 export type CSSProperties =
