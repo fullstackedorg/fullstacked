@@ -52,7 +52,10 @@ export async function buildLocalProject(directory: string) {
                 const { id, entryPoint, projectId } = JSON.parse(message);
                 const result = entryPoint.endsWith(".js")
                     ? await buildStyle(
-                          path.resolve(process.cwd(), projectId, entryPoint)
+                          "file://" +
+                              path
+                                  .resolve(process.cwd(), projectId, entryPoint)
+                                  .replace(/\\/g, "/")
                       )
                     : await buildSASS(entryPoint, {
                           canonicalize: (filePath) =>
