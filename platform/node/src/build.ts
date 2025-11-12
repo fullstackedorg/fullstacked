@@ -52,25 +52,28 @@ export async function buildLocalProject(directory: string) {
                 const { id, entryPoint, projectId } = JSON.parse(message);
                 const result = entryPoint.endsWith(".js")
                     ? await buildStyle(
-                        "file://" + path.resolve(process.cwd(), projectId, entryPoint).replace(/\\/g, "/")
-                    )
+                          "file://" +
+                              path
+                                  .resolve(process.cwd(), projectId, entryPoint)
+                                  .replace(/\\/g, "/")
+                      )
                     : await buildSASS(entryPoint, {
-                        canonicalize: (filePath) =>
-                            filePath.startsWith("file://")
-                                ? new URL(filePath)
-                                : new URL(
-                                    "file://" +
-                                    path
-                                        .resolve(
-                                            process.cwd(),
-                                            projectId,
-                                            filePath
-                                        )
-                                        .replace(/\\/g, "/")
-                                ),
-                        load: (url) =>
-                            fs.readFileSync(url, { encoding: "utf8" })
-                    });
+                          canonicalize: (filePath) =>
+                              filePath.startsWith("file://")
+                                  ? new URL(filePath)
+                                  : new URL(
+                                        "file://" +
+                                            path
+                                                .resolve(
+                                                    process.cwd(),
+                                                    projectId,
+                                                    filePath
+                                                )
+                                                .replace(/\\/g, "/")
+                                    ),
+                          load: (url) =>
+                              fs.readFileSync(url, { encoding: "utf8" })
+                      });
                 callLib(
                     new Uint8Array([
                         ...editorHeader,
