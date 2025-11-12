@@ -346,7 +346,7 @@ await sleep(1000);
 
 await kioskPage.bringToFront();
 
-await sleep(1000 * 20);
+await sleep(1000 * 15);
 
 assert.deepEqual(await getTitleAndColor(kioskPage), {
     currentTitle: testId,
