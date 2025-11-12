@@ -63,8 +63,8 @@ export async function createWebView(
     server.listen(port);
     if (!process.env.NO_OPEN) {
         let url = `http://localhost:${port}`;
-        if(process.argv.includes("--debug")) {
-            url += "?debug"
+        if (process.argv.includes("--debug")) {
+            url += "?debug";
         }
         open(url);
     }

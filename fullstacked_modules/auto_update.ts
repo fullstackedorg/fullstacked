@@ -28,8 +28,10 @@ async function checkForUpdates() {
     lastUpdateCheck = now;
 
     const pullResponse = await git.pull();
-    if(debug) {
-        console.log(`[${new Date().toISOString()}] Pull Response [ ${pullResponse} ]`);
+    if (debug) {
+        console.log(
+            `[${new Date().toISOString()}] Pull Response [ ${pullResponse} ]`
+        );
     }
     if (pullResponse !== git.PullResponse.DID_PULL) {
         return;

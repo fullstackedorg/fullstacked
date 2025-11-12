@@ -11,7 +11,7 @@ import { BridgeWindows, initRespondWindows } from "./platform/windows";
 import { serializeArgs } from "./serialization";
 import { debug } from "../debug";
 
-if(debug) {
+if (debug) {
     console.log("Running DEBUG");
 }
 
