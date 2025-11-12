@@ -50,7 +50,7 @@ export async function buildLocalProject(directory: string) {
         const cb = async (_: string, messageType: string, message: string) => {
             if (messageType === "build-style") {
                 const { id, entryPoint, projectId } = JSON.parse(message);
-                const result = entryPoint.endsWith(".js")
+                const result = entryPoint.endsWith(".mjs")
                     ? await buildStyle(
                           "file://" +
                               path

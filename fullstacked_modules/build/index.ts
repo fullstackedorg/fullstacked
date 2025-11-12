@@ -27,7 +27,7 @@ async function buildStyle(projectId: string, entrypoint: string) {
 
 core_message.addListener("build-style", async (messageStr) => {
     const { id, entryPoint, projectId } = JSON.parse(messageStr);
-    const result = entryPoint.endsWith(".js")
+    const result = entryPoint.endsWith(".mjs")
         ? await buildStyle(projectId, entryPoint)
         : await buildSASS(entryPoint, {
               projectId,

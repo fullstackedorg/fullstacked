@@ -248,7 +248,7 @@ func (p *ProjectBuild) buildJS(
 			plugins = append(plugins, wasmFsPlugin(projectDirectory, true))
 		}
 		styleFileName := utils.RandString(10)
-		projectStyleFile := path.Join(".build", styleFileName+".js")
+		projectStyleFile := path.Join(".build", styleFileName+".mjs")
 		styleFileTemplate := path.Join(setup.Directories.Tmp, styleFileName+".ts")
 		styleFileEntrypoint := path.Join(projectDirectory, projectStyleFile)
 		styleFileContents := ""
