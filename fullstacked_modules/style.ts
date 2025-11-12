@@ -50,8 +50,11 @@ export type CSSProperties =
 
 export const createClass = (name: string, cssProperties: CSSProperties) => name;
 
+export const createGlobalStyle = (cssProperties: CSSProperties) => {};
+
 const style = {
-    createClass
+    createClass,
+    createGlobalStyle
 };
 
 export default style;

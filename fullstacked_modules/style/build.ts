@@ -88,6 +88,12 @@ export function createClass(name: string, cssProperties: CSSProperties) {
     return name;
 }
 
+export function createGlobalStyle(globalCssProperties: CSSProperties) {
+    Object.entries(globalCssProperties).forEach(([name, cssProperties]) => {
+        styles[name] = createStyle(cssProperties, [name], styles[name]);
+    });
+}
+
 function constructClassName(path: string[]) {
     return path.reduce(
         (str, item) =>
@@ -137,7 +143,8 @@ export function exportStyles() {
 }
 
 const style = {
-    createClass
+    createClass,
+    createGlobalStyle
 };
 
 export default style;
