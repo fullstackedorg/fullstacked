@@ -3,6 +3,7 @@ import { Button } from "@fullstacked/ui";
 import { SnackBar } from "./components/snackbar";
 import packages from "./packages";
 import build from "./build";
+import { debug } from "./debug";
 
 let lastUpdateCheck = 0;
 const updateCheckDelay = 1000 * 10; // 10sec;
@@ -27,6 +28,9 @@ async function checkForUpdates() {
     lastUpdateCheck = now;
 
     const pullResponse = await git.pull();
+    if(debug) {
+        console.log(`[${new Date().toISOString()}] Pull Response [ ${pullResponse} ]`);
+    }
     if (pullResponse !== git.PullResponse.DID_PULL) {
         return;
     }

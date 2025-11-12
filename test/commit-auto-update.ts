@@ -63,7 +63,7 @@ process.on("unhandledRejection", onError);
 
 const repo = `${gitHost}/${repoName}`;
 
-editorProcess = child_process.exec(`node index.js ${repo}`, {
+editorProcess = child_process.exec(`node index.js --debug ${repo}`, {
     cwd: process.cwd() + "/platform/node",
     env: {
         ...process.env,
@@ -79,9 +79,9 @@ editorProcess.stderr.pipe(process.stderr);
 
 await sleep(3000);
 
-const { browser, createPage } = await createBrowser();
+const { createPage } = await createBrowser();
 const editorPage = await createPage();
-await editorPage.goto("http://localhost:9000");
+await editorPage.goto("http://localhost:9000?debug");
 await editorPage.waitForSelector(`#${RUN_PROJECT_ID}`);
 await editorPage.waitForSelector(`#${PROJECT_VIEW_ID} h1`);
 
@@ -151,7 +151,7 @@ await runProjectButton.click();
 await sleep(2000);
 
 const appPage = await createPage();
-await appPage.goto("http://localhost:9001");
+await appPage.goto("http://localhost:9001?debug");
 
 await sleep(2000);
 
@@ -248,7 +248,7 @@ const testId2 = crypto.randomUUID().split("-").at(0);
 
 const testDirectory2 = path.resolve(cacheDirectory, testId2);
 
-editorProcess2 = child_process.exec(`node index.js ${repo}`, {
+editorProcess2 = child_process.exec(`node index.js --debug ${repo}`, {
     cwd: process.cwd() + "/platform/node",
     env: {
         ...process.env,
@@ -265,7 +265,7 @@ editorProcess2.stderr.pipe(process.stderr);
 await sleep(3000);
 
 const editorPage2 = await createPage();
-await editorPage2.goto("http://localhost:9002");
+await editorPage2.goto("http://localhost:9002?debug");
 await editorPage2.waitForSelector(`#${RUN_PROJECT_ID}`);
 const projectTitle = await (
     await editorPage2.waitForSelector(`#${PROJECT_VIEW_ID} h1`)
@@ -282,7 +282,7 @@ await sleep(5000);
 
 await editorPage2.close();
 
-kioskProcess = child_process.exec(`node index.js --kiosk ${repoName}`, {
+kioskProcess = child_process.exec(`node index.js --debug --kiosk ${repoName}`, {
     cwd: process.cwd() + "/platform/node",
     env: {
         ...process.env,
@@ -299,7 +299,7 @@ kioskProcess.stderr.pipe(process.stderr);
 await sleep(3000);
 
 const kioskPage = await createPage();
-await kioskPage.goto("http://localhost:9003");
+await kioskPage.goto("http://localhost:9003?debug");
 
 assert.deepEqual(await getTitleAndColor(kioskPage), {
     currentTitle: "Hello World",

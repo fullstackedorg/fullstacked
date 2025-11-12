@@ -2,14 +2,13 @@ import http from "http";
 import net from "net";
 import open from "open";
 import { Duplex } from "stream";
-import ws, { WebSocket, WebSocketServer } from "ws";
+import { WebSocket, WebSocketServer } from "ws";
 import { createInstance } from "./instance";
 import { platform, getEnvVar } from ".";
 import {
     deserializeArgs,
     numberTo4Bytes
 } from "../../../fullstacked_modules/bridge/serialization";
-import { toByteArray } from "../../../fullstacked_modules/base64";
 
 type Instance = ReturnType<typeof createInstance>;
 
@@ -63,7 +62,11 @@ export async function createWebView(
     };
     server.listen(port);
     if (!process.env.NO_OPEN) {
-        open(`http://localhost:${port}`);
+        let url = `http://localhost:${port}`;
+        if(process.argv.includes("--debug")) {
+            url += "?debug"
+        }
+        open(url);
     }
     return {
         message: (type: string, message: string) => {

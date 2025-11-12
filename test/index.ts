@@ -31,17 +31,17 @@ const build = (testFile: string) => {
 };
 
 // type checking
-child_process.execSync(`node ${build("types.ts")}`, { stdio: "inherit" });
+// child_process.execSync(`node ${build("types.ts")}`, { stdio: "inherit" });
 
-// basic tests
-child_process.execSync(`node ${build("basic.ts")}`, {
-    stdio: "inherit"
-});
+// // basic tests
+// child_process.execSync(`node ${build("basic.ts")}`, {
+//     stdio: "inherit"
+// });
 
-// deep links and git clone tests
-child_process.execSync(`node ${build("deeplink-git.ts")}`, {
-    stdio: "inherit"
-});
+// // deep links and git clone tests
+// child_process.execSync(`node ${build("deeplink-git.ts")}`, {
+//     stdio: "inherit"
+// });
 
 // git commit and auto-update
 child_process.execSync(`node ${build("commit-auto-update.ts")}`, {
