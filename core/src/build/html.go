@@ -89,9 +89,10 @@ var DefaultHTML = []byte(`<html>
 	defaultHTMLElements[0].Text +
 	defaultHTMLElements[1].Text +
 	defaultHTMLElements[2].Text +
+	defaultHTMLElements[3].Text +
 	`</head>
 	<body>` +
-	defaultHTMLElements[3].Text +
+	defaultHTMLElements[4].Text +
 	`</body>
 </html>`)
 
