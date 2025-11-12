@@ -7,7 +7,6 @@ import {
 } from "../../../fullstacked_modules/bridge/serialization";
 import { toByteArray } from "../../../fullstacked_modules/base64";
 import prettyBytes from "pretty-bytes";
-import { doc } from "prettier";
 
 const gitProxy = "https://p.fullstacked.org";
 

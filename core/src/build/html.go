@@ -66,6 +66,15 @@ var defaultHTMLElements = []DefaultHTMLElement{
 		},
 	},
 	{
+		Text:   `<link rel="stylesheet" href="/style.css" />`,
+		InHead: true,
+		Atom:   atom.Link,
+		Attr: map[string][]string{
+			"rel":  {"stylesheet"},
+			"href": {"style.css", "/style.css"},
+		},
+	},
+	{
 		Text: `<script type="module" src="/index.js"></script>`,
 		Atom: atom.Script,
 		Attr: map[string][]string{
@@ -80,9 +89,10 @@ var DefaultHTML = []byte(`<html>
 	defaultHTMLElements[0].Text +
 	defaultHTMLElements[1].Text +
 	defaultHTMLElements[2].Text +
+	defaultHTMLElements[3].Text +
 	`</head>
 	<body>` +
-	defaultHTMLElements[3].Text +
+	defaultHTMLElements[4].Text +
 	`</body>
 </html>`)
 

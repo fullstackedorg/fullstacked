@@ -4,6 +4,7 @@ https://www.figma.com/design/xb3JBRCvEWpbwGda03T5QQ/Mockups?node-id=415-3655
 */
 
 import type { Button } from "@fullstacked/ui";
+import { snackBarClass, snackBarsContainerClass } from "./snackbar.s";
 
 type SnackBarOpt = {
     message: string;
@@ -16,12 +17,12 @@ let snackBarsContainer: HTMLDivElement;
 export function SnackBar(opts: SnackBarOpt) {
     if (!snackBarsContainer) {
         snackBarsContainer = document.createElement("div");
-        snackBarsContainer.classList.add("snack-bars-container");
+        snackBarsContainer.classList.add(snackBarsContainerClass);
         document.body.append(snackBarsContainer);
     }
 
     const container = document.createElement("div");
-    container.classList.add("snack-bar");
+    container.classList.add(snackBarClass);
 
     const text = document.createElement("div");
     text.innerHTML = opts.message;

@@ -1,10 +1,9 @@
 export const compilerOptions = {
     esModuleInterop: true,
-    module: "es2022",
-    target: "es2022",
+    module: "esnext",
+    target: "esnext",
     moduleResolution: "bundler",
     allowJs: true,
-    lib: ["dom", "dom.iterable", "es2023"],
     jsx: "react",
     typeRoots: ["../.fullstacked_modules/@types", "./node_modules/@types"]
 };

@@ -7,10 +7,9 @@ import { createRequire } from "node:module";
 import { buildCore } from "./build-core";
 import { createPayloadHeader } from "./platform/node/src/instance";
 import { serializeArgs } from "./fullstacked_modules/bridge/serialization";
-import version from "./version";
+import version, { getVersion } from "./version";
 import esbuild from "esbuild";
 import { buildLocalProject } from "./platform/node/src/build";
-import * as sass from "sass";
 globalThis.require = createRequire(import.meta.url);
 
 await import("./declarations.js");
@@ -33,8 +32,6 @@ setDirectories({
     tmp: path.resolve(process.cwd(), ".cache")
 });
 
-await prebuild();
-
 await buildLocalProject(project);
 
 await postbuild();
@@ -42,14 +39,6 @@ await postbuild();
 console.log("Success");
 
 exit();
-
-async function prebuild() {
-    const { css } = await sass.compileAsync(
-        "fullstacked_modules/components/snackbar.scss"
-    );
-
-    await fs.writeFile("fullstacked_modules/components/snackbar.css", css);
-}
 
 async function postbuild() {
     const outDir = "out";
@@ -93,6 +82,10 @@ async function postbuild() {
     await Promise.all(bundlePromises);
 
     await fs.writeFile(`${outDir}/build/version.json`, JSON.stringify(version));
+    await fs.writeFile(
+        `${outDir}/build/version-tsgo.json`,
+        JSON.stringify(getVersion("core/typescript-go"))
+    );
 
     // zip demo
     callLib(
@@ -118,6 +111,4 @@ async function postbuild() {
         ])
     );
     await fs.writeFile(`${outDir}/zip/build.txt`, Date.now().toString());
-
-    await fs.rm("fullstacked_modules/components/snackbar.css");
 }
