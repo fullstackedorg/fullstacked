@@ -7,7 +7,7 @@ import { createRequire } from "node:module";
 import { buildCore } from "./build-core";
 import { createPayloadHeader } from "./platform/node/src/instance";
 import { serializeArgs } from "./fullstacked_modules/bridge/serialization";
-import version from "./version";
+import version, { getVersion } from "./version";
 import esbuild from "esbuild";
 import { buildLocalProject } from "./platform/node/src/build";
 globalThis.require = createRequire(import.meta.url);
@@ -82,6 +82,10 @@ async function postbuild() {
     await Promise.all(bundlePromises);
 
     await fs.writeFile(`${outDir}/build/version.json`, JSON.stringify(version));
+    await fs.writeFile(
+        `${outDir}/build/version-tsgo.json`,
+        JSON.stringify(getVersion("core/typescript-go"))
+    );
 
     // zip demo
     callLib(
