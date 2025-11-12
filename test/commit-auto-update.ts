@@ -306,6 +306,8 @@ assert.deepEqual(await getTitleAndColor(kioskPage), {
     currentColor: [255, 0, 0]
 });
 
+await sleep(2000);
+
 await editorPage.bringToFront();
 
 await writeFileContent("text.txt", testId);
