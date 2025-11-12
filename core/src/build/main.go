@@ -206,7 +206,7 @@ func (p *ProjectBuild) buildJS(
 			Setup: func(build esbuild.PluginBuild) {
 				build.OnLoad(esbuild.OnLoadOptions{Filter: `.*\.s\.ts`}, func(args esbuild.OnLoadArgs) (esbuild.OnLoadResult, error) {
 					if !slices.Contains(styleFiles, args.Path) {
-						styleFiles = append(styleFiles, args.Path)
+						styleFiles = append(styleFiles, filepath.ToSlash(utils.RemoveDriveLetter(args.Path)))
 					}
 					return esbuild.OnLoadResult{}, nil
 				})
