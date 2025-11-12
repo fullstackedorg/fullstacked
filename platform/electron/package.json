@@ -6,6 +6,6 @@
         "start": "npm run build && electron .cache/index.js"
     },
     "devDependencies": {
-        "electron": "^39.0.0"
+        "electron": "^39.1.2"
     }
 }
