@@ -438,6 +438,7 @@ func wasmFsPlugin(projectDirectory string, styleBuild bool) esbuild.Plugin {
 						}, nil
 					}
 
+					// Alias
 					if styleBuild && args.Path == "style" {
 						args.Path = "style/build"
 					}
