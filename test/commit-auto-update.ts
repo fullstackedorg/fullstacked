@@ -278,7 +278,7 @@ await sleep(3000);
 const editorPage2Back = await editorPage2.waitForSelector(".back-button");
 await editorPage2Back.click();
 
-await sleep(2000);
+await sleep(5000);
 
 await editorPage2.close();
 
@@ -342,7 +342,7 @@ for (let i = 0; i < testId.length; i++) {
 
 await editorPage.keyboard.press("Enter");
 
-await sleep(1000);
+await sleep(3000);
 
 await kioskPage.bringToFront();
 
