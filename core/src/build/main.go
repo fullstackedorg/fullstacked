@@ -214,50 +214,8 @@ func (p *ProjectBuild) buildJS(
 		},
 	}
 
-	// add WASM fixture plugin
 	if fs.WASM {
-		wasmFS := esbuild.Plugin{
-			Name: "wasm-fs",
-			Setup: func(build esbuild.PluginBuild) {
-				build.OnResolve(esbuild.OnResolveOptions{Filter: `.*`},
-					func(args esbuild.OnResolveArgs) (esbuild.OnResolveResult, error) {
-						if strings.HasPrefix(args.Path, "/") {
-							return esbuild.OnResolveResult{
-								Path: args.Path,
-							}, nil
-						}
-
-						resolved := vResolve(projectDirectory, args.ResolveDir, args.Path)
-
-						if resolved == nil {
-							return esbuild.OnResolveResult{}, nil
-						}
-
-						resolvedStr := *resolved
-						if !strings.HasPrefix(resolvedStr, "/") {
-							resolvedStr = "/" + resolvedStr
-						}
-
-						return esbuild.OnResolveResult{
-							Path: resolvedStr,
-						}, nil
-					})
-
-				build.OnLoad(esbuild.OnLoadOptions{Filter: `.*`},
-					func(args esbuild.OnLoadArgs) (esbuild.OnLoadResult, error) {
-						contents, _ := fs.ReadFile(args.Path)
-						contentsStr := string(contents)
-
-						loader := inferLoader(args.Path)
-
-						return esbuild.OnLoadResult{
-							Contents: &contentsStr,
-							Loader:   loader,
-						}, nil
-					})
-			},
-		}
-		plugins = append(plugins, wasmFS)
+		plugins = append(plugins, wasmFsPlugin(projectDirectory, false))
 	}
 
 	// build
@@ -285,6 +243,10 @@ func (p *ProjectBuild) buildJS(
 	})
 
 	if len(styleFiles) > 0 {
+		plugins := []esbuild.Plugin{}
+		if fs.WASM {
+			plugins = append(plugins, wasmFsPlugin(projectDirectory, true))
+		}
 		styleFileName := utils.RandString(10)
 		projectStyleFile := path.Join(".build", styleFileName+".js")
 		styleFileTemplate := path.Join(setup.Directories.Tmp, styleFileName+".ts")
@@ -300,7 +262,8 @@ func (p *ProjectBuild) buildJS(
 			AllowOverwrite: true,
 			Outfile:        styleFileEntrypoint,
 			Bundle:         true,
-			Write:          true,
+			Write:          false,
+			Plugins:        plugins,
 			Format:         esbuild.FormatESModule,
 			Alias: map[string]string{
 				"style": "style/build",
@@ -317,7 +280,15 @@ func (p *ProjectBuild) buildJS(
 		fs.Unlink(styleFileTemplate, fileEventOrigin)
 
 		if len(styleResult.Errors) == 0 {
+			// write the output js file
+			styleFileEntrypointDir := filepath.Dir(styleFileEntrypoint)
+			fs.Mkdir(styleFileEntrypointDir, fileEventOrigin)
+			fs.WriteFile(styleFileEntrypoint, styleResult.OutputFiles[0].Contents, fileEventOrigin)
+
+			// run the script
 			styleBuild := p.buildStyle(projectStyleFile)
+
+			// append errors and css output
 			result.Errors = append(result.Errors, styleBuild.Errors...)
 			result.OutputFiles = append(result.OutputFiles, esbuild.OutputFile{
 				Path:     path.Join(tmpBuildDirectory, "style.css"),
@@ -447,4 +418,58 @@ func (p *ProjectBuild) Build() BuildResult {
 	fs.Rmdir(tmpBuildDirectory, fileEventOrigin)
 
 	return result
+}
+
+func wasmFsPlugin(projectDirectory string, styleBuild bool) esbuild.Plugin {
+	name := "wasm-fs"
+
+	if styleBuild {
+		name += "-style"
+	}
+
+	return esbuild.Plugin{
+		Name: name,
+		Setup: func(build esbuild.PluginBuild) {
+			build.OnResolve(esbuild.OnResolveOptions{Filter: `.*`},
+				func(args esbuild.OnResolveArgs) (esbuild.OnResolveResult, error) {
+					if strings.HasPrefix(args.Path, "/") {
+						return esbuild.OnResolveResult{
+							Path: args.Path,
+						}, nil
+					}
+
+					if styleBuild && args.Path == "style" {
+						args.Path = "style/build"
+					}
+
+					resolved := vResolve(projectDirectory, args.ResolveDir, args.Path)
+
+					if resolved == nil {
+						return esbuild.OnResolveResult{}, nil
+					}
+
+					resolvedStr := *resolved
+					if !strings.HasPrefix(resolvedStr, "/") {
+						resolvedStr = "/" + resolvedStr
+					}
+
+					return esbuild.OnResolveResult{
+						Path: resolvedStr,
+					}, nil
+				})
+
+			build.OnLoad(esbuild.OnLoadOptions{Filter: `.*`},
+				func(args esbuild.OnLoadArgs) (esbuild.OnLoadResult, error) {
+					contents, _ := fs.ReadFile(args.Path)
+					contentsStr := string(contents)
+
+					loader := inferLoader(args.Path)
+
+					return esbuild.OnLoadResult{
+						Contents: &contentsStr,
+						Loader:   loader,
+					}, nil
+				})
+		},
+	}
 }
