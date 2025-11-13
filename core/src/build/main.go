@@ -183,7 +183,9 @@ func (p *ProjectBuild) buildJS(
 ) esbuild.BuildResult {
 	intermediateFilePath := path.Join(setup.Directories.Tmp, utils.RandString(10)+".js")
 
-	fileTemplate := "import \"bridge\";\n"
+	fullstackedModulesDir := path.Join(setup.Directories.Editor, "fullstacked_modules")
+
+	fileTemplate := "import \"" + path.Join(fullstackedModulesDir, "bridge") + "\";\n"
 
 	if entryPoint != nil {
 		entryPointJSPath := path.Join(setup.Directories.Root, p.ProjectID, *entryPoint)
@@ -218,11 +220,10 @@ func (p *ProjectBuild) buildJS(
 		plugins = append(plugins, wasmFsPlugin(projectDirectory, false))
 	}
 
-	// build
-	fullstackedModulesDir := findEntryPoint(setup.Directories.Root, []string{
-		"fullstacked_modules",
-		".fullstacked_modules",
-	})
+	nodePaths := []string{
+		fullstackedModulesDir,
+		path.Join(projectDirectory, "node_modules"),
+	}
 
 	result := esbuild.Build(esbuild.BuildOptions{
 		EntryPointsAdvanced: []esbuild.EntryPoint{{
@@ -236,10 +237,7 @@ func (p *ProjectBuild) buildJS(
 		Sourcemap:      esbuild.SourceMapInlineAndExternal,
 		Write:          false,
 		Plugins:        plugins,
-		NodePaths: []string{
-			path.Join(setup.Directories.Root, *fullstackedModulesDir),
-			path.Join(projectDirectory, "node_modules"),
-		},
+		NodePaths:      nodePaths,
 	})
 
 	if len(styleFiles) > 0 {
@@ -268,10 +266,7 @@ func (p *ProjectBuild) buildJS(
 			Alias: map[string]string{
 				"style": "style/build",
 			},
-			NodePaths: []string{
-				path.Join(setup.Directories.Root, *fullstackedModulesDir),
-				path.Join(projectDirectory, "node_modules"),
-			},
+			NodePaths: nodePaths,
 		})
 
 		result.Errors = append(result.Errors, styleResult.Errors...)

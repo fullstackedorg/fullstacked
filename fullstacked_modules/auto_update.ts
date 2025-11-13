@@ -1,13 +1,12 @@
 import git from "./git";
-import { Button } from "@fullstacked/ui";
 import { SnackBar } from "./components/snackbar";
 import packages from "./packages";
 import build from "./build";
-import { debug } from "./debug";
+import debug from "./debug";
 
 let lastUpdateCheck = 0;
 const updateCheckDelay = 1000 * 10; // 10sec;
-let updating = false;
+let checking = false;
 let disabled = false;
 
 export function disableAutoUpdate() {
@@ -17,47 +16,42 @@ export function enableAutoUpdate() {
     disabled = false;
 }
 
-async function checkForUpdates() {
+function checkForUpdates() {
     window.requestAnimationFrame(checkForUpdates);
 
     const now = Date.now();
-    if (disabled || now - lastUpdateCheck < updateCheckDelay || updating) {
+    if (disabled || now - lastUpdateCheck < updateCheckDelay || checking) {
         return;
     }
 
-    lastUpdateCheck = now;
+    checking = true;
 
-    const pullResponse = await git.pull();
-    if (debug) {
-        console.log(
-            `[${new Date().toISOString()}] Pull Response [ ${pullResponse} ]`
-        );
-    }
-    if (pullResponse !== git.PullResponse.DID_PULL) {
-        return;
-    }
+    git.pull().then(async (pullResponse) => {
+        if (pullResponse === git.PullResponse.DID_PULL) {
+            let preventReload = false;
+            const preventReloadButton = document.createElement("button");
+            preventReloadButton.innerText = "Stop";
+            preventReloadButton.onclick = () => {
+                preventReload = true;
+                snackbar.dismiss();
+            };
 
-    let preventReload = false;
-    const preventReloadButton = Button({
-        text: "Stop"
-    });
-    preventReloadButton.onclick = () => {
-        preventReload = true;
-        snackbar.dismiss();
-    };
+            const snackbar = SnackBar({
+                message: "Project has updated. Rebuilding...",
+                button: preventReloadButton
+            });
 
-    const snackbar = SnackBar({
-        message: "Project has updated. Rebuilding...",
-        button: preventReloadButton
-    });
+            await update();
+            snackbar.dismiss();
 
-    updating = true;
-    update().then(() => {
-        updating = false;
-        snackbar.dismiss();
+            if (!preventReload) {
+                window.location.reload();
+                return;
+            }
+        }
 
-        if (preventReload) return;
-        window.location.reload();
+        checking = false;
+        lastUpdateCheck = now;
     });
 }
 if (await git.hasGit()) {

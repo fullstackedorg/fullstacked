@@ -2,6 +2,7 @@ import { bridge } from "./bridge";
 import { serializeArgs } from "./bridge/serialization";
 import core_message from "./core_message";
 import { Project } from "./../editor/types";
+import debug from "./debug";
 
 const pullPromises = new Map<
     string,

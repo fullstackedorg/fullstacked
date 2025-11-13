@@ -1,13 +1,11 @@
 import { Bridge } from "..";
 import { deserializeArgs } from "../serialization";
 
-const bridge = globalThis.fetch;
-
 export const BridgeNode: Bridge = async (
     payload: Uint8Array<ArrayBuffer>,
     transformer?: (responseArgs: any[]) => any
 ) => {
-    const response = await bridge("/call", {
+    const response = await fetch("/call", {
         method: "POST",
         body: payload
     });

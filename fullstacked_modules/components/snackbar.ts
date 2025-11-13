@@ -3,13 +3,12 @@ This file must follow the figma design
 https://www.figma.com/design/xb3JBRCvEWpbwGda03T5QQ/Mockups?node-id=415-3655
 */
 
-import type { Button } from "@fullstacked/ui";
 import { snackBarClass, snackBarsContainerClass } from "./snackbar.s";
 
 type SnackBarOpt = {
     message: string;
     autoDismissTimeout?: number;
-    button?: ReturnType<typeof Button>;
+    button?: HTMLButtonElement;
 };
 
 let snackBarsContainer: HTMLDivElement;

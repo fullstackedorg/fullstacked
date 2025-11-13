@@ -81,7 +81,7 @@ export async function createWebView(
 
 function createHandler(instance: Instance) {
     return async (req: http.IncomingMessage, res: http.ServerResponse) => {
-        let [pathname, query] = req.url.split("?");
+        let [pathname] = req.url.split("?");
         pathname = decodeURI(pathname);
 
         if (pathname === "/platform") {

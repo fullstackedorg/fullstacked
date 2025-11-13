@@ -1,4 +1,4 @@
-import { Project } from "../../editor/types";
+import type { Project } from "../../editor/types";
 import { bridge } from "../bridge";
 import {
     getLowestKeyIdAvailable,

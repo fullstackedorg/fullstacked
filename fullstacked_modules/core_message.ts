@@ -1,4 +1,5 @@
 import { SnackBar } from "./components/snackbar";
+import { debug } from "./debug";
 
 const coreMessageListeners = new Map<string, Set<(message: string) => void>>();
 export const addListener = (
@@ -49,6 +50,11 @@ globalThis.oncoremessage = (messageType: string, message: string) => {
 
 addListener("hello", console.log);
 addListener("log", console.log);
+addListener("debug-log", (message) => {
+    if (debug) {
+        console.log(message);
+    }
+});
 addListener("alert", (message) => {
     SnackBar({
         message,

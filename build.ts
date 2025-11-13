@@ -28,7 +28,7 @@ const project = "editor";
 setDirectories({
     root: process.cwd(),
     config: "",
-    editor: "",
+    editor: process.cwd(),
     tmp: path.resolve(process.cwd(), ".cache")
 });
 
@@ -51,10 +51,6 @@ async function postbuild() {
         [
             "node_modules/sass/sass.default.js",
             "fullstacked_modules/sass/index.js"
-        ],
-        [
-            "node_modules/@fullstacked/ui/ui.ts",
-            "fullstacked_modules/@fullstacked/ui/index.js"
         ]
     ];
 
@@ -75,8 +71,7 @@ async function postbuild() {
             outfile: `${outDir}/build/${to}`,
             bundle: true,
             platform: "browser",
-            format: "esm",
-            external: ["fetch"]
+            format: "esm"
         })
     );
     await Promise.all(bundlePromises);
