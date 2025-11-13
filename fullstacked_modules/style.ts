@@ -48,13 +48,23 @@ export type CSSProperties =
           [child: string]: CSSProperties;
       };
 
+export type CSSAnimationProperties = Partial<{
+    [key in `${number}%` | "from" | "to"]: CSSProperties;
+}>;
+
 export const createClass = (name: string, cssProperties: CSSProperties) => name;
 
 export const createGlobalStyle = (cssProperties: CSSProperties) => {};
 
+export const createAnimation = (
+    name: string,
+    cssAnimationProperties: CSSAnimationProperties
+) => name;
+
 const style = {
     createClass,
-    createGlobalStyle
+    createGlobalStyle,
+    createAnimation
 };
 
 export default style;

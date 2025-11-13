@@ -1,4 +1,8 @@
-import { propertiesDefaultingToPx, CSSProperties } from "../style";
+import {
+    CSSAnimationProperties,
+    propertiesDefaultingToPx,
+    CSSProperties
+} from "../style";
 
 const propertiesDefaultingToPxArr = Object.keys(propertiesDefaultingToPx);
 const allCSSProperties = [];
@@ -10,10 +14,18 @@ type StyleItem = {
     element: HTMLElement;
     order: number;
     children: StyleTree;
+    type: "style";
 };
 
 type StyleTree = {
-    [name: string]: StyleItem;
+    [name: string]: StyleItem | AnimationItem;
+};
+
+type AnimationItem = {
+    element: null;
+    order: number;
+    children: StyleTree;
+    type: "animation";
 };
 
 const styles: StyleTree = {};
@@ -29,7 +41,8 @@ function getOrCreateParentFromPath(path: string[], parent = styles): StyleTree {
         parent[child] = {
             element: document.createElement("div"),
             order: order++,
-            children: {}
+            children: {},
+            type: "style"
         };
     }
 
@@ -40,11 +53,12 @@ function createStyle(
     cssProperties: CSSProperties,
     path: string[],
     existing: StyleItem
-): StyleItem {
+) {
     const styleItem = existing || {
         element: document.createElement("div"),
         order: order++,
-        children: {}
+        children: {},
+        type: "style"
     };
 
     Object.entries(cssProperties).forEach(([property, value]) => {
@@ -80,7 +94,11 @@ function _createClass(
     cssProperties: CSSProperties,
     parent = styles
 ) {
-    parent[path.at(-1)] = createStyle(cssProperties, path, parent[path.at(-1)]);
+    parent[path.at(-1)] = createStyle(
+        cssProperties,
+        path,
+        parent[path.at(-1)] as StyleItem
+    );
 }
 
 export function createClass(name: string, cssProperties: CSSProperties) {
@@ -90,8 +108,28 @@ export function createClass(name: string, cssProperties: CSSProperties) {
 
 export function createGlobalStyle(globalCssProperties: CSSProperties) {
     Object.entries(globalCssProperties).forEach(([name, cssProperties]) => {
-        styles[name] = createStyle(cssProperties, [name], styles[name]);
+        styles[name] = createStyle(
+            cssProperties,
+            [name],
+            styles[name] as StyleItem
+        );
     });
+}
+
+export function createAnimation(
+    name: string,
+    cssAnimationProperties: CSSAnimationProperties
+) {
+    styles[name] = {
+        ...(createStyle(
+            cssAnimationProperties,
+            [name],
+            styles[name] as StyleItem
+        ) as any),
+        order: -1,
+        type: "animation"
+    };
+    return name;
 }
 
 function constructClassName(path: string[]) {
@@ -106,6 +144,10 @@ function generateStyleRecusively(path: string[] = [], parent = styles) {
     return Object.entries(parent)
         .sort(([_, itemA], [__, itemB]) => itemA.order - itemB.order)
         .map(([tag, styleItem]) => {
+            if (styleItem.type === "animation") {
+                return `@keyframes ${tag} { ${generateStyleRecusively([], styleItem.children)} }`;
+            }
+
             let css = "";
 
             const currentPath = [...path, tag];
@@ -144,7 +186,8 @@ export function exportStyles() {
 
 const style = {
     createClass,
-    createGlobalStyle
+    createGlobalStyle,
+    createAnimation
 };
 
 export default style;
