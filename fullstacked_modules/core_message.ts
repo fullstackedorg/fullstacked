@@ -1,5 +1,5 @@
 import { SnackBar } from "./components/snackbar";
-import { debug } from "./debug";
+import debug from "./debug";
 
 const coreMessageListeners = new Map<string, Set<(message: string) => void>>();
 export const addListener = (
