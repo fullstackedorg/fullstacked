@@ -62,7 +62,11 @@ function createStyle(
     };
 
     Object.entries(cssProperties).forEach(([property, value]) => {
-        if (!allCSSProperties.includes(property)) {
+        if (
+            !allCSSProperties.includes(property) &&
+            !property.startsWith("Webkit") &&
+            !property.startsWith("Moz")
+        ) {
             if (property.startsWith("@media")) {
                 const parentPath = [property, ...path];
                 _createClass(
