@@ -9,7 +9,7 @@ import { BridgeNode, initCallbackNode } from "./platform/node";
 import { BridgeWasm } from "./platform/wasm";
 import { BridgeWindows, initRespondWindows } from "./platform/windows";
 import { serializeArgs } from "./serialization";
-import { debug } from "../debug";
+import debug from "../debug";
 
 if (debug) {
     console.log("Running DEBUG");
