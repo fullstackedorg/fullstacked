@@ -2,6 +2,7 @@ package methods
 
 import (
 	"encoding/json"
+	"errors"
 	"path"
 	"path/filepath"
 	"slices"
@@ -291,7 +292,11 @@ func fsSwitch(method int, baseDir string, args []any) []byte {
 		fileName = args[0].(string)
 	}
 
-	filePath := path.Join(baseDir, fileName)
+	filePath := path.Clean(path.Join(baseDir, fileName))
+
+	if !strings.HasPrefix(filePath, baseDir) {
+		return serialize.SerializeError(errors.New("illegal fs operation"))
+	}
 
 	switch method {
 	case FS_READFILE:
