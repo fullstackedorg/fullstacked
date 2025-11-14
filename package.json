@@ -1,5 +1,5 @@
 {
-    "version": "0.12.2",
+    "version": "0.12.3",
     "scripts": {
         "prebuild": "esbuild --bundle --platform=node --format=esm --packages=external --outfile=build.js build.ts",
         "build": "node build.js",
@@ -26,9 +26,9 @@
         "@codemirror/theme-one-dark": "^6.1.3",
         "@fullstacked/ai-agent": "github:fullstackedorg/ai-agent#34002e3ba21e79aacaee6b78a3be9e023f80bfae",
         "@fullstacked/codemirror-view": "github:fullstackedorg/codemirror-view#9d7705eb5f73f8733ec93a8f71bb4dd515f6fc86",
-        "@fullstacked/file-tree": "github:fullstackedorg/file-tree#8fc6d5e587507c631a68525659745eeda414bcf3",
+        "@fullstacked/file-tree": "github:fullstackedorg/file-tree#a7b09ad58f0940fa094d4d3939a8009c7cd9a942",
         "@fullstacked/stack-navigation": "github:fullstackedorg/stack-navigation#888302a680bcc501639dfdb0a6aede3da91f06ff",
-        "@fullstacked/ui": "github:fullstackedorg/ui#74e1492ab7dc48dcc14497cd9b478c632813e3a7",
+        "@fullstacked/ui": "github:fullstackedorg/ui#55b39ce1cfa842cbeee860314c29cbe4bab99957",
         "@types/node": "^24.10.1",
         "@types/semver": "^7.7.1",
         "csstype": "^3.1.3",
