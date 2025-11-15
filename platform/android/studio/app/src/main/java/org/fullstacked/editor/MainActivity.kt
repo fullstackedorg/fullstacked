@@ -145,13 +145,14 @@ class MainActivity() : ComponentActivity() {
         // launch editor and maybe launch Url
         if(projectIdExternal == null) {
             val editorInstance = Instance( "", true)
-            this.editorWebViewComponent = WebViewComponent(this, editorInstance)
 
             // after editor update,
             // make sure to set directories to re-run setup fn
             if(this.extractEditorFiles(editorInstance, editor)){
                 this.setDirectories()
             }
+
+            this.editorWebViewComponent = WebViewComponent(this, editorInstance)
 
             this.fileChooserResultLauncher = this.createFileChooserResultLauncher()
             this.setContentView(this.editorWebViewComponent?.webView)
