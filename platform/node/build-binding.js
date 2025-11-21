@@ -31,8 +31,8 @@ export function buildNodeBinding(directory) {
     const bindingFilePath = path.resolve(directory, "gyp", "binding.gyp");
     fs.writeFileSync(bindingFilePath, JSON.stringify(binding, null, 4));
 
-    child_process.execSync(`node-gyp --arch=${arch} clean configure build`, {
-        cwd: path.resolve(directory, "gyp"),
+    child_process.execSync(`npx node-gyp --directory=${path.resolve(directory, "gyp")} --arch=${arch} clean configure build`, {
+        cwd: directory,
         stdio: "inherit"
     });
 
