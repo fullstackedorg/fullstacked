@@ -10,6 +10,7 @@
         "test": "esbuild test/index.ts --bundle --outfile=.cache/test.js --platform=node --format=esm --packages=external && node .cache/test.js "
     },
     "workspaces": [
+        "platform/electron",
         "platform/node",
         "platform/wasm"
     ],

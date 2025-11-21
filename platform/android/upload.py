@@ -1,6 +1,7 @@
 #!/usr/bin/python
 #
 # use python 2
+# pip install google-api-python-client oauth2client
 #
 #
 # Copyright 2014 Google Inc. All Rights Reserved.
