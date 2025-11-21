@@ -1,7 +1,7 @@
-ARCH=$(uname -i)
-ARCH2=$(uname -i)
+ARCH=$(uname -m)
+ARCH2=$(uname -m)
 
-if [[ $(uname -a) == *"x86_64"* ]]; then 
+if [ "$ARCH" == "x86_64" ]; then 
     ARCH="x64"
     ARCH2="amd64"
 else
