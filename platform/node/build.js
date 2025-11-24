@@ -16,4 +16,8 @@ if (process.argv.includes("--binding")) {
         packages: "external",
         platform: "node"
     });
+
+    if (process.argv.includes("--fullstacked_modules")) {
+        await import("./build-modules.js");
+    }
 }

@@ -147,9 +147,9 @@ func Call(payload []byte) []byte {
 
 	args := serialize.DeserializeArgs(payload[cursor:])
 
-	baseDir := setup.Directories.Root + "/" + projectId
+	baseDir := path.Clean(path.Join(setup.Directories.Root, projectId))
 	if isEditor {
-		baseDir = setup.Directories.Root
+		baseDir = path.Clean(setup.Directories.Root)
 	}
 
 	if slices.Contains(EDITOR_ONLY, method) && !isEditor {

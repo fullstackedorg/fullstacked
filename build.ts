@@ -58,9 +58,10 @@ async function postbuild() {
         });
     }
 
-    
-    (await import("./build-sass.js")).buildSASS(`${outDir}/build/fullstacked_modules/sass/index.js`);
-    
+    (await import("./build-sass.js")).buildSASS(
+        `${outDir}/build/fullstacked_modules/sass/index.js`
+    );
+
     await fs.writeFile(`${outDir}/build/version.json`, JSON.stringify(version));
     await fs.writeFile(
         `${outDir}/build/version-tsgo.json`,

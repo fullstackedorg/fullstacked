@@ -49,17 +49,18 @@ func directories(
 	fs.Rmdir(setup.Directories.Tmp, fileEventOrigin)
 	fs.Mkdir(setup.Directories.Tmp, fileEventOrigin)
 
-	// if repo build, fullstacked_modules already exists
-	exists, _ := fs.Exists(path.Join(setup.Directories.Root, "fullstacked_modules"))
-	if !exists {
-		// place fullstacked_modules for lsp
-		fs.Copy(
-			path.Join(setup.Directories.Editor, "fullstacked_modules"),
-			path.Join(setup.Directories.Root, ".fullstacked_modules"),
-			fileEventOrigin,
-		)
+	if methods.TSGOptr != nil {
+		// if repo build, fullstacked_modules already exists
+		exists, _ := fs.Exists(path.Join(setup.Directories.Root, "fullstacked_modules"))
+		if !exists {
+			// place fullstacked_modules for internal lsp
+			fs.Copy(
+				path.Join(setup.Directories.Editor, "fullstacked_modules"),
+				path.Join(setup.Directories.Root, ".fullstacked_modules"),
+				fileEventOrigin,
+			)
+		}
 	}
-
 }
 
 var cCallback = (unsafe.Pointer)(nil)

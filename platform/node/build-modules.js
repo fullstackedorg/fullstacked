@@ -4,7 +4,7 @@ import fs from "node:fs";
 await import("../../declarations.js");
 
 const currentDirectory = import.meta.dirname;
-const rootDirectory = path.resolve(currentDirectory, "..", "..")
+const rootDirectory = path.resolve(currentDirectory, "..", "..");
 
 const fullstackedModulesDirectory = path.resolve(
     currentDirectory,
@@ -21,4 +21,6 @@ fs.cpSync(
     { recursive: true }
 );
 
-(await import("../../build-sass.js")).buildSASS(path.resolve(fullstackedModulesDirectory, "sass", "index.js"));
+(await import("../../build-sass.js")).buildSASS(
+    path.resolve(fullstackedModulesDirectory, "sass", "index.js")
+);

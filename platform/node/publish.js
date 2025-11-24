@@ -40,7 +40,7 @@ let command =
         : platform === "linux"
           ? `make ${platform}-${currentArch}-shared -j4 NO_TSGO=1`
           : `make ${platform}-x64-shared ${platform}-arm64-shared -j4 NO_TSGO=1`;
-          
+
 child_process.execSync(command, {
     cwd: path.resolve(rootDirectory, "core", "build"),
     stdio: "inherit"

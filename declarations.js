@@ -3,7 +3,7 @@ import child_process from "node:child_process";
 import path from "node:path";
 import prettier from "prettier";
 
-const currentDirectory = import.meta.dirname
+const currentDirectory = import.meta.dirname;
 const declarationsDir = path.resolve(currentDirectory, "declarations");
 const fullstackedModulesDir = "fullstacked_modules";
 const typesDirectory = "@types";
@@ -17,7 +17,11 @@ child_process.execSync("npx tsc --project tsconfig.declarations.json", {
     cwd: currentDirectory
 });
 
-const outTypesDirectory = path.resolve(currentDirectory, fullstackedModulesDir, typesDirectory);
+const outTypesDirectory = path.resolve(
+    currentDirectory,
+    fullstackedModulesDir,
+    typesDirectory
+);
 
 if (fs.existsSync(outTypesDirectory)) {
     fs.rmSync(outTypesDirectory, { recursive: true });
@@ -63,7 +67,12 @@ fs.rmSync(declarationsDir, { recursive: true });
 
 // csstype
 
-const typeFile = path.resolve(currentDirectory, "node_modules", "csstype", "index.d.ts");
+const typeFile = path.resolve(
+    currentDirectory,
+    "node_modules",
+    "csstype",
+    "index.d.ts"
+);
 const declaredModule = await makeDeclaredModule("csstype", typeFile);
 const directory = path.resolve(
     currentDirectory,

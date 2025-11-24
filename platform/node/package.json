@@ -5,7 +5,7 @@
         "build": "node build.js",
         "postbuild": "node build.js --binding",
         "start": "npm run build && node index.js --debug --lib ../../core/bin --root ~/FullStacked --config ~/.config/fullstacked --editor ../../out/build",
-        "prepack": "node build.js"
+        "prepack": "node build.js --fullstacked_modules"
     },
     "bin": {
         "fullstacked": "index.js"
