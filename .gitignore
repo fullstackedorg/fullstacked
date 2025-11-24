@@ -7,4 +7,3 @@ out
 .vscode
 ./build.js
 fullstacked_modules/@types
-fullstacked_modules/sass
