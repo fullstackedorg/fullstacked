@@ -43,7 +43,7 @@ darwin-arm64-static:
 	go build -buildmode=c-archive $(TAGS) -o $(OUT)/darwin-arm64.a -v ..
 
 darwin-static: darwin-x64-static darwin-arm64-static
-	lipo $(OUT)/darwin-x64.a $(OUT)/darwin-arm64.a -create $(TAGS) -output $(OUT)/darwin.a
+	lipo $(OUT)/darwin-x64.a $(OUT)/darwin-arm64.a -create -output $(OUT)/darwin.a
 	cp $(OUT)/darwin-arm64.h $(OUT)/darwin.h
 
 ###### iOS/iPadOS #######
