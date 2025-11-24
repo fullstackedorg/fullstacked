@@ -1,3 +1,4 @@
+SHELL := /bin/bash
 OUT = $(CURDIR)/../bin
 
 $(shell node ./typescript-go-patch/patch.js)
