@@ -15,13 +15,14 @@ import (
 	fetch "fullstackedorg/fullstacked/src/fetch"
 	fs "fullstackedorg/fullstacked/src/fs"
 	git "fullstackedorg/fullstacked/src/git"
-	ts_lsp "fullstackedorg/fullstacked/src/lsp"
 	packages "fullstackedorg/fullstacked/src/packages"
 	serialize "fullstackedorg/fullstacked/src/serialize"
 	setup "fullstackedorg/fullstacked/src/setup"
 	staticFiles "fullstackedorg/fullstacked/src/staticFiles"
 	utils "fullstackedorg/fullstacked/src/utils"
 )
+
+type tsgo struct{}
 
 const (
 	HELLO       = 0
@@ -86,10 +87,11 @@ const (
 	GIT_HAS_GIT       = 82
 	GIT_REMOTE_URL    = 83
 
-	LSP_START   = 90
-	LSP_REQUEST = 91
-	LSP_END     = 92
-	LSP_VERSION = 93
+	LSP_START     = 90
+	LSP_REQUEST   = 91
+	LSP_END       = 92
+	LSP_VERSION   = 93
+	LSP_AVAILABLE = 94
 
 	OPEN = 100
 )
@@ -145,9 +147,9 @@ func Call(payload []byte) []byte {
 
 	args := serialize.DeserializeArgs(payload[cursor:])
 
-	baseDir := setup.Directories.Root + "/" + projectId
+	baseDir := path.Clean(path.Join(setup.Directories.Root, projectId))
 	if isEditor {
-		baseDir = setup.Directories.Root
+		baseDir = path.Clean(setup.Directories.Root)
 	}
 
 	if slices.Contains(EDITOR_ONLY, method) && !isEditor {
@@ -274,13 +276,23 @@ func Call(payload []byte) []byte {
 	case method == FULLSTACKED_MODULES_LIST:
 		return fs.ReadDirSerialized(path.Join(setup.Directories.Editor, "fullstacked_modules"), true, false, false, []string{})
 	case method == LSP_START:
-		return serialize.SerializeString(ts_lsp.Start(path.Join(setup.Directories.Root, args[0].(string))))
+		if TSGOptr != nil {
+			return serialize.SerializeString((*TSGOptr).start(path.Join(setup.Directories.Root, args[0].(string))))
+		}
 	case method == LSP_REQUEST:
-		ts_lsp.Request(args[0].(string), args[1].(string))
+		if TSGOptr != nil {
+			(*TSGOptr).request(args[0].(string), args[1].(string))
+		}
 	case method == LSP_END:
-		ts_lsp.End(args[0].(string))
+		if TSGOptr != nil {
+			(*TSGOptr).end(args[0].(string))
+		}
 	case method == LSP_VERSION:
-		return serialize.SerializeString(ts_lsp.Version())
+		if TSGOptr != nil {
+			return serialize.SerializeString((*TSGOptr).version())
+		}
+	case method == LSP_AVAILABLE:
+		return serialize.SerializeBoolean(TSGOptr != nil)
 	}
 
 	return nil

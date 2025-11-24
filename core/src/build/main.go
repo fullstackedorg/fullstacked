@@ -181,7 +181,7 @@ func (p *ProjectBuild) buildJS(
 	styleEntryPoint *string,
 	tmpBuildDirectory string,
 ) esbuild.BuildResult {
-	intermediateFilePath := path.Join(setup.Directories.Tmp, utils.RandString(10)+".js")
+	intermediateFilePath := path.Join(setup.Directories.Tmp, utils.RandString(10)+".ts")
 
 	fullstackedModulesDir := path.Join(setup.Directories.Editor, "fullstacked_modules")
 

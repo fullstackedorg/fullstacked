@@ -8,11 +8,8 @@ import { buildCore } from "./build-core";
 import { createPayloadHeader } from "./platform/node/src/instance";
 import { serializeArgs } from "./fullstacked_modules/bridge/serialization";
 import version, { getVersion } from "./version";
-import esbuild from "esbuild";
 import { buildLocalProject } from "./platform/node/src/build";
 globalThis.require = createRequire(import.meta.url);
-
-await import("./declarations.js");
 
 const exit = () => process.exit();
 ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => process.on(signal, exit));
@@ -41,17 +38,13 @@ console.log("Success");
 exit();
 
 async function postbuild() {
+    await import("./declarations.js");
+
     const outDir = "out";
     const assets = [
         [`${project}/assets`, "assets"],
         ["node_modules/@fullstacked/ui/icons", "icons"],
         ["fullstacked_modules", "fullstacked_modules"]
-    ];
-    const toBundle = [
-        [
-            "node_modules/sass/sass.default.js",
-            "fullstacked_modules/sass/index.js"
-        ]
     ];
 
     await fs.rm(outDir, { recursive: true, force: true });
@@ -65,16 +58,9 @@ async function postbuild() {
         });
     }
 
-    const bundlePromises = toBundle.map(([from, to]) =>
-        esbuild.build({
-            entryPoints: [from],
-            outfile: `${outDir}/build/${to}`,
-            bundle: true,
-            platform: "browser",
-            format: "esm"
-        })
+    (await import("./build-sass.js")).buildSASS(
+        `${outDir}/build/fullstacked_modules/sass/index.js`
     );
-    await Promise.all(bundlePromises);
 
     await fs.writeFile(`${outDir}/build/version.json`, JSON.stringify(version));
     await fs.writeFile(

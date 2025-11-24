@@ -15,12 +15,9 @@ const isRelease = process.argv.includes("--release");
 const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(currentDirectory, "..", "..");
 
-// build editor (for the fullstacked_modules)
+// prepare fullstacked_modules
 
-child_process.execSync("npm run build", {
-    cwd: rootDirectory,
-    stdio: "inherit"
-});
+await import("./build-modules.js");
 
 // update version
 
@@ -39,10 +36,10 @@ const platform = os.platform();
 const currentArch = os.arch();
 let command =
     platform === "win32"
-        ? "call ./windows.bat arm64 && call ./windows.bat x64"
+        ? "call ./windows.bat arm64 NO_TSGO=1 && call ./windows.bat x64 NO_TSGO=1"
         : platform === "linux"
-          ? `make ${platform}-${currentArch}-shared -j4`
-          : `make ${platform}-x64-shared ${platform}-arm64-shared -j4`;
+          ? `make ${platform}-${currentArch}-shared -j4 NO_TSGO=1`
+          : `make ${platform}-x64-shared ${platform}-arm64-shared -j4 NO_TSGO=1`;
 
 child_process.execSync(command, {
     cwd: path.resolve(rootDirectory, "core", "build"),
