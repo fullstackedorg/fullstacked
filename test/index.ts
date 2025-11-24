@@ -31,10 +31,10 @@ const build = (testFile: string) => {
 };
 
 // type checking
-child_process.execSync(`node ./types.js`, { 
+child_process.execSync(`node ./types.js`, {
     stdio: "inherit",
     cwd: "./test"
- });
+});
 
 // basic tests
 child_process.execSync(`node ${build("basic.ts")}`, {
