@@ -11,10 +11,12 @@ import version, { getVersion } from "./version";
 import { buildLocalProject } from "./platform/node/src/build";
 globalThis.require = createRequire(import.meta.url);
 
+const noTSGO = process.argv.includes("--no-tsgo");
+
 const exit = () => process.exit();
 ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => process.on(signal, exit));
 
-buildCore();
+buildCore(noTSGO);
 
 buildNodeBinding("platform/node");
 
@@ -38,7 +40,9 @@ console.log("Success");
 exit();
 
 async function postbuild() {
-    await import("./declarations.js");
+    if (!noTSGO) {
+        await import("./declarations.js");
+    }
 
     const outDir = "out";
     const assets = [
@@ -63,10 +67,13 @@ async function postbuild() {
     );
 
     await fs.writeFile(`${outDir}/build/version.json`, JSON.stringify(version));
-    await fs.writeFile(
-        `${outDir}/build/version-tsgo.json`,
-        JSON.stringify(getVersion("core/typescript-go"))
-    );
+
+    if (!noTSGO) {
+        await fs.writeFile(
+            `${outDir}/build/version-tsgo.json`,
+            JSON.stringify(getVersion("core/typescript-go"))
+        );
+    }
 
     // zip demo
     callLib(
