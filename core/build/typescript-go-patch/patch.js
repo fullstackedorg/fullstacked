@@ -1,32 +1,66 @@
 import fs from "node:fs";
+import path from "node:path";
 
-// /dev/null/infered crashes everything
-const fileToPatch = "../typescript-go/internal/project/project.go";
-let contents = fs.readFileSync(fileToPatch, { encoding: "utf8" });
-contents = contents.replace(
-    `inferredProjectName = "/dev/null/inferred"`,
-    `inferredProjectName = ".inferred"`
-);
-fs.writeFileSync(fileToPatch, contents);
+const tsgoDirectory = path.resolve("..", "typescript-go");
 
-// fix invalid utf8 panic
-const fileToPatch2 = "../typescript-go/internal/ls/signaturehelp.go";
-let contents2 = fs.readFileSync(fileToPatch2, { encoding: "utf8" });
-contents2 = contents2
-    .replace(
-        `Label:         displayParts.String(),`,
-        `Label:         strings.ToValidUTF8(displayParts.String(), ""),`
-    )
-    .replace(
-        `Label:         display.String(),`,
-        `Label:         strings.ToValidUTF8(display.String(), ""),`
-    );
-fs.writeFileSync(fileToPatch2, contents2);
+const toPatch = [
+    {
+        // /dev/null/infered crashes everything
+        file: path.resolve(tsgoDirectory, "internal", "project", "project.go"),
+        replace: [
+            {
+                from: `inferredProjectName = "/dev/null/inferred"`,
+                to__: `inferredProjectName = ".inferred"`
+            }
+        ]
+    },
+    {
+        // fix invalid utf8 panic
+        file: path.resolve(tsgoDirectory, "internal", "ls", "signaturehelp.go"),
+        replace: [
+            {
+                from: `Label:         displayParts.String(),`,
+                to__: `Label:         strings.ToValidUTF8(displayParts.String(), ""),`
+            },
+            {
+                from: `Label:         display.String(),`,
+                to__: `Label:         strings.ToValidUTF8(display.String(), ""),`
+            }
+        ]
+    },
+    {
+        // ios isCaseSensitive
+        file: path.resolve(tsgoDirectory, "internal", "vfs", "osvfs", "os.go"),
+        replace: [
+            {
+                from: `if runtime.GOOS == "windows" {`,
+                to__: `if runtime.GOOS == "windows" || runtime.GOOS == "ios" {`
+            }
+        ]
+    }
+];
 
-// put tsgo module into the codebase
-const sourceFile = "./typescript-go-patch/module/tsgo.go";
-const outDir = "../typescript-go/cmd/module";
-const outFile = outDir + "/tsgo.go";
+function patch() {
+    toPatch.forEach((p) => {
+        let contents = fs.readFileSync(p.file, { encoding: "utf8" });
+        p.replace.forEach(({ from, to__ }) => {
+            if (!contents.includes(from) && !contents.includes(to__)) {
+                throw `Cannot find text to replace\n${p.file}\n[${from}]\n[${to__}] `;
+            }
+            contents = contents.replace(from, to__);
+        });
+        fs.writeFileSync(p.file, contents);
+    });
 
-fs.mkdirSync(outDir, { recursive: true });
-fs.cpSync(sourceFile, outFile);
+    // put tsgo module into the codebase
+    const sourceFile = path.resolve("typescript-go-patch", "module", "tsgo.go");
+    const outDir = path.resolve("typescript-go", "cmd", "module");
+    const outFile = path.resolve(outDir, "tsgo.go");
+
+    fs.mkdirSync(outDir, { recursive: true });
+    fs.cpSync(sourceFile, outFile);
+}
+
+if (fs.readdirSync(tsgoDirectory).length > 0) {
+    patch();
+}
