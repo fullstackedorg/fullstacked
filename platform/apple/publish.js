@@ -110,7 +110,8 @@ const appleKeys = dotenv.parse(
     fs.readFileSync(path.resolve(currentDirectory, "APPLE_KEYS.env"))
 );
 
-const bundleiOS = path.resolve(pkgDirectoryiOS, "FullStacked.ipa");
+const bundleiOSName = fs.readdirSync(pkgDirectoryiOS).find(item => item.endsWith(".ipa"));
+const bundleiOS = path.resolve(pkgDirectoryiOS, bundleiOSName);
 child_process.execSync(
     `xcrun altool --upload-app --file ${bundleiOS} -t ios --apiKey ${appleKeys.APPLE_API_KEY_ID} --apiIssuer ${appleKeys.APPLE_API_ISSUER} --show-progress`,
     {
@@ -121,7 +122,8 @@ child_process.execSync(
     }
 );
 
-const bundleMacOS = path.resolve(pkgDirectoryMacOS, "FullStacked.pkg");
+const bundleMacOSName = fs.readdirSync(pkgDirectoryMacOS).find(item => item.endsWith(".pkg"));
+const bundleMacOS = path.resolve(pkgDirectoryMacOS, bundleMacOSName);
 child_process.execSync(
     `xcrun altool --upload-app --file ${bundleMacOS} -t macosx --apiKey ${appleKeys.APPLE_API_KEY_ID} --apiIssuer ${appleKeys.APPLE_API_ISSUER} --show-progress`,
     {
