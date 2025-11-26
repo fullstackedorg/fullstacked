@@ -15,21 +15,24 @@ import version from "../../version.js";
 const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(currentDirectory, "..", "..");
 
+const tsgoLocation = path.resolve(rootDirectory, "core", "typescript-go");
+const noTSGO = fs.readdirSync(tsgoLocation).length === 0;
+
 // build editor
 
-child_process.execSync("npm run build", {
+child_process.execSync(`npm run build ${noTSGO ? "-- --no-tsgo" : ""}`, {
     cwd: rootDirectory,
     stdio: "inherit"
 });
 
 // build core
 
-child_process.execSync("call ./windows.bat arm64", {
+child_process.execSync(`call ./windows.bat arm64 ${noTSGO ? "NO_TSGO=1" : ""}`, {
     cwd: path.resolve(rootDirectory, "core", "build"),
     stdio: "inherit"
 });
 
-child_process.execSync("call ./windows.bat x64", {
+child_process.execSync(`call ./windows.bat x64 ${noTSGO ? "NO_TSGO=1" : ""}`, {
     cwd: path.resolve(rootDirectory, "core", "build"),
     stdio: "inherit"
 });
