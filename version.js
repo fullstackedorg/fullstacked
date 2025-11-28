@@ -1,11 +1,8 @@
 import path from "node:path";
-import url from "node:url";
 import fs from "node:fs";
 import child_process from "node:child_process";
 
-export function getVersion(directory) {
-    const cwd = directory || path.dirname(url.fileURLToPath(import.meta.url));
-
+export function getVersion(cwd = process.cwd()) {
     const packageJsonFile = path.join(cwd, "package.json");
     const packageJsonContent = fs.readFileSync(packageJsonFile, {
         encoding: "utf-8"
