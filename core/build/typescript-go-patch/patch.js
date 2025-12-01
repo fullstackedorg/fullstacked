@@ -54,7 +54,7 @@ function patch() {
 
     // put tsgo module into the codebase
     const sourceFile = path.resolve("typescript-go-patch", "module", "tsgo.go");
-    const outDir = path.resolve("typescript-go", "cmd", "module");
+    const outDir = path.resolve(tsgoDirectory, "cmd", "module");
     const outFile = path.resolve(outDir, "tsgo.go");
 
     fs.mkdirSync(outDir, { recursive: true });

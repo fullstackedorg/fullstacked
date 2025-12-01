@@ -29,7 +29,7 @@
         "@fullstacked/codemirror-view": "github:fullstackedorg/codemirror-view#9d7705eb5f73f8733ec93a8f71bb4dd515f6fc86",
         "@fullstacked/file-tree": "github:fullstackedorg/file-tree#a7b09ad58f0940fa094d4d3939a8009c7cd9a942",
         "@fullstacked/stack-navigation": "github:fullstackedorg/stack-navigation#888302a680bcc501639dfdb0a6aede3da91f06ff",
-        "@fullstacked/ui": "github:fullstackedorg/ui#55b39ce1cfa842cbeee860314c29cbe4bab99957",
+        "@fullstacked/ui": "github:fullstackedorg/ui#5c1b45860f45642b8fb76790d16612dcb78f1b13",
         "@types/node": "^24.10.1",
         "@types/semver": "^7.7.1",
         "csstype": "^3.2.3",
