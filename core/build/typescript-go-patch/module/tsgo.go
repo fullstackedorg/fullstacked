@@ -72,7 +72,7 @@ func runLSP(
 	s := lsp.NewServer(&lsp.ServerOptions{
 		In:                 lsp.ToReader(in),
 		Out:                lsp.ToWriter(out),
-		Err:                os.Stderr,
+		Err:                io.Discard,
 		Cwd:                directory,
 		FS:                 fs,
 		DefaultLibraryPath: defaultLibraryPath,

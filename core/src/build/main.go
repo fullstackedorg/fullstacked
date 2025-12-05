@@ -238,6 +238,7 @@ func (p *ProjectBuild) buildJS(
 		Write:          false,
 		Plugins:        plugins,
 		NodePaths:      nodePaths,
+		Platform:       esbuild.PlatformBrowser,
 	})
 
 	if len(styleFiles) > 0 {
@@ -263,6 +264,7 @@ func (p *ProjectBuild) buildJS(
 			Write:          false,
 			Plugins:        plugins,
 			Format:         esbuild.FormatESModule,
+			Platform:       esbuild.PlatformBrowser,
 			Alias: map[string]string{
 				"style": "style/build",
 			},

@@ -15,7 +15,6 @@ type FetchOptions = {
     headers: Record<string, string>;
     body: string | Uint8Array;
     timeout: number;
-    stream: boolean;
 };
 
 type FetchResponse = {
@@ -78,7 +77,7 @@ export default function core_fetch(
 ): Promise<FetchResponse & { body: string }>;
 export default function core_fetch(
     url: string,
-    options?: Partial<FetchOptions> & { stream?: boolean; encoding?: "utf8" }
+    options?: Partial<FetchOptions> & { encoding?: "utf8" }
 ) {
     const method = options?.method || "GET";
 

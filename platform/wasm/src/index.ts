@@ -240,7 +240,7 @@ directories(dirs.root, dirs.config, dirs.editor, dirs.tmp);
 
 const te = new TextEncoder();
 const editorDir = te.encode(dirs.editor);
-let payload = new Uint8Array([
+const payload = new Uint8Array([
     1, // isEditor
     ...numberTo4Bytes(0), // no project id
     30, // UNZIP_BIN_TO_FILE
@@ -260,6 +260,36 @@ if (!unzipResult) {
 }
 
 directories(dirs.root, dirs.config, dirs.editor, dirs.root + "/.tmp");
+
+// add FullStacked main projects list for Demo purpose
+
+const projectsListsConfig = {
+    lists: [
+        {
+            url: "https://files.fullstacked.org/projects.json",
+            name: "FullStacked",
+            id: "org.fullstacked"
+        }
+    ]
+};
+const projectsListsConfigStr = JSON.stringify(projectsListsConfig);
+const projectsListsConfigStrData = te.encode(projectsListsConfigStr);
+const configType = "projects-lists";
+const configTypeData = te.encode(configType);
+const payloadWrite = new Uint8Array([
+    1, // isEditor
+    ...numberTo4Bytes(0), // no project id
+    51, // CONFIG_SAVE
+    2, // STRING
+    ...numberTo4Bytes(configTypeData.length),
+    ...configTypeData,
+    2, // STRING
+    ...numberTo4Bytes(projectsListsConfigStrData.length),
+    ...projectsListsConfigStrData
+]);
+await call(payloadWrite);
+
+// end add projects list
 
 async function staticFileServing(projectId: string, pathname: string) {
     const projectIdData = te.encode(projectId);

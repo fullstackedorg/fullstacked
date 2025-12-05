@@ -52,7 +52,7 @@ func FetchSerialized(
 	if err != nil {
 		bytes = append(bytes, serialize.SerializeNumber(id)...)
 		bytes = append(bytes, serialize.SerializeNumber(float64(500))...)
-		bytes = append(bytes, serialize.SerializeString("Failed fecth")...)
+		bytes = append(bytes, serialize.SerializeString("Failed fetch")...)
 		bytes = append(bytes, serialize.SerializeString("{}")...)
 		bytes = append(bytes, serialize.SerializeString(err.Error())...)
 
