@@ -146,7 +146,19 @@ function constructClassName(path: string[]) {
 
 function generateStyleRecusively(path: string[] = [], parent = styles) {
     return Object.entries(parent)
-        .sort(([_, itemA], [__, itemB]) => itemA.order - itemB.order)
+        .sort(([tagA, itemA], [tagB, itemB]) => {
+            const tagAisMedia = tagA.startsWith("@media");
+            const tabBisMedia = tagB.startsWith("@media");
+            if (tagAisMedia && !tabBisMedia) return 1;
+            else if (!tagAisMedia && tabBisMedia) return -1;
+            else if (tagAisMedia && tabBisMedia) {
+                let numberA = parseInt(tagA.match(/\d+/g)?.[0] || "0");
+                let numberB = parseInt(tagB.match(/\d+/g)?.[0] || "0");
+                if (isNaN(numberA)) numberA = 0;
+                if (isNaN(numberB)) numberB = 0;
+                return numberB - numberA;
+            } else return itemA.order - itemB.order;
+        })
         .map(([tag, styleItem]) => {
             if (styleItem.type === "animation") {
                 return `@keyframes ${tag} { ${generateStyleRecusively([], styleItem.children)} }`;

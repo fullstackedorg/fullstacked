@@ -11,6 +11,66 @@ import (
 	esbuild "github.com/evanw/esbuild/pkg/api"
 )
 
+func isPathNodeModules(path string) bool {
+	return strings.Contains(path, "node_modules")
+}
+
+var packageJSONCache = map[string]PackageJSON{}
+
+func loadPackageJSON(packageJSONpath string) (*PackageJSON, error) {
+	cached, ok := packageJSONCache[packageJSONpath]
+	if ok {
+		return &cached, nil
+	}
+
+	_, isFile := fs.Exists(packageJSONpath)
+
+	if !isFile {
+		return nil, nil
+	}
+
+	packageJSONData, _ := fs.ReadFile(packageJSONpath)
+	packageJSON := PackageJSON{}
+	err := json.Unmarshal(packageJSONData, &packageJSON)
+	packageJSONCache[packageJSONpath] = packageJSON
+
+	return &packageJSON, err
+}
+
+func checkForPathAlias(projectDir string, modulePath string) *string {
+	modulePathComponents := strings.Split(modulePath[len(projectDir+"/node_modules/"):], "/")
+
+	nodeModulesName := modulePathComponents[0]
+	modulePathComponents = modulePathComponents[1:]
+
+	if strings.HasPrefix(nodeModulesName, "@") {
+		nodeModulesName += "/" + modulePathComponents[0]
+		modulePathComponents = modulePathComponents[1:]
+	}
+
+	relativeModulePath := "./" + strings.Join(modulePathComponents, "/")
+
+	packageJSONpath := path.Join(projectDir, "node_modules", nodeModulesName, "package.json")
+
+	packageJSON, _ := loadPackageJSON(packageJSONpath)
+
+	if packageJSON.Browser != nil {
+		browserAlias := PACKAGE_BROWSER_RESOLVE(relativeModulePath, packageJSON.Browser)
+		if browserAlias != nil {
+			return LOAD_AS_FILE(path.Join(projectDir, "node_modules", nodeModulesName, *browserAlias))
+		}
+	}
+
+	if packageJSON.Exports != nil {
+		exportsAliasResolved := PACKAGE_EXPORTS_RESOLVE(path.Join(projectDir, "node_modules", nodeModulesName), relativeModulePath, packageJSON.Exports)
+		if exportsAliasResolved != nil {
+			return LOAD_AS_FILE(*exportsAliasResolved)
+		}
+	}
+
+	return &modulePath
+}
+
 func vResolve(projectDir string, resolveDir string, module string) *string {
 	if strings.HasPrefix(module, "/") {
 		panic("do not use absolute path for imports")
@@ -23,6 +83,10 @@ func vResolve(projectDir string, resolveDir string, module string) *string {
 			resolvedPath = LOAD_AS_DIR(modulePath)
 		}
 		if resolvedPath != nil {
+			if isPathNodeModules(*resolvedPath) {
+				resolvedPath = checkForPathAlias(projectDir, *resolvedPath)
+			}
+
 			return resolvedPath
 		}
 	} else {
@@ -79,11 +143,8 @@ func LOAD_AS_DIR(modulePath string) *string {
 	}
 
 	packageJsonPath := path.Join(modulePath, "package.json")
-	pExists, _ := fs.Exists(packageJsonPath)
-	if pExists {
-		packageJsonData, _ := fs.ReadFile(packageJsonPath)
-		packageJSON := PackageJSON{}
-		err := json.Unmarshal(packageJsonData, &packageJSON)
+	packageJSON, err := loadPackageJSON(packageJsonPath)
+	if packageJSON != nil {
 		if err != nil {
 			return LOAD_INDEX(modulePath)
 		}
@@ -191,26 +252,22 @@ type PackageJSON struct {
 
 func LOAD_PACKAGE_EXPORTS(packageDir string, modulePath string) (*string, *PackageJSON) {
 	packageJsonPath := path.Join(packageDir, "package.json")
-	exists, isFile := fs.Exists(packageJsonPath)
-	if !exists || !isFile {
+	packageJSON, err := loadPackageJSON(packageJsonPath)
+	if packageJSON == nil {
 		return nil, nil
 	}
 
-	packageJsonData, _ := fs.ReadFile(packageJsonPath)
-	packageJSON := PackageJSON{}
-	err := json.Unmarshal(packageJsonData, &packageJSON)
-
 	if err != nil || packageJSON.Exports == nil {
-		return nil, &packageJSON
+		return nil, packageJSON
 	}
 
 	match := PACKAGE_EXPORTS_RESOLVE(packageDir, "."+modulePath, packageJSON.Exports)
 
 	if match == nil {
-		return nil, &packageJSON
+		return nil, packageJSON
 	}
 
-	return existResolve(*match), &packageJSON
+	return existResolve(*match), packageJSON
 }
 
 // https://github.com/nodejs/node/blob/main/doc/api/esm.md
@@ -315,6 +372,18 @@ func arrayEquals(arrA []string, arrB []string) bool {
 //		  	  "default": "./sass.default.js"   <= this is the one we want
 //		  }
 //	}
+//
+//	"exports": {
+//	  ".": {
+//	 	"types": "./index.d.ts",
+//	 	"require": "./index.cjs",
+//	    "browser": {
+//	         "import": "./standalone.mjs",
+//	         "default": "./standalone.js"
+//	     },
+//	     "default": "./index.mjs"
+//	   },
+//	}
 func PACKAGE_EXPORTS_RESOLVE_OBJECT(moduleDirectory string, subpath string, exports map[string]json.RawMessage) *string {
 	if subpath == "." && exports["default"] != nil {
 		return PACKAGE_EXPORTS_RESOLVE(moduleDirectory, ".", exports["default"])
@@ -341,11 +410,33 @@ func PACKAGE_EXPORTS_RESOLVE_OBJECT(moduleDirectory string, subpath string, expo
 			exportObject := (map[string]string)(nil)
 			err = json.Unmarshal(export, &exportObject)
 			if err == nil {
-				exportDefault := exportObject["default"]
+				exportDefault := exportObject["import"]
 				if exportDefault == "" {
-					exportDefault = exportObject["import"]
+					exportDefault = exportObject["default"]
 				}
 				return PACKAGE_EXPORTS_RESOLVE_STRING(moduleDirectory, subpath, exportDefault)
+			} else {
+				exportWithSubObjects := (map[string]json.RawMessage)(nil)
+				err = json.Unmarshal(export, &exportWithSubObjects)
+				if err == nil {
+					browser, hasBrowser := exportWithSubObjects["browser"]
+					if hasBrowser {
+						browserFile := PACKAGE_BROWSER_RESOLVE(subpath, browser)
+						if browserFile != nil {
+							resolved := path.Join(moduleDirectory, *browserFile)
+							return &resolved
+						}
+					}
+
+					defaultObject, hasDefault := exportWithSubObjects["default"]
+					if hasDefault {
+						defaultFile := PACKAGE_BROWSER_RESOLVE(subpath, defaultObject)
+						if defaultFile != nil {
+							resolved := path.Join(moduleDirectory, *defaultFile)
+							return &resolved
+						}
+					}
+				}
 			}
 		}
 
@@ -408,15 +499,26 @@ func PACKAGE_BROWSER_RESOLVE(path string, browser json.RawMessage) *string {
 	}
 
 	browserObject := (map[string]string)(nil)
+
 	err := json.Unmarshal(browser, &browserObject)
 	if err != nil {
 		return nil
 	}
 
 	for key, modulePath := range browserObject {
-		if key == path {
+		if key == path || key == strings.TrimRight(path, ".js") {
 			return &modulePath
 		}
+	}
+
+	importValue, hasImport := browserObject["import"]
+	if hasImport {
+		return &importValue
+	}
+
+	defaultValue, hasDefault := browserObject["default"]
+	if hasDefault {
+		return &defaultValue
 	}
 
 	return nil

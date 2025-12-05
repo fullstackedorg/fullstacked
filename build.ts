@@ -62,7 +62,7 @@ async function postbuild() {
         });
     }
 
-    (await import("./build-sass.js")).buildSASS(
+    await (await import("./build-sass.js")).buildSASS(
         `${outDir}/build/fullstacked_modules/sass/index.js`
     );
 
