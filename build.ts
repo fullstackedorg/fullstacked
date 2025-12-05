@@ -62,9 +62,9 @@ async function postbuild() {
         });
     }
 
-    await (await import("./build-sass.js")).buildSASS(
-        `${outDir}/build/fullstacked_modules/sass/index.js`
-    );
+    await (
+        await import("./build-sass.js")
+    ).buildSASS(`${outDir}/build/fullstacked_modules/sass/index.js`);
 
     await fs.writeFile(`${outDir}/build/version.json`, JSON.stringify(version));
 

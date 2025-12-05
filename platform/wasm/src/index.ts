@@ -92,7 +92,7 @@ function createWindow(projectId: string) {
     initProjectWindow(projectId);
 }
 
-globalThis.onmessageWASM = function(
+globalThis.onmessageWASM = function (
     projectId: string,
     messageType: string,
     message: string
@@ -264,23 +264,22 @@ directories(dirs.root, dirs.config, dirs.editor, dirs.root + "/.tmp");
 // add FullStacked main projects list for Demo purpose
 
 const projectsListsConfig = {
-    lists:
-        [
-            {
-                url: "https://files.fullstacked.org/projects.json", 
-                name: "FullStacked", 
-                id: "org.fullstacked"
-            }
-        ]
-}
+    lists: [
+        {
+            url: "https://files.fullstacked.org/projects.json",
+            name: "FullStacked",
+            id: "org.fullstacked"
+        }
+    ]
+};
 const projectsListsConfigStr = JSON.stringify(projectsListsConfig);
-const projectsListsConfigStrData = te.encode(projectsListsConfigStr)
+const projectsListsConfigStrData = te.encode(projectsListsConfigStr);
 const configType = "projects-lists";
-const configTypeData = te.encode(configType)
+const configTypeData = te.encode(configType);
 const payloadWrite = new Uint8Array([
     1, // isEditor
     ...numberTo4Bytes(0), // no project id
-    51,// CONFIG_SAVE
+    51, // CONFIG_SAVE
     2, // STRING
     ...numberTo4Bytes(configTypeData.length),
     ...configTypeData,
@@ -288,7 +287,7 @@ const payloadWrite = new Uint8Array([
     ...numberTo4Bytes(projectsListsConfigStrData.length),
     ...projectsListsConfigStrData
 ]);
-await call(payloadWrite)
+await call(payloadWrite);
 
 // end add projects list
 
@@ -319,7 +318,7 @@ async function initProjectWindow(projectId: string) {
     if (!webview) return;
 
     webview.window.originalFetch = webview.window.fetch;
-    webview.window.fetch = async function(
+    webview.window.fetch = async function (
         url: string | Request,
         options: any
     ) {
