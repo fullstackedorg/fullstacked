@@ -112,7 +112,7 @@ function createHandler(instance: Instance) {
             ...numberTo4Bytes(pathnameData.length), // arg length
             ...pathnameData
         ]);
-        const responseData = await instance.call(payload);
+        const responseData = instance.call(payload);
         const [mimeType, data] = deserializeArgs(responseData);
 
         // not found
@@ -129,7 +129,9 @@ function createHandler(instance: Instance) {
         res.writeHead(200, {
             "content-type": mimeType,
             "content-length": data.length,
-            "cache-control": "no-cache"
+            "cache-control": "no-cache",
+            "Cross-Origin-Opener-Policy": "same-origin",
+            "Cross-Origin-Embedder-Policy": "require-corp",
         });
         res.end(data);
     };

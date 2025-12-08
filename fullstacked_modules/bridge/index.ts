@@ -11,6 +11,10 @@ import { BridgeWindows, initRespondWindows } from "./platform/windows";
 import { serializeArgs } from "./serialization";
 import debug from "../debug";
 
+console.log(window.SharedArrayBuffer
+    ? '✅ SAB available'
+    : '❌ SAB unavailable')
+
 if (debug) {
     console.log("Running DEBUG");
 }
