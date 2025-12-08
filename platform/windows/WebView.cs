@@ -72,7 +72,8 @@ namespace FullStacked
                     string[] headersPlatform = {
                         "Content-Type: text/html",
                         "Content-Length: " + platformData.Length
-                    };
+                    }
+                ;
                     args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", string.Join("\r\n", headersPlatform));
                     return;
                 }
@@ -108,7 +109,9 @@ namespace FullStacked
                 string[] headers = {
                     "Content-Type: " + values[0].str,
                     "Content-Length: " + values[1].buffer.Length,
-                    "Cache-Control: no-cache"
+                    "Cache-Control: no-cache",
+                    "Cross-Origin-Opener-Policy: same-origin",
+                    "Cross-Origin-Embedder-Policy: require-corp"
                 };
                 IRandomAccessStream resStream = new MemoryStream(values[1].buffer).AsRandomAccessStream();
                 args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(resStream, 200, "OK", string.Join("\r\n", headers));

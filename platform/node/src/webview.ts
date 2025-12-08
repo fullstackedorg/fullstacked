@@ -130,8 +130,8 @@ function createHandler(instance: Instance) {
             "content-type": mimeType,
             "content-length": data.length,
             "cache-control": "no-cache",
-            "Cross-Origin-Opener-Policy": "same-origin",
-            "Cross-Origin-Embedder-Policy": "require-corp",
+            "cross-origin-opener-policy": "same-origin",
+            "cross-origin-embedder-policy": "require-corp",
         });
         res.end(data);
     };
