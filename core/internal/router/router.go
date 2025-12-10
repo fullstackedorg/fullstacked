@@ -11,6 +11,14 @@ const (
 	Net  Module = 3
 )
 
+type CoreResponseType = int
+
+const (
+	CoreError  CoreResponseType = 0
+	CoreData   CoreResponseType = 1
+	CoreStream CoreResponseType = 2
+)
+
 func Call(module Module, fn int, payload []byte) []byte {
 	switch module {
 	case Fs:

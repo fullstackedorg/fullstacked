@@ -1,6 +1,8 @@
 import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
+import { createRequire } from "node:module";
+globalThis.require = createRequire(import.meta.url);
 let core: any;
 
 export const CoreCallbackListeners = new Set<typeof callback>();

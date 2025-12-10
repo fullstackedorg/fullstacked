@@ -123,8 +123,3 @@ func call(id C.int, buffer unsafe.Pointer, length C.int) C.int {
 
 	return C.int(len(response))
 }
-
-//export freePtr
-func freePtr(ptr unsafe.Pointer) {
-	C.free(ptr)
-}

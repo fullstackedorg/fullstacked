@@ -15,6 +15,9 @@ func main() {
 			}, {
 				Path:       "fullstackedorg/fullstacked/internal/fs",
 				OutputPath: "../lib/@types/fs.ts",
+			}, {
+				Path:       "fullstackedorg/fullstacked/internal/serialization",
+				OutputPath: "../lib/@types/serialization.ts",
 			},
 		},
 	}

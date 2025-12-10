@@ -72,63 +72,63 @@ class WebViewComponent(
         return true
     }
 
-    override fun shouldInterceptRequest(
-        view: WebView?,
-        request: WebResourceRequest?,
-    ): WebResourceResponse? {
-        if(request?.url?.host != "localhost") {
-            return super.shouldInterceptRequest(view, request)
-        }
-
-        val pathname = request.url?.path ?: "/"
-
-        println("request: $pathname")
-
-        if(pathname == "/platform") {
-            return WebResourceResponse(
-                "text/plain",
-                "utf-8",
-                "android".byteInputStream()
-            )
-        }
-
-        // static file serving
-
-        val pathnameData = pathname.toByteArray()
-        var payload = byteArrayOf(
-            1, // static file method
-            2  // STRING
-        )
-        payload += numberToBytes(pathnameData.size)
-        payload += pathnameData
-
-        val start = Instant.now().toEpochMilli()
-        val response = this.instance.callLib(payload)
-        val callTime = Instant.now().toEpochMilli()
-        println("DEBUG TIME CALL: " + pathname + " | " + (callTime - start))
-        val args = deserializeArgs(response)
-        println("DEBUG TIME DESERIALIZE: " + pathname + " | " + (Instant.now().toEpochMilli() - callTime))
-
-        if(args.size == 0) {
-            return WebResourceResponse(
-                "text/plain",
-                "utf-8",
-                404,
-                "Not Found",
-                mapOf(),
-                "Not Found".byteInputStream()
-            )
-        }
-
-        return WebResourceResponse(
-            args[0] as String,
-            "",
-            200,
-            "OK",
-            mapOf("cache-control" to "no-cache"),
-            (args[1] as ByteArray).inputStream()
-        )
-    }
+//    override fun shouldInterceptRequest(
+//        view: WebView?,
+//        request: WebResourceRequest?,
+//    ): WebResourceResponse? {
+//        if(request?.url?.host != "localhost") {
+//            return super.shouldInterceptRequest(view, request)
+//        }
+//
+//        val pathname = request.url?.path ?: "/"
+//
+//        println("request: $pathname")
+//
+//        if(pathname == "/platform") {
+//            return WebResourceResponse(
+//                "text/plain",
+//                "utf-8",
+//                "android".byteInputStream()
+//            )
+//        }
+//
+//        // static file serving
+//
+//        val pathnameData = pathname.toByteArray()
+//        var payload = byteArrayOf(
+//            1, // static file method
+//            2  // STRING
+//        )
+//        payload += numberToBytes(pathnameData.size)
+//        payload += pathnameData
+//
+//        val start = Instant.now().toEpochMilli()
+//        val response = this.instance.callLib(payload)
+//        val callTime = Instant.now().toEpochMilli()
+//        println("DEBUG TIME CALL: " + pathname + " | " + (callTime - start))
+//        val args = deserializeArgs(response)
+//        println("DEBUG TIME DESERIALIZE: " + pathname + " | " + (Instant.now().toEpochMilli() - callTime))
+//
+//        if(args.size == 0) {
+//            return WebResourceResponse(
+//                "text/plain",
+//                "utf-8",
+//                404,
+//                "Not Found",
+//                mapOf(),
+//                "Not Found".byteInputStream()
+//            )
+//        }
+//
+//        return WebResourceResponse(
+//            args[0] as String,
+//            "",
+//            200,
+//            "OK",
+//            mapOf("cache-control" to "no-cache"),
+//            (args[1] as ByteArray).inputStream()
+//        )
+//    }
 }
 
 @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
@@ -149,7 +149,7 @@ fun createWebView(delegate: WebViewComponent) : WebView {
         }
     }
     webView.settings.javaScriptEnabled = true
-    webView.loadUrl("http://localhost")
+    webView.loadUrl("http://localhost:9000")
     webView.addJavascriptInterface(delegate, "android")
 
     return webView

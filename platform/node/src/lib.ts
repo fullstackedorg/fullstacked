@@ -11,11 +11,14 @@ const arch = os.arch();
 const libBinary =
     platform + "-" + arch + "." + (platform === "win32" ? "dll" : "so");
 
-export async function getLibPath(directory: string) {
+export function getLocalLibPath(directory: string) {
     const libPath = path.resolve(directory, libBinary);
-    if (fs.existsSync(libPath)) {
-        return libPath;
-    }
+    return fs.existsSync(libPath) ? libPath : null;
+}
+
+export async function getLibPath(directory: string) {
+    const libPath = getLocalLibPath(directory);
+    if (libPath) return libPath;
 
     const packageJsonFilePath = path.resolve(directory, "package.json");
     const packageJson = JSON.parse(

@@ -1,1 +1,0 @@
-https://linuxhint.com/setup_git_http_server_docker/

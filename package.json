@@ -7,7 +7,8 @@
         "start": "npm run build && npm start -w platform/node --ignore-scripts",
         "fmt": "sh ./fmt.sh",
         "typecheck": "tsc --noEmit",
-        "test": "esbuild test/index.ts --bundle --outfile=.cache/test.js --platform=node --format=esm --packages=external && node .cache/test.js "
+        "test": "node --experimental-test-coverage -r @nitrogql/esbuild-register test/*",
+        "test:node": "npm test -w platform/node"
     },
     "workspaces": [
         "platform/electron",
@@ -30,6 +31,7 @@
         "@fullstacked/file-tree": "github:fullstackedorg/file-tree#a7b09ad58f0940fa094d4d3939a8009c7cd9a942",
         "@fullstacked/stack-navigation": "github:fullstackedorg/stack-navigation#888302a680bcc501639dfdb0a6aede3da91f06ff",
         "@fullstacked/ui": "github:fullstackedorg/ui#2020b31ae235a40f19a2329bd8b1f13808b7bfec",
+        "@nitrogql/esbuild-register": "^1.7.2",
         "@types/node": "^24.10.1",
         "@types/semver": "^7.7.1",
         "csstype": "^3.2.3",
