@@ -7,8 +7,7 @@
         "start": "npm run build && npm start -w platform/node --ignore-scripts",
         "fmt": "sh ./fmt.sh",
         "typecheck": "tsc --noEmit",
-        "test": "node --experimental-test-coverage -r @nitrogql/esbuild-register test/*",
-        "test:node": "npm test -w platform/node"
+        "test": "node --experimental-test-coverage -r @nitrogql/esbuild-register test"
     },
     "workspaces": [
         "platform/electron",

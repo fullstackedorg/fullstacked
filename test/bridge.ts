@@ -1,5 +1,5 @@
-import { load } from "../src/call.ts";
-import { getLocalLibPath } from "../src/lib.ts";
+import { load } from "../platform/node/src/call.ts";
+import { getLocalLibPath } from "../platform/node/src/lib.ts";
 import path from "node:path";
 import url from "node:url";
 
@@ -8,9 +8,10 @@ import url from "node:url";
 );
 
 const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
-const libDirectory = path.resolve(currentDirectory, "..", "..", "..", "core", "bin")
+const nodeDirectory = path.resolve(currentDirectory, "..", "platform", "node")
+const libDirectory = path.resolve(currentDirectory, "..", "core", "bin")
 const libPath = getLocalLibPath(libDirectory);
 if(!libPath) {
     throw new Error("make sure to build core before running node:test")
 }
-load(libPath, ".")
+load(libPath, nodeDirectory)
