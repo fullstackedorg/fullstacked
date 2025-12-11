@@ -131,7 +131,7 @@ function createHandler(instance: Instance) {
             "content-length": data.length,
             "cache-control": "no-cache",
             "cross-origin-opener-policy": "same-origin",
-            "cross-origin-embedder-policy": "require-corp",
+            "cross-origin-embedder-policy": "require-corp"
         });
         res.end(data);
     };

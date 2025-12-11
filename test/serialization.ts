@@ -59,52 +59,6 @@ suite("bridge serialization", () => {
         assert.throws(() => uint4BytesToNumber(new Uint8Array([1])));
     });
 
-    test("data type switch", () => {
-        assert.deepEqual(dataTypeSwitch(undefined), UNDEFINED);
-        assert.deepEqual(dataTypeSwitch(false), BOOLEAN);
-        assert.deepEqual(dataTypeSwitch(""), STRING);
-        assert.deepEqual(dataTypeSwitch(0), NUMBER);
-        assert.deepEqual(dataTypeSwitch(new Uint8Array()), BUFFER);
-        assert.deepEqual(dataTypeSwitch({}), OBJECT);
-        assert.deepEqual(dataTypeSwitch([]), OBJECT);
-        assert.deepEqual(dataTypeSwitch(new ArrayBuffer()), null);
-    });
-
-    test("merge uint8arrays", () => {
-        assert.deepEqual(mergeUint8Arrays(), new Uint8Array());
-        assert.deepEqual(
-            mergeUint8Arrays(new Uint8Array([0])),
-            new Uint8Array([0])
-        );
-        assert.deepEqual(
-            mergeUint8Arrays(new Uint8Array([0]), new Uint8Array([0])),
-            new Uint8Array([0, 0])
-        );
-        assert.throws(() => mergeUint8Arrays(null));
-    });
-
-    test("get slice of size from buffer", () => {
-        assert.deepEqual(
-            getBufferSliceFromSizeData(new Uint8Array([0, 0, 0, 1, 1]).buffer),
-            {
-                slice: new Uint8Array([1]).buffer,
-                size: 5
-            }
-        );
-
-        assert.deepEqual(
-            getBufferSliceFromSizeData(new Uint8Array([0, 0, 0, 0, 1]).buffer),
-            {
-                slice: new Uint8Array().buffer,
-                size: 4
-            }
-        );
-
-        assert.throws(() =>
-            getBufferSliceFromSizeData(new Uint8Array([0, 0, 0, 2, 1]).buffer)
-        );
-    });
-
     test("undefined", () => {
         const serialized = new Uint8Array([UNDEFINED]);
 
@@ -121,35 +75,6 @@ suite("bridge serialization", () => {
         assert.deepEqual(deserialize(serialized.buffer), [undefined]);
 
         assert.throws(() => deserializeUndefined(new Uint8Array([1]).buffer));
-    });
-
-    test("buffer / uint8array", () => {
-        const arr = new Uint8Array([1, 2, 3, 4]);
-        const serialized = new Uint8Array([
-            BUFFER,
-            ...numberToUint4Bytes(arr.byteLength),
-            ...arr
-        ]);
-
-        assert.deepEqual(serializeBuffer(arr), serialized);
-        assert.deepEqual(serialize(arr), serialized);
-        assert.deepEqual(deserializeBuffer(serialized.buffer), {
-            data: arr,
-            size: serialized.byteLength
-        });
-        assert.deepEqual(deserializeData(serialized.buffer), {
-            data: arr,
-            size: serialized.byteLength
-        });
-        assert.deepEqual(deserialize(serialized.buffer), [arr]);
-
-        assert.throws(() => deserializeBuffer(new Uint8Array([0]).buffer));
-        assert.throws(() =>
-            deserializeBuffer(new Uint8Array([0, 0, 0, 1, 0]).buffer)
-        );
-        assert.throws(() =>
-            deserializeBuffer(new Uint8Array([BUFFER, 0, 0, 0, 1]).buffer)
-        );
     });
 
     test("boolean", () => {
@@ -225,6 +150,35 @@ suite("bridge serialization", () => {
         );
     });
 
+    test("buffer / uint8array", () => {
+        const arr = new Uint8Array([1, 2, 3, 4]);
+        const serialized = new Uint8Array([
+            BUFFER,
+            ...numberToUint4Bytes(arr.byteLength),
+            ...arr
+        ]);
+
+        assert.deepEqual(serializeBuffer(arr), serialized);
+        assert.deepEqual(serialize(arr), serialized);
+        assert.deepEqual(deserializeBuffer(serialized.buffer), {
+            data: arr,
+            size: serialized.byteLength
+        });
+        assert.deepEqual(deserializeData(serialized.buffer), {
+            data: arr,
+            size: serialized.byteLength
+        });
+        assert.deepEqual(deserialize(serialized.buffer), [arr]);
+
+        assert.throws(() => deserializeBuffer(new Uint8Array([0]).buffer));
+        assert.throws(() =>
+            deserializeBuffer(new Uint8Array([0, 0, 0, 1, 0]).buffer)
+        );
+        assert.throws(() =>
+            deserializeBuffer(new Uint8Array([BUFFER, 0, 0, 0, 1]).buffer)
+        );
+    });
+
     test("object", () => {
         const obj = {
             test: "foo"
@@ -278,6 +232,52 @@ suite("bridge serialization", () => {
             size: serialized.byteLength
         });
         assert.deepEqual(deserialize(serialized.buffer), [arr]);
+    });
+
+    test("data type switch", () => {
+        assert.deepEqual(dataTypeSwitch(undefined), UNDEFINED);
+        assert.deepEqual(dataTypeSwitch(false), BOOLEAN);
+        assert.deepEqual(dataTypeSwitch(""), STRING);
+        assert.deepEqual(dataTypeSwitch(0), NUMBER);
+        assert.deepEqual(dataTypeSwitch(new Uint8Array()), BUFFER);
+        assert.deepEqual(dataTypeSwitch({}), OBJECT);
+        assert.deepEqual(dataTypeSwitch([]), OBJECT);
+        assert.deepEqual(dataTypeSwitch(new ArrayBuffer()), null);
+    });
+
+    test("merge uint8arrays", () => {
+        assert.deepEqual(mergeUint8Arrays(), new Uint8Array());
+        assert.deepEqual(
+            mergeUint8Arrays(new Uint8Array([0])),
+            new Uint8Array([0])
+        );
+        assert.deepEqual(
+            mergeUint8Arrays(new Uint8Array([0]), new Uint8Array([0])),
+            new Uint8Array([0, 0])
+        );
+        assert.throws(() => mergeUint8Arrays(null));
+    });
+
+    test("get slice of size from buffer", () => {
+        assert.deepEqual(
+            getBufferSliceFromSizeData(new Uint8Array([0, 0, 0, 1, 1]).buffer),
+            {
+                slice: new Uint8Array([1]).buffer,
+                size: 5
+            }
+        );
+
+        assert.deepEqual(
+            getBufferSliceFromSizeData(new Uint8Array([0, 0, 0, 0, 1]).buffer),
+            {
+                slice: new Uint8Array().buffer,
+                size: 4
+            }
+        );
+
+        assert.throws(() =>
+            getBufferSliceFromSizeData(new Uint8Array([0, 0, 0, 2, 1]).buffer)
+        );
     });
 
     test("data deserialization", () => {

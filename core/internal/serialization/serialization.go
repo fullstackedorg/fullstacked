@@ -55,7 +55,7 @@ func SerializeUndefined() []byte {
 	return []byte{UNDEFINED}
 }
 func DeserializeUndefined(buffer []byte, index int) (any, int, error) {
-	if index+1 < len(buffer) {
+	if index+1 > len(buffer) {
 		return nil, 1, errors.New("buffer too short for undefined deserialize")
 	}
 
@@ -113,21 +113,21 @@ func SerializeString(str string) ([]byte, error) {
 	return buffer, nil
 }
 func DeserializeString(buffer []byte, index int) (string, int, error) {
+	if index+5 > len(buffer) {
+		return "", 0, errors.New("buffer too short for string deserialize")
+	}
+
 	if buffer[index] != STRING {
 		return "", 0, errors.New("wrong type for string")
 	}
 	index++
 
-	size, err := Uint4BytesToNumber(buffer[index : index+4])
-
-	if err != nil {
-		return "", size + 5, errors.New("problem with str size deserialize")
-	}
+	size, _ := Uint4BytesToNumber(buffer[index : index+4])
+	index += 4
 
 	if index+size > len(buffer) {
 		return "", size + 5, errors.New("buffer length too short to get slice of expected size")
 	}
-	index += 4
 
 	return string(buffer[index : index+size]), size + 5, nil
 }
@@ -168,21 +168,21 @@ func SerializeBuffer(buffer []byte) ([]byte, error) {
 	return buffer2, nil
 }
 func DeserializeBuffer(buffer []byte, index int) ([]byte, int, error) {
+	if index+5 > len(buffer) {
+		return nil, 0, errors.New("buffer too short for buffer deserialize")
+	}
+
 	if buffer[index] != BUFFER {
 		return nil, 0, errors.New("wrong type for buffer")
 	}
 	index++
 
-	size, err := Uint4BytesToNumber(buffer[index : index+4])
-
-	if err != nil {
-		return nil, size + 5, errors.New("problem with buffer size deserialize")
-	}
+	size, _ := Uint4BytesToNumber(buffer[index : index+4])
+	index += 4
 
 	if index+size > len(buffer) {
 		return nil, size + 5, errors.New("buffer too short for buffer deserialize")
 	}
-	index += 4
 
 	return buffer[index : index+size], size + 5, nil
 }
@@ -214,21 +214,22 @@ type Object struct {
 
 func DeserializeObject(buffer []byte, index int) (Object, int, error) {
 	obj := Object{}
+
+	if index+5 > len(buffer) {
+		return obj, 0, errors.New("buffer too short for object deserialize")
+	}
+
 	if buffer[index] != OBJECT {
 		return obj, 0, errors.New("wrong type for object")
 	}
 	index++
 
-	size, err := Uint4BytesToNumber(buffer[index : index+4])
-
-	if err != nil {
-		return obj, size + 5, errors.New("problem with object size deserialize")
-	}
+	size, _ := Uint4BytesToNumber(buffer[index : index+4])
+	index += 4
 
 	if index+size > len(buffer) {
 		return obj, size + 5, errors.New("buffer too short for object deserialize")
 	}
-	index += 4
 
 	obj.Data = buffer[index : index+size]
 	return obj, size + 5, nil
@@ -255,8 +256,36 @@ func Serialize(data interface{}) ([]byte, error) {
 	return serialized, err
 }
 
+func MergeBuffers(buffers [][]byte) ([]byte, error) {
+	if buffers == nil {
+		return nil, errors.New("cannot merge nil buffers")
+	}
+
+	size := 0
+	for _, buf := range buffers {
+		if buf == nil {
+			return nil, errors.New("received nil buffer to merge")
+		}
+		size += len(buf)
+	}
+
+	buffer := make([]byte, size)
+	offset := 0
+	for _, buf := range buffers {
+		size := len(buf)
+		copy(buffer[offset:offset+size], buf)
+		offset += size
+	}
+
+	return buffer, nil
+}
+
 func deserializeData(buffer []byte, index int) (any, int, error) {
-	dataType := buffer[0]
+	if len(buffer) == 0 || buffer == nil {
+		return nil, 0, errors.New("buffer is nil or size 0")
+	}
+
+	dataType := buffer[index]
 	switch dataType {
 	case UNDEFINED:
 		return DeserializeUndefined(buffer, index)
@@ -276,6 +305,10 @@ func deserializeData(buffer []byte, index int) (any, int, error) {
 }
 
 func Deserialize(buffer []byte) ([]any, error) {
+	if len(buffer) == 0 || buffer == nil {
+		return nil, errors.New("cannot deserialize buffer nil or size 0")
+	}
+
 	data := []any{}
 	index := 0
 	for index < len(buffer) {
@@ -287,21 +320,4 @@ func Deserialize(buffer []byte) ([]any, error) {
 		data = append(data, deserialized)
 	}
 	return data, nil
-}
-
-func MergeBuffers(buffers [][]byte) []byte {
-	size := 0
-	for _, buf := range buffers {
-		size += len(buf)
-	}
-
-	buffer := make([]byte, size)
-	offset := 0
-	for _, buf := range buffers {
-		size := len(buf)
-		copy(buffer[offset:offset+size], buf)
-		offset += size
-	}
-
-	return buffer
 }

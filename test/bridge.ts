@@ -8,10 +8,10 @@ import url from "node:url";
 );
 
 const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
-const nodeDirectory = path.resolve(currentDirectory, "..", "platform", "node")
-const libDirectory = path.resolve(currentDirectory, "..", "core", "bin")
+const nodeDirectory = path.resolve(currentDirectory, "..", "platform", "node");
+const libDirectory = path.resolve(currentDirectory, "..", "core", "bin");
 const libPath = getLocalLibPath(libDirectory);
-if(!libPath) {
-    throw new Error("make sure to build core before running node:test")
+if (!libPath) {
+    throw new Error("make sure to build core before running node:test");
 }
-load(libPath, nodeDirectory)
+load(libPath, nodeDirectory);

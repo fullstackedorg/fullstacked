@@ -45,7 +45,7 @@ export function uint4BytesToNumber(bytes: Uint8Array) {
         throw new Error("cant convert null/undefined to number");
     }
 
-    if(bytes.byteLength !== 4) {
+    if (bytes.byteLength !== 4) {
         throw new Error("uint8array for uint 4 bytes must be of size 4");
     }
 
@@ -56,29 +56,6 @@ export function uint4BytesToNumber(bytes: Uint8Array) {
             (bytes[3] << 0)) >>>
         0
     );
-}
-
-export type Data = string | boolean | number | Uint8Array | object | null;
-
-export function dataTypeSwitch(data: Data): DataType {
-    if (typeof data === "undefined" || data === null) {
-        return UNDEFINED;
-    } else if (typeof data === "boolean") {
-        return BOOLEAN;
-    } else if (typeof data === "string") {
-        return STRING;
-    } else if (typeof data === "number") {
-        return NUMBER;
-    } else if (typeof data === "object") {
-        if (
-            data.constructor.name === "Object" ||
-            data.constructor.name === "Array"
-        )
-            return OBJECT;
-        else if (data instanceof Uint8Array) return BUFFER;
-    }
-
-    return null;
 }
 
 export function serializeUndefined() {
@@ -93,53 +70,13 @@ export function deserializeUndefined(buffer: ArrayBuffer, index = 0) {
     return { data: undefined, size: 1 };
 }
 
-export function serializeBuffer(arr: Uint8Array) {
-    if (arr.byteLength > MAX_UINT_4_BYTES) {
-        throw new Error("serializing too long buffer");
-    }
-
-    const serialize = new Uint8Array(arr.byteLength + 5);
-    serialize.set([BUFFER], 0);
-    serialize.set(numberToUint4Bytes(arr.byteLength), 1);
-    serialize.set(arr, 5);
-    return serialize;
-}
-
-export function getBufferSliceFromSizeData(buffer: ArrayBuffer, index = 0) {
-    const size = uint4BytesToNumber(
-        new Uint8Array(buffer.slice(index, index + 4))
-    );
-    index += 4;
-
-    if (index + size > buffer.byteLength) {
-        throw new Error(
-            "buffer length too short to get slice of expected size"
-        );
-    }
-
-    return {
-        slice: buffer.slice(index, index + size),
-        size: size + 4
-    };
-}
-
-export function deserializeBuffer(buffer: ArrayBuffer, index = 0) {
-    if (new DataView(buffer).getUint8(index) !== BUFFER) {
-        throw new Error("wrong data type for buffer");
-    }
-
-    index++;
-    const { slice, size } = getBufferSliceFromSizeData(buffer, index);
-
-    return { data: new Uint8Array(slice), size: size + 1 };
-}
-
 export function serializeBoolean(bool: boolean) {
     if (bool === null || bool === undefined) {
         throw new Error("cannot serialize null or undefined as bool");
     }
     return new Uint8Array([BOOLEAN, bool ? 1 : 0]);
 }
+
 export function deserializeBoolean(buffer: ArrayBuffer, index = 0) {
     if (new DataView(buffer).getUint8(index) !== BOOLEAN) {
         throw new Error("wrong data type for boolean");
@@ -215,6 +152,29 @@ export function deserializeNumber(buffer: ArrayBuffer, index = 0) {
     };
 }
 
+export function serializeBuffer(arr: Uint8Array) {
+    if (arr.byteLength > MAX_UINT_4_BYTES) {
+        throw new Error("serializing too long buffer");
+    }
+
+    const serialize = new Uint8Array(arr.byteLength + 5);
+    serialize.set([BUFFER], 0);
+    serialize.set(numberToUint4Bytes(arr.byteLength), 1);
+    serialize.set(arr, 5);
+    return serialize;
+}
+
+export function deserializeBuffer(buffer: ArrayBuffer, index = 0) {
+    if (new DataView(buffer).getUint8(index) !== BUFFER) {
+        throw new Error("wrong data type for buffer");
+    }
+
+    index++;
+    const { slice, size } = getBufferSliceFromSizeData(buffer, index);
+
+    return { data: new Uint8Array(slice), size: size + 1 };
+}
+
 export function serializeObject(obj: object) {
     if (obj === null || obj === undefined) {
         throw new Error("cannot serialize null or undefined as object");
@@ -240,6 +200,47 @@ export function deserializeObject(buffer: ArrayBuffer, index = 0) {
     return { data: JSON.parse(jsonStr), size: size + 1 };
 }
 
+export function getBufferSliceFromSizeData(buffer: ArrayBuffer, index = 0) {
+    const size = uint4BytesToNumber(
+        new Uint8Array(buffer.slice(index, index + 4))
+    );
+    index += 4;
+
+    if (index + size > buffer.byteLength) {
+        throw new Error(
+            "buffer length too short to get slice of expected size"
+        );
+    }
+
+    return {
+        slice: buffer.slice(index, index + size),
+        size: size + 4
+    };
+}
+
+export type Data = string | boolean | number | Uint8Array | object | null;
+
+export function dataTypeSwitch(data: Data): DataType {
+    if (typeof data === "undefined" || data === null) {
+        return UNDEFINED;
+    } else if (typeof data === "boolean") {
+        return BOOLEAN;
+    } else if (typeof data === "string") {
+        return STRING;
+    } else if (typeof data === "number") {
+        return NUMBER;
+    } else if (typeof data === "object") {
+        if (
+            data.constructor.name === "Object" ||
+            data.constructor.name === "Array"
+        )
+            return OBJECT;
+        else if (data instanceof Uint8Array) return BUFFER;
+    }
+
+    return null;
+}
+
 export function serialize(data: Data): Uint8Array<ArrayBuffer> {
     const type = dataTypeSwitch(data);
 
@@ -263,6 +264,22 @@ export function serialize(data: Data): Uint8Array<ArrayBuffer> {
     }
 
     return null;
+}
+
+export function mergeUint8Arrays(...arrays: Uint8Array[]) {
+    if (arrays.find((arr) => !(arr instanceof Uint8Array))) {
+        throw new Error("cannot merge anything other than Uint8Array");
+    }
+
+    const length = arrays.reduce((total, arr) => total + arr.length, 0);
+    const merged = new Uint8Array(length);
+    let offset = 0;
+    for (let i = 0; i < arrays.length; i++) {
+        const arr = arrays[i];
+        merged.set(arr, offset);
+        offset += arr.byteLength;
+    }
+    return merged;
 }
 
 export function deserializeData(buffer: ArrayBuffer, index = 0) {
@@ -293,20 +310,4 @@ export function deserialize(buffer: ArrayBuffer): Data[] {
     }
 
     return data;
-}
-
-export function mergeUint8Arrays(...arrays: Uint8Array[]) {
-    if (arrays.find((arr) => !(arr instanceof Uint8Array))) {
-        throw new Error("cannot merge anything other than Uint8Array");
-    }
-
-    const length = arrays.reduce((total, arr) => total + arr.length, 0);
-    const merged = new Uint8Array(length);
-    let offset = 0;
-    for (let i = 0; i < arrays.length; i++) {
-        const arr = arrays[i];
-        merged.set(arr, offset);
-        offset += arr.byteLength;
-    }
-    return merged;
 }
