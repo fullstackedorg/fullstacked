@@ -1,6 +1,7 @@
 package serialization
 
 import (
+	"encoding/json"
 	"slices"
 	"testing"
 )
@@ -47,15 +48,11 @@ func TestUint4BytesToInt(t *testing.T) {
 func TestUndefined(t *testing.T) {
 	value := (any)(nil)
 	serialized := SerializeUndefined()
-	deserialized, err := DeserializeUndefined(serialized)
-	if deserialized != value || err != nil {
+	deserialized, size, err := DeserializeUndefined(serialized, 0)
+	if deserialized != value || size != len(serialized) || err != nil {
 		t.Errorf(`Failed Undefined`)
 	}
-	_, err = DeserializeUndefined([]byte{BOOLEAN})
-	if err == nil {
-		t.Errorf(`Failed Undefined`)
-	}
-	_, err = DeserializeUndefined([]byte{UNDEFINED, 0})
+	_, _, err = DeserializeUndefined([]byte{BOOLEAN}, 0)
 	if err == nil {
 		t.Errorf(`Failed Undefined`)
 	}
@@ -64,20 +61,87 @@ func TestUndefined(t *testing.T) {
 func TestBoolean(t *testing.T) {
 	value := false
 	serialized := SerializeBoolean(value)
-	deserialized, err := DeserializeBoolean(serialized)
-	if deserialized != value || err != nil {
+	deserialized, size, err := DeserializeBoolean(serialized, 0)
+	if deserialized != value || size != len(serialized) || err != nil {
 		t.Errorf(`Failed Boolean`)
 	}
-	value, err = DeserializeBoolean(SerializeBoolean(true))
+	value, _, err = DeserializeBoolean(SerializeBoolean(true), 0)
 	if !value {
 		t.Errorf(`Failed Boolean`)
 	}
-	_, err = DeserializeBoolean([]byte{BOOLEAN})
+	_, _, err = DeserializeBoolean([]byte{BOOLEAN}, 0)
 	if err == nil {
 		t.Errorf(`Failed Boolean`)
 	}
-	_, err = DeserializeBoolean([]byte{UNDEFINED, 0})
+	_, _, err = DeserializeBoolean([]byte{BOOLEAN, 2}, 0)
 	if err == nil {
 		t.Errorf(`Failed Boolean`)
+	}
+	_, _, err = DeserializeBoolean([]byte{UNDEFINED, 0}, 0)
+	if err == nil {
+		t.Errorf(`Failed Boolean`)
+	}
+}
+
+func TestString(t *testing.T) {
+	value := "test"
+	serialized, err := SerializeString(value)
+	if err != nil {
+		t.Errorf(`Failed String`)
+	}
+	deserialized, size, err := DeserializeString(serialized, 0)
+	if deserialized != value || size != len(serialized) || err != nil {
+		t.Errorf(`Failed String`)
+	}
+}
+
+func TestNumber(t *testing.T) {
+	value := 12.0
+	serialized := SerializeNumber(value)
+	deserialized, size, err := DeserializeNumber(serialized, 0)
+	if deserialized != value || size != len(serialized) || err != nil {
+		t.Errorf(`Failed Number`)
+	}
+}
+
+func TestBuffer(t *testing.T) {
+	value := []byte{1, 2, 3, 4}
+	serialized, err := SerializeBuffer(value)
+	if err != nil {
+		t.Errorf(`Failed Buffer`)
+	}
+	deserialized, size, err := DeserializeBuffer(serialized, 0)
+	if slices.Compare(value, deserialized) != 0 || size != len(serialized) || err != nil {
+		t.Errorf(`Failed Buffer`)
+	}
+}
+
+type Test struct {
+	Foo    string
+	Bar    int
+	Nested TestNest
+}
+
+type TestNest struct {
+	Baz string
+}
+
+func TestObject(t *testing.T) {
+	value := Test{
+		Foo: "foo",
+		Bar: 2,
+		Nested: TestNest{
+			Baz: "bar",
+		},
+	}
+	serialized, err := SerializeObject(value)
+	if err != nil {
+		t.Errorf(`Failed Object`)
+	}
+	deserialized, size, err := DeserializeObject(serialized, 0)
+	deserializedObj := Test{}
+	json.Unmarshal(deserialized.Data, &deserializedObj)
+	if deserializedObj.Nested.Baz != value.Nested.Baz || size != len(serialized) || err != nil {
+		t.Errorf(`Failed Object`)
 	}
 }
