@@ -1,13 +1,15 @@
 import {
     BOOLEAN,
     BUFFER,
-    DataType,
     MAX_UINT_4_BYTES,
     NUMBER,
     OBJECT,
+    SerializableData,
+    SerializableDataType,
     STRING,
     UNDEFINED
-} from "../@types/serialization.ts";
+} from "../@types/index.ts";
+import { types } from "sass";
 
 /*
 
@@ -218,9 +220,7 @@ export function getBufferSliceFromSizeData(buffer: ArrayBuffer, index = 0) {
     };
 }
 
-export type Data = string | boolean | number | Uint8Array | object | null;
-
-export function dataTypeSwitch(data: Data): DataType {
+export function dataTypeSwitch(data: SerializableData): SerializableDataType {
     if (typeof data === "undefined" || data === null) {
         return UNDEFINED;
     } else if (typeof data === "boolean") {
@@ -241,7 +241,7 @@ export function dataTypeSwitch(data: Data): DataType {
     return null;
 }
 
-export function serialize(data: Data): Uint8Array<ArrayBuffer> {
+export function serialize(data: SerializableData): Uint8Array<ArrayBuffer> {
     const type = dataTypeSwitch(data);
 
     if (type === null) {
@@ -282,8 +282,11 @@ export function mergeUint8Arrays(...arrays: Uint8Array[]) {
     return merged;
 }
 
-export function deserializeData(buffer: ArrayBuffer, index = 0) {
-    const type = new DataView(buffer).getUint8(index) as DataType;
+export function deserialize(
+    buffer: ArrayBuffer,
+    index = 0
+): { data: SerializableData; size: number } {
+    const type = new DataView(buffer).getUint8(index) as SerializableDataType;
     switch (type) {
         case UNDEFINED:
             return deserializeUndefined(buffer, index);
@@ -298,16 +301,5 @@ export function deserializeData(buffer: ArrayBuffer, index = 0) {
         case OBJECT:
             return deserializeObject(buffer, index);
     }
-}
-
-export function deserialize(buffer: ArrayBuffer): Data[] {
-    const data: Data[] = [];
-    let index = 0;
-    while (index < buffer.byteLength) {
-        const deserialized = deserializeData(buffer, index);
-        data.push(deserialized.data);
-        index += deserialized.size;
-    }
-
-    return data;
+    return { data: null, size: 0 };
 }

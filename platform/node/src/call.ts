@@ -3,7 +3,10 @@ import path from "node:path";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 globalThis.require = createRequire(import.meta.url);
-let core: any;
+let core: {
+    load(libPath: string): void;
+    call(payload: ArrayBuffer): Uint8Array<ArrayBuffer>;
+};
 
 export const CoreCallbackListeners = new Set<typeof callback>();
 function callback(projectId: string, messageType: string, message: string) {
@@ -19,9 +22,7 @@ export function load(libPath: string, bindingDir: string) {
     core = require(p);
     core.load(libPath);
 
-    core.callback((id: number) => {
-        core.callbackValue(id, callback);
-    });
+    return core;
 }
 
 export function setDirectories(directories: {
@@ -30,14 +31,10 @@ export function setDirectories(directories: {
     editor: string;
     tmp: string;
 }) {
-    core.directories(
-        directories.root,
-        directories.config,
-        directories.editor,
-        directories.tmp
-    );
-}
-
-export function callLib(payload: Uint8Array): Uint8Array {
-    return core.call(payload);
+    // core.directories(
+    //     directories.root,
+    //     directories.config,
+    //     directories.editor,
+    //     directories.tmp
+    // );
 }

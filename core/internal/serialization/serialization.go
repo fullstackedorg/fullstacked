@@ -4,28 +4,17 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fullstackedorg/fullstacked/types"
 	"math"
+	"strconv"
 )
-
-type DataType = uint8
-
-const (
-	UNDEFINED DataType = 0
-	BOOLEAN   DataType = 1
-	STRING    DataType = 2
-	NUMBER    DataType = 3
-	BUFFER    DataType = 4
-	OBJECT    DataType = 5
-)
-
-const MAX_UINT_4_BYTES = 4294967295
 
 func NumberToUin4Bytes(num int) ([]byte, error) {
 	if num < 0 {
 		return nil, errors.New("cannot convert negative number to uint 4 bytes")
 	}
 
-	if num > MAX_UINT_4_BYTES {
+	if num > types.MAX_UINT_4_BYTES {
 		return nil, errors.New("converting too high number to uint 4 bytes")
 	}
 
@@ -51,24 +40,24 @@ func Uint4BytesToNumber(bytes []byte) (int, error) {
 		(uint(bytes[3]) << 0)), nil
 }
 
-func SerializeUndefined() []byte {
-	return []byte{UNDEFINED}
+func serializeUndefined() []byte {
+	return []byte{types.UNDEFINED}
 }
-func DeserializeUndefined(buffer []byte, index int) (any, int, error) {
+func deserializeUndefined(buffer []byte, index int) (types.SerializableData, int, error) {
 	if index+1 > len(buffer) {
 		return nil, 1, errors.New("buffer too short for undefined deserialize")
 	}
 
-	if buffer[index] != UNDEFINED {
+	if buffer[index] != types.UNDEFINED {
 		return nil, 1, errors.New("wrong type for undefined")
 	}
 
 	return nil, 1, nil
 }
 
-func SerializeBoolean(boolean bool) []byte {
+func serializeBoolean(boolean bool) []byte {
 	buffer := make([]byte, 2)
-	buffer[0] = BOOLEAN
+	buffer[0] = types.BOOLEAN
 	if boolean {
 		buffer[1] = 1
 	} else {
@@ -76,12 +65,12 @@ func SerializeBoolean(boolean bool) []byte {
 	}
 	return buffer
 }
-func DeserializeBoolean(buffer []byte, index int) (bool, int, error) {
+func deserializeBoolean(buffer []byte, index int) (bool, int, error) {
 	if index+2 > len(buffer) {
 		return false, 2, errors.New("buffer too short for boolean")
 	}
 
-	if buffer[index] != BOOLEAN {
+	if buffer[index] != types.BOOLEAN {
 		return false, 2, errors.New("wrong type for boolean")
 	}
 
@@ -95,7 +84,7 @@ func DeserializeBoolean(buffer []byte, index int) (bool, int, error) {
 	return false, 2, errors.New("wrong value for boolean")
 }
 
-func SerializeString(str string) ([]byte, error) {
+func serializeString(str string) ([]byte, error) {
 	strData := []byte(str)
 	strSize := len(strData)
 	size, err := NumberToUin4Bytes(strSize)
@@ -105,19 +94,19 @@ func SerializeString(str string) ([]byte, error) {
 	}
 
 	buffer := make([]byte, strSize+5)
-	buffer[0] = STRING
+	buffer[0] = types.STRING
 
 	copy(buffer[1:5], size)
 	copy(buffer[5:], strData)
 
 	return buffer, nil
 }
-func DeserializeString(buffer []byte, index int) (string, int, error) {
+func deserializeString(buffer []byte, index int) (string, int, error) {
 	if index+5 > len(buffer) {
 		return "", 0, errors.New("buffer too short for string deserialize")
 	}
 
-	if buffer[index] != STRING {
+	if buffer[index] != types.STRING {
 		return "", 0, errors.New("wrong type for string")
 	}
 	index++
@@ -132,18 +121,18 @@ func DeserializeString(buffer []byte, index int) (string, int, error) {
 	return string(buffer[index : index+size]), size + 5, nil
 }
 
-func SerializeNumber(num float64) []byte {
+func serializeNumber(num float64) []byte {
 	buffer := make([]byte, 9)
-	buffer[0] = NUMBER
+	buffer[0] = types.NUMBER
 	binary.BigEndian.PutUint64(buffer[1:], math.Float64bits(num))
 	return buffer
 }
-func DeserializeNumber(buffer []byte, index int) (float64, int, error) {
+func deserializeNumber(buffer []byte, index int) (float64, int, error) {
 	if index+9 > len(buffer) {
 		return 0, 9, errors.New("buffer too short for number deserialize")
 	}
 
-	if buffer[index] != NUMBER {
+	if buffer[index] != types.NUMBER {
 		return 0, 9, errors.New("wrong type for number")
 	}
 	index++
@@ -153,7 +142,7 @@ func DeserializeNumber(buffer []byte, index int) (float64, int, error) {
 	return float, 9, nil
 }
 
-func SerializeBuffer(buffer []byte) ([]byte, error) {
+func serializeBuffer(buffer []byte) ([]byte, error) {
 	bufferSize := len(buffer)
 	size, err := NumberToUin4Bytes(bufferSize)
 
@@ -162,17 +151,17 @@ func SerializeBuffer(buffer []byte) ([]byte, error) {
 	}
 
 	buffer2 := make([]byte, bufferSize+5)
-	buffer2[0] = BUFFER
+	buffer2[0] = types.BUFFER
 	copy(buffer2[1:5], size)
 	copy(buffer2[5:], buffer)
 	return buffer2, nil
 }
-func DeserializeBuffer(buffer []byte, index int) ([]byte, int, error) {
+func deserializeBuffer(buffer []byte, index int) ([]byte, int, error) {
 	if index+5 > len(buffer) {
 		return nil, 0, errors.New("buffer too short for buffer deserialize")
 	}
 
-	if buffer[index] != BUFFER {
+	if buffer[index] != types.BUFFER {
 		return nil, 0, errors.New("wrong type for buffer")
 	}
 	index++
@@ -187,7 +176,7 @@ func DeserializeBuffer(buffer []byte, index int) ([]byte, int, error) {
 	return buffer[index : index+size], size + 5, nil
 }
 
-func SerializeObject(obj any) ([]byte, error) {
+func serializeObject(obj any) ([]byte, error) {
 	jsonBuffer, err := json.Marshal(obj)
 
 	if err != nil {
@@ -202,24 +191,20 @@ func SerializeObject(obj any) ([]byte, error) {
 	}
 
 	buffer := make([]byte, jsonBufferSize+5)
-	buffer[0] = OBJECT
+	buffer[0] = types.OBJECT
 	copy(buffer[1:5], size)
 	copy(buffer[5:], jsonBuffer)
 	return buffer, nil
 }
 
-type Object struct {
-	Data []byte
-}
-
-func DeserializeObject(buffer []byte, index int) (Object, int, error) {
-	obj := Object{}
+func deserializeObject(buffer []byte, index int) (types.DeserializedRawObject, int, error) {
+	obj := types.DeserializedRawObject{}
 
 	if index+5 > len(buffer) {
 		return obj, 0, errors.New("buffer too short for object deserialize")
 	}
 
-	if buffer[index] != OBJECT {
+	if buffer[index] != types.OBJECT {
 		return obj, 0, errors.New("wrong type for object")
 	}
 	index++
@@ -235,22 +220,22 @@ func DeserializeObject(buffer []byte, index int) (Object, int, error) {
 	return obj, size + 5, nil
 }
 
-func Serialize(data interface{}) ([]byte, error) {
+func Serialize(data types.SerializableData) ([]byte, error) {
 	serialized := ([]byte)(nil)
 	err := (error)(nil)
 	switch data := data.(type) {
 	case nil:
-		serialized = SerializeUndefined()
+		serialized = serializeUndefined()
 	case bool:
-		serialized = SerializeBoolean(data)
+		serialized = serializeBoolean(data)
 	case float64:
-		serialized = SerializeNumber(data)
+		serialized = serializeNumber(data)
 	case string:
-		serialized, err = SerializeString(data)
+		serialized, err = serializeString(data)
 	case []byte:
-		serialized, err = SerializeBuffer(data)
+		serialized, err = serializeBuffer(data)
 	default:
-		serialized, err = SerializeObject(data)
+		serialized, err = serializeObject(data)
 	}
 
 	return serialized, err
@@ -280,43 +265,55 @@ func MergeBuffers(buffers [][]byte) ([]byte, error) {
 	return buffer, nil
 }
 
-func deserializeData(buffer []byte, index int) (any, int, error) {
+func Deserialize(buffer []byte, index int) (types.DeserializedData, error) {
 	if len(buffer) == 0 || buffer == nil {
-		return nil, 0, errors.New("buffer is nil or size 0")
+		return types.DeserializedData{}, errors.New("buffer is nil or size 0")
 	}
 
 	dataType := buffer[index]
+	data := (types.SerializableData)(nil)
+	size := 0
+	err := (error)(nil)
 	switch dataType {
-	case UNDEFINED:
-		return DeserializeUndefined(buffer, index)
-	case BUFFER:
-		return DeserializeBuffer(buffer, index)
-	case BOOLEAN:
-		return DeserializeBoolean(buffer, index)
-	case STRING:
-		return DeserializeString(buffer, index)
-	case NUMBER:
-		return DeserializeNumber(buffer, index)
-	case OBJECT:
-		return DeserializeObject(buffer, index)
+	case types.UNDEFINED:
+		data, size, err = deserializeUndefined(buffer, index)
+	case types.BOOLEAN:
+		data, size, err = deserializeBoolean(buffer, index)
+	case types.STRING:
+		data, size, err = deserializeString(buffer, index)
+	case types.NUMBER:
+		data, size, err = deserializeNumber(buffer, index)
+	case types.BUFFER:
+		data, size, err = deserializeBuffer(buffer, index)
+	case types.OBJECT:
+		data, size, err = deserializeObject(buffer, index)
+	default:
+		return types.DeserializedData{}, errors.New("unknown data type for buffer")
 	}
 
-	return nil, 0, errors.New("unknown data type for buffer")
+	if err != nil {
+		return types.DeserializedData{}, errors.New("failed to deserialize data of type: " + strconv.Itoa(int(dataType)))
+	}
+	return types.DeserializedData{
+		Data:           data,
+		Type:           dataType,
+		SizeSerialized: size,
+	}, nil
 }
 
-func Deserialize(buffer []byte) ([]any, error) {
-	if len(buffer) == 0 || buffer == nil {
-		return nil, errors.New("cannot deserialize buffer nil or size 0")
+func DeserializeAll(buffer []byte) ([]types.DeserializedData, error) {
+	if buffer == nil {
+		return nil, errors.New("cannot deserialize all buffer nil or size 0")
 	}
 
-	data := []any{}
+	data := []types.DeserializedData{}
 	index := 0
 	for index < len(buffer) {
-		deserialized, size, err := deserializeData(buffer, index)
+		deserialized, err := Deserialize(buffer, index)
 		if (err) != nil {
 			return data, err
 		}
-		index += size
+		index += deserialized.SizeSerialized
 		data = append(data, deserialized)
 	}
 	return data, nil

@@ -106,15 +106,12 @@ void N_Callback_Value(const Napi::CallbackInfo &info) {
     callbackMessagesMutex.unlock();
 }
 
-int callId = 0;
-Napi::TypedArrayOf<uint8_t> N_Call(const Napi::CallbackInfo &info) {
+Napi::ArrayBuffer N_Call(const Napi::CallbackInfo &info) {
     Napi::Env env = info.Env();
-    int id = callId++;
-    Napi::TypedArray typedArray = info[0].As<Napi::TypedArray>();
-    Napi::Uint8Array payload = typedArray.As<Napi::Uint8Array>();
-    int responseLength = lib.call(id, payload.Data(), payload.ElementLength());
-    Napi::Uint8Array response =
-        Napi::Uint8Array::New(env, responseLength, napi_uint8_array);
+    Napi::ArrayBuffer buffer = info[0].As<Napi::ArrayBuffer>();
+    int size = lib.call(buffer.Data(), buffer.ByteLength());
+    uint8_t id = ((uint8_t *)(buffer.Data()))[0];
+    Napi::ArrayBuffer response = Napi::ArrayBuffer::New(env, size);
     lib.getResponse(id, response.Data());
     return response;
 }

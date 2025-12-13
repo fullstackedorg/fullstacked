@@ -2,7 +2,7 @@ module fullstackedorg/fullstacked
 
 go 1.25
 
-replace github.com/microsoft/typescript-go v0.0.0 => ./typescript-go
+// replace github.com/microsoft/typescript-go v0.0.0 => ./typescript-go
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0 // direct
@@ -30,7 +30,6 @@ require (
 	github.com/go-json-experiment/json v0.0.0-20251027170946-4849db3c2f7e // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/gzuidhof/tygo v0.2.20 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/kevinburke/ssh_config v1.4.0 // indirect

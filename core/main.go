@@ -16,11 +16,8 @@ static inline void write_bytes_array(void *data, int size, void *ptr) {
 import "C"
 
 import (
-	fs "fullstackedorg/fullstacked/src/fs"
-	methods "fullstackedorg/fullstacked/src/methods"
-	setup "fullstackedorg/fullstacked/src/setup"
-	"path"
-	"sync"
+	"fmt"
+	"fullstackedorg/fullstacked/internal/router"
 	"unsafe"
 )
 
@@ -30,96 +27,42 @@ func main() {}
 func directories(
 	root *C.char,
 	config *C.char,
-	editor *C.char,
 	tmp *C.char,
 ) {
 
-	setup.SetupDirectories(
-		C.GoString(root),
-		C.GoString(config),
-		C.GoString(editor),
-		C.GoString(tmp),
-	)
-
-	fileEventOrigin := "setup"
-	fs.Mkdir(setup.Directories.Root, fileEventOrigin)
-	fs.Mkdir(setup.Directories.Config, fileEventOrigin)
-
-	// clean tmp
-	fs.Rmdir(setup.Directories.Tmp, fileEventOrigin)
-	fs.Mkdir(setup.Directories.Tmp, fileEventOrigin)
-
-	if methods.TSGOptr != nil {
-		// if repo build, fullstacked_modules already exists
-		exists, _ := fs.Exists(path.Join(setup.Directories.Root, "fullstacked_modules"))
-		if !exists {
-			// place fullstacked_modules for internal lsp
-			fs.Copy(
-				path.Join(setup.Directories.Editor, "fullstacked_modules"),
-				path.Join(setup.Directories.Root, ".fullstacked_modules"),
-				fileEventOrigin,
-			)
-		}
-	}
 }
 
 var cCallback = (unsafe.Pointer)(nil)
 
 //export callback
 func callback(cb unsafe.Pointer) {
-	cCallback = cb
 
-	setup.Callback = func(projectId string, messageType string, message string) {
-		projectIdPtr := C.CString(projectId)
-		messageTypePtr := C.CString(messageType)
-
-		messageData := []byte(message)
-		messagePtr := C.CBytes(messageData)
-		messageLength := (C.int)(len(messageData))
-
-		C.CallMyFunction(
-			cCallback,
-			projectIdPtr,
-			messageTypePtr,
-			messagePtr,
-			messageLength,
-		)
-
-		C.free(unsafe.Pointer(projectIdPtr))
-		C.free(unsafe.Pointer(messageTypePtr))
-		C.free(unsafe.Pointer(messagePtr))
-	}
 }
 
-var responses = map[C.int][]byte{}
-var responsesMutex = sync.Mutex{}
-
 //export getResponse
-func getResponse(id C.int, ptr unsafe.Pointer) {
-	responsesMutex.Lock()
-	response, ok := responses[id]
-	responsesMutex.Unlock()
+func getResponse(id C.uint8_t, ptr unsafe.Pointer) {
+	response, err := router.GetCoreResponse(uint8(id))
 
-	if !ok {
+	fmt.Println(response[0])
+
+	if err != nil {
+		fmt.Println(err.Error())
 		return
 	}
 
 	bytes := C.CBytes(response)
 	C.write_bytes_array(bytes, C.int(len(response)), ptr)
 	C.free(bytes)
-
-	responsesMutex.Lock()
-	delete(responses, id)
-	responsesMutex.Unlock()
 }
 
 //export call
-func call(id C.int, buffer unsafe.Pointer, length C.int) C.int {
-	response := methods.Call(C.GoBytes(buffer, length))
+func call(buffer unsafe.Pointer, length C.int) C.int {
+	size, err := router.Call(C.GoBytes(buffer, length))
 
-	responsesMutex.Lock()
-	responses[id] = response
-	responsesMutex.Unlock()
+	if err != nil {
+		fmt.Println(err.Error())
+		return 0
+	}
 
-	return C.int(len(response))
+	return C.int(size)
 }

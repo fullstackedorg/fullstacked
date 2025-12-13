@@ -1,19 +1,17 @@
+import { deserialize, mergeUint8Arrays, serialize } from "./serialization.ts";
+import * as node from "./platform/node.ts";
 import {
-    Data,
-    deserialize,
-    mergeUint8Arrays,
-    serialize
-} from "./serialization";
-import * as node from "./platform/node";
-import {
-    CoreData,
-    CoreError,
-    CoreResponseType,
-    CoreStream,
-    Module
-} from "../@types/router";
+    CoreCallResponseType,
+    CoreModule,
+    CoreResponseData,
+    CoreResponseError,
+    CoreResponseEventEmitter,
+    CoreResponseStream,
+    SerializableData
+} from "../@types/index.ts";
 
 enum Platform {
+    TEST = "test",
     NODE = "node",
     APPLE = "apple",
     ANDROID = "android",
@@ -29,14 +27,22 @@ declare global {
     const platform: Platform;
 }
 
-type BridgeSync = (payload: ArrayBuffer) => ArrayBuffer;
-type BridgeAsync = (payload: ArrayBuffer) => Promise<ArrayBuffer>;
-
+/*
+ *
+ * if CallSync return null, we need to call GetResponseSync,
+ * this allows to make the call in two parts and
+ * hang on the GetResponseSync (using xmlhttprequest sync)
+ *
+ */
 let bridges: {
-    Sync: BridgeSync;
-    Async: BridgeAsync;
+    Async: (payload: ArrayBuffer) => Promise<ArrayBuffer>;
+    Sync: (payload: ArrayBuffer) => ArrayBuffer;
+    GetResponseSync?: (id: number) => ArrayBuffer;
 } = null;
 switch (platform) {
+    case Platform.TEST:
+        bridges = globalThis.bridges;
+        break;
     case Platform.NODE:
         bridges = node;
         break;
@@ -44,22 +50,37 @@ switch (platform) {
         throw new Error("Brige not implemented for current platform");
 }
 
-type CoreResponse = Data[] | ReadableStream;
-
 type BridgeOpts = {
-    mod: Module;
+    mod: CoreModule;
     fn: number;
-    args?: Data[];
+    data?: SerializableData[];
 };
 
-export function bridge(opts: BridgeOpts, sync: true): CoreResponse;
-export function bridge(opts: BridgeOpts, sync?: false): Promise<CoreResponse>;
+let id = 0;
+
+export function bridge(opts: BridgeOpts, sync: true): SerializableData;
+export function bridge(
+    opts: BridgeOpts,
+    sync?: false
+): Promise<SerializableData>;
 export function bridge(opts: BridgeOpts, sync = false) {
-    const serialized = [];
-    const payload = mergeUint8Arrays(...serialized).buffer;
+    const data = opts.data
+        ? mergeUint8Arrays(...opts.data.map(serialize))
+        : null;
+    const payload = new Uint8Array(3 + (data?.byteLength ?? 0));
+
+    payload[0] = id++;
+    payload[1] = opts.mod;
+    payload[2] = opts.fn;
+    if (data != null) {
+        payload.set(data, 3);
+    }
 
     if (sync) {
-        const responseBuffer = bridges.Sync(payload);
+        let responseBuffer = bridges.Sync(payload.buffer);
+        if (responseBuffer == null && bridges.GetResponseSync) {
+            responseBuffer = bridges.GetResponseSync(id);
+        }
         const response = processResponse(responseBuffer);
         if (response instanceof Error) {
             throw response;
@@ -67,8 +88,8 @@ export function bridge(opts: BridgeOpts, sync = false) {
         return response;
     }
 
-    return new Promise<CoreResponse>(async (resolve, reject) => {
-        const responseBuffer = await bridges.Async(payload);
+    return new Promise<SerializableData>(async (resolve, reject) => {
+        const responseBuffer = await bridges.Async(payload.buffer);
         const response = processResponse(responseBuffer);
         if (response instanceof Error) {
             reject(response);
@@ -79,14 +100,22 @@ export function bridge(opts: BridgeOpts, sync = false) {
 }
 
 function processResponse(buffer: ArrayBuffer) {
-    const responseType = buffer[0] as CoreResponseType;
+    const responseType = new DataView(buffer, 0, 1).getUint8(
+        0
+    ) as CoreCallResponseType;
     switch (responseType) {
-        case CoreError:
-            return new Error("error from bridge");
-        case CoreData:
-            return deserialize(buffer.slice(1));
-        case CoreStream:
-            return new ReadableStream();
+        case CoreResponseError:
+            return new Error(
+                `error from bridge: [${deserialize(buffer, 1).data}]`
+            );
+        case CoreResponseData:
+            if (buffer.byteLength === 1) {
+                return undefined;
+            }
+            return deserialize(buffer, 1).data;
+        case CoreResponseStream:
+        case CoreResponseEventEmitter:
+            throw new Error("not yet implemented");
     }
 
     throw new Error("don't know how to process response from core");

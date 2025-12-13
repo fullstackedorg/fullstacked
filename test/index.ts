@@ -1,2 +1,2 @@
 import "./serialization.ts";
-import "./bridge.ts";
+import "./e2e/index.ts";

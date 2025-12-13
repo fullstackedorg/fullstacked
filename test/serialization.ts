@@ -1,12 +1,10 @@
 import test, { suite } from "node:test";
 import assert from "node:assert";
 import {
-    Data,
     dataTypeSwitch,
     deserialize,
     deserializeBoolean,
     deserializeBuffer,
-    deserializeData,
     deserializeNumber,
     deserializeObject,
     deserializeString,
@@ -31,7 +29,7 @@ import {
     OBJECT,
     STRING,
     UNDEFINED
-} from "../lib/@types/serialization.ts";
+} from "../lib/@types/index.ts";
 
 suite("bridge serialization", () => {
     test("number / uint 4 bytes", () => {
@@ -68,11 +66,10 @@ suite("bridge serialization", () => {
             data: undefined,
             size: serialized.byteLength
         });
-        assert.deepEqual(deserializeData(serialized.buffer), {
+        assert.deepEqual(deserialize(serialized.buffer), {
             data: undefined,
             size: serialized.byteLength
         });
-        assert.deepEqual(deserialize(serialized.buffer), [undefined]);
 
         assert.throws(() => deserializeUndefined(new Uint8Array([1]).buffer));
     });
@@ -87,11 +84,10 @@ suite("bridge serialization", () => {
             data: bool,
             size: serialized.byteLength
         });
-        assert.deepEqual(deserializeData(serialized.buffer), {
+        assert.deepEqual(deserialize(serialized.buffer), {
             data: bool,
             size: serialized.byteLength
         });
-        assert.deepEqual(deserialize(serialized.buffer), [bool]);
 
         assert.throws(() => serializeBoolean(null));
         assert.throws(() => serializeBoolean(undefined));
@@ -112,11 +108,10 @@ suite("bridge serialization", () => {
             data: str,
             size: serialized.byteLength
         });
-        assert.deepEqual(deserializeData(serialized.buffer), {
+        assert.deepEqual(deserialize(serialized.buffer), {
             data: str,
             size: serialized.byteLength
         });
-        assert.deepEqual(deserialize(serialized.buffer), [str]);
 
         assert.throws(() => serializeString(null));
         assert.throws(() => serializeString(undefined));
@@ -136,11 +131,10 @@ suite("bridge serialization", () => {
             data: num,
             size: serialized.byteLength
         });
-        assert.deepEqual(deserializeData(serialized.buffer), {
+        assert.deepEqual(deserialize(serialized.buffer), {
             data: num,
             size: serialized.byteLength
         });
-        assert.deepEqual(deserialize(serialized.buffer), [num]);
 
         assert.throws(() => serializeNumber(null));
         assert.throws(() => serializeNumber(undefined));
@@ -164,11 +158,10 @@ suite("bridge serialization", () => {
             data: arr,
             size: serialized.byteLength
         });
-        assert.deepEqual(deserializeData(serialized.buffer), {
+        assert.deepEqual(deserialize(serialized.buffer), {
             data: arr,
             size: serialized.byteLength
         });
-        assert.deepEqual(deserialize(serialized.buffer), [arr]);
 
         assert.throws(() => deserializeBuffer(new Uint8Array([0]).buffer));
         assert.throws(() =>
@@ -197,11 +190,10 @@ suite("bridge serialization", () => {
             data: obj,
             size: serialized.byteLength
         });
-        assert.deepEqual(deserializeData(serialized.buffer), {
+        assert.deepEqual(deserialize(serialized.buffer), {
             data: obj,
             size: serialized.byteLength
         });
-        assert.deepEqual(deserialize(serialized.buffer), [obj]);
 
         assert.throws(() => serializeObject(null));
         assert.throws(() => serializeObject(undefined));
@@ -227,11 +219,10 @@ suite("bridge serialization", () => {
             data: arr,
             size: serialized.byteLength
         });
-        assert.deepEqual(deserializeData(serialized.buffer), {
+        assert.deepEqual(deserialize(serialized.buffer), {
             data: arr,
             size: serialized.byteLength
         });
-        assert.deepEqual(deserialize(serialized.buffer), [arr]);
     });
 
     test("data type switch", () => {
@@ -278,18 +269,5 @@ suite("bridge serialization", () => {
         assert.throws(() =>
             getBufferSliceFromSizeData(new Uint8Array([0, 0, 0, 2, 1]).buffer)
         );
-    });
-
-    test("data deserialization", () => {
-        const data: Data[] = [
-            1,
-            "test",
-            false,
-            { test: "obj" },
-            undefined,
-            new Uint8Array([1, 2, 3, 4])
-        ];
-        const serialized = mergeUint8Arrays(...data.map(serialize));
-        assert.deepEqual(deserialize(serialized.buffer), data);
     });
 });
