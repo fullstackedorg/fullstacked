@@ -1,12 +1,12 @@
 #include <stdint.h>
 
-typedef void (*Directories)(char *root, char *config, char *main, char *lib);
+typedef uint8_t (*Start)(char *directory);
 typedef void (*Callback)(void *cb);
 typedef int (*Call)(void *buffer, int length);
-typedef void (*GetResponse)(uint8_t id, void *ptr);
+typedef void (*GetResponse)(uint8_t ctx, uint8_t id, void *ptr);
 
 struct CoreLib {
-        Directories directories;
+        Start start;
         Callback callback;
         Call call;
         GetResponse getResponse;

@@ -1,4 +1,3 @@
-import "./init.ts";
 import test, { suite } from "node:test";
 import assert from "node:assert";
 import t from "../../lib/test/index.ts";
@@ -11,7 +10,7 @@ import {
     UNDEFINED
 } from "../../lib/@types/index.ts";
 
-suite("e2e", () => {
+suite("serialization - e2e", () => {
     test("hello", () => {
         assert.deepEqual(t.hello(), "Hello from go");
     });
@@ -54,9 +53,9 @@ suite("e2e", () => {
             false,
             1.1,
             "test",
-            new Uint8Array([1,2,3]),
-            {foo: "bar"}
-        ]
+            new Uint8Array([1, 2, 3]),
+            { foo: "bar" }
+        ];
         assert.deepEqual(t.serializationIndex(0, ...data), {
             Type: UNDEFINED,
             Data: undefined,

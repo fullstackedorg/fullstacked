@@ -1,6 +1,6 @@
 import { bridge } from "../bridge/index.ts";
 import { DeserializedData, SerializableData, Test } from "../@types/index.ts";
-import { Hello, Serialization,SerializationIndex } from "../@types/test.ts";
+import { Hello, Serialization, SerializationIndex } from "../@types/test.ts";
 
 function hello(): string {
     return bridge(
@@ -23,7 +23,10 @@ function serialization(data: SerializableData): DeserializedData {
     );
 }
 
-function serializationIndex(index: number, ...data: SerializableData[]): DeserializedData {
+function serializationIndex(
+    index: number,
+    ...data: SerializableData[]
+): DeserializedData {
     return bridge(
         {
             mod: Test,

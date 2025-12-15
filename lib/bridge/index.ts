@@ -1,5 +1,4 @@
 import { deserialize, mergeUint8Arrays, serialize } from "./serialization.ts";
-import * as node from "./platform/node.ts";
 import {
     CoreCallResponseType,
     CoreModule,
@@ -34,17 +33,18 @@ declare global {
  * hang on the GetResponseSync (using xmlhttprequest sync)
  *
  */
-let bridges: {
+let coreBridge: {
+    ctx: number;
     Async: (payload: ArrayBuffer) => Promise<ArrayBuffer>;
     Sync: (payload: ArrayBuffer) => ArrayBuffer;
     GetResponseSync?: (id: number) => ArrayBuffer;
 } = null;
 switch (platform) {
     case Platform.TEST:
-        bridges = globalThis.bridges;
+        coreBridge = globalThis.bridges;
         break;
     case Platform.NODE:
-        bridges = node;
+        coreBridge = await import("./platform/node.ts");
         break;
     default:
         throw new Error("Brige not implemented for current platform");
@@ -67,19 +67,20 @@ export function bridge(opts: BridgeOpts, sync = false) {
     const data = opts.data
         ? mergeUint8Arrays(...opts.data.map(serialize))
         : null;
-    const payload = new Uint8Array(3 + (data?.byteLength ?? 0));
+    const payload = new Uint8Array(4 + (data?.byteLength ?? 0));
 
-    payload[0] = id++;
-    payload[1] = opts.mod;
-    payload[2] = opts.fn;
+    payload[0] = coreBridge.ctx;
+    payload[1] = id++;
+    payload[2] = opts.mod;
+    payload[3] = opts.fn;
     if (data != null) {
-        payload.set(data, 3);
+        payload.set(data, 4);
     }
 
     if (sync) {
-        let responseBuffer = bridges.Sync(payload.buffer);
-        if (responseBuffer == null && bridges.GetResponseSync) {
-            responseBuffer = bridges.GetResponseSync(id);
+        let responseBuffer = coreBridge.Sync(payload.buffer);
+        if (responseBuffer == null && coreBridge.GetResponseSync) {
+            responseBuffer = coreBridge.GetResponseSync(id);
         }
         const response = processResponse(responseBuffer);
         if (response instanceof Error) {
@@ -89,7 +90,7 @@ export function bridge(opts: BridgeOpts, sync = false) {
     }
 
     return new Promise<SerializableData>(async (resolve, reject) => {
-        const responseBuffer = await bridges.Async(payload.buffer);
+        const responseBuffer = await coreBridge.Async(payload.buffer);
         const response = processResponse(responseBuffer);
         if (response instanceof Error) {
             reject(response);

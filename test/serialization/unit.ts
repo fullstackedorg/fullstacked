@@ -20,7 +20,7 @@ import {
     serializeString,
     serializeUndefined,
     uint4BytesToNumber
-} from "../lib/bridge/serialization.ts";
+} from "../../lib/bridge/serialization.ts";
 import {
     BOOLEAN,
     BUFFER,
@@ -29,9 +29,9 @@ import {
     OBJECT,
     STRING,
     UNDEFINED
-} from "../lib/@types/index.ts";
+} from "../../lib/@types/index.ts";
 
-suite("bridge serialization", () => {
+suite("serialization - unit", () => {
     test("number / uint 4 bytes", () => {
         const testData = [
             [0, new Uint8Array([0, 0, 0, 0])],

@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 globalThis.require = createRequire(import.meta.url);
 let core: {
     load(libPath: string): void;
+    start(directory: string): number;
     call(payload: ArrayBuffer): Uint8Array<ArrayBuffer>;
 };
 

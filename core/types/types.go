@@ -1,5 +1,7 @@
 package types
 
+import "sync"
+
 type CoreModule = uint8
 
 const (
@@ -15,8 +17,8 @@ type CoreCallResponseType = uint8
 const (
 	CoreResponseError        CoreCallResponseType = 0
 	CoreResponseData         CoreCallResponseType = 1
-	CoreResponseStream       CoreCallResponseType = 2
-	CoreResponseEventEmitter CoreCallResponseType = 3
+	CoreResponseEventEmitter CoreCallResponseType = 2
+	CoreResponseStream       CoreCallResponseType = 3
 )
 
 type CoreCallResponse struct {
@@ -28,6 +30,12 @@ type CoreCallHeader struct {
 	Id     uint8
 	Module uint8
 	Fn     uint8
+}
+
+type CoreCallContext struct {
+	BaseDirectory  string
+	Responses      map[uint8][]byte
+	ResponsesMutex *sync.Mutex
 }
 
 type SerializableData = any

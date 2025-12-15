@@ -1,31 +1,24 @@
-import { bridge } from "../bridge";
-import { Mkdir, MkdirOptions } from "../@types/fs";
-import { Fs } from "../@types/router";
+// nodejs source: https://nodejs.org/docs/latest/api/fs.html
 
-type PathLike = string | Buffer | URL;
-type Callback = (err: Error) => void;
+import { bridge } from "../bridge/index.ts";
+import { Exists, ReadFileOpts } from "../@types/fs.ts";
+import { Fs } from "../@types/index.ts";
 
-export function mkdir(path: PathLike, callback: Callback): void;
-export function mkdir(
-    path: PathLike,
-    options: { recursive: boolean },
-    callback: Callback
-): void;
-export function mkdir(
-    path: PathLike,
-    options: { recursive: boolean } | Callback,
-    callback?: Callback
-): void {
-    const p =
-        path instanceof URL
-            ? path.pathname
-            : typeof path === "string"
-              ? path
-              : new TextDecoder().decode(path);
+type PathLike = string | URL;
 
-    const cb = typeof options === "function" ? options : callback;
+export function existsSync(path: PathLike): boolean {
+    const data = path instanceof URL ? path.pathname : path;
 
-    const opts: MkdirOptions = {
-        Recursive: typeof options === "object" ? options?.recursive : undefined
-    };
+    return bridge(
+        {
+            mod: Fs,
+            fn: Exists,
+            data: [data]
+        },
+        true
+    );
+}
+
+export function readFileSync(path: PathLike, options?: ReadFileOpts) {
+    const data = [];
 }

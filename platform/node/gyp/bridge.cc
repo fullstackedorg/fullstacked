@@ -13,14 +13,10 @@ using namespace Napi;
 
 CoreLib lib;
 
-void N_Directories(const Napi::CallbackInfo &info) {
-    Napi::String arg1 = info[0].As<Napi::String>().ToString();
-    Napi::String arg2 = info[1].As<Napi::String>().ToString();
-    Napi::String arg3 = info[2].As<Napi::String>().ToString();
-    Napi::String arg4 = info[3].As<Napi::String>().ToString();
-    lib.directories(
-        (char *)arg1.Utf8Value().c_str(), (char *)arg2.Utf8Value().c_str(),
-        (char *)arg3.Utf8Value().c_str(), (char *)arg4.Utf8Value().c_str());
+Napi::Number N_Start(const Napi::CallbackInfo &info) {
+    Napi::String directory = info[0].As<Napi::String>().ToString();
+    return Napi::Number::New(info.Env(),
+                             lib.start((char *)directory.Utf8Value().c_str()));
 }
 
 using Context = Reference<Value>;
@@ -110,9 +106,11 @@ Napi::ArrayBuffer N_Call(const Napi::CallbackInfo &info) {
     Napi::Env env = info.Env();
     Napi::ArrayBuffer buffer = info[0].As<Napi::ArrayBuffer>();
     int size = lib.call(buffer.Data(), buffer.ByteLength());
-    uint8_t id = ((uint8_t *)(buffer.Data()))[0];
+    uint8_t *payload = (uint8_t *)(buffer.Data());
+    uint8_t ctx = payload[0];
+    uint8_t id = payload[1];
     Napi::ArrayBuffer response = Napi::ArrayBuffer::New(env, size);
-    lib.getResponse(id, response.Data());
+    lib.getResponse(ctx, id, response.Data());
     return response;
 }
 
@@ -125,8 +123,8 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set(Napi::String::New(env, "load"),
                 Napi::Function::New(env, N_Load));
 
-    exports.Set(Napi::String::New(env, "directories"),
-                Napi::Function::New(env, N_Directories));
+    exports.Set(Napi::String::New(env, "start"),
+                Napi::Function::New(env, N_Start));
 
     exports.Set(Napi::String::New(env, "callback"),
                 Napi::Function::New(env, N_Callback));

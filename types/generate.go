@@ -26,10 +26,14 @@ func main() {
 				Path:       "fullstackedorg/fullstacked/internal/test",
 				OutputPath: "../lib/@types/test.ts",
 			},
-			//{
-			// 	Path:       "fullstackedorg/fullstacked/internal/serialization",
-			// 	OutputPath: "../lib/@types/serialization.ts",
-			// },
+			{
+				Path:       "fullstackedorg/fullstacked/internal/fs",
+				OutputPath: "../lib/@types/fs.ts",
+			},
+			{
+				Path:       "fullstackedorg/fullstacked/internal/path",
+				OutputPath: "../lib/@types/path.ts",
+			},
 		},
 	}
 	gen := tygo.New(config)

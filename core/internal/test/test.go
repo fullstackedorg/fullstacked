@@ -18,7 +18,12 @@ type TestObject struct {
 	Foo string `json:"foo"`
 }
 
-func Switch(fn TestFn, data []types.DeserializedData, response *types.CoreCallResponse) error {
+func Switch(
+	ctx *types.CoreCallContext,
+	fn TestFn,
+	data []types.DeserializedData,
+	response *types.CoreCallResponse,
+) error {
 	switch fn {
 	case Hello:
 		response.Type = types.CoreResponseData

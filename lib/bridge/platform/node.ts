@@ -1,3 +1,5 @@
+export const ctx = await (await fetch("/ctx")).json();
+
 export function Sync(payload: ArrayBuffer) {
     const xmlHttpRequest = new XMLHttpRequest();
     xmlHttpRequest.open("POST", "/call", true);
