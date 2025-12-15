@@ -4,14 +4,25 @@ import (
 	"errors"
 	"fullstackedorg/fullstacked/types"
 	goPath "path"
+	"strings"
 )
 
 type PathFn = uint8
 
 const (
-	Join    PathFn = 0
-	Resolve PathFn = 1
+	Join      PathFn = 0
+	Resolve   PathFn = 1
+	Normalize PathFn = 2
+	Parse     PathFn = 3
 )
+
+type ParsedPath struct {
+	Dir  string `json:"dir"`
+	Root string `json:"root"`
+	Base string `json:"base"`
+	Name string `json:"name"`
+	Ext  string `json:"ext"`
+}
 
 func Switch(
 	ctx *types.CoreCallContext,
@@ -27,6 +38,14 @@ func Switch(
 	case Resolve:
 		response.Type = types.CoreResponseData
 		response.Data = ResolveWithContext(ctx, DataToStringSlice(data...)...)
+		return nil
+	case Normalize:
+		response.Type = types.CoreResponseData
+		response.Data = goPath.Clean(data[0].Data.(string))
+		return nil
+	case Parse:
+		response.Type = types.CoreResponseData
+		response.Data = ParsePath(data[0].Data.(string))
 		return nil
 	}
 	return errors.New("unkown path function")
@@ -46,4 +65,24 @@ func DataToStringSlice(data ...types.DeserializedData) []string {
 		strSlice = append(strSlice, p.Data.(string))
 	}
 	return strSlice
+}
+
+func ParsePath(path string) ParsedPath {
+	path = strings.TrimRight(path, "/")
+
+	parsed := ParsedPath{
+		Root: "",
+		Dir:  "",
+	}
+	parsed.Base = goPath.Base(path)
+	if len(path) > len(parsed.Base) {
+		parsed.Dir = path[:len(path)-len(parsed.Base)-1]
+	}
+	parsed.Ext = goPath.Ext(path)
+	parsed.Name = strings.TrimSuffix(parsed.Base, parsed.Ext)
+
+	if goPath.IsAbs(path) {
+		parsed.Root = "/"
+	}
+	return parsed
 }

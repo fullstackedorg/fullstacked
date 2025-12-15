@@ -2,9 +2,9 @@
 
 import { bridge } from "../bridge/index.ts";
 import { Path } from "../@types/index.ts";
-import { Join, Resolve } from "../@types/path.ts";
+import { Join, Normalize, Parse, ParsedPath, Resolve } from "../@types/path.ts";
 
-export function resolve(...paths: string[]) {
+export function resolve(...paths: string[]): string {
     return bridge(
         {
             mod: Path,
@@ -15,7 +15,7 @@ export function resolve(...paths: string[]) {
     );
 }
 
-export function join(...paths: string[]) {
+export function join(...paths: string[]): string {
     return bridge(
         {
             mod: Path,
@@ -26,7 +26,38 @@ export function join(...paths: string[]) {
     );
 }
 
-export function normalize() {}
-export function extname() {}
-export function dirname() {}
-export function basename() {}
+export function normalize(path: string): string {
+    return bridge(
+        {
+            mod: Path,
+            fn: Normalize,
+            data: [path]
+        },
+        true
+    );
+}
+
+export function parse(path: string): ParsedPath {
+    return bridge(
+        {
+            mod: Path,
+            fn: Parse,
+            data: [path]
+        },
+        true
+    );
+}
+
+export function extname(path: string) {
+    return parse(path).ext;
+}
+export function dirname(path: string) {
+    return parse(path).dir;
+}
+export function basename(path: string, suffix?: string) {
+    const base = parse(path).base;
+    if (suffix && base.endsWith(suffix)) {
+        return base.slice(0, 0 - suffix.length);
+    }
+    return base;
+}
