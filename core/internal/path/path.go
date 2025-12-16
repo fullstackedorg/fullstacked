@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fullstackedorg/fullstacked/types"
 	goPath "path"
+	"path/filepath"
 	"strings"
 )
 
@@ -13,7 +14,8 @@ const (
 	Join      PathFn = 0
 	Resolve   PathFn = 1
 	Normalize PathFn = 2
-	Parse     PathFn = 3
+	Relative  PathFn = 3
+	Parse     PathFn = 4
 )
 
 type ParsedPath struct {
@@ -42,6 +44,14 @@ func Switch(
 	case Normalize:
 		response.Type = types.CoreResponseData
 		response.Data = goPath.Clean(data[0].Data.(string))
+		return nil
+	case Relative:
+		str, err := filepath.Rel(data[0].Data.(string), data[1].Data.(string))
+		if err != nil {
+			return err
+		}
+		response.Type = types.CoreResponseData
+		response.Data = str
 		return nil
 	case Parse:
 		response.Type = types.CoreResponseData

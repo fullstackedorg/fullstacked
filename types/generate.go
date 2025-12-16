@@ -35,6 +35,10 @@ func main() {
 				OutputPath: "../lib/@types/path.ts",
 			},
 		},
+		TypeMappings: map[string]string{
+			"time.Time":   "number /* time.Time */",
+			"os.FileMode": "number /* os.FileMode */",
+		},
 	}
 	gen := tygo.New(config)
 	fmt.Println(gen.Generate())

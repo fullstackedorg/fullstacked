@@ -5,13 +5,16 @@ import (
 	"fullstackedorg/fullstacked/internal/path"
 	"fullstackedorg/fullstacked/types"
 	"os"
+
+	"github.com/djherbis/times"
 )
 
 type FsFn = uint8
 
 const (
 	Exists   FsFn = 0
-	ReadFile FsFn = 1
+	Stats    FsFn = 1
+	ReadFile FsFn = 2
 )
 
 func Switch(
@@ -22,13 +25,24 @@ func Switch(
 ) error {
 	switch fn {
 	case Exists:
-		filePath := path.ResolveWithContext(ctx, data[0].Data.(string))
 		response.Type = types.CoreResponseData
-		response.Data = ExistsFn(filePath)
+		response.Data = ExistsFn(path.ResolveWithContext(ctx, data[0].Data.(string)))
+		return nil
+	case Stats:
+		stats, err := StatsFn(path.ResolveWithContext(ctx, data[0].Data.(string)))
+		if err != nil {
+			return err
+		}
+		response.Type = types.CoreResponseData
+		response.Data = stats
 		return nil
 	case ReadFile:
+		contents, err := ReadFileFn(path.ResolveWithContext(ctx, data[0].Data.(string)))
+		if err != nil {
+			return err
+		}
 		response.Type = types.CoreResponseData
-
+		response.Data = contents
 		return nil
 	}
 
@@ -43,9 +57,60 @@ func ExistsFn(p string) bool {
 	return false
 }
 
-type ReadFileOpts struct {
-	Encoding string `json:"encoding"`
+type GoFileInfo struct {
+	Name      string
+	Size      int64
+	ATime     int64
+	MTime     int64
+	CTime     int64
+	BirthTime int64
+	IsDir     bool
+	Mode      os.FileMode
 }
 
-func ReadFileFn(p string, opts ReadFileOpts) {
+func StatsFn(p string) (GoFileInfo, error) {
+	fileInfo, err := os.Stat(p)
+
+	if err != nil {
+		return GoFileInfo{}, err
+	}
+
+	t, _ := times.Stat(p)
+
+	mTime := t.ModTime()
+	aTime := t.AccessTime()
+
+	cTime := mTime
+	if t.HasChangeTime() {
+		cTime = t.ChangeTime()
+	}
+
+	birthTime := cTime
+	if t.HasBirthTime() {
+		birthTime = t.BirthTime();
+	}
+
+	return GoFileInfo{
+		Name:      fileInfo.Name(),
+		Size:      fileInfo.Size(),
+		ATime:     aTime.UnixNano(),
+		MTime:     mTime.UnixNano(),
+		CTime:     cTime.UnixNano(),
+		BirthTime: birthTime.UnixNano(),
+		IsDir:     fileInfo.IsDir(),
+		Mode:      fileInfo.Mode(),
+	}, nil
+}
+
+func ReadFileFn(p string) ([]byte, error) {
+	stat, err := StatsFn(p)
+	if err != nil {
+		return nil, err
+	}
+
+	if stat.IsDir {
+		return nil, errors.New("path is directory")
+	}
+
+	return os.ReadFile(p)
 }

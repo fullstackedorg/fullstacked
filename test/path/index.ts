@@ -75,4 +75,11 @@ suite("path - e2e", () => {
             nodePath.basename("/foo/bar/baz/asdf/quux.html", ".html")
         );
     });
+
+    test("relative", () => {
+        assert.deepEqual(
+            path.relative('/data/orandea/test/aaa', '/data/orandea/impl/bbb'),
+            nodePath.relative('/data/orandea/test/aaa', '/data/orandea/impl/bbb')
+        );
+    });
 });
