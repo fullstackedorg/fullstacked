@@ -78,8 +78,11 @@ suite("path - e2e", () => {
 
     test("relative", () => {
         assert.deepEqual(
-            path.relative('/data/orandea/test/aaa', '/data/orandea/impl/bbb'),
-            nodePath.relative('/data/orandea/test/aaa', '/data/orandea/impl/bbb')
+            path.relative("/data/orandea/test/aaa", "/data/orandea/impl/bbb"),
+            nodePath.relative(
+                "/data/orandea/test/aaa",
+                "/data/orandea/impl/bbb"
+            )
         );
     });
 });

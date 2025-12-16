@@ -16,30 +16,33 @@ func main() {
 
 	os.RemoveAll(outDir)
 
+	modules, _ := os.ReadDir("../core/internal")
+
+	mainTypesPackage := tygo.PackageConfig{
+		Path:       "fullstackedorg/fullstacked/types",
+		OutputPath: "../lib/@types/index.ts",
+	}
+
+	packages := []*tygo.PackageConfig{&mainTypesPackage}
+	for _, m := range modules {
+		p := tygo.PackageConfig{
+			Path:       "fullstackedorg/fullstacked/internal/" + m.Name(),
+			OutputPath: "../lib/@types/" + m.Name() + ".ts",
+		}
+		packages = append(packages, &p)
+	}
+
 	config := &tygo.Config{
-		Packages: []*tygo.PackageConfig{
-			{
-				Path:       "fullstackedorg/fullstacked/types",
-				OutputPath: "../lib/@types/index.ts",
-			},
-			{
-				Path:       "fullstackedorg/fullstacked/internal/test",
-				OutputPath: "../lib/@types/test.ts",
-			},
-			{
-				Path:       "fullstackedorg/fullstacked/internal/fs",
-				OutputPath: "../lib/@types/fs.ts",
-			},
-			{
-				Path:       "fullstackedorg/fullstacked/internal/path",
-				OutputPath: "../lib/@types/path.ts",
-			},
-		},
+		Packages: packages,
 		TypeMappings: map[string]string{
 			"time.Time":   "number /* time.Time */",
 			"os.FileMode": "number /* os.FileMode */",
+			"[]byte":      "Uint8Array",
 		},
 	}
 	gen := tygo.New(config)
-	fmt.Println(gen.Generate())
+	err := gen.Generate()
+	if err != nil {
+		fmt.Println(err)
+	}
 }

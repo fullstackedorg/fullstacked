@@ -24,27 +24,27 @@ export function existsSync(path: PathLike): boolean {
 export interface Stats {
     // dev: 2114,
     // ino: 48064969,
-    mode: number,
+    mode: number;
     // nlink: 1,
     // uid: 85,
     // gid: 100,
     // rdev: 0,
-    size: number,
+    size: number;
     // blksize: 4096,
     // blocks: 8,
-    atimeMs: number,
-    mtimeMs: number,
-    ctimeMs: number,
-    birthtimeMs: number,
-    atime: Date,
-    mtime: Date,
-    ctime: Date,
+    atimeMs: number;
+    mtimeMs: number;
+    ctimeMs: number;
+    birthtimeMs: number;
+    atime: Date;
+    mtime: Date;
+    ctime: Date;
     birthtime: Date;
     // isBlockDevice(): boolean
     // isCharacterDevice(): boolean
     // isFIFO(): boolean
-    isDirectory(): boolean
-    isFile(): boolean
+    isDirectory(): boolean;
+    isFile(): boolean;
     // isSocket(): boolean
     // isSymbolicLink(): boolean
 }
@@ -52,7 +52,7 @@ export interface Stats {
 function fileInfoToStat(fileInfo: GoFileInfo): Stats {
     const typeFlag = fileInfo.IsDir
         ? 16384 // fs.constants.S_IFDIR
-        : 32768 // fs.constants.S_IFREG
+        : 32768; // fs.constants.S_IFREG
 
     const mode = typeFlag | fileInfo.Mode;
 
@@ -69,21 +69,24 @@ function fileInfoToStat(fileInfo: GoFileInfo): Stats {
         birthtime: new Date(fileInfo.BirthTime / 1e6),
         isDirectory: () => fileInfo.IsDir,
         isFile: () => !fileInfo.IsDir
-    }
+    };
 }
 
 type StatOpts = {
-    throwIfNoEntry?: boolean
-}
+    throwIfNoEntry?: boolean;
+};
 
 export function statSync(path: PathLike, options?: StatOpts): Stats {
-    const fileInfo: GoFileInfo = bridge({
-        mod: Fs,
-        fn: Stats,
-        data: [formatPathLike(path)]
-    }, true)
+    const fileInfo: GoFileInfo = bridge(
+        {
+            mod: Fs,
+            fn: Stats,
+            data: [formatPathLike(path)]
+        },
+        true
+    );
 
-    return fileInfoToStat(fileInfo)
+    return fileInfoToStat(fileInfo);
 }
 
 async function statPromise(path: PathLike, options?: StatOpts): Promise<Stats> {
@@ -91,26 +94,35 @@ async function statPromise(path: PathLike, options?: StatOpts): Promise<Stats> {
         mod: Fs,
         fn: Stats,
         data: [formatPathLike(path)]
-    })
+    });
 
-    return fileInfoToStat(fileInfo)
+    return fileInfoToStat(fileInfo);
 }
 
 type StatCallback = (err: Error, stat: Stats) => void;
 
-export function stat(path: PathLike, callback: StatCallback): void
-export function stat(path: PathLike, options: object, callback: StatCallback): void
-export function stat(path: PathLike, options?: StatCallback | object, callback?: StatCallback): void {
-    const cb = typeof options === "function" ? options as StatCallback : callback;
-    const opts = typeof options === "function" ? null : options; 
+export function stat(path: PathLike, callback: StatCallback): void;
+export function stat(
+    path: PathLike,
+    options: object,
+    callback: StatCallback
+): void;
+export function stat(
+    path: PathLike,
+    options?: StatCallback | object,
+    callback?: StatCallback
+): void {
+    const cb =
+        typeof options === "function" ? (options as StatCallback) : callback;
+    const opts = typeof options === "function" ? null : options;
     statPromise(path, opts)
-        .then(stats => cb(null, stats))
-        .catch(e => cb(e, null));
+        .then((stats) => cb(null, stats))
+        .catch((e) => cb(e, null));
 }
 
 type ReadFileOpts = {
-    encoding: string
-}
+    encoding: string;
+};
 
 function decodeStringData(data: Uint8Array, options: ReadFileOpts) {
     if (!options?.encoding) return Buffer.from(data);
@@ -118,10 +130,7 @@ function decodeStringData(data: Uint8Array, options: ReadFileOpts) {
 }
 
 export function readFileSync(path: PathLike): Buffer<ArrayBuffer>;
-export function readFileSync(
-    path: PathLike,
-    options: ReadFileOpts
-): string;
+export function readFileSync(path: PathLike, options: ReadFileOpts): string;
 export function readFileSync(path: PathLike, options?: ReadFileOpts) {
     const data: Uint8Array = bridge(
         {
@@ -135,32 +144,43 @@ export function readFileSync(path: PathLike, options?: ReadFileOpts) {
     return decodeStringData(data, options);
 }
 
-async function readFilePromise(path: PathLike): Promise<Buffer<ArrayBuffer>>
-async function readFilePromise(path: PathLike, options: ReadFileOpts): Promise<string>
+async function readFilePromise(path: PathLike): Promise<Buffer<ArrayBuffer>>;
+async function readFilePromise(
+    path: PathLike,
+    options: ReadFileOpts
+): Promise<string>;
 async function readFilePromise(path: PathLike, options?: ReadFileOpts) {
-    const data: Uint8Array = await bridge(
-        {
-            mod: Fs,
-            fn: ReadFile,
-            data: [formatPathLike(path)]
-        });
+    const data: Uint8Array = await bridge({
+        mod: Fs,
+        fn: ReadFile,
+        data: [formatPathLike(path)]
+    });
 
     return decodeStringData(data, options);
 }
 
-export function readFile(path: PathLike, callback: (err: Error, data: Buffer) => void): void
-export function readFile(path: PathLike, options: ReadFileOpts, callback: (err: Error, data: string) => void): void
-export function readFile(path: PathLike, options: ReadFileOpts | Function, callback?: Function) {
+export function readFile(
+    path: PathLike,
+    callback: (err: Error, data: Buffer) => void
+): void;
+export function readFile(
+    path: PathLike,
+    options: ReadFileOpts,
+    callback: (err: Error, data: string) => void
+): void;
+export function readFile(
+    path: PathLike,
+    options: ReadFileOpts | Function,
+    callback?: Function
+) {
     const cb = typeof options === "function" ? options : callback;
     const opts = typeof options === "function" ? null : options;
     readFilePromise(path, opts)
-        .then(data => callback(null, data))
-        .then(e => callback(e, null));
+        .then((data) => cb(null, data))
+        .catch((e) => cb(e, null));
 }
-
-
 
 export const promises = {
     stat: statPromise,
     readFile: readFilePromise
-}
+};

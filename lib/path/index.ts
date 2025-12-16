@@ -2,7 +2,14 @@
 
 import { bridge } from "../bridge/index.ts";
 import { Path } from "../@types/index.ts";
-import { Join, Normalize, Parse, ParsedPath, Relative, Resolve } from "../@types/path.ts";
+import {
+    Join,
+    Normalize,
+    Parse,
+    ParsedPath,
+    Relative,
+    Resolve
+} from "../@types/path.ts";
 
 export function resolve(...paths: string[]): string {
     return bridge(
@@ -65,7 +72,7 @@ export function basename(path: string, suffix?: string) {
 }
 
 export function isAbsolute(path: string) {
-    return parse(path).root !== ""
+    return parse(path).root !== "";
 }
 
 export function relative(from: string, to: string) {
@@ -73,7 +80,7 @@ export function relative(from: string, to: string) {
         {
             mod: Path,
             fn: Relative,
-            data: [from , to]
+            data: [from, to]
         },
         true
     );

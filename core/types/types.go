@@ -5,11 +5,12 @@ import "sync"
 type CoreModule = uint8
 
 const (
-	Test CoreModule = 0
-	Fs   CoreModule = 1
-	Path CoreModule = 2
-	Os   CoreModule = 3
-	Net  CoreModule = 4
+	Test  CoreModule = 0
+	Fs    CoreModule = 1
+	Path  CoreModule = 2
+	Os    CoreModule = 3
+	Net   CoreModule = 4
+	Fetch CoreModule = 5
 )
 
 type CoreCallResponseType = uint8

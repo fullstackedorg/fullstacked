@@ -87,7 +87,7 @@ func StatsFn(p string) (GoFileInfo, error) {
 
 	birthTime := cTime
 	if t.HasBirthTime() {
-		birthTime = t.BirthTime();
+		birthTime = t.BirthTime()
 	}
 
 	return GoFileInfo{

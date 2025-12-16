@@ -2,6 +2,7 @@ package router
 
 import (
 	"errors"
+	"fullstackedorg/fullstacked/internal/fetch"
 	"fullstackedorg/fullstacked/internal/fs"
 	"fullstackedorg/fullstacked/internal/path"
 	"fullstackedorg/fullstacked/internal/serialization"
@@ -111,6 +112,8 @@ func callProcess(
 		return path.Switch(ctx, header.Fn, data, response)
 	case types.Fs:
 		return fs.Switch(ctx, header.Fn, data, response)
+	case types.Fetch:
+		return fetch.Switch(ctx, header.Fn, data, response)
 	case types.Test:
 		return test.Switch(ctx, header.Fn, data, response)
 	}
