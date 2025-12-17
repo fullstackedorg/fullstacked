@@ -114,3 +114,7 @@ func ReadFileFn(p string) ([]byte, error) {
 
 	return os.ReadFile(p)
 }
+
+func WrtieFile(p string, data []byte) error {
+	return os.WriteFile(p, data, 0644)
+}

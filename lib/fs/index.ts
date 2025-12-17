@@ -184,3 +184,10 @@ export const promises = {
     stat: statPromise,
     readFile: readFilePromise
 };
+
+export default {
+    existsSync,
+    statSync,
+    readFileSync,
+    promises
+};

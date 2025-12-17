@@ -7,7 +7,6 @@ import {
 } from "../@types/fetch.ts";
 import { bridge } from "../bridge/index.ts";
 import { mergeUint8Arrays } from "../bridge/serialization.ts";
-import { read } from "fs";
 
 function headersToObj(headers: HeadersInit) {
     if (headers === null) return {};

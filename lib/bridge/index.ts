@@ -47,7 +47,7 @@ switch (platform) {
         coreBridge = globalThis.bridges;
         break;
     case Platform.NODE:
-        // coreBridge = await import("./platform/node.ts");
+        coreBridge = await import("./platform/node.ts");
         break;
     default:
         throw new Error("Brige not implemented for current platform");

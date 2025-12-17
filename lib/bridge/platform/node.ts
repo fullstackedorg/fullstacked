@@ -1,4 +1,8 @@
+import { fetch } from "../../fetch";
+
 export const ctx = await (await fetch("/ctx")).json();
+
+globalThis.fetch = fetch;
 
 export function Sync(payload: ArrayBuffer) {
     const xmlHttpRequest = new XMLHttpRequest();

@@ -1,5 +1,5 @@
 import test, { suite } from "node:test";
-import assert, { rejects } from "node:assert";
+import assert from "node:assert";
 import * as fs from "../../lib/fs/index.ts";
 import * as nodeFs from "node:fs";
 

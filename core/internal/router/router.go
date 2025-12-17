@@ -2,6 +2,7 @@ package router
 
 import (
 	"errors"
+	"fullstackedorg/fullstacked/internal/bundle"
 	"fullstackedorg/fullstacked/internal/fetch"
 	"fullstackedorg/fullstacked/internal/fs"
 	"fullstackedorg/fullstacked/internal/path"
@@ -70,51 +71,28 @@ func Call(payload []byte) (int, error) {
 	return size, nil
 }
 
+var modules = map[types.CoreModule]types.ModuleSwitch{
+	types.Core:   Switch,
+	types.Path:   path.Switch,
+	types.Fs:     fs.Switch,
+	types.Fetch:  fetch.Switch,
+	types.Bundle: bundle.Switch,
+	types.Test:   test.Switch,
+}
+
 func callProcess(
 	ctx *types.CoreCallContext,
 	header types.CoreCallHeader,
 	data []types.DeserializedData,
 	response *types.CoreCallResponse,
 ) error {
-	switch header.Module {
-	case types.Core:
-		return Switch(
-			ctx,
-			header,
-			data,
-			response,
-		)
-	case types.Path:
-		return path.Switch(
-			ctx,
-			header,
-			data,
-			response,
-		)
-	case types.Fs:
-		return fs.Switch(
-			ctx,
-			header,
-			data,
-			response,
-		)
-	case types.Fetch:
-		return fetch.Switch(
-			ctx,
-			header,
-			data,
-			response,
-		)
-	case types.Test:
-		return test.Switch(
-			ctx,
-			header,
-			data,
-			response,
-		)
+	moduleSwitch, ok := modules[header.Module]
+
+	if !ok {
+		return errors.New("unknown module")
 	}
 
-	return errors.New("unknown module")
+	return moduleSwitch(ctx, header, data, response)
 }
 
 func Switch(

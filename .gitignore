@@ -8,3 +8,4 @@ out
 ./build.js
 fullstacked_modules/@types
 lib/@types
+**/*/_*.js

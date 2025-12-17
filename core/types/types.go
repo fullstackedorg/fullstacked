@@ -5,14 +5,17 @@ import "sync"
 type CoreModule = uint8
 
 const (
-	Core  CoreModule = 0
-	Test  CoreModule = 1
-	Fs    CoreModule = 2
-	Path  CoreModule = 3
-	Os    CoreModule = 4
-	Net   CoreModule = 5
-	Fetch CoreModule = 6
+	Core   CoreModule = 0
+	Test   CoreModule = 1
+	Fs     CoreModule = 2
+	Path   CoreModule = 3
+	Os     CoreModule = 4
+	Net    CoreModule = 5
+	Fetch  CoreModule = 6
+	Bundle CoreModule = 7
 )
+
+type ModuleSwitch = func(*CoreCallContext, CoreCallHeader, []DeserializedData, *CoreCallResponse) error
 
 type CoreCallResponseType = uint8
 
