@@ -8,7 +8,11 @@ suite("stream - e2e", () => {
         const intervalMs = 0;
         const data = new Uint8Array([1, 2, 3]);
 
-        const stream = t.streaming(new Uint8Array([1, 2, 3]), intervalMs, false);
+        const stream = t.streaming(
+            new Uint8Array([1, 2, 3]),
+            intervalMs,
+            false
+        );
         let chunksCount = 0,
             streamed = new Uint8Array();
         for await (const chunk of stream) {
@@ -25,7 +29,11 @@ suite("stream - e2e", () => {
         const data = new Uint8Array([1, 2, 3]);
         const start = Date.now();
 
-        const stream = t.streaming(new Uint8Array([1, 2, 3]), intervalMs, false);
+        const stream = t.streaming(
+            new Uint8Array([1, 2, 3]),
+            intervalMs,
+            false
+        );
 
         let chunksCount = 0,
             streamed = new Uint8Array();
@@ -35,7 +43,7 @@ suite("stream - e2e", () => {
         }
 
         assert.deepEqual(streamed, data);
-        assert.ok((Date.now() - start) > intervalMs * data.byteLength);
+        assert.ok(Date.now() - start > intervalMs * data.byteLength);
         assert.deepEqual(chunksCount, 1);
     });
 
@@ -43,7 +51,11 @@ suite("stream - e2e", () => {
         const intervalMs = 0;
         const data = new Uint8Array([1, 2, 3]);
 
-        const stream = await t.streaming(new Uint8Array([1, 2, 3]), intervalMs, true);
+        const stream = await t.streaming(
+            new Uint8Array([1, 2, 3]),
+            intervalMs,
+            true
+        );
 
         let chunksCount = 0,
             streamed = new Uint8Array();
@@ -54,14 +66,18 @@ suite("stream - e2e", () => {
 
         assert.deepEqual(streamed, data);
         assert.deepEqual(chunksCount, 4);
-    })
+    });
 
     test("streaming async - long", { timeout: 500 }, async () => {
         const intervalMs = 100;
         const data = new Uint8Array([1, 2, 3]);
         const start = Date.now();
 
-        const stream = await t.streaming(new Uint8Array([1, 2, 3]), intervalMs, true);
+        const stream = await t.streaming(
+            new Uint8Array([1, 2, 3]),
+            intervalMs,
+            true
+        );
 
         let chunksCount = 0,
             streamed = new Uint8Array();
@@ -71,7 +87,7 @@ suite("stream - e2e", () => {
         }
 
         assert.deepEqual(streamed, data);
-        assert.ok((Date.now() - start) > intervalMs * data.byteLength);
+        assert.ok(Date.now() - start > intervalMs * data.byteLength);
         assert.deepEqual(chunksCount, 4);
     });
 });

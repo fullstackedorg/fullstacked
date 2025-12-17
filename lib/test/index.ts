@@ -42,8 +42,16 @@ function serializationIndex(
     );
 }
 
-function streaming(data: Uint8Array, intervalMs: number, async: false): ReadableStream<Uint8Array>
-function streaming(data: Uint8Array, intervalMs: number, async: true): Promise<ReadableStream<Uint8Array>>
+function streaming(
+    data: Uint8Array,
+    intervalMs: number,
+    async: false
+): ReadableStream<Uint8Array>;
+function streaming(
+    data: Uint8Array,
+    intervalMs: number,
+    async: true
+): Promise<ReadableStream<Uint8Array>>;
 function streaming(data: Uint8Array, intervalMs: number, async: boolean) {
     return bridge(
         {

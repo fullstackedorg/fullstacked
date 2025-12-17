@@ -4,19 +4,24 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/types"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 )
 
 type FetchFn = uint8
 
 const (
-	Fetch FetchFn = 0
+	Fetch        FetchFn = 0
+	ResponseBody FetchFn = 1
 )
 
-func Switch(ctx *types.CoreCallContext,
+func Switch(
+	ctx *types.CoreCallContext,
 	header types.CoreCallHeader,
 	data []types.DeserializedData,
 	response *types.CoreCallResponse,
@@ -38,8 +43,20 @@ func Switch(ctx *types.CoreCallContext,
 		response.Type = types.CoreResponseData
 		response.Data = res
 		return nil
+	case ResponseBody:
+		id := int(data[0].Data.(float64))
+		_, ok := activeResponses[id]
+		if !ok {
+			return errors.New("cannot find response")
+		}
+		response.Type = types.CoreResponseStream
+		response.Stream = func() {
+			go StreamResponse(ctx, header, id)
+		}
+		return nil
 	}
-	return nil
+
+	return errors.New("unknown fetch function")
 }
 
 type RequestHead struct {
@@ -49,10 +66,15 @@ type RequestHead struct {
 }
 
 type ResponseHead struct {
+	Id         int
 	Status     int
 	StatusText string
 	Headers    map[string][]string
 }
+
+var activeResponses = map[int]*http.Response{}
+var activeResponsesMutex = sync.Mutex{}
+var responseId = 0
 
 var client = &http.Client{}
 
@@ -86,11 +108,47 @@ func FetchFnApply(requestHead RequestHead, body []byte) (ResponseHead, error) {
 		return ResponseHead{}, err
 	}
 
+	activeResponsesMutex.Lock()
+	id := responseId
+	activeResponses[id] = response
+	responseId += 1
+	activeResponsesMutex.Unlock()
+
 	responseHead := ResponseHead{
+		Id:         id,
 		Status:     response.StatusCode,
 		StatusText: response.Status,
 		Headers:    response.Header,
 	}
 
 	return responseHead, nil
+}
+
+func StreamResponse(
+	ctx *types.CoreCallContext,
+	header types.CoreCallHeader,
+	responseId int,
+) {
+	activeResponsesMutex.Lock()
+	response, ok := activeResponses[responseId]
+	activeResponsesMutex.Unlock()
+
+	if !ok {
+		return
+	}
+
+	defer response.Body.Close()
+
+	for {
+		buffer := make([]byte, 2048)
+		n, err := response.Body.Read(buffer)
+		buffer = buffer[:n]
+		end := err == io.EOF
+		store.StreamChunk(ctx, header, buffer, end)
+		if end {
+			break
+		}
+	}
+
+	delete(activeResponses, responseId)
 }

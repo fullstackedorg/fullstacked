@@ -90,7 +90,7 @@ func streamTest(
 	streamingFn := func() {
 		for i, b := range data {
 			time.Sleep(time.Millisecond * time.Duration(intervalMs))
-			store.StreamChunk(ctx, header, []byte{b}, i == len(data) - 1)
+			store.StreamChunk(ctx, header, []byte{b}, i == len(data)-1)
 		}
 	}
 

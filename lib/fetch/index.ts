@@ -2,9 +2,12 @@ import { Fetch } from "../@types/index.ts";
 import {
     Fetch as FetchFn,
     RequestHead,
+    ResponseBody,
     ResponseHead
 } from "../@types/fetch.ts";
 import { bridge } from "../bridge/index.ts";
+import { mergeUint8Arrays } from "../bridge/serialization.ts";
+import { read } from "fs";
 
 function headersToObj(headers: HeadersInit) {
     if (headers === null) return {};
@@ -56,6 +59,20 @@ export async function fetch(
         data: [requestHead, requestBody]
     });
 
+    const responseBodyStream = await bridge({
+        mod: Fetch,
+        fn: ResponseBody,
+        data: [responseHead.Id]
+    });
+
+    const readBody = async () => {
+        let buffer = new Uint8Array();
+        for await (const chunk of responseBodyStream) {
+            buffer = mergeUint8Arrays(buffer, chunk);
+        }
+        return buffer;
+    };
+
     const response: Response = {
         url,
         redirected: false,
@@ -65,14 +82,24 @@ export async function fetch(
         status: responseHead.Status,
         statusText: responseHead.StatusText,
         bodyUsed: false,
-        body: null,
-        clone: () => null,
-        json: () => null,
-        text: () => null,
-        arrayBuffer: () => null,
-        blob: () => null,
-        bytes: () => null,
-        formData: () => null
+        body: responseBodyStream,
+        json: async () => {
+            return JSON.parse(new TextDecoder().decode(await readBody()));
+        },
+        text: async () => {
+            return new TextDecoder().decode(await readBody());
+        },
+        arrayBuffer: async () => {
+            return (await readBody()).buffer;
+        },
+        blob: async () => {
+            return new Blob([await readBody()]);
+        },
+        bytes: readBody,
+
+        // not implemented
+        clone: () => null as Response,
+        formData: async () => null as FormData
     };
 
     return response;
