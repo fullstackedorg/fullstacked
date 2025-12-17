@@ -17,11 +17,11 @@ const (
 )
 
 func Switch(ctx *types.CoreCallContext,
-	fn FetchFn,
+	header types.CoreCallHeader,
 	data []types.DeserializedData,
 	response *types.CoreCallResponse,
 ) error {
-	switch fn {
+	switch header.Fn {
 	case Fetch:
 		requestHead := RequestHead{}
 		json.Unmarshal(data[0].Data.(types.DeserializedRawObject).Data, &requestHead)

@@ -91,7 +91,7 @@ export function deserializeBoolean(buffer: ArrayBuffer, index = 0) {
         );
     }
 
-    return { data, size: 2 };
+    return { data: data == 1, size: 2 };
 }
 
 const te = new TextEncoder();

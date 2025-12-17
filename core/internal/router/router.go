@@ -6,27 +6,16 @@ import (
 	"fullstackedorg/fullstacked/internal/fs"
 	"fullstackedorg/fullstacked/internal/path"
 	"fullstackedorg/fullstacked/internal/serialization"
+	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/internal/test"
 	"fullstackedorg/fullstacked/types"
-	"sync"
 )
 
-var ctxCount = 0
-var contexts = map[uint8]types.CoreCallContext{}
+type CoreFn = uint8
 
-func NewContext(directory string) uint8 {
-	id := uint8(ctxCount % 256)
-	contexts[id] = types.CoreCallContext{
-		BaseDirectory:  directory,
-		Responses:      map[uint8][]byte{},
-		ResponsesMutex: &sync.Mutex{},
-	}
-	ctxCount++
-
-	return id
-}
-
-var noResponsePayload, _ = serialization.Serialize("no response")
+const (
+	OpenStream CoreFn = 0
+)
 
 /*
 1 byte ctx
@@ -42,7 +31,7 @@ func Call(payload []byte) (int, error) {
 	}
 
 	ctxId := payload[0]
-	ctx, ok := contexts[ctxId]
+	ctx, ok := store.Contexts[ctxId]
 
 	if !ok {
 		return 0, errors.New("unkown call context")
@@ -66,12 +55,12 @@ func Call(payload []byte) (int, error) {
 
 	size := 0
 	if coreError != nil {
-		size, err = stashResponse(&ctx, header, types.CoreCallResponse{
+		size, err = store.StoreResponse(&ctx, header, types.CoreCallResponse{
 			Type: types.CoreResponseError,
 			Data: coreError.Error(),
 		})
 	} else {
-		size, err = stashResponse(&ctx, header, response)
+		size, err = store.StoreResponse(&ctx, header, response)
 	}
 
 	if err != nil {
@@ -81,26 +70,6 @@ func Call(payload []byte) (int, error) {
 	return size, nil
 }
 
-func GetCoreResponse(ctxId uint8, id uint8) ([]byte, error) {
-	ctx, ok := contexts[ctxId]
-
-	if !ok {
-		return nil, errors.New("unkown call context")
-	}
-
-	ctx.ResponsesMutex.Lock()
-	response, ok := ctx.Responses[id]
-	ctx.ResponsesMutex.Unlock()
-
-	if !ok {
-		return nil, errors.New("cannot find response for id")
-	}
-
-	defer delete(ctx.Responses, id)
-
-	return response, nil
-}
-
 func callProcess(
 	ctx *types.CoreCallContext,
 	header types.CoreCallHeader,
@@ -108,39 +77,62 @@ func callProcess(
 	response *types.CoreCallResponse,
 ) error {
 	switch header.Module {
+	case types.Core:
+		return Switch(
+			ctx,
+			header,
+			data,
+			response,
+		)
 	case types.Path:
-		return path.Switch(ctx, header.Fn, data, response)
+		return path.Switch(
+			ctx,
+			header,
+			data,
+			response,
+		)
 	case types.Fs:
-		return fs.Switch(ctx, header.Fn, data, response)
+		return fs.Switch(
+			ctx,
+			header,
+			data,
+			response,
+		)
 	case types.Fetch:
-		return fetch.Switch(ctx, header.Fn, data, response)
+		return fetch.Switch(
+			ctx,
+			header,
+			data,
+			response,
+		)
 	case types.Test:
-		return test.Switch(ctx, header.Fn, data, response)
+		return test.Switch(
+			ctx,
+			header,
+			data,
+			response,
+		)
 	}
 
 	return errors.New("unknown module")
 }
 
-func stashResponse(
+func Switch(
 	ctx *types.CoreCallContext,
 	header types.CoreCallHeader,
-	response types.CoreCallResponse) (int, error) {
-	buffer := []byte{response.Type}
-
-	if response.Data != nil {
-		data, err := serialization.Serialize(response.Data)
+	data []types.DeserializedData,
+	response *types.CoreCallResponse,
+) error {
+	switch header.Fn {
+	case OpenStream:
+		buffer, err := store.GetCoreResponse(ctx.Id, uint8(data[0].Data.(float64)), true)
 		if err != nil {
-			return 0, err
+			return err
 		}
-		buffer, err = serialization.MergeBuffers([][]byte{buffer, data})
-		if err != nil {
-			return 0, err
-		}
+		response.Type = types.CoreResponseData
+		response.Data = buffer
+		return nil
 	}
 
-	ctx.ResponsesMutex.Lock()
-	ctx.Responses[header.Id] = buffer
-	ctx.ResponsesMutex.Unlock()
-
-	return len(buffer), nil
+	return errors.New("unknown core function")
 }

@@ -28,11 +28,11 @@ type ParsedPath struct {
 
 func Switch(
 	ctx *types.CoreCallContext,
-	fn PathFn,
+	header types.CoreCallHeader,
 	data []types.DeserializedData,
 	response *types.CoreCallResponse,
 ) error {
-	switch fn {
+	switch header.Fn {
 	case Join:
 		response.Type = types.CoreResponseData
 		response.Data = goPath.Join(DataToStringSlice(data...)...)

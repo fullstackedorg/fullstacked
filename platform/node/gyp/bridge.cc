@@ -19,87 +19,54 @@ Napi::Number N_Start(const Napi::CallbackInfo &info) {
                              lib.start((char *)directory.Utf8Value().c_str()));
 }
 
+struct CallbackChunk {
+        uint8_t ctx;
+        uint8_t id;
+        std::vector<uint8_t> buffer;
+};
+
 using Context = Reference<Value>;
-using DataType = int;
+using DataType = CallbackChunk;
 using FinalizerDataType = void;
 
 void CallJs(Napi::Env env, Function callback, Context *context,
             DataType *data) {
-    // Is the JavaScript environment still available to call into, eg. the TSFN
-    // is not aborted
-    if (env != nullptr) {
-        // On Node-API 5+, the `callback` parameter is optional; however, this
-        // example does ensure a callback is provided.
-        if (callback != nullptr) {
-            callback.Call(context->Value(), {Number::New(env, *data)});
-        }
-    }
-    if (data != nullptr) {
-        // We're finished with the data.
-        delete data;
-    }
+    CallbackChunk chunk = *data;
+    callback.Call({Number::New(env, chunk.ctx), Number::New(env, chunk.id),
+                   Napi::ArrayBuffer::New(env, chunk.buffer.data(),
+                                          chunk.buffer.size())});
+    delete data;
 }
 using TSFN = TypedThreadSafeFunction<Context, DataType, CallJs>;
 
 TSFN tsfn;
 
-struct CallbackMessage {
-        std::string projectId;
-        std::string messageType;
-        std::string message;
-};
-std::map<int, CallbackMessage> callbackMessages{};
-std::mutex callbackMessagesMutex;
-int callbackId = 0;
-
-void n_callback(char *arg1, char *arg2, void *arg3, int arg4) {
-    std::string message(static_cast<const char *>(arg3), arg4);
-
-    CallbackMessage msg = {arg1, arg2, message};
-    int id = callbackId++;
-
-    callbackMessagesMutex.lock();
-    callbackMessages[id] = msg;
-    callbackMessagesMutex.unlock();
-
-    int *num = new int(id);
-    tsfn.NonBlockingCall(num);
+void n_callback(uint8_t ctx, uint8_t id, int size) {
+    std::vector<uint8_t> buffer(size, 0);
+    lib.getResponse(ctx, id, buffer.data());
+    CallbackChunk *chunk = new CallbackChunk;
+    chunk->ctx = ctx;
+    chunk->id = id;
+    chunk->buffer = buffer;
+    tsfn.NonBlockingCall(chunk);
 }
 
 void N_Callback(const Napi::CallbackInfo &info) {
     Napi::Env env = info.Env();
-    Context *context = new Reference<Value>(Persistent(info.This()));
-    // Create a ThreadSafeFunction
     tsfn = TSFN::New(
         env,
         info[0].As<Function>(), // JavaScript function called asynchronously
         "Callback",             // Name
         0,                      // Unlimited queue
         1,                      // Only one thread will use this initially
-        context,
+        nullptr,
         [](Napi::Env, FinalizerDataType *, Context *ctx) { delete ctx; });
 
     lib.callback((void *)n_callback);
 }
 
-void N_Callback_Value(const Napi::CallbackInfo &info) {
-    Napi::Env env = info.Env();
-    int id = info[0].As<Napi::Number>().Int32Value();
-    Napi::Function cb = info[1].As<Napi::Function>();
-
-    callbackMessagesMutex.lock();
-    CallbackMessage msg = callbackMessages[id];
-    callbackMessagesMutex.unlock();
-
-    cb.Call(env.Global(), {
-                              Napi::String::New(env, msg.projectId),
-                              Napi::String::New(env, msg.messageType),
-                              Napi::String::New(env, msg.message),
-                          });
-
-    callbackMessagesMutex.lock();
-    callbackMessages.erase(id);
-    callbackMessagesMutex.unlock();
+void N_End(const Napi::CallbackInfo &info) {
+    tsfn.Release();
 }
 
 Napi::ArrayBuffer N_Call(const Napi::CallbackInfo &info) {
@@ -129,11 +96,10 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set(Napi::String::New(env, "callback"),
                 Napi::Function::New(env, N_Callback));
 
-    exports.Set(Napi::String::New(env, "callbackValue"),
-                Napi::Function::New(env, N_Callback_Value));
-
     exports.Set(Napi::String::New(env, "call"),
                 Napi::Function::New(env, N_Call));
+
+    exports.Set(Napi::String::New(env, "end"), Napi::Function::New(env, N_End));
     return exports;
 }
 

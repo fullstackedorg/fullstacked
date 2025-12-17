@@ -251,12 +251,12 @@ func TestMergeBuffers(t *testing.T) {
 		t.Errorf(`Failed mergeBuffers`)
 	}
 
-	_, err = MergeBuffers([][]byte{{}, nil})
+	_, err = MergeBuffers([]byte{}, nil)
 	if err == nil {
 		t.Errorf(`Failed mergeBuffers`)
 	}
 
-	merged, err := MergeBuffers([][]byte{{1}, {2}, {3}, {4}})
+	merged, err := MergeBuffers([]byte{1}, []byte{2}, []byte{3}, []byte{4})
 	if !slices.Equal(merged, []byte{1, 2, 3, 4}) || err != nil {
 		t.Errorf(`Failed mergeBuffers`)
 	}
@@ -337,7 +337,7 @@ func TestDeserialize(t *testing.T) {
 		}
 		serializedValues = append(serializedValues, serialized)
 	}
-	merged, err := MergeBuffers(serializedValues)
+	merged, err := MergeBuffers(serializedValues...)
 	if err != nil {
 		t.Errorf(`Failed Deserialize`)
 	}

@@ -5,12 +5,13 @@ import "sync"
 type CoreModule = uint8
 
 const (
-	Test  CoreModule = 0
-	Fs    CoreModule = 1
-	Path  CoreModule = 2
-	Os    CoreModule = 3
-	Net   CoreModule = 4
-	Fetch CoreModule = 5
+	Core  CoreModule = 0
+	Test  CoreModule = 1
+	Fs    CoreModule = 2
+	Path  CoreModule = 3
+	Os    CoreModule = 4
+	Net   CoreModule = 5
+	Fetch CoreModule = 6
 )
 
 type CoreCallResponseType = uint8
@@ -18,13 +19,14 @@ type CoreCallResponseType = uint8
 const (
 	CoreResponseError        CoreCallResponseType = 0
 	CoreResponseData         CoreCallResponseType = 1
-	CoreResponseEventEmitter CoreCallResponseType = 2
-	CoreResponseStream       CoreCallResponseType = 3
+	CoreResponseStream       CoreCallResponseType = 2
+	CoreResponseEventEmitter CoreCallResponseType = 3
 )
 
 type CoreCallResponse struct {
-	Type CoreCallResponseType
-	Data SerializableData
+	Type   CoreCallResponseType
+	Data   SerializableData
+	Stream func()
 }
 
 type CoreCallHeader struct {
@@ -33,9 +35,18 @@ type CoreCallHeader struct {
 	Fn     uint8
 }
 
+type StoredResponse struct {
+	Type   CoreCallResponseType
+	Buffer []byte
+	Stream func()
+	Opened bool
+	Ended  bool
+}
+
 type CoreCallContext struct {
+	Id             uint8
 	BaseDirectory  string
-	Responses      map[uint8][]byte
+	Responses      map[uint8]*StoredResponse
 	ResponsesMutex *sync.Mutex
 }
 

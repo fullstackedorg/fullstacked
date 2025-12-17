@@ -43,8 +43,8 @@ suite("serialization - unit", () => {
         ] as const;
 
         for (const [dec, arr] of testData) {
-            assert.deepEqual(numberToUint4Bytes(dec), arr);
-            assert.deepEqual(uint4BytesToNumber(arr), dec);
+            assert.deepStrictEqual(numberToUint4Bytes(dec), arr);
+            assert.deepStrictEqual(uint4BytesToNumber(arr), dec);
         }
 
         assert.throws(() => numberToUint4Bytes(null));
@@ -60,13 +60,13 @@ suite("serialization - unit", () => {
     test("undefined", () => {
         const serialized = new Uint8Array([UNDEFINED]);
 
-        assert.deepEqual(serializeUndefined(), serialized);
-        assert.deepEqual(serialize(undefined), serialized);
-        assert.deepEqual(deserializeUndefined(serialized.buffer), {
+        assert.deepStrictEqual(serializeUndefined(), serialized);
+        assert.deepStrictEqual(serialize(undefined), serialized);
+        assert.deepStrictEqual(deserializeUndefined(serialized.buffer), {
             data: undefined,
             size: serialized.byteLength
         });
-        assert.deepEqual(deserialize(serialized.buffer), {
+        assert.deepStrictEqual(deserialize(serialized.buffer), {
             data: undefined,
             size: serialized.byteLength
         });
@@ -78,13 +78,13 @@ suite("serialization - unit", () => {
         const bool = false;
         const serialized = new Uint8Array([BOOLEAN, 0]);
 
-        assert.deepEqual(serializeBoolean(bool), serialized);
-        assert.deepEqual(serialize(bool), serialized);
-        assert.deepEqual(deserializeBoolean(serialized.buffer), {
+        assert.deepStrictEqual(serializeBoolean(bool), serialized);
+        assert.deepStrictEqual(serialize(bool), serialized);
+        assert.deepStrictEqual(deserializeBoolean(serialized.buffer), {
             data: bool,
             size: serialized.byteLength
         });
-        assert.deepEqual(deserialize(serialized.buffer), {
+        assert.deepStrictEqual(deserialize(serialized.buffer), {
             data: bool,
             size: serialized.byteLength
         });
@@ -102,13 +102,13 @@ suite("serialization - unit", () => {
             ...new TextEncoder().encode(str)
         ]);
 
-        assert.deepEqual(serializeString(str), serialized);
-        assert.deepEqual(serialize(str), serialized);
-        assert.deepEqual(deserializeString(serialized.buffer), {
+        assert.deepStrictEqual(serializeString(str), serialized);
+        assert.deepStrictEqual(serialize(str), serialized);
+        assert.deepStrictEqual(deserializeString(serialized.buffer), {
             data: str,
             size: serialized.byteLength
         });
-        assert.deepEqual(deserialize(serialized.buffer), {
+        assert.deepStrictEqual(deserialize(serialized.buffer), {
             data: str,
             size: serialized.byteLength
         });
@@ -125,13 +125,13 @@ suite("serialization - unit", () => {
         const num = 1;
         const serialized = new Uint8Array([NUMBER, 63, 240, 0, 0, 0, 0, 0, 0]);
 
-        assert.deepEqual(serializeNumber(num), serialized);
-        assert.deepEqual(serialize(num), serialized);
-        assert.deepEqual(deserializeNumber(serialized.buffer), {
+        assert.deepStrictEqual(serializeNumber(num), serialized);
+        assert.deepStrictEqual(serialize(num), serialized);
+        assert.deepStrictEqual(deserializeNumber(serialized.buffer), {
             data: num,
             size: serialized.byteLength
         });
-        assert.deepEqual(deserialize(serialized.buffer), {
+        assert.deepStrictEqual(deserialize(serialized.buffer), {
             data: num,
             size: serialized.byteLength
         });
@@ -152,13 +152,13 @@ suite("serialization - unit", () => {
             ...arr
         ]);
 
-        assert.deepEqual(serializeBuffer(arr), serialized);
-        assert.deepEqual(serialize(arr), serialized);
-        assert.deepEqual(deserializeBuffer(serialized.buffer), {
+        assert.deepStrictEqual(serializeBuffer(arr), serialized);
+        assert.deepStrictEqual(serialize(arr), serialized);
+        assert.deepStrictEqual(deserializeBuffer(serialized.buffer), {
             data: arr,
             size: serialized.byteLength
         });
-        assert.deepEqual(deserialize(serialized.buffer), {
+        assert.deepStrictEqual(deserialize(serialized.buffer), {
             data: arr,
             size: serialized.byteLength
         });
@@ -184,13 +184,13 @@ suite("serialization - unit", () => {
             ...new TextEncoder().encode(JSON.stringify(obj))
         ]);
 
-        assert.deepEqual(serializeObject(obj), serialized);
-        assert.deepEqual(serialize(obj), serialized);
-        assert.deepEqual(deserializeObject(serialized.buffer), {
+        assert.deepStrictEqual(serializeObject(obj), serialized);
+        assert.deepStrictEqual(serialize(obj), serialized);
+        assert.deepStrictEqual(deserializeObject(serialized.buffer), {
             data: obj,
             size: serialized.byteLength
         });
-        assert.deepEqual(deserialize(serialized.buffer), {
+        assert.deepStrictEqual(deserialize(serialized.buffer), {
             data: obj,
             size: serialized.byteLength
         });
@@ -213,36 +213,36 @@ suite("serialization - unit", () => {
             ...new TextEncoder().encode(JSON.stringify(arr))
         ]);
 
-        assert.deepEqual(serializeObject(arr), serialized);
-        assert.deepEqual(serialize(arr), serialized);
-        assert.deepEqual(deserializeObject(serialized.buffer), {
+        assert.deepStrictEqual(serializeObject(arr), serialized);
+        assert.deepStrictEqual(serialize(arr), serialized);
+        assert.deepStrictEqual(deserializeObject(serialized.buffer), {
             data: arr,
             size: serialized.byteLength
         });
-        assert.deepEqual(deserialize(serialized.buffer), {
+        assert.deepStrictEqual(deserialize(serialized.buffer), {
             data: arr,
             size: serialized.byteLength
         });
     });
 
     test("data type switch", () => {
-        assert.deepEqual(dataTypeSwitch(undefined), UNDEFINED);
-        assert.deepEqual(dataTypeSwitch(false), BOOLEAN);
-        assert.deepEqual(dataTypeSwitch(""), STRING);
-        assert.deepEqual(dataTypeSwitch(0), NUMBER);
-        assert.deepEqual(dataTypeSwitch(new Uint8Array()), BUFFER);
-        assert.deepEqual(dataTypeSwitch({}), OBJECT);
-        assert.deepEqual(dataTypeSwitch([]), OBJECT);
-        assert.deepEqual(dataTypeSwitch(new ArrayBuffer()), null);
+        assert.deepStrictEqual(dataTypeSwitch(undefined), UNDEFINED);
+        assert.deepStrictEqual(dataTypeSwitch(false), BOOLEAN);
+        assert.deepStrictEqual(dataTypeSwitch(""), STRING);
+        assert.deepStrictEqual(dataTypeSwitch(0), NUMBER);
+        assert.deepStrictEqual(dataTypeSwitch(new Uint8Array()), BUFFER);
+        assert.deepStrictEqual(dataTypeSwitch({}), OBJECT);
+        assert.deepStrictEqual(dataTypeSwitch([]), OBJECT);
+        assert.deepStrictEqual(dataTypeSwitch(new ArrayBuffer()), null);
     });
 
     test("merge uint8arrays", () => {
-        assert.deepEqual(mergeUint8Arrays(), new Uint8Array());
-        assert.deepEqual(
+        assert.deepStrictEqual(mergeUint8Arrays(), new Uint8Array());
+        assert.deepStrictEqual(
             mergeUint8Arrays(new Uint8Array([0])),
             new Uint8Array([0])
         );
-        assert.deepEqual(
+        assert.deepStrictEqual(
             mergeUint8Arrays(new Uint8Array([0]), new Uint8Array([0])),
             new Uint8Array([0, 0])
         );
@@ -250,7 +250,7 @@ suite("serialization - unit", () => {
     });
 
     test("get slice of size from buffer", () => {
-        assert.deepEqual(
+        assert.deepStrictEqual(
             getBufferSliceFromSizeData(new Uint8Array([0, 0, 0, 1, 1]).buffer),
             {
                 slice: new Uint8Array([1]).buffer,
@@ -258,7 +258,7 @@ suite("serialization - unit", () => {
             }
         );
 
-        assert.deepEqual(
+        assert.deepStrictEqual(
             getBufferSliceFromSizeData(new Uint8Array([0, 0, 0, 0, 1]).buffer),
             {
                 slice: new Uint8Array().buffer,

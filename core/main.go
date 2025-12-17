@@ -4,9 +4,9 @@ package main
 #include <stdlib.h>
 #include <string.h>
 
-typedef void (*Callback)(char *projectId, char* type, void *msg, int msgLength);
-static inline void CallMyFunction(void *callback, char *projectId, char * type, void *msg, int msgLength) {
-    ((Callback)callback)(projectId, type, msg, msgLength);
+typedef void (*Callback)(uint8_t ctx, uint8_t id, int size);
+static inline void CallMyFunction(void *callback, uint8_t ctx, uint8_t id, int size) {
+    ((Callback)callback)(ctx, id, size);
 }
 
 static inline void write_bytes_array(void *data, int size, void *ptr) {
@@ -18,6 +18,7 @@ import "C"
 import (
 	"fmt"
 	"fullstackedorg/fullstacked/internal/router"
+	"fullstackedorg/fullstacked/internal/store"
 	"unsafe"
 )
 
@@ -27,7 +28,7 @@ func main() {}
 func start(
 	directory *C.char,
 ) C.uint8_t {
-	id := router.NewContext(C.GoString(directory))
+	id := store.NewContext(C.GoString(directory))
 	return C.uint8_t(id)
 }
 
@@ -35,12 +36,21 @@ var cCallback = (unsafe.Pointer)(nil)
 
 //export callback
 func callback(cb unsafe.Pointer) {
+	cCallback = cb
 
+	store.Callback = func(ctx uint8, id uint8, size int) {
+		C.CallMyFunction(
+			cCallback,
+			C.uint8_t(ctx),
+			C.uint8_t(id),
+			C.int(size),
+		)
+	}
 }
 
 //export getResponse
 func getResponse(ctx C.uint8_t, id C.uint8_t, ptr unsafe.Pointer) {
-	response, err := router.GetCoreResponse(uint8(ctx), uint8(id))
+	response, err := store.GetCoreResponse(uint8(ctx), uint8(id), false)
 
 	if err != nil {
 		fmt.Println(err.Error())

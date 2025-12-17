@@ -20,11 +20,14 @@ suite("fetch - e2e", () => {
     test("head", async () => {
         const responseNode = await fetch("http://localhost:9000");
         const responseGo = await goFetch("http://localhost:9000");
-        assert.deepEqual(responseGo.ok, responseGo.ok)
-        assert.ok(!!responseNode.headers.get("x-header-test"))
-        assert.deepEqual(responseGo.headers.get("x-header-test"), responseGo.headers.get("x-header-test"))
-        assert.deepEqual(responseGo.status, responseGo.status)
-        assert.deepEqual(responseGo.statusText, responseGo.statusText)
+        assert.deepEqual(responseGo.ok, responseGo.ok);
+        assert.ok(!!responseNode.headers.get("x-header-test"));
+        assert.deepEqual(
+            responseGo.headers.get("x-header-test"),
+            responseGo.headers.get("x-header-test")
+        );
+        assert.deepEqual(responseGo.status, responseGo.status);
+        assert.deepEqual(responseGo.statusText, responseGo.statusText);
     });
 
     after(async () => {

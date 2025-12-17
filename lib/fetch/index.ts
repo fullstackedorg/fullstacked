@@ -12,8 +12,10 @@ function headersToObj(headers: HeadersInit) {
 }
 function objToHeader(headersObj: ResponseHead["Headers"]) {
     const headers = new Headers();
-    if(!headersObj) return headers;
-    Object.entries(headersObj).forEach(([key, values]) => headers.set(key.toLowerCase(), values.at(-1)))
+    if (!headersObj) return headers;
+    Object.entries(headersObj).forEach(([key, values]) =>
+        headers.set(key.toLowerCase(), values.at(-1))
+    );
     return headers;
 }
 

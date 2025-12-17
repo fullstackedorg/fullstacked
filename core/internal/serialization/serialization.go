@@ -241,7 +241,7 @@ func Serialize(data types.SerializableData) ([]byte, error) {
 	return serialized, err
 }
 
-func MergeBuffers(buffers [][]byte) ([]byte, error) {
+func MergeBuffers(buffers ...[]byte) ([]byte, error) {
 	if buffers == nil {
 		return nil, errors.New("cannot merge nil buffers")
 	}

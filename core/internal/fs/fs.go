@@ -19,11 +19,11 @@ const (
 
 func Switch(
 	ctx *types.CoreCallContext,
-	fn FsFn,
+	header types.CoreCallHeader,
 	data []types.DeserializedData,
 	response *types.CoreCallResponse,
 ) error {
-	switch fn {
+	switch header.Fn {
 	case Exists:
 		response.Type = types.CoreResponseData
 		response.Data = ExistsFn(path.ResolveWithContext(ctx, data[0].Data.(string)))
