@@ -7,10 +7,7 @@
         "skipLibCheck": true,
         "jsx": "react",
         "allowImportingTsExtensions": true,
-        "noEmit": true,
-        "paths": {
-            "*": ["./fullstacked_modules/*"]
-        }
+        "noEmit": true
     },
     "exclude": [
         "demo",

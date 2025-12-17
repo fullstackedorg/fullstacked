@@ -56,7 +56,7 @@ export async function fetch(
     const responseHead: ResponseHead = await bridge({
         mod: Fetch,
         fn: FetchFn,
-        data: [requestHead, requestBody]
+        data: [requestHead, new Uint8Array(requestBody)]
     });
 
     const responseBodyStream = await bridge({
@@ -80,7 +80,10 @@ export async function fetch(
         type: "default",
         ok: responseHead.Status >= 200 && responseHead.Status <= 299,
         status: responseHead.Status,
-        statusText: responseHead.StatusText,
+        statusText: responseHead.StatusText.replace(
+            responseHead.Status.toString(),
+            ""
+        ).trim(),
         bodyUsed: false,
         body: responseBodyStream,
         json: async () => {
