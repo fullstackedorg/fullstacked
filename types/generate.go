@@ -9,7 +9,7 @@ import (
 	"github.com/gzuidhof/tygo/tygo"
 )
 
-var outDir = path.Join("..", "lib", "@types")
+var outDir = path.Join("..", "core", "internal", "bundle", "lib", "@types")
 
 func main() {
 	fmt.Println(types.UNDEFINED)
@@ -20,14 +20,14 @@ func main() {
 
 	mainTypesPackage := tygo.PackageConfig{
 		Path:       "fullstackedorg/fullstacked/types",
-		OutputPath: "../lib/@types/index.ts",
+		OutputPath: path.Join(outDir, "index.ts"),
 	}
 
 	packages := []*tygo.PackageConfig{&mainTypesPackage}
 	for _, m := range modules {
 		p := tygo.PackageConfig{
 			Path:       "fullstackedorg/fullstacked/internal/" + m.Name(),
-			OutputPath: "../lib/@types/" + m.Name() + ".ts",
+			OutputPath: path.Join(outDir, m.Name()+".ts"),
 		}
 		packages = append(packages, &p)
 	}

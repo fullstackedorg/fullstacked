@@ -1,6 +1,6 @@
 import test, { suite } from "node:test";
 import assert from "node:assert";
-import t from "../../lib/test/index.ts";
+import t from "../../core/internal/bundle/lib/test/index.ts";
 import {
     BOOLEAN,
     BUFFER,
@@ -8,7 +8,7 @@ import {
     OBJECT,
     STRING,
     UNDEFINED
-} from "../../lib/@types/index.ts";
+} from "../../core/internal/bundle/lib/@types/index.ts";
 
 suite("serialization - e2e", () => {
     test("hello", () => {

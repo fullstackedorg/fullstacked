@@ -1,8 +1,8 @@
 import test, { after, before, suite } from "node:test";
 import assert from "node:assert";
-import { fetch as goFetch } from "../../lib/fetch/index.ts";
+import { fetch as goFetch } from "../../core/internal/bundle/lib/fetch/index.ts";
 import { Worker } from "node:worker_threads";
-import { mergeUint8Arrays } from "../../lib/bridge/serialization.ts";
+import { mergeUint8Arrays } from "../../core/internal/bundle/lib/bridge/serialization.ts";
 
 function startServer() {
     return new Promise<Worker>((res) => {

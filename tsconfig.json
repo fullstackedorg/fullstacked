@@ -12,7 +12,7 @@
     "exclude": [
         "demo",
         "out",
-        "core",
+        "core/typescript-go",
         "platform/android",
         "platform/apple",
         "platform/docker",

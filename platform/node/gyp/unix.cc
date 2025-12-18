@@ -6,6 +6,7 @@ CoreLib loadLibrary(std::string libPath) {
 
     CoreLib lib = {
         (Start)(dlsym(coreLib, "start")),
+        (Stop)(dlsym(coreLib, "stop")),
         (Callback)(dlsym(coreLib, "callback")),
         (Call)(dlsym(coreLib, "call")),
         (GetResponse)(dlsym(coreLib, "getResponse")),

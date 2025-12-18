@@ -20,7 +20,7 @@ import {
     serializeString,
     serializeUndefined,
     uint4BytesToNumber
-} from "../../lib/bridge/serialization.ts";
+} from "../../core/internal/bundle/lib/bridge/serialization.ts";
 import {
     BOOLEAN,
     BUFFER,
@@ -29,7 +29,7 @@ import {
     OBJECT,
     STRING,
     UNDEFINED
-} from "../../lib/@types/index.ts";
+} from "../../core/internal/bundle/lib/@types/index.ts";
 
 suite("serialization - unit", () => {
     test("number / uint 4 bytes", () => {

@@ -5,6 +5,7 @@ import (
 	"fullstackedorg/fullstacked/internal/bundle"
 	"fullstackedorg/fullstacked/internal/fetch"
 	"fullstackedorg/fullstacked/internal/fs"
+	"fullstackedorg/fullstacked/internal/os"
 	"fullstackedorg/fullstacked/internal/path"
 	"fullstackedorg/fullstacked/internal/serialization"
 	"fullstackedorg/fullstacked/internal/store"
@@ -75,6 +76,7 @@ var modules = map[types.CoreModule]types.ModuleSwitch{
 	types.Core:   Switch,
 	types.Path:   path.Switch,
 	types.Fs:     fs.Switch,
+	types.Os:     os.Switch,
 	types.Fetch:  fetch.Switch,
 	types.Bundle: bundle.Switch,
 	types.Test:   test.Switch,

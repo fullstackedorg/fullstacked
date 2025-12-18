@@ -1,7 +1,14 @@
-import "./init.ts";
-import "./serialization/index.ts";
-import "./path/index.ts";
-import "./fetch/index.ts";
-import "./fs/index.ts";
-import "./stream/index.ts";
-import "./bundle/index.ts";
+import init from "./init.ts";
+import { after, before } from "node:test";
+
+before(init.before);
+
+await import("./serialization/index.ts");
+await import("./path/index.ts");
+await import("./os/index.ts");
+await import("./fetch/index.ts");
+await import("./fs/index.ts");
+await import("./stream/index.ts");
+await import("./bundle/index.ts");
+
+after(init.after);

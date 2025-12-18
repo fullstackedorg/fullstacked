@@ -19,6 +19,11 @@ Napi::Number N_Start(const Napi::CallbackInfo &info) {
                              lib.start((char *)directory.Utf8Value().c_str()));
 }
 
+void N_Stop(const Napi::CallbackInfo &info) {
+    uint32_t ctxId = info[0].As<Napi::Number>().Uint32Value();
+    lib.stop(static_cast<uint8_t>(ctxId));
+}
+
 struct CallbackChunk {
         uint8_t ctx;
         uint8_t id;
@@ -92,6 +97,9 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
 
     exports.Set(Napi::String::New(env, "start"),
                 Napi::Function::New(env, N_Start));
+
+    exports.Set(Napi::String::New(env, "stop"),
+                Napi::Function::New(env, N_Stop));
 
     exports.Set(Napi::String::New(env, "callback"),
                 Napi::Function::New(env, N_Callback));

@@ -1,6 +1,6 @@
 import test, { suite } from "node:test";
-import t from "../../lib/test/index.ts";
-import { mergeUint8Arrays } from "../../lib/bridge/serialization.ts";
+import t from "../../core/internal/bundle/lib/test/index.ts";
+import { mergeUint8Arrays } from "../../core/internal/bundle/lib/bridge/serialization.ts";
 import assert from "node:assert";
 
 suite("stream - e2e", () => {

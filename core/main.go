@@ -32,6 +32,13 @@ func start(
 	return C.uint8_t(id)
 }
 
+//export stop
+func stop(
+	ctxId C.uint8_t,
+) {
+	delete(store.Contexts, uint8(ctxId))
+}
+
 var cCallback = (unsafe.Pointer)(nil)
 
 //export callback

@@ -1,6 +1,6 @@
 import test, { suite } from "node:test";
 import assert from "node:assert";
-import * as fs from "../../lib/fs/index.ts";
+import * as fs from "../../core/internal/bundle/lib/fs/index.ts";
 import * as nodeFs from "node:fs";
 
 suite("fs - e2e", () => {

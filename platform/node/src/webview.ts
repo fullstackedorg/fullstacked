@@ -1,14 +1,15 @@
-import http from "http";
-import net from "net";
+import http from "node:http";
+import net from "node:net";
+// import { Duplex } from "node:stream";
 import open from "open";
-import { Duplex } from "stream";
-import { WebSocket, WebSocketServer } from "ws";
+// import { WebSocket, WebSocketServer } from "ws";
 import { createInstance } from "./instance";
 import { platform, getEnvVar } from ".";
 import {
     deserializeArgs,
     numberTo4Bytes
 } from "../../../fullstacked_modules/bridge/serialization";
+import { Core } from "./core";
 
 type Instance = ReturnType<typeof createInstance>;
 
@@ -20,66 +21,64 @@ if (!mainPort || isNaN(mainPort)) {
 const te = new TextEncoder();
 
 export async function createWebView(
-    instance: Instance,
-    onClose?: () => void,
-    onFirstConnection?: () => void
+    core: Core,
+    directory: string,
+    openBrowser = false
 ) {
+    const ctx = core.start(directory);
     const port = await getNextAvailablePort(mainPort);
-    const server = http.createServer(createHandler(instance));
+    const server = http.createServer(createHandler(ctx));
 
     const close = () => {
-        if (onClose) {
-            onClose();
-            server.close();
-        }
+        core.stop(ctx);
+        server.close();
     };
 
-    let closeTimeout: ReturnType<typeof setTimeout>,
-        connectedOnce = false,
-        messagesQueue: [string, string][] = [];
-    const onSocketOpen = () => {
-        if (!connectedOnce) {
-            connectedOnce = true;
-            messagesQueue.forEach(send);
-            messagesQueue = [];
-            onFirstConnection?.();
-        }
-        if (!closeTimeout) return;
-        clearTimeout(closeTimeout);
-        closeTimeout = null;
-    };
-    const onSocketClose = () => {
-        if (webSockets.size !== 0) return;
-        closeTimeout = setTimeout(close, 2000);
-    };
-    const webSockets = createWebSocketServer(server, {
-        onSocketOpen,
-        onSocketClose
-    });
-    const send = (m: [string, string]) => {
-        const jsonStr = JSON.stringify(m);
-        webSockets.forEach((ws) => ws.send(jsonStr));
-    };
+    // let closeTimeout: ReturnType<typeof setTimeout>,
+    //     connectedOnce = false,
+    //     messagesQueue: [string, string][] = [];
+    // const onSocketOpen = () => {
+    //     if (!connectedOnce) {
+    //         connectedOnce = true;
+    //         messagesQueue.forEach(send);
+    //         messagesQueue = [];
+    //     }
+    //     if (!closeTimeout) return;
+    //     clearTimeout(closeTimeout);
+    //     closeTimeout = null;
+    // };
+    // const onSocketClose = () => {
+    //     if (webSockets.size !== 0) return;
+    //     closeTimeout = setTimeout(close, 2000);
+    // };
+    // const webSockets = createWebSocketServer(server, {
+    //     onSocketOpen,
+    //     onSocketClose
+    // });
+    // const send = (m: [string, string]) => {
+    //     const jsonStr = JSON.stringify(m);
+    //     webSockets.forEach((ws) => ws.send(jsonStr));
+    // };
+
     server.listen(port);
-    if (!process.env.NO_OPEN) {
-        let url = `http://localhost:${port}`;
-        if (process.argv.includes("--debug")) {
-            url += "?debug";
-        }
-        open(url);
+
+    if (openBrowser) {
+        open(`http://localhost:${port}`);
     }
+
     return {
-        message: (type: string, message: string) => {
-            if (!connectedOnce) {
-                messagesQueue.push([type, message]);
-            } else {
-                send([type, message]);
-            }
-        }
+        close
+        // message: (type: string, message: string) => {
+        //     if (!connectedOnce) {
+        //         messagesQueue.push([type, message]);
+        //     } else {
+        //         send([type, message]);
+        //     }
+        // }
     };
 }
 
-function createHandler(instance: Instance) {
+function createHandler(ctx: number) {
     return async (req: http.IncomingMessage, res: http.ServerResponse) => {
         let [pathname] = req.url.split("?");
         pathname = decodeURI(pathname);
@@ -219,28 +218,28 @@ function getNextAvailablePort(
     });
 }
 
-function createWebSocketServer(
-    server: http.Server,
-    cb: {
-        onSocketOpen: () => void;
-        onSocketClose: () => void;
-    }
-) {
-    const webSockets = new Set<WebSocket>();
-    const wss = new WebSocketServer({ noServer: true });
-    const onClose = (ws: WebSocket) => {
-        webSockets.delete(ws);
-        cb.onSocketClose();
-    };
-    const handleUpgrade = (ws: WebSocket) => {
-        webSockets.add(ws);
-        cb.onSocketOpen();
+// function createWebSocketServer(
+//     server: http.Server,
+//     cb: {
+//         onSocketOpen: () => void;
+//         onSocketClose: () => void;
+//     }
+// ) {
+//     const webSockets = new Set<WebSocket>();
+//     const wss = new WebSocketServer({ noServer: true });
+//     const onClose = (ws: WebSocket) => {
+//         webSockets.delete(ws);
+//         cb.onSocketClose();
+//     };
+//     const handleUpgrade = (ws: WebSocket) => {
+//         webSockets.add(ws);
+//         cb.onSocketOpen();
 
-        ws.on("close", () => onClose(ws));
-    };
-    const onUpgrade = (...args: [InstanceType<any>, Duplex, Buffer]) => {
-        wss.handleUpgrade(...args, handleUpgrade);
-    };
-    server.on("upgrade", onUpgrade);
-    return webSockets;
-}
+//         ws.on("close", () => onClose(ws));
+//     };
+//     const onUpgrade = (...args: [InstanceType<any>, Duplex, Buffer]) => {
+//         wss.handleUpgrade(...args, handleUpgrade);
+//     };
+//     server.on("upgrade", onUpgrade);
+//     return webSockets;
+// }
