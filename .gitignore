@@ -7,5 +7,5 @@ out
 .vscode
 ./build.js
 fullstacked_modules/@types
-lib/@types
+core/internal/bundle/lib/@types
 **/*/_*.js
