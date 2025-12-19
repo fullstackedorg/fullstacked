@@ -37,8 +37,4 @@ suite("bundle - e2e", () => {
         assert.deepEqual(errorsAndWarnings.Warnings, null);
         assert.ok(fs.existsSync("test/bundle/sample/_index.ts.js"));
     });
-
-    after(() => {
-        cleanupBundledFiles();
-    });
 });

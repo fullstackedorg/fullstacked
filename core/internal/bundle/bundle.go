@@ -15,6 +15,13 @@ import (
 //go:embed lib
 var lib embed.FS
 
+var libModules = map[string]string{
+	"fs": "/lib/fs/index.ts",
+}
+
+// https://github.com/evanw/esbuild/blob/main/pkg/api/api_impl.go#L502
+var BundleExtensions = []string{".tsx", ".ts", ".jsx", ".js"}
+
 type PlatformBundle = float64
 
 const (
@@ -28,8 +35,8 @@ const (
 	Electron = 7
 )
 
-var libModules = map[string]string{
-	"fs": "/lib/fs/index.ts",
+var platformBridge = map[PlatformBundle]string{
+	Node: "/lib/bridge/platform/node.ts",
 }
 
 type BundleFn = uint8
@@ -120,9 +127,25 @@ func BundleFnApply(platform PlatformBundle, entryPoints []string) EsbuildErrorsA
 
 					// resolve relative import in lib modules
 					build.OnResolve(esbuild.OnResolveOptions{Filter: ".*", Namespace: "lib"}, func(args esbuild.OnResolveArgs) (esbuild.OnResolveResult, error) {
+						Path := path.Join(args.ResolveDir, args.Path)
+						Errors := []esbuild.Message{}
+						if Path == "/lib/bridge/platform/index.ts" {
+							bridge, hasPlatform := platformBridge[platform]
+							if !hasPlatform {
+								Errors = append(Errors, esbuild.Message{
+									Notes: []esbuild.Note{
+										{
+											Text: "unknown platform bridge",
+										},
+									},
+								})
+							}
+							Path = bridge
+						}
 						return esbuild.OnResolveResult{
-							Path:      path.Join(args.ResolveDir, args.Path),
+							Path:      Path,
 							Namespace: "lib",
+							Errors:    Errors,
 						}, nil
 					})
 

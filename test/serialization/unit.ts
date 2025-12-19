@@ -3,6 +3,7 @@ import assert from "node:assert";
 import {
     dataTypeSwitch,
     deserialize,
+    deserializeAll,
     deserializeBoolean,
     deserializeBuffer,
     deserializeNumber,
@@ -269,5 +270,19 @@ suite("serialization - unit", () => {
         assert.throws(() =>
             getBufferSliceFromSizeData(new Uint8Array([0, 0, 0, 2, 1]).buffer)
         );
+    });
+
+    test("deserializeAll", () => {
+        const data = [
+            undefined,
+            false,
+            1.1,
+            "test",
+            new Uint8Array([1, 2, 3, 4]),
+            { Foo: "test" }
+        ];
+        const dataSerialized = data.map(serialize);
+        const merged = mergeUint8Arrays(...dataSerialized);
+        assert.deepStrictEqual(deserializeAll(merged.buffer), data);
     });
 });

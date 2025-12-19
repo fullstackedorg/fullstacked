@@ -9,7 +9,6 @@ import {
     STRING,
     UNDEFINED
 } from "../@types/index.ts";
-import { types } from "sass";
 
 /*
 
@@ -302,4 +301,15 @@ export function deserialize(
             return deserializeObject(buffer, index);
     }
     return { data: null, size: 0 };
+}
+
+export function deserializeAll(buffer: ArrayBuffer): SerializableData[] {
+    const data: SerializableData[] = [];
+    let index = 0;
+    while (index < buffer.byteLength) {
+        const deserialized = deserialize(buffer, index);
+        data.push(deserialized.data);
+        index += deserialized.size;
+    }
+    return data;
 }

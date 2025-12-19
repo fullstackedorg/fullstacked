@@ -3,20 +3,25 @@ import net from "node:net";
 // import { Duplex } from "node:stream";
 import open from "open";
 // import { WebSocket, WebSocketServer } from "ws";
-import { createInstance } from "./instance";
-import { platform, getEnvVar } from ".";
+// import { getEnvVar } from ".";
+import type { Core } from "./core.ts";
 import {
-    deserializeArgs,
-    numberTo4Bytes
-} from "../../../fullstacked_modules/bridge/serialization";
-import { Core } from "./core";
+    deserialize,
+    deserializeAll,
+    numberToUint4Bytes
+} from "../../../core/internal/bundle/lib/bridge/serialization.ts";
+import {
+    Core as CoreModule,
+    STRING
+} from "../../../core/internal/bundle/lib/@types/index.ts";
+import { StaticFile } from "../../../core/internal/bundle/lib/@types/router.ts";
+import { fromByteArray } from "../../../core/internal/bundle/lib/bridge/base64.ts";
 
-type Instance = ReturnType<typeof createInstance>;
-
-export let mainPort = parseInt(getEnvVar("port"));
-if (!mainPort || isNaN(mainPort)) {
-    mainPort = 9000;
-}
+// export let mainPort = parseInt(getEnvVar("port"));
+// if (!mainPort || isNaN(mainPort)) {
+//     mainPort = 9000;
+// }
+const mainPort = 9000;
 
 const te = new TextEncoder();
 
@@ -27,7 +32,7 @@ export async function createWebView(
 ) {
     const ctx = core.start(directory);
     const port = await getNextAvailablePort(mainPort);
-    const server = http.createServer(createHandler(ctx));
+    const server = http.createServer(createHandler(core, ctx));
 
     const close = () => {
         core.stop(ctx);
@@ -78,67 +83,99 @@ export async function createWebView(
     };
 }
 
-function createHandler(ctx: number) {
+async function coreCall(core: Core, req: http.IncomingMessage) {
+    const payload = await readBody(req);
+    const data = core.call(payload.buffer);
+    return new Uint8Array(data);
+}
+
+function createHandler(core: Core, ctx: number) {
     return async (req: http.IncomingMessage, res: http.ServerResponse) => {
         let [pathname] = req.url.split("?");
         pathname = decodeURI(pathname);
 
-        if (pathname === "/platform") {
+        if (pathname === "/ctx") {
+            const ctxStr = ctx.toString();
             res.writeHead(200, {
                 "content-type": "text/plain",
-                "content-length": platform.length
+                "content-length": ctxStr.length
             });
-            return res.end(platform);
+            return res.end(ctxStr);
         } else if (pathname === "/call") {
-            const payload = await readBody(req);
-            const data = instance.call(payload);
+            const payload = await coreCall(core, req);
             res.writeHead(200, {
                 "content-type": "application/octet-stream",
-                "content-length": data.length,
+                "content-length": payload.byteLength,
                 "cache-control": "no-cache"
             });
-            return res.end(data);
-        }
-
-        // Serve Static File
-
-        const pathnameData = te.encode(pathname);
-
-        const payload = new Uint8Array([
-            1, // Static File Serving
-
-            2, // arg type: STRING
-            ...numberTo4Bytes(pathnameData.length), // arg length
-            ...pathnameData
-        ]);
-        const responseData = instance.call(payload);
-        const [mimeType, data] = deserializeArgs(responseData);
-
-        // not found
-        if (!mimeType) {
-            const body = te.encode("Not Found");
-            res.writeHead(404, {
+            return res.end(payload);
+        } else if (pathname === "/call-sync") {
+            const payload = await coreCall(core, req);
+            const payloadBase64 = fromByteArray(payload);
+            res.writeHead(200, {
                 "content-type": "text/plain",
-                "content-length": body.length,
+                "content-length": payloadBase64.length,
                 "cache-control": "no-cache"
             });
-            return res.end(body);
+            return res.end(payloadBase64);
         }
 
-        res.writeHead(200, {
-            "content-type": mimeType,
-            "content-length": data.length,
-            "cache-control": "no-cache",
-            "cross-origin-opener-policy": "same-origin",
-            "cross-origin-embedder-policy": "require-corp"
+        const staticFile = coreStaticFile(core, ctx, pathname);
+
+        res.writeHead(staticFile.found ? 200 : 400, {
+            "content-type": staticFile.mimeType,
+            "content-length": staticFile.data.byteLength,
+            "cache-control": "no-cache"
         });
-        res.end(data);
+        res.end(staticFile.data);
+    };
+}
+
+export function coreStaticFile(
+    core: Core,
+    ctx: number,
+    pathname: string
+): {
+    found: boolean;
+    mimeType: string;
+    data: Uint8Array;
+} {
+    const pathnameData = te.encode(pathname);
+    const payload = new Uint8Array([
+        ctx,
+        0, // id
+        CoreModule, // Module
+        StaticFile, // Fn
+
+        STRING,
+        ...numberToUint4Bytes(pathnameData.length), // arg length
+        ...pathnameData
+    ]);
+    const responseData = core.call(payload.buffer);
+    const response: { data: Uint8Array<ArrayBuffer> } = deserialize(
+        responseData.slice(1)
+    );
+
+    if (response.data.byteLength === 0) {
+        return {
+            found: false,
+            mimeType: "text/plain",
+            data: te.encode("not found")
+        };
+    }
+
+    const [mimeType, data] = deserializeAll(response.data.buffer);
+
+    return {
+        found: true,
+        mimeType,
+        data
     };
 }
 
 const readBodyQueue: {
     req: http.IncomingMessage;
-    resolve: (body: Uint8Array) => void;
+    resolve: (body: Uint8Array<ArrayBuffer>) => void;
 }[] = [];
 let processingRequestLock = false;
 function processRequests() {
@@ -152,7 +189,7 @@ function processRequests() {
     processingRequestLock = true;
     const { req, resolve } = readBody;
 
-    const end = (body: Uint8Array) => {
+    const end = (body: Uint8Array<ArrayBuffer>) => {
         resolve(body);
         processingRequestLock = false;
         processRequests();
@@ -176,7 +213,7 @@ function processRequests() {
 }
 
 function readBody(req: http.IncomingMessage) {
-    return new Promise<Uint8Array>((resolve) => {
+    return new Promise<Uint8Array<ArrayBuffer>>((resolve) => {
         readBodyQueue.push({ req, resolve });
         processRequests();
     });

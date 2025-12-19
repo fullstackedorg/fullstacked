@@ -3,6 +3,7 @@
 import { bridge } from "../bridge/index.ts";
 import { Exists, GoFileInfo, ReadFile, Stats } from "../@types/fs.ts";
 import { Fs } from "../@types/index.ts";
+import { fromByteArray } from "../bridge/base64.ts";
 
 type PathLike = string | URL | Buffer;
 
@@ -126,6 +127,11 @@ type ReadFileOpts = {
 
 function decodeStringData(data: Uint8Array, options: ReadFileOpts) {
     if (!options?.encoding) return Buffer.from(data);
+
+    if (options.encoding === "base64") {
+        return fromByteArray(data);
+    }
+
     return new TextDecoder(options.encoding).decode(data);
 }
 

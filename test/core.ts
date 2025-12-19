@@ -9,7 +9,10 @@ import { load } from "../platform/node/src/core.ts";
 let core: Awaited<ReturnType<typeof load>>;
 
 export default {
-    before: async () => {
+    get instance() {
+        return core;
+    },
+    start: async () => {
         const currentDirectory = path.dirname(
             url.fileURLToPath(import.meta.url)
         );
@@ -28,13 +31,10 @@ export default {
         core = await load(libDirectory, nodeDirectory, (_, id, buffer) => {
             globalThis.callback(id, buffer);
         });
-        const ctxId = core.start(process.cwd());
-
+        core.start(process.cwd());
         globalThis.bridges = {
             Sync: (payload: ArrayBuffer) => core.call(payload),
             Async: async (payload: ArrayBuffer) => core.call(payload)
         };
-    },
-    // release callback
-    after: () => core.end()
+    }
 };

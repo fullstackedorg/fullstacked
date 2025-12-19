@@ -142,13 +142,13 @@ suite("fs - e2e", () => {
             nodeFs.readFileSync("package.json", { encoding: "utf-8" })
         );
         assert.deepEqual(
-            fs.readFileSync("package.json", { encoding: "utf-16le" }),
-            nodeFs.readFileSync("package.json", { encoding: "utf-16le" })
+            fs.readFileSync("package.json", { encoding: "base64" }),
+            nodeFs.readFileSync("package.json", { encoding: "base64" })
         );
-        // assert.deepEqual(
-        //     fs.readFileSync("package.json", { encoding: "ascii" }),
-        //     nodeFs.readFileSync("package.json", { encoding: "ascii" })
-        // );
+        assert.deepEqual(
+            fs.readFileSync("package.json", { encoding: "ascii" }),
+            nodeFs.readFileSync("package.json", { encoding: "ascii" })
+        );
     });
 
     test("readFile", (_, done) => {

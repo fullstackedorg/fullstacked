@@ -16,7 +16,8 @@ import (
 type CoreFn = uint8
 
 const (
-	OpenStream CoreFn = 0
+	StaticFile CoreFn = 0
+	OpenStream CoreFn = 1
 )
 
 /*
@@ -104,6 +105,10 @@ func Switch(
 	response *types.CoreCallResponse,
 ) error {
 	switch header.Fn {
+	case StaticFile:
+		response.Type = types.CoreResponseData
+		response.Data = staticFile(ctx, data[0].Data.(string))
+		return nil
 	case OpenStream:
 		buffer, err := store.GetCoreResponse(ctx.Id, uint8(data[0].Data.(float64)), true)
 		if err != nil {
