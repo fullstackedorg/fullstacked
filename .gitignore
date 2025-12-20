@@ -9,4 +9,5 @@ out
 fullstacked_modules/@types
 core/internal/bundle/lib/@types
 **/*/_*.js
+**/*/_*.css
 !test/static-file/sample/_index.ts.js

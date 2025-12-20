@@ -166,7 +166,7 @@ func BundleFnApply(platform PlatformBundle, entryPoints []string) EsbuildErrorsA
 
 	if len(result.Errors) == 0 {
 		for _, f := range result.OutputFiles {
-			fs.WrtieFile(f.Path, f.Contents)
+			fs.WriteFileFn(f.Path, f.Contents)
 		}
 	}
 

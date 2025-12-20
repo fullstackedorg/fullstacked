@@ -1,20 +1,13 @@
 import test, { before, after, suite } from "node:test";
 import assert from "node:assert";
 import fs from "node:fs";
-import path from "node:path";
 import * as bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 import { Node } from "../../core/internal/bundle/lib/@types/bundle.ts";
-
-const cleanupBundledFiles = () => {
-    const sampleDir = "test/bundle/sample";
-    fs.readdirSync(sampleDir)
-        .filter((f) => f.startsWith("_"))
-        .forEach((f) => fs.rmSync(path.join(sampleDir, f)));
-};
+import { cleanupBundledFiles } from "./utils.ts";
 
 suite("bundle - e2e", () => {
     before(() => {
-        cleanupBundledFiles();
+        cleanupBundledFiles("test/bundle/samples");
     });
 
     test("esbuild version", async () => {
@@ -28,13 +21,24 @@ suite("bundle - e2e", () => {
         assert.deepEqual(await bundle.esbuildVersion(), esbuildVersionJS);
     });
 
-    test("bundle", async () => {
+    test("bundle - ts", async () => {
         const errorsAndWarnings = await bundle.bundle(
             Node,
-            "test/bundle/sample/index.ts"
+            "test/bundle/samples/basic/index.ts"
         );
         assert.deepEqual(errorsAndWarnings.Errors, null);
         assert.deepEqual(errorsAndWarnings.Warnings, null);
-        assert.ok(fs.existsSync("test/bundle/sample/_index.ts.js"));
+        assert.ok(fs.existsSync("test/bundle/samples/basic/_index.ts.js"));
+    });
+
+    test("bundle - css", async () => {
+        const errorsAndWarnings = await bundle.bundle(
+            Node,
+            "test/bundle/samples/css/index.ts"
+        );
+        assert.deepEqual(errorsAndWarnings.Errors, null);
+        assert.deepEqual(errorsAndWarnings.Warnings, null);
+        assert.ok(fs.existsSync("test/bundle/samples/css/_index.ts.js"));
+        assert.ok(fs.existsSync("test/bundle/samples/css/_index.ts.css"));
     });
 });

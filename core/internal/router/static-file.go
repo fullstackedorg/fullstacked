@@ -23,13 +23,7 @@ func staticFile(ctx *types.CoreCallContext, pathname string) []byte {
 
 	pathname = path.Join(ctx.BaseDirectory, pathname)
 
-	pathname, err := resolveFile(pathname)
-
-	if err != nil {
-		return []byte{}
-	}
-
-	contents, err := fs.ReadFileFn(pathname)
+	pathname, contents, err := resolveFile(pathname)
 
 	if err != nil {
 		return []byte{}
@@ -64,23 +58,35 @@ func staticFile(ctx *types.CoreCallContext, pathname string) []byte {
 	return merged
 }
 
-func resolveFile(pathname string) (string, error) {
+func resolveFile(pathname string) (string, []byte, error) {
 	exists := fs.ExistsFn(pathname)
 	if !exists {
-		return "", errors.New("not existing")
+		if strings.HasSuffix(pathname, "index.html") {
+			html, err := generateIndexHTML(path.Dir(pathname))
+
+			if err != nil {
+				return "", nil, err
+			}
+
+			return pathname, html, nil
+		} else {
+			return "", nil, errors.New("not found")
+		}
 	}
 
 	stats, err := fs.StatsFn(pathname)
 
 	if err != nil {
-		return "", errors.New("failed to stats")
+		return "", nil, err
 	}
 
 	if stats.IsDir {
 		return resolveFile(path.Join(pathname, "index.html"))
 	}
 
-	return resolveBundledFile(pathname), nil
+	pathname = resolveBundledFile(pathname)
+
+	return resolvedFileContents(pathname)
 }
 
 func resolveBundledFile(pathname string) string {
@@ -91,10 +97,19 @@ func resolveBundledFile(pathname string) string {
 	}
 
 	bundlePathname := path.Join(path.Dir(pathname), "_"+path.Base(pathname)+".js")
-
 	if fs.ExistsFn(bundlePathname) {
 		return bundlePathname
 	}
 
 	return pathname
+}
+
+func resolvedFileContents(pathname string) (string, []byte, error) {
+	contents, err := fs.ReadFileFn(pathname)
+
+	if err != nil {
+		return "", nil, err
+	}
+
+	return pathname, contents, nil
 }

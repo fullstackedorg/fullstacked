@@ -1,7 +1,7 @@
 // nodejs source: https://nodejs.org/docs/latest/api/fs.html
 
 import { bridge } from "../bridge/index.ts";
-import { Exists, GoFileInfo, ReadFile, Stats } from "../@types/fs.ts";
+import { Exists, GoFileInfo, ReadDir, ReadFile, Stats } from "../@types/fs.ts";
 import { Fs } from "../@types/index.ts";
 import { fromByteArray } from "../bridge/base64.ts";
 
@@ -186,14 +186,140 @@ export function readFile(
         .catch((e) => cb(e, null));
 }
 
+export interface Dirent {
+    name: string;
+    parentPath: string;
+    // isBlockDevice(): boolean
+    // isCharacterDevice(): boolean
+    isDirectory(): boolean;
+    // isFIFO(): boolean
+    isFile(): boolean;
+    // isSocket(): boolean
+    // isSymbolicLink(): boolean
+}
+
+type ReadDirOpts = {
+    recursive: boolean;
+    withFileTypes: boolean;
+};
+
+function convertGoFileInfo(
+    baseDir: string,
+    items: GoFileInfo[],
+    withFileTypes: boolean
+): Dirent[] | string[] {
+    if (withFileTypes) {
+        return items.map((item) => {
+            const itemNameComponents = item.Name.split("/");
+            const name = itemNameComponents.pop();
+            const parentPath = [baseDir, ...itemNameComponents].join("/");
+            return {
+                name,
+                parentPath,
+                isDirectory: () => item.IsDir,
+                isFile: () => !item.IsDir
+            };
+        }) as Dirent[];
+    }
+
+    return items.map(({ Name }) => Name);
+}
+
+export function readdirSync(
+    path: PathLike,
+    options: { withFileTypes: true; recursive?: boolean }
+): Dirent[];
+export function readdirSync(
+    path: PathLike,
+    options?: { withFileTypes?: false; recursive?: boolean }
+): string[];
+export function readdirSync(
+    path: PathLike,
+    options?: Partial<ReadDirOpts>
+): string[] | Dirent[] {
+    const baseDir = formatPathLike(path);
+    const items: GoFileInfo[] = bridge(
+        {
+            mod: Fs,
+            fn: ReadDir,
+            data: [baseDir, options?.recursive ?? false]
+        },
+        true
+    );
+
+    return convertGoFileInfo(baseDir, items, options?.withFileTypes);
+}
+
+async function readdirPromise(
+    path: PathLike,
+    options: { withFileTypes: true; recursive?: boolean }
+): Promise<Dirent[]>;
+async function readdirPromise(
+    path: PathLike,
+    options?: { withFileTypes?: false; recursive?: boolean }
+): Promise<string[]>;
+async function readdirPromise(
+    path: PathLike,
+    options?: Partial<ReadDirOpts>
+): Promise<string[] | Dirent[]> {
+    const baseDir = formatPathLike(path);
+    const items: GoFileInfo[] = await bridge({
+        mod: Fs,
+        fn: ReadDir,
+        data: [baseDir, options?.recursive ?? false]
+    });
+    return convertGoFileInfo(baseDir, items, options?.withFileTypes);
+}
+
+type ReaddirCallback = (err: Error, items: string[]) => void;
+type ReaddirWithFileTypesCallback = (err: Error, items: Dirent[]) => void;
+
+export function readdir(path: PathLike, callback: ReaddirCallback): void;
+export function readdir(
+    path: PathLike,
+    options: { withFileTypes: true; recursive?: boolean },
+    callback: ReaddirWithFileTypesCallback
+): void;
+export function readdir(
+    path: PathLike,
+    options: { withFileTypes?: false; recursive?: boolean },
+    callback: ReaddirCallback
+): void;
+export function readdir(
+    path: PathLike,
+    options: Partial<ReadDirOpts> | ReaddirCallback,
+    callback?: ReaddirCallback | ReaddirWithFileTypesCallback
+): void {
+    const cb = typeof options === "function" ? options : callback;
+    const opts = typeof options === "function" ? {} : options;
+    const baseDir = formatPathLike(path);
+    bridge({
+        mod: Fs,
+        fn: ReadDir,
+        data: [baseDir, opts?.recursive ?? false]
+    })
+        .then((items: GoFileInfo[]) =>
+            cb(
+                null,
+                convertGoFileInfo(baseDir, items, opts.withFileTypes) as any[]
+            )
+        )
+        .catch((e) => cb(e, null));
+}
+
 export const promises = {
     stat: statPromise,
-    readFile: readFilePromise
+    readFile: readFilePromise,
+    readdir: readdirPromise
 };
 
 export default {
     existsSync,
     statSync,
+    stat,
     readFileSync,
+    readFile,
+    readdirSync,
+
     promises
 };

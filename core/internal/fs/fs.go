@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fullstackedorg/fullstacked/internal/path"
 	"fullstackedorg/fullstacked/types"
+	"io/fs"
 	"os"
+	"path/filepath"
 
 	"github.com/djherbis/times"
 )
@@ -15,6 +17,7 @@ const (
 	Exists   FsFn = 0
 	Stats    FsFn = 1
 	ReadFile FsFn = 2
+	ReadDir  FsFn = 3
 )
 
 func Switch(
@@ -43,6 +46,21 @@ func Switch(
 		}
 		response.Type = types.CoreResponseData
 		response.Data = contents
+		return nil
+	case ReadDir:
+		recursive := data[1].Data.(bool)
+		items := (any)(nil)
+		err := (error)(nil)
+		if recursive {
+			items, err = ReadDirFnRecursive(path.ResolveWithContext(ctx, data[0].Data.(string)))
+		} else {
+			items, err = ReadDirFn(path.ResolveWithContext(ctx, data[0].Data.(string)))
+		}
+		if err != nil {
+			return err
+		}
+		response.Data = items
+		response.Type = types.CoreResponseData
 		return nil
 	}
 
@@ -115,6 +133,50 @@ func ReadFileFn(p string) ([]byte, error) {
 	return os.ReadFile(p)
 }
 
-func WrtieFile(p string, data []byte) error {
+func WriteFileFn(p string, data []byte) error {
 	return os.WriteFile(p, data, 0644)
+}
+
+func ReadDirFn(p string) ([]GoFileInfo, error) {
+	items := []GoFileInfo{}
+
+	entries, err := os.ReadDir(p)
+
+	if err != nil {
+		return items, err
+	}
+
+	for _, item := range entries {
+		items = append(items, GoFileInfo{
+			Name:  item.Name(),
+			IsDir: item.IsDir(),
+		})
+	}
+
+	return items, nil
+}
+
+func ReadDirFnRecursive(p string) ([]GoFileInfo, error) {
+	items := []GoFileInfo{}
+
+	err := filepath.WalkDir(p, func(itemPath string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		name, _ := filepath.Rel(p, itemPath)
+
+		if name == "." {
+			return nil
+		}
+
+		items = append(items, GoFileInfo{
+			Name:  name,
+			IsDir: d.IsDir(),
+		})
+
+		return nil
+	})
+
+	return items, err
 }
