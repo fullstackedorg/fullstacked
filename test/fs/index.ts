@@ -2,8 +2,6 @@ import test, { suite } from "node:test";
 import assert from "node:assert";
 import * as fs from "../../core/internal/bundle/lib/fs/index.ts";
 import * as nodeFs from "node:fs";
-import node from "../../core/internal/bundle/lib/bridge/platform/node.ts";
-import { sort } from "semver";
 
 suite("fs - e2e", () => {
     test("existsSync", () => {
@@ -155,7 +153,7 @@ suite("fs - e2e", () => {
 
     test("readFile", (_, done) => {
         fs.readFile("package.json", (_, data) => {
-            nodeFs.readFile("package.json", (err, nodeData) => {
+            nodeFs.readFile("package.json", (_, nodeData) => {
                 try {
                     assert.deepEqual(data, nodeData);
                     done();

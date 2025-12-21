@@ -2,6 +2,24 @@ import { toByteArray } from "../base64.ts";
 
 const ctx = await (await fetch("/ctx")).json();
 
+const webSockerUrl = new URL(window.location.href);
+webSockerUrl.protocol = webSockerUrl.protocol === "https:" ? "wss:" : "ws:";
+
+function webSocketForCallback() {
+    return new Promise((res) => {
+        const ws = new WebSocket(webSockerUrl);
+        ws.binaryType = "arraybuffer";
+        ws.onmessage = (e: { data: ArrayBuffer }) => {
+            globalThis.callback(
+                new DataView(e.data).getUint8(0),
+                e.data.slice(1)
+            );
+        };
+        ws.onopen = res;
+    });
+}
+await webSocketForCallback();
+
 function Sync(payload: ArrayBuffer) {
     const xmlHttpRequest = new XMLHttpRequest();
     xmlHttpRequest.open("POST", "/call-sync", false);

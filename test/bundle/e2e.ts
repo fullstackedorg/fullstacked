@@ -1,15 +1,10 @@
-import test, { before, after, suite } from "node:test";
+import test, { suite } from "node:test";
 import assert from "node:assert";
 import fs from "node:fs";
 import * as bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 import { Node } from "../../core/internal/bundle/lib/@types/bundle.ts";
-import { cleanupBundledFiles } from "./utils.ts";
 
 suite("bundle - e2e", () => {
-    before(() => {
-        cleanupBundledFiles("test/bundle/samples");
-    });
-
     test("esbuild version", async () => {
         const packageJson = JSON.parse(
             await fs.promises.readFile("package.json", { encoding: "utf-8" })

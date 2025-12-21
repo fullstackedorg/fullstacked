@@ -8,9 +8,9 @@ await import("./path/index.ts");
 await import("./os/index.ts");
 await import("./fetch/index.ts");
 await import("./fs/index.ts");
-await import("./stream/index.ts");
 await import("./static-file/index.ts");
 await import("./bundle/index.ts");
+await import("./stream/index.ts");
 
 // hangs if C++ callback not released
 after(core.instance.end);

@@ -1,8 +1,8 @@
 import http from "node:http";
 import net from "node:net";
-// import { Duplex } from "node:stream";
+import { Duplex } from "node:stream";
 import open from "open";
-// import { WebSocket, WebSocketServer } from "ws";
+import { WebSocket, WebSocketServer } from "ws";
 // import { getEnvVar } from ".";
 import type { Core } from "./core.ts";
 import {
@@ -39,31 +39,13 @@ export async function createWebView(
         server.close();
     };
 
-    // let closeTimeout: ReturnType<typeof setTimeout>,
-    //     connectedOnce = false,
-    //     messagesQueue: [string, string][] = [];
-    // const onSocketOpen = () => {
-    //     if (!connectedOnce) {
-    //         connectedOnce = true;
-    //         messagesQueue.forEach(send);
-    //         messagesQueue = [];
-    //     }
-    //     if (!closeTimeout) return;
-    //     clearTimeout(closeTimeout);
-    //     closeTimeout = null;
-    // };
-    // const onSocketClose = () => {
-    //     if (webSockets.size !== 0) return;
-    //     closeTimeout = setTimeout(close, 2000);
-    // };
-    // const webSockets = createWebSocketServer(server, {
-    //     onSocketOpen,
-    //     onSocketClose
-    // });
-    // const send = (m: [string, string]) => {
-    //     const jsonStr = JSON.stringify(m);
-    //     webSockets.forEach((ws) => ws.send(jsonStr));
-    // };
+    const webSockets = createWebSocketServer(server);
+    const callback = (id: number, buffer: ArrayBuffer) => {
+        const payload = new Uint8Array(buffer.byteLength + 1);
+        payload[0] = id;
+        payload.set(new Uint8Array(buffer), 1);
+        webSockets.forEach((ws) => ws.send(payload));
+    };
 
     server.listen(port);
 
@@ -72,14 +54,9 @@ export async function createWebView(
     }
 
     return {
-        close
-        // message: (type: string, message: string) => {
-        //     if (!connectedOnce) {
-        //         messagesQueue.push([type, message]);
-        //     } else {
-        //         send([type, message]);
-        //     }
-        // }
+        close,
+        port,
+        callback
     };
 }
 
@@ -255,28 +232,20 @@ function getNextAvailablePort(
     });
 }
 
-// function createWebSocketServer(
-//     server: http.Server,
-//     cb: {
-//         onSocketOpen: () => void;
-//         onSocketClose: () => void;
-//     }
-// ) {
-//     const webSockets = new Set<WebSocket>();
-//     const wss = new WebSocketServer({ noServer: true });
-//     const onClose = (ws: WebSocket) => {
-//         webSockets.delete(ws);
-//         cb.onSocketClose();
-//     };
-//     const handleUpgrade = (ws: WebSocket) => {
-//         webSockets.add(ws);
-//         cb.onSocketOpen();
+function createWebSocketServer(server: http.Server) {
+    const webSockets = new Set<WebSocket>();
+    const wss = new WebSocketServer({ noServer: true });
+    const onClose = (ws: WebSocket) => {
+        webSockets.delete(ws);
+    };
+    const handleUpgrade = (ws: WebSocket) => {
+        webSockets.add(ws);
 
-//         ws.on("close", () => onClose(ws));
-//     };
-//     const onUpgrade = (...args: [InstanceType<any>, Duplex, Buffer]) => {
-//         wss.handleUpgrade(...args, handleUpgrade);
-//     };
-//     server.on("upgrade", onUpgrade);
-//     return webSockets;
-// }
+        ws.on("close", () => onClose(ws));
+    };
+    const onUpgrade = (...args: [InstanceType<any>, Duplex, Buffer]) => {
+        wss.handleUpgrade(...args, handleUpgrade);
+    };
+    server.on("upgrade", onUpgrade);
+    return webSockets;
+}

@@ -1,28 +1,22 @@
 import { after, before, suite, test } from "node:test";
-import { createWebView } from "../../platform/node/src/webview.ts";
-import core from "../core.ts";
-import { createBrowser } from "../browser.ts";
+import { Browser, createBrowser } from "../browser.ts";
 import * as bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 import { Node } from "../../core/internal/bundle/lib/@types/bundle.ts";
 import assert from "node:assert";
 import fs from "node:fs";
-import { cleanupBundledFiles, getPixelColorRGB } from "./utils.ts";
 
 suite("bundle - integration", () => {
-    let webview: Awaited<ReturnType<typeof createWebView>>,
-        browser: Awaited<ReturnType<typeof createBrowser>>,
-        page: Awaited<ReturnType<(typeof browser)["createPage"]>>;
+    let browser: Browser;
 
     before(async () => {
-        cleanupBundledFiles("test/bundle/samples");
-        webview = await createWebView(core.instance, "test/bundle/samples");
-        browser = await createBrowser();
-        page = await browser.createPage();
+        browser = await createBrowser("test/bundle/samples");
     });
 
     test("basic (fs)", async () => {
         await bundle.bundle(Node, "test/bundle/samples/basic/index.ts");
-        await page.page.goto("http://localhost:9000/basic/");
+        const page = await browser.createPage(
+            `http://localhost:${browser.webview.port}/basic/`
+        );
         const text = await page.getTextContent("pre");
         assert.deepEqual(
             text,
@@ -30,22 +24,23 @@ suite("bundle - integration", () => {
                 encoding: "utf-8"
             })
         );
+        await page.page.close();
     });
 
     test("css", async () => {
         await bundle.bundle(Node, "test/bundle/samples/css/index.ts");
-        await page.page.goto("http://localhost:9000/css/");
+        const page = await browser.createPage(
+            `http://localhost:${browser.webview.port}/css/`
+        );
         assert.deepEqual(
-            await getPixelColorRGB(page.page, {
+            await page.getPixelColorRGB({
                 x: 0,
                 y: 0
             }),
             [255, 0, 0]
         );
+        await page.page.close();
     });
 
-    after(() => {
-        webview.close();
-        return browser.browser.close();
-    });
+    after(() => browser.end());
 });

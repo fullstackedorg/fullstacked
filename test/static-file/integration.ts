@@ -1,33 +1,28 @@
 import test, { before, suite, after } from "node:test";
-import { createBrowser } from "../browser.ts";
-import { createWebView } from "../../platform/node/src/webview.ts";
-import core from "../core.ts";
+import { Browser, createBrowser } from "../browser.ts";
 import assert from "node:assert";
 import { HTTPResponse } from "puppeteer";
 import fs from "../../core/internal/bundle/lib/fs/index.ts";
 
 suite("static-file - integration", () => {
-    let webview: Awaited<ReturnType<typeof createWebView>>,
-        browser: Awaited<ReturnType<typeof createBrowser>>,
-        page: Awaited<ReturnType<(typeof browser)["createPage"]>>;
+    let browser: Browser;
 
     before(async () => {
-        webview = await createWebView(core.instance, "test/static-file/sample");
-
-        browser = await createBrowser();
-        page = await browser.createPage();
+        browser = await createBrowser("test/static-file/sample");
     });
 
     test("index.html", async () => {
-        await page.page.goto("http://localhost:9000");
+        const page = await browser.createPage();
         const title = await page.getTextContent("title");
         const bodyH1 = await page.getTextContent("h1");
         assert.deepEqual(title.toString(), "Test");
         assert.deepEqual(bodyH1.toString(), "Test");
+        await page.page.close();
     });
 
     test("script", { timeout: 10000000 }, async () => {
-        const scriptContent = await new Promise<Uint8Array>((resolve) => {
+        const scriptContent = await new Promise<Uint8Array>(async (resolve) => {
+            const page = await browser.createPage(null);
             const resCb = async (res: HTTPResponse) => {
                 if (res.url().endsWith("/index.ts")) {
                     resolve(await res.content());
@@ -36,7 +31,7 @@ suite("static-file - integration", () => {
             };
 
             page.page.on("response", resCb);
-            page.page.goto("http://localhost:9000/script");
+            page.page.goto(`http://localhost:${browser.webview.port}/script/`);
         });
 
         assert.deepEqual(
@@ -45,8 +40,5 @@ suite("static-file - integration", () => {
         );
     });
 
-    after(() => {
-        webview.close();
-        return browser.browser.close();
-    });
+    after(() => browser.end());
 });

@@ -16,7 +16,8 @@ import (
 var lib embed.FS
 
 var libModules = map[string]string{
-	"fs": "/lib/fs/index.ts",
+	"fs":   "/lib/fs/index.ts",
+	"test": "/lib/test/index.ts",
 }
 
 // https://github.com/evanw/esbuild/blob/main/pkg/api/api_impl.go#L502
