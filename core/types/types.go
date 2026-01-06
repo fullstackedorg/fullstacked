@@ -28,9 +28,9 @@ const (
 )
 
 type ResponseStream struct {
-	Open  func(streamId uint8)
-	Write func(streamId uint8, data []byte)
-	Close func(streamId uint8)
+	Open  func(ctx *CoreCallContext, streamId uint8)
+	Write func(ctx *CoreCallContext, streamId uint8, data []byte)
+	Close func(ctx *CoreCallContext, streamId uint8)
 }
 
 type CoreCallResponse struct {
@@ -47,10 +47,10 @@ type CoreCallHeader struct {
 
 type StoredStream struct {
 	Buffer []byte
-	Open   func(streamId uint8)
+	Open   func(ctx *CoreCallContext, streamId uint8)
 	Opened bool
-	Write  func(streamId uint8, data []byte)
-	Close  func(streamId uint8)
+	Write  func(ctx *CoreCallContext, streamId uint8, data []byte)
+	Close  func(ctx *CoreCallContext, streamId uint8)
 	Ended  bool
 }
 

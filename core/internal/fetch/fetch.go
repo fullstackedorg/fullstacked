@@ -45,13 +45,13 @@ func Switch(
 		return nil
 	case ResponseBody:
 		id := int(data[0].Data.(float64))
-		_, ok := activeResponses[id]
+		_, ok := fetchResponses[id]
 		if !ok {
 			return errors.New("cannot find response")
 		}
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
-			Open: func(streamId uint8) {
+			Open: func(ctx *types.CoreCallContext, streamId uint8) {
 				go StreamResponse(ctx, streamId, id)
 			},
 		}
@@ -74,9 +74,9 @@ type ResponseHead struct {
 	Headers    map[string][]string
 }
 
-var activeResponses = map[int]*http.Response{}
-var activeResponsesMutex = sync.Mutex{}
-var responseId = 0
+var fetchResponses = map[int]*http.Response{}
+var fetchResponsesMutex = sync.Mutex{}
+var fetchId = 0
 
 var client = &http.Client{}
 
@@ -110,11 +110,11 @@ func FetchFnApply(requestHead RequestHead, body []byte) (ResponseHead, error) {
 		return ResponseHead{}, err
 	}
 
-	activeResponsesMutex.Lock()
-	id := responseId
-	activeResponses[id] = response
-	responseId += 1
-	activeResponsesMutex.Unlock()
+	fetchResponsesMutex.Lock()
+	id := fetchId
+	fetchResponses[id] = response
+	fetchId += 1
+	fetchResponsesMutex.Unlock()
 
 	responseHead := ResponseHead{
 		Id:         id,
@@ -131,9 +131,9 @@ func StreamResponse(
 	streamId uint8,
 	responseId int,
 ) {
-	activeResponsesMutex.Lock()
-	response, ok := activeResponses[responseId]
-	activeResponsesMutex.Unlock()
+	fetchResponsesMutex.Lock()
+	response, ok := fetchResponses[responseId]
+	fetchResponsesMutex.Unlock()
 
 	if !ok {
 		return
@@ -152,7 +152,7 @@ func StreamResponse(
 		}
 	}
 
-	activeResponsesMutex.Lock()
-	delete(activeResponses, responseId)
-	activeResponsesMutex.Unlock()
+	fetchResponsesMutex.Lock()
+	delete(fetchResponses, responseId)
+	fetchResponsesMutex.Unlock()
 }

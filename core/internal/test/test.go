@@ -50,7 +50,7 @@ func Switch(
 	case Stream:
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
-			Open: func(streamId uint8) {
+			Open: func(ctx *types.CoreCallContext, streamId uint8) {
 				streamTest(
 					ctx,
 					streamId,
@@ -64,7 +64,7 @@ func Switch(
 	case StreamWrite:
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
-			Write: func(streamId uint8, data []byte) {
+			Write: func(ctx *types.CoreCallContext, streamId uint8, data []byte) {
 				store.StreamChunk(ctx, streamId, data, false)
 			},
 		}

@@ -1,6 +1,8 @@
 import { toByteArray } from "../base64.ts";
 
-const ctx = await (await fetch("/ctx")).json();
+globalThis.originalFetch = fetch;
+
+const ctx = await (await globalThis.originalFetch("/ctx")).json();
 
 const webSockerUrl = new URL(window.location.href);
 webSockerUrl.protocol = webSockerUrl.protocol === "https:" ? "wss:" : "ws:";
@@ -28,7 +30,7 @@ function Sync(payload: ArrayBuffer) {
 }
 
 async function Async(payload: ArrayBuffer) {
-    const response = await fetch("/call", {
+    const response = await globalThis.originalFetch("/call", {
         method: "POST",
         body: payload
     });

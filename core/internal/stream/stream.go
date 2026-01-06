@@ -59,7 +59,7 @@ func openStream(ctx *types.CoreCallContext, streamId uint8) error {
 	stream.Opened = true
 
 	if stream.Open != nil {
-		stream.Open(streamId)
+		stream.Open(ctx, streamId)
 	}
 
 	return nil
@@ -82,7 +82,7 @@ func writeStream(ctx *types.CoreCallContext, streamId uint8, data []byte) error 
 		return errors.New("stream has no write function")
 	}
 
-	stream.Write(streamId, data)
+	stream.Write(ctx, streamId, data)
 
 	return nil
 }
@@ -97,7 +97,7 @@ func closeStream(ctx *types.CoreCallContext, streamId uint8) error {
 	}
 
 	if stream.Close != nil {
-		stream.Close(streamId)
+		stream.Close(ctx, streamId)
 	}
 
 	store.StreamChunk(ctx, streamId, nil, true)

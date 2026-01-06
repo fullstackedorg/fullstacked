@@ -39,6 +39,8 @@ func StoreResponse(
 	response types.CoreCallResponse,
 ) (int, error) {
 	switch response.Type {
+	case types.CoreResponseError:
+		return storeResponseData(ctx, header, response)
 	case types.CoreResponseData:
 		return storeResponseData(ctx, header, response)
 	case types.CoreResponseStream:
@@ -194,7 +196,11 @@ func StreamChunk(
 	ctx.StreamsMutex.Unlock()
 
 	if !ok {
-		panic("no stream for id")
+		if len(buffer) > 0 || !end {
+			panic("no stream for id")
+		} else {
+			return
+		}
 	}
 
 	if !stream.Opened {

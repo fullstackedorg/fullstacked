@@ -26,15 +26,18 @@ function bodyInitToBuffer(body: BodyInit) {
     return new Response(body).arrayBuffer();
 }
 
-export async function fetch(
+function urlOrStringToUrl(url: URL | string) {
+    return url instanceof URL ? url : new URL(url, globalThis?.location?.host)
+}
+
+async function fetch(
     request: string | URL | Request,
     init?: RequestInit
 ): Promise<Response> {
-    const url = (
-        request instanceof URL || typeof request === "string"
-            ? request
-            : request.url
-    ).toString();
+    const url = (request instanceof URL || typeof request === "string"
+        ? urlOrStringToUrl(request)
+        : urlOrStringToUrl(request.url)).toString();
+
     const method =
         (request instanceof Request ? request.method : init?.method) || "GET";
     const headers = headersToObj(
@@ -106,3 +109,5 @@ export async function fetch(
 
     return response;
 }
+
+globalThis.fetch = fetch
