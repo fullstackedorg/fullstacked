@@ -27,7 +27,7 @@ const packagesToBundle = [
         outfile: "core/internal/bundle/lib/buffer/index.js"
     },
     {
-        entryPoint: "node_modules/readable-stream/lib/stream.js",
+        entryPoint: "node_modules/readable-stream/lib/ours/browser.js",
         outfile: "core/internal/bundle/lib/stream/index.js"
     },
     {
@@ -49,7 +49,8 @@ packagesToBundle.forEach(({ entryPoint, outfile }) =>
         entryPoints: [entryPoint],
         outfile,
         bundle: true,
-        format: "esm",
-        platform: "node"
+        // format: "esm",
+        platform: "node",
+        external: ["process/"]
     })
 );

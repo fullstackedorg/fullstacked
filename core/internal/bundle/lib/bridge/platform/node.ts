@@ -1,8 +1,8 @@
 import { toByteArray } from "../base64.ts";
 
-globalThis.originalFetch = fetch;
+globalThis.global = globalThis;
 
-const ctx = await (await globalThis.originalFetch("/ctx")).json();
+globalThis.originalFetch = fetch;
 
 const webSockerUrl = new URL(window.location.href);
 webSockerUrl.protocol = webSockerUrl.protocol === "https:" ? "wss:" : "ws:";
@@ -20,7 +20,6 @@ function webSocketForCallback() {
         ws.onopen = res;
     });
 }
-await webSocketForCallback();
 
 function Sync(payload: ArrayBuffer) {
     const xmlHttpRequest = new XMLHttpRequest();
@@ -37,8 +36,19 @@ async function Async(payload: ArrayBuffer) {
     return response.arrayBuffer();
 }
 
-export default {
-    ctx,
+let ctx = {
+    id: null
+}
+
+const bridge = {
+    get ctx() {return ctx.id},
+    ready: new Promise<void>(async res => {
+        ctx.id = await (await globalThis.originalFetch("/ctx")).json();
+        await webSocketForCallback();
+        res();
+    }),
     Sync,
     Async
-};
+}
+
+export default bridge

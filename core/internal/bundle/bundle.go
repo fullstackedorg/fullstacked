@@ -16,7 +16,7 @@ import (
 var lib embed.FS
 
 var libModules = map[string]string{
-	"buffer":         "/lib/buffer/index.js",
+	"buffer":         "/lib/buffer/index.ts",
 	"crypto":         "/lib/crypto/index.js",
 	"events":         "/lib/events/index.js",
 	"fetch":          "/lib/fetch/index.ts",
@@ -24,7 +24,7 @@ var libModules = map[string]string{
 	"net":            "/lib/net/index.ts",
 	"os":             "/lib/os/index.ts",
 	"path":           "/lib/path/index.ts",
-	"process":        "/lib/process/index.js",
+	"process":        "/lib/process/index.ts",
 	"stream":         "/lib/stream/index.js",
 	"string_decoder": "/lib/string_decoder/index.js",
 	"timers":         "/lib/timers/index.ts",

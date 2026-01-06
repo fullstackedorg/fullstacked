@@ -25,22 +25,29 @@ export function bridge<T extends boolean>(
     sync: T
 ): T extends true ? SerializableData : Promise<SerializableData>;
 export function bridge(opts: BridgeOpts, sync?: boolean) {
-    id = (id + 1) % 256;
+    const preparePayload = () => {
+        id = (id + 1) % 256;
 
-    const data = opts.data
-        ? mergeUint8Arrays(...opts.data.map(serialize))
-        : null;
-    const payload = new Uint8Array(4 + (data?.byteLength ?? 0));
+        const data = opts.data
+            ? mergeUint8Arrays(...opts.data.map(serialize))
+            : null;
+        const payload = new Uint8Array(4 + (data?.byteLength ?? 0));
 
-    payload[0] = platformBridge.ctx;
-    payload[1] = id;
-    payload[2] = opts.mod;
-    payload[3] = opts.fn;
-    if (data != null) {
-        payload.set(data, 4);
+        payload[0] = platformBridge.ctx;
+        payload[1] = id;
+        payload[2] = opts.mod;
+        payload[3] = opts.fn;
+        if (data != null) {
+            payload.set(data, 4);
+        }
+        return payload;
     }
 
     if (sync) {
+        if(platformBridge.ctx === null) {
+            throw new Error("cannot call sync that quickly")
+        }
+        const payload = preparePayload()
         let responseBuffer = platformBridge.Sync(payload.buffer);
         if (responseBuffer == null && platformBridge.GetResponseSync) {
             responseBuffer = platformBridge.GetResponseSync(id);
@@ -53,6 +60,8 @@ export function bridge(opts: BridgeOpts, sync?: boolean) {
     }
 
     return new Promise<SerializableData>(async (resolve, reject) => {
+        await platformBridge.ready;
+        const payload = preparePayload();
         const responseBuffer = await platformBridge.Async(payload.buffer);
         const response = processResponse(responseBuffer);
         if (response instanceof Error) {
