@@ -38,17 +38,19 @@ async function Async(payload: ArrayBuffer) {
 
 let ctx = {
     id: null
-}
+};
 
 const bridge = {
-    get ctx() {return ctx.id},
-    ready: new Promise<void>(async res => {
+    get ctx() {
+        return ctx.id;
+    },
+    ready: new Promise<void>(async (res) => {
         ctx.id = await (await globalThis.originalFetch("/ctx")).json();
         await webSocketForCallback();
         res();
     }),
     Sync,
     Async
-}
+};
 
-export default bridge
+export default bridge;

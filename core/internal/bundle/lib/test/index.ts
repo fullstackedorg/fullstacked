@@ -44,11 +44,7 @@ function serializationIndex(
     );
 }
 
-function streaming(
-    data: Uint8Array,
-    intervalMs: number,
-    async: false
-): Duplex;
+function streaming(data: Uint8Array, intervalMs: number, async: false): Duplex;
 function streaming(
     data: Uint8Array,
     intervalMs: number,
@@ -65,14 +61,17 @@ function streaming(data: Uint8Array, intervalMs: number, async: boolean) {
     );
 }
 
-function streamWrite(async: false): Duplex
-function streamWrite(async: true): Promise<Duplex>
+function streamWrite(async: false): Duplex;
+function streamWrite(async: true): Promise<Duplex>;
 function streamWrite(async: boolean) {
-    return bridge({
-        mod: Test,
-        fn: StreamWrite,
-        data: []
-    }, !async)
+    return bridge(
+        {
+            mod: Test,
+            fn: StreamWrite,
+            data: []
+        },
+        !async
+    );
 }
 
 const test = {

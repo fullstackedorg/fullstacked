@@ -1,2 +1,2 @@
-import "./e2e.ts"
-import "./integration.ts"
+import "./e2e.ts";
+import "./integration.ts";

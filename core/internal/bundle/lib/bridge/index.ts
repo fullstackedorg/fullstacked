@@ -41,13 +41,13 @@ export function bridge(opts: BridgeOpts, sync?: boolean) {
             payload.set(data, 4);
         }
         return payload;
-    }
+    };
 
     if (sync) {
-        if(platformBridge.ctx === null) {
-            throw new Error("cannot call sync that quickly")
+        if (platformBridge.ctx === null) {
+            throw new Error("cannot call sync that quickly");
         }
-        const payload = preparePayload()
+        const payload = preparePayload();
         let responseBuffer = platformBridge.Sync(payload.buffer);
         if (responseBuffer == null && platformBridge.GetResponseSync) {
             responseBuffer = platformBridge.GetResponseSync(id);
@@ -87,7 +87,7 @@ function processResponse(buffer: ArrayBuffer) {
             }
             return deserialize(buffer, 1).data;
         case CoreResponseStream:
-            const streamId = deserialize(buffer, 1).data as number
+            const streamId = deserialize(buffer, 1).data as number;
             return createDuplex(streamId);
         case CoreResponseEventEmitter:
             throw new Error("not yet implemented");

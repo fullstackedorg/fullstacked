@@ -49,7 +49,7 @@ TSFN tsfn;
 void n_onStreamData(uint8_t ctx, uint8_t streamId, int size) {
     std::vector<uint8_t> buffer(size, 0);
     // 2 for CoreType Stream
-    lib.getCorePayload(ctx, 2,streamId, buffer.data());
+    lib.getCorePayload(ctx, 2, streamId, buffer.data());
     StreamChunk *chunk = new StreamChunk;
     chunk->ctx = ctx;
     chunk->id = streamId;

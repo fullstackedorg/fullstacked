@@ -14,8 +14,10 @@ suite("fetch - e2e", () => {
 
     test("head", async () => {
         assert.notEqual(fetch, globalThis.nodeFetch);
-        
-        const responseNode = await globalThis.nodeFetch("http://localhost:9090");
+
+        const responseNode = await globalThis.nodeFetch(
+            "http://localhost:9090"
+        );
         const responseGo = await fetch("http://localhost:9090");
         assert.deepEqual(responseNode.ok, responseGo.ok);
         assert.ok(!!responseNode.headers.get("x-header-test"));
@@ -28,7 +30,9 @@ suite("fetch - e2e", () => {
     });
 
     test("response body - stream", async () => {
-        const responseNode = await globalThis.nodeFetch("http://localhost:9090");
+        const responseNode = await globalThis.nodeFetch(
+            "http://localhost:9090"
+        );
         let streamedNode = new Uint8Array();
         for await (const chunk of responseNode.body) {
             streamedNode = mergeUint8Arrays(streamedNode, chunk);
@@ -44,13 +48,17 @@ suite("fetch - e2e", () => {
     });
 
     test("response body - bytes", async () => {
-        const responseNode = await globalThis.nodeFetch("http://localhost:9090");
+        const responseNode = await globalThis.nodeFetch(
+            "http://localhost:9090"
+        );
         const responseGo = await fetch("http://localhost:9090");
         assert.deepEqual(await responseNode.bytes(), await responseGo.bytes());
     });
 
     test("response body - arraybuffer", async () => {
-        const responseNode = await globalThis.nodeFetch("http://localhost:9090");
+        const responseNode = await globalThis.nodeFetch(
+            "http://localhost:9090"
+        );
         const responseGo = await fetch("http://localhost:9090");
         assert.deepEqual(
             await responseNode.arrayBuffer(),
@@ -59,7 +67,9 @@ suite("fetch - e2e", () => {
     });
 
     test("response body - text", async () => {
-        const responseNode = await globalThis.nodeFetch("http://localhost:9090");
+        const responseNode = await globalThis.nodeFetch(
+            "http://localhost:9090"
+        );
         const responseGo = await fetch("http://localhost:9090");
         assert.deepEqual(await responseNode.text(), await responseGo.text());
     });
@@ -72,10 +82,13 @@ suite("fetch - e2e", () => {
         });
         const responseGoBytes = await responseGo.bytes();
         assert.deepEqual(responseGoBytes, body);
-        const responseNode = await globalThis.nodeFetch("http://localhost:9090", {
-            method: "POST",
-            body
-        });
+        const responseNode = await globalThis.nodeFetch(
+            "http://localhost:9090",
+            {
+                method: "POST",
+                body
+            }
+        );
         assert.deepEqual(responseGoBytes, await responseNode.bytes());
     });
 

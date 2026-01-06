@@ -14,13 +14,18 @@ const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
 
 let webview: Awaited<ReturnType<typeof createWebView>> = null;
 
-const core = await load(currentDirectory, currentDirectory, (ctx: number, streamId: number, buffer: ArrayBuffer) => {
-    if (webview) {
-        webview.callback(streamId, buffer);
-    } else {
-        console.log(ctx, streamId, buffer);
-    }
-}, true);
+const core = await load(
+    currentDirectory,
+    currentDirectory,
+    (ctx: number, streamId: number, buffer: ArrayBuffer) => {
+        if (webview) {
+            webview.callback(streamId, buffer);
+        } else {
+            console.log(ctx, streamId, buffer);
+        }
+    },
+    true
+);
 
 const mainCtx = core.start(process.cwd());
 
@@ -38,5 +43,5 @@ result.Errors?.forEach((e) => console.log(e));
 if (result.Errors === null || result.Errors?.length === 0) {
     webview = await createWebView(core, process.cwd(), true);
 } else {
-    process.exit()
-} 
+    process.exit();
+}

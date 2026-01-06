@@ -10,9 +10,9 @@ suite("net - integration", () => {
     let browser: Browser, server: Worker;
 
     before(async () => {
-        server = await startServer()
+        server = await startServer();
         browser = await createBrowser("test/net/sample");
-    })
+    });
 
     test("socket", async () => {
         const result = await bundle.bundle(Node, "test/net/sample/index.ts");
@@ -26,14 +26,17 @@ suite("net - integration", () => {
             );
             const streamed = await page.getTextContent("body");
             assert.deepEqual(streamed, "123");
-        }
+        };
 
         await test();
 
         await page.page.emulateCPUThrottling(4);
         await page.page.reload();
         await test();
-    })
+    });
 
-    after(() => {server.terminate();browser.end()});
+    after(() => {
+        server.terminate();
+        browser.end();
+    });
 });

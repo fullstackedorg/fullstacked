@@ -12,10 +12,15 @@ suite("stream - integration", () => {
     });
 
     test("stream", { timeout: 1000 * 3 }, async () => {
-        const result = await bundle.bundle(Node, "test/stream/sample/read/index.ts");
+        const result = await bundle.bundle(
+            Node,
+            "test/stream/sample/read/index.ts"
+        );
         assert.deepEqual(result.Errors, null);
         assert.deepEqual(result.Warnings, null);
-        const page = await browser.createPage(`http://localhost:${browser.webview.port}/read/`);
+        const page = await browser.createPage(
+            `http://localhost:${browser.webview.port}/read/`
+        );
 
         const test = async () => {
             await page.page.waitForFunction(
@@ -23,7 +28,7 @@ suite("stream - integration", () => {
             );
             const streamed = await page.getTextContent("body");
             assert.deepEqual(streamed, "123");
-        }
+        };
 
         await test();
 
@@ -33,10 +38,15 @@ suite("stream - integration", () => {
     });
 
     test("streamWrite", { timeout: 1000 * 3 }, async () => {
-        const result = await bundle.bundle(Node, "test/stream/sample/write/index.ts");
+        const result = await bundle.bundle(
+            Node,
+            "test/stream/sample/write/index.ts"
+        );
         assert.deepEqual(result.Errors, null);
         assert.deepEqual(result.Warnings, null);
-        const page = await browser.createPage(`http://localhost:${browser.webview.port}/write/`);
+        const page = await browser.createPage(
+            `http://localhost:${browser.webview.port}/write/`
+        );
 
         const test = async () => {
             await page.page.waitForFunction(
@@ -44,7 +54,7 @@ suite("stream - integration", () => {
             );
             const streamed = await page.getTextContent("body");
             assert.deepEqual(streamed, "123");
-        }
+        };
 
         await test();
 

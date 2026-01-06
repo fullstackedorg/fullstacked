@@ -8,11 +8,7 @@ suite("stream - e2e", () => {
         const intervalMs = 0;
         const data = new Uint8Array([1, 2, 3]);
 
-        const stream = t.streaming(
-            new Uint8Array(data),
-            intervalMs,
-            false
-        );
+        const stream = t.streaming(new Uint8Array(data), intervalMs, false);
 
         let streamed = new Uint8Array();
         stream.on("data", (chunk: Uint8Array) => {
@@ -20,7 +16,7 @@ suite("stream - e2e", () => {
         });
         stream.on("close", () => {
             assert.deepEqual(streamed, data);
-            done()
+            done();
         });
     });
 
@@ -28,18 +24,14 @@ suite("stream - e2e", () => {
         const intervalMs = 0;
         const data = new Uint8Array([1, 2, 3]);
 
-        const stream = t.streaming(
-            new Uint8Array(data),
-            intervalMs,
-            false
-        );
+        const stream = t.streaming(new Uint8Array(data), intervalMs, false);
 
         let streamed = new Uint8Array();
-        await new Promise<void>(res => {
+        await new Promise<void>((res) => {
             stream.on("data", (chunk: Uint8Array) => {
                 streamed = mergeUint8Arrays(streamed, chunk);
-            })
-            stream.on("close", res)
+            });
+            stream.on("close", res);
         });
 
         assert.deepEqual(streamed, data);
@@ -49,11 +41,7 @@ suite("stream - e2e", () => {
         const intervalMs = 0;
         const data = new Uint8Array([1, 2, 3]);
 
-        const stream = t.streaming(
-            new Uint8Array(data),
-            intervalMs,
-            false
-        );
+        const stream = t.streaming(new Uint8Array(data), intervalMs, false);
         let streamed = new Uint8Array();
         for await (const chunk of stream) {
             streamed = mergeUint8Arrays(streamed, chunk);
@@ -125,13 +113,17 @@ suite("stream - e2e", () => {
         const stream = await t.streamWrite(true);
         let streamed = new Uint8Array();
 
-        await new Promise<void>(resolve => {
-            stream.on("data", (chunk: Uint8Array) => streamed = mergeUint8Arrays(streamed, chunk));
+        await new Promise<void>((resolve) => {
+            stream.on(
+                "data",
+                (chunk: Uint8Array) =>
+                    (streamed = mergeUint8Arrays(streamed, chunk))
+            );
             stream.on("close", resolve);
             stream.write(data);
             stream.end();
         });
 
         assert.deepEqual(streamed, data);
-    })
+    });
 });

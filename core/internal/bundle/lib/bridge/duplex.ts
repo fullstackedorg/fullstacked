@@ -1,31 +1,29 @@
 import { toByteArray } from "./base64.ts";
 import { Stream } from "../@types/index.ts";
 import { bridge } from "./index.ts";
-import {
-    Close,
-    Open, Write } from "../@types/stream.ts";
+import { Close, Open, Write } from "../@types/stream.ts";
 import { mergeUint8Arrays } from "./serialization.ts";
 
 type DuplexItem = {
-    opening: Promise<void>,
-    open: boolean,
-    done: boolean,
+    opening: Promise<void>;
+    open: boolean;
+    done: boolean;
     listeners: {
-        data: Set<(chunk: Uint8Array) => void>
-        close: Set<() => void>
-    },
+        data: Set<(chunk: Uint8Array) => void>;
+        close: Set<() => void>;
+    };
     asyncRead: {
-        promise?: { resolve: () => void, reject: (reason: string) => void }
-        data: Uint8Array
-    }
-}
+        promise?: { resolve: () => void; reject: (reason: string) => void };
+        data: Uint8Array;
+    };
+};
 
-const activeDuplexes = new Map<
-    number,
-    DuplexItem
->();
+const activeDuplexes = new Map<number, DuplexItem>();
 
-globalThis.callback = async function(id: number, payload: ArrayBuffer | string) {
+globalThis.callback = async function (
+    id: number,
+    payload: ArrayBuffer | string
+) {
     const chunk =
         typeof payload === "string"
             ? toByteArray(payload)
@@ -40,31 +38,38 @@ globalThis.callback = async function(id: number, payload: ArrayBuffer | string) 
     duplex.done = chunk[0] === 1;
     const data = chunk.slice(1);
 
-    duplex?.listeners.data.forEach(cb => cb(data))
-    if (duplex.done)
-        duplex?.listeners.close.forEach(cb => cb())
+    duplex?.listeners.data.forEach((cb) => cb(data));
+    if (duplex.done) duplex?.listeners.close.forEach((cb) => cb());
 
     if (duplex?.asyncRead === null) {
-        return
+        return;
     }
 
-    duplex.asyncRead.data = duplex.asyncRead.data === null
-        ? data
-        : mergeUint8Arrays(duplex.asyncRead.data, data);
+    duplex.asyncRead.data =
+        duplex.asyncRead.data === null
+            ? data
+            : mergeUint8Arrays(duplex.asyncRead.data, data);
 
     duplex?.asyncRead?.promise?.resolve?.();
 };
 
-type StreamData = string | Buffer | Uint8Array | DataView
+type StreamData = string | Buffer | Uint8Array | DataView;
 
-type EndCallback = () => void
+type EndCallback = () => void;
 
 export interface Duplex extends ReadableStream<Uint8Array> {
-    on(event: "data", callback: (chunk: StreamData, encoding?: string) => void): void
-    on(event: "close", callback: EndCallback): void
-    write(data: StreamData): void
-    end(chunk?: StreamData, encoding?: string | EndCallback, callback?: EndCallback): void
-};
+    on(
+        event: "data",
+        callback: (chunk: StreamData, encoding?: string) => void
+    ): void;
+    on(event: "close", callback: EndCallback): void;
+    write(data: StreamData): void;
+    end(
+        chunk?: StreamData,
+        encoding?: string | EndCallback,
+        callback?: EndCallback
+    ): void;
+}
 
 export function createDuplex(id: number): Duplex {
     const duplex: DuplexItem = {
@@ -76,20 +81,20 @@ export function createDuplex(id: number): Duplex {
             close: new Set<() => void>()
         },
         asyncRead: null
-    }
+    };
 
     activeDuplexes.set(id, duplex);
 
     const open = () => {
         if (duplex.open) {
             throw "trying to open a duplex already opened";
-        };
+        }
 
         if (duplex.opening) {
             throw "trying to open a duplex opening";
         }
 
-        duplex.opening = new Promise(async resolveOpening => {
+        duplex.opening = new Promise(async (resolveOpening) => {
             await bridge({
                 mod: Stream,
                 fn: Open,
@@ -99,24 +104,24 @@ export function createDuplex(id: number): Duplex {
             duplex.open = true;
             resolveOpening();
             duplex.opening = null;
-        })
+        });
 
-        return duplex.opening
-    }
+        return duplex.opening;
+    };
 
     const read = () => {
         return new Promise<void>((resolve, reject) => {
-            duplex.asyncRead.promise = { resolve, reject }
-        })
-    }
+            duplex.asyncRead.promise = { resolve, reject };
+        });
+    };
 
     const next = async () => {
         if (duplex.asyncRead === null) {
             duplex.asyncRead = {
                 data: null
-            }
+            };
         }
-        
+
         if (!duplex.open) {
             await open();
         }
@@ -131,7 +136,7 @@ export function createDuplex(id: number): Duplex {
         return {
             value,
             done: duplex.done
-        }
+        };
     };
 
     const it = {
@@ -149,23 +154,25 @@ export function createDuplex(id: number): Duplex {
                 duplex.listeners.close.add(cb);
                 break;
         }
-        
+
         if (!duplex.open && duplex.opening === null) {
             open();
         }
     };
 
-    stream.write = (data: Uint8Array) => bridge({
-        mod: Stream,
-        fn: Write,
-        data: [id, data]
-    });
+    stream.write = (data: Uint8Array) =>
+        bridge({
+            mod: Stream,
+            fn: Write,
+            data: [id, data]
+        });
 
-    stream.end = () => bridge({
-        mod: Stream,
-        fn: Close,
-        data: [id]
-    });
+    stream.end = () =>
+        bridge({
+            mod: Stream,
+            fn: Close,
+            data: [id]
+        });
 
     return stream;
 }
@@ -184,4 +191,4 @@ function iteratorToStream(iterator: AsyncIterator<Uint8Array>) {
             }
         }
     }) as any;
-} 
+}

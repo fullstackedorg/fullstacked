@@ -14,7 +14,9 @@ export interface Core {
     start(directory: string): number;
     stop(ctx: number): void;
     call(payload: ArrayBuffer): ArrayBuffer;
-    setOnStreamData(cb: (ctx: number, streamId: number, buffer: ArrayBuffer) => void): void;
+    setOnStreamData(
+        cb: (ctx: number, streamId: number, buffer: ArrayBuffer) => void
+    ): void;
     end(): void;
 }
 

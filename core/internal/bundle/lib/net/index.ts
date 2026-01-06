@@ -16,9 +16,11 @@ export class Socket extends EventEmitter {
             mod: Net,
             fn: Connect,
             data: [port, h]
-        }).then(d => {
+        }).then((d) => {
             this.duplex = d;
-            this.duplex.on("data", (data: Uint8Array) => this.emit("data", Buffer.from(data)));
+            this.duplex.on("data", (data: Uint8Array) =>
+                this.emit("data", Buffer.from(data))
+            );
             this.duplex.on("close", () => this.emit("close"));
             this.emit("connect");
         });
@@ -28,11 +30,11 @@ export class Socket extends EventEmitter {
         this.duplex.end(data);
     }
 
-    destroy(){
+    destroy() {
         this.duplex.end();
     }
 
-    write(data: Uint8Array){
+    write(data: Uint8Array) {
         this.duplex.write(data);
         return this;
     }
@@ -41,7 +43,7 @@ export class Socket extends EventEmitter {
         return this;
     }
 
-    setKeepAlive(enable: boolean, initialDelay: number){
+    setKeepAlive(enable: boolean, initialDelay: number) {
         return this;
     }
 }
@@ -50,9 +52,9 @@ export function connect(port: number, host?: string) {
     const socket = new Socket();
     socket.connect(port, host);
     return socket;
-} 
+}
 
 export default {
     Socket,
     connect
-}
+};

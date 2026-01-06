@@ -1,5 +1,5 @@
 export default {
-    ready: new Promise<void>(res => res()),
+    ready: new Promise<void>((res) => res()),
     get ctx() {
         return globalThis.ctxId;
     },

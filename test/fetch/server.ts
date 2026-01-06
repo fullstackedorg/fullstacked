@@ -6,4 +6,4 @@ export function startServer() {
         worker.on("message", () => res(worker));
         worker.on("error", console.log);
     });
-} 
+}
