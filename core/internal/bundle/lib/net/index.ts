@@ -1,11 +1,11 @@
 // nodejs source: https://nodejs.org/docs/latest/api/net.html
 
+import "buffer";
 import { bridge } from "../bridge/index.ts";
 import { Net } from "../@types/index.ts";
 import { Connect } from "../@types/net.ts";
 import { Duplex } from "../bridge/duplex.ts";
 import EventEmitter from "events";
-
 
 export class Socket extends EventEmitter {
     private duplex: Duplex = null;
@@ -18,10 +18,14 @@ export class Socket extends EventEmitter {
             data: [port, h]
         }).then(d => {
             this.duplex = d;
-            this.duplex.on("data", (data: Uint8Array) => this.emit("data", data));
+            this.duplex.on("data", (data: Uint8Array) => this.emit("data", Buffer.from(data)));
             this.duplex.on("close", () => this.emit("close"));
             this.emit("connect");
         });
+    }
+
+    end(data: Uint8Array) {
+        this.duplex.end(data);
     }
 
     destroy(){
@@ -30,6 +34,15 @@ export class Socket extends EventEmitter {
 
     write(data: Uint8Array){
         this.duplex.write(data);
+        return this;
+    }
+
+    setNoDelay(noDelay: boolean) {
+        return this;
+    }
+
+    setKeepAlive(enable: boolean, initialDelay: number){
+        return this;
     }
 }
 

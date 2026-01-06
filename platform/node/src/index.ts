@@ -12,7 +12,15 @@ import { createWebView } from "./webview";
 
 const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
 
-const core = await load(currentDirectory, currentDirectory, console.log, true);
+let webview: Awaited<ReturnType<typeof createWebView>> = null;
+
+const core = await load(currentDirectory, currentDirectory, (ctx: number, streamId: number, buffer: ArrayBuffer) => {
+    if (webview) {
+        webview.callback(streamId, buffer);
+    } else {
+        console.log(ctx, streamId, buffer);
+    }
+}, true);
 
 const mainCtx = core.start(process.cwd());
 
@@ -28,7 +36,7 @@ result.Warnings?.forEach((w) => console.log(w));
 result.Errors?.forEach((e) => console.log(e));
 
 if (result.Errors === null || result.Errors?.length === 0) {
-    await createWebView(core, process.cwd(), true);
+    webview = await createWebView(core, process.cwd(), true);
 } else {
     process.exit()
-}
+} 
