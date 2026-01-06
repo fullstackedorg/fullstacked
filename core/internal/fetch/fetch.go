@@ -50,8 +50,10 @@ func Switch(
 			return errors.New("cannot find response")
 		}
 		response.Type = types.CoreResponseStream
-		response.Stream = func() {
-			go StreamResponse(ctx, header, id)
+		response.Stream = &types.ResponseStream{
+			Open: func(streamId uint8) {
+				go StreamResponse(ctx, streamId, id)
+			},
 		}
 		return nil
 	}
@@ -126,7 +128,7 @@ func FetchFnApply(requestHead RequestHead, body []byte) (ResponseHead, error) {
 
 func StreamResponse(
 	ctx *types.CoreCallContext,
-	header types.CoreCallHeader,
+	streamId uint8,
 	responseId int,
 ) {
 	activeResponsesMutex.Lock()
@@ -144,11 +146,13 @@ func StreamResponse(
 		n, err := response.Body.Read(buffer)
 		buffer = buffer[:n]
 		end := err == io.EOF
-		store.StreamChunk(ctx, header, buffer, end)
+		store.StreamChunk(ctx, streamId, buffer, end)
 		if end {
 			break
 		}
 	}
 
+	activeResponsesMutex.Lock()
 	delete(activeResponses, responseId)
+	activeResponsesMutex.Unlock()
 }

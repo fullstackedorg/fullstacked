@@ -9,6 +9,7 @@ import (
 	"fullstackedorg/fullstacked/internal/path"
 	"fullstackedorg/fullstacked/internal/serialization"
 	"fullstackedorg/fullstacked/internal/store"
+	"fullstackedorg/fullstacked/internal/stream"
 	"fullstackedorg/fullstacked/internal/test"
 	"fullstackedorg/fullstacked/types"
 )
@@ -17,7 +18,6 @@ type CoreFn = uint8
 
 const (
 	StaticFile CoreFn = 0
-	OpenStream CoreFn = 1
 )
 
 /*
@@ -38,6 +38,16 @@ func Call(payload []byte) (int, error) {
 
 	if !ok {
 		return 0, errors.New("unkown call context")
+	}
+
+	id := payload[1]
+
+	ctx.ResponsesMutex.Lock()
+	_, used := ctx.Responses[id]
+	ctx.ResponsesMutex.Unlock()
+
+	if used {
+		return 0, errors.New("id already in use for another call")
 	}
 
 	header := types.CoreCallHeader{
@@ -75,6 +85,7 @@ func Call(payload []byte) (int, error) {
 
 var modules = map[types.CoreModule]types.ModuleSwitch{
 	types.Core:   Switch,
+	types.Stream: stream.Switch,
 	types.Path:   path.Switch,
 	types.Fs:     fs.Switch,
 	types.Os:     os.Switch,
@@ -108,14 +119,6 @@ func Switch(
 	case StaticFile:
 		response.Type = types.CoreResponseData
 		response.Data = staticFile(ctx, data[0].Data.(string))
-		return nil
-	case OpenStream:
-		buffer, err := store.GetCoreResponse(ctx.Id, uint8(data[0].Data.(float64)), true)
-		if err != nil {
-			return err
-		}
-		response.Type = types.CoreResponseData
-		response.Data = buffer
 		return nil
 	}
 

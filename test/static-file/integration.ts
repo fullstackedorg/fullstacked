@@ -20,7 +20,7 @@ suite("static-file - integration", () => {
         await page.page.close();
     });
 
-    test("script", { timeout: 10000000 }, async () => {
+    test("script", { timeout: 3000 }, async () => {
         const scriptContent = await new Promise<Uint8Array>(async (resolve) => {
             const page = await browser.createPage(null);
             const resCb = async (res: HTTPResponse) => {

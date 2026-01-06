@@ -1,102 +1,55 @@
-import path from "node:path";
-import { promises as fs } from "node:fs";
-import { getLibPath } from "./platform/node/src/lib";
-import { load, setDirectories, callLib } from "./platform/node/src/call";
-import { buildNodeBinding } from "./platform/node/build-binding";
-import { createRequire } from "node:module";
-import { buildCore } from "./build-core";
-import { createPayloadHeader } from "./platform/node/src/instance";
-import { serializeArgs } from "./fullstacked_modules/bridge/serialization";
-import version, { getVersion } from "./version";
-import { buildLocalProject } from "./platform/node/src/build";
-globalThis.require = createRequire(import.meta.url);
+// events : https://www.npmjs.com/package/events
+// util : https://www.npmjs.com/package/util
+// string_decoder : https://www.npmjs.com/package/string_decoder
+// buffer : https://www.npmjs.com/package/buffer
+// stream : https://www.npmjs.com/package/readable-stream
+// process : https://www.npmjs.com/package/process
+// crypto : https://www.npmjs.com/package/crypto-browserify
+// zlib : https://www.npmjs.com/package/browserify-zlib
 
-const noTSGO = process.argv.includes("--no-tsgo");
+import esbuild from "esbuild";
 
-const exit = () => process.exit();
-["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => process.on(signal, exit));
-
-buildCore(noTSGO);
-
-buildNodeBinding("platform/node");
-
-load(await getLibPath("core/bin"), "platform/node");
-
-const project = "editor";
-
-setDirectories({
-    root: process.cwd(),
-    config: "",
-    editor: process.cwd(),
-    tmp: path.resolve(process.cwd(), ".cache")
-});
-
-await buildLocalProject(project);
-
-await postbuild();
-
-console.log("Success");
-
-exit();
-
-async function postbuild() {
-    if (!noTSGO) {
-        await import("./declarations.js");
+const packagesToBundle = [
+    {
+        entryPoint: "node_modules/events/events.js",
+        outfile: "core/internal/bundle/lib/events/index.js"
+    },
+    {
+        entryPoint: "node_modules/util/util.js",
+        outfile: "core/internal/bundle/lib/util/index.js"
+    },
+    {
+        entryPoint: "node_modules/string_decoder/lib/string_decoder.js",
+        outfile: "core/internal/bundle/lib/string_decoder/index.js"
+    },
+    {
+        entryPoint: "node_modules/buffer/index.js",
+        outfile: "core/internal/bundle/lib/buffer/index.js"
+    },
+    {
+        entryPoint: "node_modules/readable-stream/lib/stream.js",
+        outfile: "core/internal/bundle/lib/stream/index.js"
+    },
+    {
+        entryPoint: "node_modules/process/browser.js",
+        outfile: "core/internal/bundle/lib/process/index.js"
+    },
+    {
+        entryPoint: "node_modules/crypto-browserify/index.js",
+        outfile: "core/internal/bundle/lib/crypto/index.js"
+    },
+    {
+        entryPoint: "node_modules/browserify-zlib/lib/index.js",
+        outfile: "core/internal/bundle/lib/zlib/index.js"
     }
+];
 
-    const outDir = "out";
-    const assets = [
-        [`${project}/assets`, "assets"],
-        ["node_modules/@fullstacked/ui/icons", "icons"],
-        ["fullstacked_modules", "fullstacked_modules"]
-    ];
-
-    await fs.rm(outDir, { recursive: true, force: true });
-    await fs.mkdir(outDir, { recursive: true });
-    await fs.rename(`${project}/.build`, `${outDir}/build`);
-
-    for (const [from, to] of assets) {
-        await fs.cp(from, `${outDir}/build/${to}`, {
-            recursive: true,
-            force: true
-        });
-    }
-
-    await (
-        await import("./build-sass.js")
-    ).buildSASS(`${outDir}/build/fullstacked_modules/sass/index.js`);
-
-    await fs.writeFile(`${outDir}/build/version.json`, JSON.stringify(version));
-
-    if (!noTSGO) {
-        await fs.writeFile(
-            `${outDir}/build/version-tsgo.json`,
-            JSON.stringify(getVersion("core/typescript-go"))
-        );
-    }
-
-    // zip demo
-    callLib(
-        new Uint8Array([
-            ...createPayloadHeader({
-                id: "",
-                isEditor: true
-            }),
-            36,
-            ...serializeArgs([`demo`, `${outDir}/build/demo.zip`])
-        ])
-    );
-
-    // zip build
-    callLib(
-        new Uint8Array([
-            ...createPayloadHeader({
-                id: "",
-                isEditor: true
-            }),
-            36,
-            ...serializeArgs([`${outDir}/build`, `${outDir}/zip/build.zip`])
-        ])
-    );
-    await fs.writeFile(`${outDir}/zip/build.txt`, Date.now().toString());
-}
+packagesToBundle.forEach(({ entryPoint, outfile }) =>
+    esbuild.buildSync({
+        entryPoints: [entryPoint],
+        outfile,
+        bundle: true,
+        format: "esm",
+        platform: "node"
+    })
+);

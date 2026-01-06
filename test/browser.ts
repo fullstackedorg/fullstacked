@@ -9,7 +9,8 @@ export async function createBrowser(directory: string) {
     core.callbackListeners.add(webview.callback);
 
     const browser = await puppeteer.launch({
-        headless: !process.argv.includes("--show-browser")
+        headless: !process.argv.includes("--show-browser"),
+        devtools: process.argv.includes("--show-browser")
     });
 
     const createPage = async (url?: string) => {

@@ -24,19 +24,19 @@ void N_Stop(const Napi::CallbackInfo &info) {
     lib.stop(static_cast<uint8_t>(ctxId));
 }
 
-struct CallbackChunk {
+struct StreamChunk {
         uint8_t ctx;
         uint8_t id;
         std::vector<uint8_t> buffer;
 };
 
 using Context = Reference<Value>;
-using DataType = CallbackChunk;
+using DataType = StreamChunk;
 using FinalizerDataType = void;
 
 void CallJs(Napi::Env env, Function callback, Context *context,
             DataType *data) {
-    CallbackChunk chunk = *data;
+    StreamChunk chunk = *data;
     callback.Call({Number::New(env, chunk.ctx), Number::New(env, chunk.id),
                    Napi::ArrayBuffer::New(env, chunk.buffer.data(),
                                           chunk.buffer.size())});
@@ -46,12 +46,13 @@ using TSFN = TypedThreadSafeFunction<Context, DataType, CallJs>;
 
 TSFN tsfn;
 
-void n_callback(uint8_t ctx, uint8_t id, int size) {
+void n_onStreamData(uint8_t ctx, uint8_t streamId, int size) {
     std::vector<uint8_t> buffer(size, 0);
-    lib.getResponse(ctx, id, buffer.data());
-    CallbackChunk *chunk = new CallbackChunk;
+    // 2 for CoreType Stream
+    lib.getCorePayload(ctx, 2,streamId, buffer.data());
+    StreamChunk *chunk = new StreamChunk;
     chunk->ctx = ctx;
-    chunk->id = id;
+    chunk->id = streamId;
     chunk->buffer = buffer;
     tsfn.NonBlockingCall(chunk);
 }
@@ -61,13 +62,13 @@ void N_Callback(const Napi::CallbackInfo &info) {
     tsfn = TSFN::New(
         env,
         info[0].As<Function>(), // JavaScript function called asynchronously
-        "Callback",             // Name
+        "OnStreamData",         // Name
         0,                      // Unlimited queue
         1,                      // Only one thread will use this initially
         nullptr,
         [](Napi::Env, FinalizerDataType *, Context *ctx) { delete ctx; });
 
-    lib.callback((void *)n_callback);
+    lib.setOnStreamData((void *)n_onStreamData);
 }
 
 void N_End(const Napi::CallbackInfo &info) {
@@ -82,7 +83,8 @@ Napi::ArrayBuffer N_Call(const Napi::CallbackInfo &info) {
     uint8_t ctx = payload[0];
     uint8_t id = payload[1];
     Napi::ArrayBuffer response = Napi::ArrayBuffer::New(env, size);
-    lib.getResponse(ctx, id, response.Data());
+    // 1 for CoreType Data
+    lib.getCorePayload(ctx, 1, id, response.Data());
     return response;
 }
 
@@ -101,7 +103,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set(Napi::String::New(env, "stop"),
                 Napi::Function::New(env, N_Stop));
 
-    exports.Set(Napi::String::New(env, "callback"),
+    exports.Set(Napi::String::New(env, "setOnStreamData"),
                 Napi::Function::New(env, N_Callback));
 
     exports.Set(Napi::String::New(env, "call"),

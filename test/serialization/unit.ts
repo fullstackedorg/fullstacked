@@ -31,8 +31,16 @@ import {
     STRING,
     UNDEFINED
 } from "../../core/internal/bundle/lib/@types/index.ts";
+import child_process from "node:child_process";
 
 suite("serialization - unit", () => {
+    test("go", () => {
+        child_process.execSync("go test -cover", {
+            cwd: "core/internal/serialization",
+            stdio: ["ignore", "ignore", "inherit"]
+        });
+    });
+
     test("number / uint 4 bytes", () => {
         const testData = [
             [0, new Uint8Array([0, 0, 0, 0])],

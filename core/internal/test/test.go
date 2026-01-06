@@ -15,6 +15,7 @@ const (
 	Serialization      TestFn = 1
 	SerializationIndex TestFn = 2
 	Stream             TestFn = 3
+	StreamWrite        TestFn = 4
 )
 
 type TestObject struct {
@@ -48,14 +49,24 @@ func Switch(
 		return nil
 	case Stream:
 		response.Type = types.CoreResponseStream
-		response.Stream = func() {
-			streamTest(
-				ctx,
-				header,
-				data[0].Data.([]byte),
-				data[1].Data.(float64),
-				data[2].Data.(bool),
-			)
+		response.Stream = &types.ResponseStream{
+			Open: func(streamId uint8) {
+				streamTest(
+					ctx,
+					streamId,
+					data[0].Data.([]byte),
+					data[1].Data.(float64),
+					data[2].Data.(bool),
+				)
+			},
+		}
+		return nil
+	case StreamWrite:
+		response.Type = types.CoreResponseStream
+		response.Stream = &types.ResponseStream{
+			Write: func(streamId uint8, data []byte) {
+				store.StreamChunk(ctx, streamId, data, false)
+			},
 		}
 		return nil
 	}
@@ -82,7 +93,7 @@ func testDataCheck(testData types.DeserializedData) types.DeserializedData {
 
 func streamTest(
 	ctx *types.CoreCallContext,
-	header types.CoreCallHeader,
+	streamId uint8,
 	data []byte,
 	intervalMs float64,
 	async bool,
@@ -90,7 +101,7 @@ func streamTest(
 	streamingFn := func() {
 		for i, b := range data {
 			time.Sleep(time.Millisecond * time.Duration(intervalMs))
-			store.StreamChunk(ctx, header, []byte{b}, i == len(data)-1)
+			store.StreamChunk(ctx, streamId, []byte{b}, i == len(data)-1)
 		}
 	}
 

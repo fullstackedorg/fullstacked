@@ -35,6 +35,12 @@ function _byteLength(_, validLen, placeHoldersLen) {
 }
 
 export function toByteArray(b64: string) {
+    //@ts-ignore
+    if (typeof Uint8Array.prototype.fromBase64 === "function") {
+        //@ts-ignore
+        return Uint8Array.fromBase64(b64);
+    }
+    
     let tmp: any;
     const lens = getLens(b64);
     const validLen = lens[0];
@@ -101,6 +107,12 @@ function encodeChunk(uint8, start, end) {
 }
 
 export function fromByteArray(uint8: Uint8Array) {
+    //@ts-ignore
+    if (typeof uint8.toBase64 === "function") {
+        //@ts-ignore
+        return uint8.toBase64();
+    }
+
     let tmp;
     const len = uint8.length;
     const extraBytes = len % 3; // if we have 1 byte left, pad 2 bytes
@@ -126,9 +138,9 @@ export function fromByteArray(uint8: Uint8Array) {
         tmp = (uint8[len - 2] << 8) + uint8[len - 1];
         parts.push(
             lookup[tmp >> 10] +
-                lookup[(tmp >> 4) & 0x3f] +
-                lookup[(tmp << 2) & 0x3f] +
-                "="
+            lookup[(tmp >> 4) & 0x3f] +
+            lookup[(tmp << 2) & 0x3f] +
+            "="
         );
     }
 

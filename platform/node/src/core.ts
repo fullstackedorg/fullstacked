@@ -14,7 +14,7 @@ export interface Core {
     start(directory: string): number;
     stop(ctx: number): void;
     call(payload: ArrayBuffer): ArrayBuffer;
-    callback(cb: (ctx: number, id: number, buffer: ArrayBuffer) => void): void;
+    setOnStreamData(cb: (ctx: number, streamId: number, buffer: ArrayBuffer) => void): void;
     end(): void;
 }
 
@@ -28,7 +28,7 @@ const binding = `${platform}-${arch}.node`;
 export async function load(
     libDirectory: string,
     bindingDir: string,
-    callback: Parameters<(typeof core)["callback"]>[0],
+    onStreamData: Parameters<(typeof core)["setOnStreamData"]>[0],
     downloadLibIfNotExising = false
 ) {
     const libPath = path.resolve(libDirectory, libBinary);
@@ -45,7 +45,7 @@ export async function load(
     }
     core = require(bindingPath);
     core.load(libPath);
-    core.callback(callback);
+    core.setOnStreamData(onStreamData);
     return core;
 }
 

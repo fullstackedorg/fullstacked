@@ -7,7 +7,8 @@ import (
 	"sync"
 )
 
-var Callback = (func(uint8, uint8, int))(nil)
+// ctxId, storedStreamId, size
+var OnStreamData = (func(uint8, uint8, int))(nil)
 
 var ctxCount = 0
 var Contexts = map[uint8]types.CoreCallContext{}
@@ -17,10 +18,14 @@ func NewContext(directory string) uint8 {
 	ctxMutex.Lock()
 	id := uint8(ctxCount % 256)
 	Contexts[id] = types.CoreCallContext{
-		Id:             id,
-		BaseDirectory:  directory,
-		Responses:      map[uint8]*types.StoredResponse{},
+		Id:            id,
+		BaseDirectory: directory,
+
+		Responses:      map[uint8][]byte{},
 		ResponsesMutex: &sync.Mutex{},
+
+		Streams:      map[uint8]*types.StoredStream{},
+		StreamsMutex: &sync.Mutex{},
 	}
 	ctxCount++
 	ctxMutex.Unlock()
@@ -33,38 +38,105 @@ func StoreResponse(
 	header types.CoreCallHeader,
 	response types.CoreCallResponse,
 ) (int, error) {
-	buffer := []byte{response.Type}
+	switch response.Type {
+	case types.CoreResponseData:
+		return storeResponseData(ctx, header, response)
+	case types.CoreResponseStream:
+		return storeResponseStream(ctx, header, response)
+	}
+
+	return 0, errors.New("unknown core response type")
+}
+
+func storeResponseData(
+	ctx *types.CoreCallContext,
+	header types.CoreCallHeader,
+	response types.CoreCallResponse,
+) (int, error) {
+	payload := []byte{response.Type}
 
 	if response.Data != nil {
 		data, err := serialization.Serialize(response.Data)
 		if err != nil {
 			return 0, err
 		}
-		buffer, err = serialization.MergeBuffers(buffer, data)
+		payload, err = serialization.MergeBuffers(payload, data)
 		if err != nil {
 			return 0, err
 		}
 	}
 
 	ctx.ResponsesMutex.Lock()
-	ctx.Responses[header.Id] = &types.StoredResponse{
-		Type:   response.Type,
-		Buffer: buffer,
-		Ended:  response.Type == types.CoreResponseData || response.Type == types.CoreResponseError,
-		Stream: response.Stream,
-	}
+	ctx.Responses[header.Id] = payload
 	ctx.ResponsesMutex.Unlock()
 
-	return len(buffer), nil
+	return len(payload), nil
 }
 
-func GetCoreResponse(ctxId uint8, id uint8, openStream bool) ([]byte, error) {
-	ctx, ok := Contexts[ctxId]
+var streamId = uint8(0)
 
-	if !ok {
-		return nil, errors.New("unkown call context")
+func storeResponseStream(
+	ctx *types.CoreCallContext,
+	header types.CoreCallHeader,
+	response types.CoreCallResponse,
+) (int, error) {
+	if response.Stream == nil {
+		return 0, errors.New("cannot store response stream with stream nil")
 	}
 
+	ctx.StreamsMutex.Lock()
+	storedStreamId := streamId
+	ctx.Streams[storedStreamId] = &types.StoredStream{
+		Open:   response.Stream.Open,
+		Close:  response.Stream.Close,
+		Write:  response.Stream.Write,
+		Opened: false,
+		Ended:  false,
+		Buffer: []byte{},
+	}
+	streamId += 1
+	ctx.StreamsMutex.Unlock()
+
+	payload := []byte{response.Type}
+	storedStreamIdSerialized, err := serialization.Serialize(float64(storedStreamId))
+	if err != nil {
+		return 0, err
+	}
+	payload, err = serialization.MergeBuffers(payload, storedStreamIdSerialized)
+	if err != nil {
+		return 0, err
+	}
+
+	ctx.ResponsesMutex.Lock()
+	ctx.Responses[header.Id] = payload
+	ctx.ResponsesMutex.Unlock()
+
+	return len(payload), nil
+}
+
+func GetCorePayload(
+	ctxId uint8,
+	coreType types.CoreCallResponseType,
+	id uint8,
+) ([]byte, error) {
+	ctxMutex.Lock()
+	ctx, ok := Contexts[ctxId]
+	ctxMutex.Unlock()
+
+	if !ok {
+		return nil, errors.New("unkown context")
+	}
+
+	switch coreType {
+	case types.CoreResponseData:
+		return getCorePayloadData(&ctx, id)
+	case types.CoreResponseStream:
+		return getCorePayloadStream(&ctx, id)
+	}
+
+	return nil, errors.New("unknown core type")
+}
+func getCorePayloadData(ctx *types.CoreCallContext, id uint8) ([]byte, error) {
 	ctx.ResponsesMutex.Lock()
 	response, ok := ctx.Responses[id]
 	ctx.ResponsesMutex.Unlock()
@@ -73,64 +145,75 @@ func GetCoreResponse(ctxId uint8, id uint8, openStream bool) ([]byte, error) {
 		return nil, errors.New("cannot find response for id")
 	}
 
-	didOpenStream := false
-	if !response.Opened && openStream {
-		response.Stream()
-		didOpenStream = true
+	defer func() {
+		ctx.ResponsesMutex.Lock()
+		delete(ctx.Responses, id)
+		ctx.ResponsesMutex.Unlock()
+	}()
+
+	return response, nil
+}
+func getCorePayloadStream(ctx *types.CoreCallContext, id uint8) ([]byte, error) {
+	ctx.StreamsMutex.Lock()
+
+	stream, ok := ctx.Streams[id]
+	if !ok {
+		return nil, errors.New("cannot find stream for id")
 	}
 
-	ctx.ResponsesMutex.Lock()
-	if didOpenStream {
-		response.Opened = true
-	}
-	buffer := response.Buffer
-	if response.Ended {
-		defer delete(ctx.Responses, id)
-	} else {
-		response.Buffer = []byte{}
-	}
-	ctx.ResponsesMutex.Unlock()
+	buffer, err := serialization.MergeBuffers([]byte{0}, stream.Buffer)
 
-	if response.Opened {
-		doneByte := []byte{0}
-		if response.Ended {
-			doneByte = []byte{1}
-		}
-		buffer, _ = serialization.MergeBuffers(doneByte, buffer)
+	if err != nil {
+		return nil, err
 	}
+
+	if stream.Ended {
+		buffer[0] = 1
+		defer func() {
+			ctx.StreamsMutex.Lock()
+			delete(ctx.Streams, id)
+			ctx.StreamsMutex.Unlock()
+		}()
+	}
+
+	stream.Buffer = []byte{}
+
+	ctx.StreamsMutex.Unlock()
 
 	return buffer, nil
 }
 
 func StreamChunk(
 	ctx *types.CoreCallContext,
-	header types.CoreCallHeader,
+	storedStreamId uint8,
 	buffer []byte,
 	end bool,
 ) {
-	ctx.ResponsesMutex.Lock()
-	response, ok := ctx.Responses[header.Id]
-	ctx.ResponsesMutex.Unlock()
+	ctx.StreamsMutex.Lock()
+	stream, ok := ctx.Streams[storedStreamId]
+	ctx.StreamsMutex.Unlock()
 
 	if !ok {
-		panic("no response for stream chunk")
+		panic("no stream for id")
+	}
+
+	if !stream.Opened {
+		panic("streaming chunk for stream not opened")
 	}
 
 	size := 0
 	ctx.ResponsesMutex.Lock()
-	response.Buffer = append(response.Buffer, buffer...)
-	response.Ended = end
-	size = len(response.Buffer)
+	if buffer != nil {
+		stream.Buffer = append(stream.Buffer, buffer...)
+	}
+	stream.Ended = end
+	size = len(stream.Buffer)
 	ctx.ResponsesMutex.Unlock()
 
-	if !response.Opened {
-		return
-	}
-
-	if Callback == nil {
-		panic("no callback")
+	if OnStreamData == nil {
+		panic("did not set OnStreamData")
 	}
 
 	// add 1 to size for the done byte prepended in front
-	Callback(ctx.Id, header.Id, size+1)
+	OnStreamData(ctx.Id, storedStreamId, size+1)
 }

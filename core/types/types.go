@@ -6,13 +6,14 @@ type CoreModule = uint8
 
 const (
 	Core   CoreModule = 0
-	Test   CoreModule = 1
-	Fs     CoreModule = 2
-	Path   CoreModule = 3
-	Os     CoreModule = 4
-	Net    CoreModule = 5
-	Fetch  CoreModule = 6
-	Bundle CoreModule = 7
+	Stream CoreModule = 1
+	Test   CoreModule = 2
+	Fs     CoreModule = 3
+	Path   CoreModule = 4
+	Os     CoreModule = 5
+	Net    CoreModule = 6
+	Fetch  CoreModule = 7
+	Bundle CoreModule = 8
 )
 
 type ModuleSwitch = func(*CoreCallContext, CoreCallHeader, []DeserializedData, *CoreCallResponse) error
@@ -26,31 +27,47 @@ const (
 	CoreResponseEventEmitter CoreCallResponseType = 3
 )
 
+type ResponseStream struct {
+	Open  func(streamId uint8)
+	Write func(streamId uint8, data []byte)
+	Close func(streamId uint8)
+}
+
 type CoreCallResponse struct {
 	Type   CoreCallResponseType
 	Data   SerializableData
-	Stream func()
+	Stream *ResponseStream
 }
 
 type CoreCallHeader struct {
 	Id     uint8
-	Module uint8
+	Module CoreModule
 	Fn     uint8
 }
 
-type StoredResponse struct {
-	Type   CoreCallResponseType
+type StoredStream struct {
 	Buffer []byte
-	Stream func()
+	Open   func(streamId uint8)
 	Opened bool
+	Write  func(streamId uint8, data []byte)
+	Close  func(streamId uint8)
 	Ended  bool
 }
 
+type StoredResponse struct {
+	Type    CoreCallResponseType
+	Payload []byte
+}
+
 type CoreCallContext struct {
-	Id             uint8
-	BaseDirectory  string
-	Responses      map[uint8]*StoredResponse
+	Id            uint8
+	BaseDirectory string
+
+	Responses      map[uint8][]byte
 	ResponsesMutex *sync.Mutex
+
+	Streams      map[uint8]*StoredStream
+	StreamsMutex *sync.Mutex
 }
 
 type SerializableData = any

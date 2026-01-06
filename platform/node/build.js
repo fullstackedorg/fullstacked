@@ -5,19 +5,13 @@ import { buildNodeBinding } from "./build-binding.js";
 
 const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
 
-if (process.argv.includes("--binding")) {
-    buildNodeBinding(currentDirectory);
-} else {
-    esbuild.buildSync({
-        entryPoints: ["src/index.ts"],
-        outfile: "index.js",
-        bundle: true,
-        format: "esm",
-        packages: "external",
-        platform: "node"
-    });
+buildNodeBinding(currentDirectory);
 
-    if (process.argv.includes("--fullstacked_modules")) {
-        await import("./build-modules.js");
-    }
-}
+esbuild.buildSync({
+    entryPoints: ["src/index.ts"],
+    outfile: "index.js",
+    bundle: true,
+    format: "esm",
+    packages: "external",
+    platform: "node"
+});

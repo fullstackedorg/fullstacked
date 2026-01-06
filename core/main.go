@@ -41,23 +41,28 @@ func stop(
 
 var cCallback = (unsafe.Pointer)(nil)
 
-//export callback
-func callback(cb unsafe.Pointer) {
+//export setOnStreamData
+func setOnStreamData(cb unsafe.Pointer) {
 	cCallback = cb
 
-	store.Callback = func(ctx uint8, id uint8, size int) {
+	store.OnStreamData = func(ctx uint8, streamId uint8, size int) {
 		C.CallMyFunction(
 			cCallback,
 			C.uint8_t(ctx),
-			C.uint8_t(id),
+			C.uint8_t(streamId),
 			C.int(size),
 		)
 	}
 }
 
-//export getResponse
-func getResponse(ctx C.uint8_t, id C.uint8_t, ptr unsafe.Pointer) {
-	response, err := store.GetCoreResponse(uint8(ctx), uint8(id), false)
+//export getCorePayload
+func getCorePayload(
+	ctx C.uint8_t,
+	coreType C.uint8_t,
+	id C.uint8_t,
+	ptr unsafe.Pointer,
+) {
+	response, err := store.GetCorePayload(uint8(ctx), uint8(coreType), uint8(id))
 
 	if err != nil {
 		fmt.Println(err.Error())

@@ -4,8 +4,10 @@ import {
     Hello,
     Serialization,
     SerializationIndex,
-    Stream
+    Stream,
+    StreamWrite
 } from "../@types/test.ts";
+import { Duplex } from "../bridge/duplex.ts";
 
 function hello(): string {
     return bridge(
@@ -46,12 +48,12 @@ function streaming(
     data: Uint8Array,
     intervalMs: number,
     async: false
-): ReadableStream<Uint8Array>;
+): Duplex;
 function streaming(
     data: Uint8Array,
     intervalMs: number,
     async: true
-): Promise<ReadableStream<Uint8Array>>;
+): Promise<Duplex>;
 function streaming(data: Uint8Array, intervalMs: number, async: boolean) {
     return bridge(
         {
@@ -63,11 +65,22 @@ function streaming(data: Uint8Array, intervalMs: number, async: boolean) {
     );
 }
 
+function streamWrite(async: false): Duplex
+function streamWrite(async: true): Promise<Duplex>
+function streamWrite(async: boolean) {
+    return bridge({
+        mod: Test,
+        fn: StreamWrite,
+        data: []
+    }, !async)
+}
+
 const test = {
     hello,
     serialization,
     serializationIndex,
-    streaming
+    streaming,
+    streamWrite
 };
 
 export default test;

@@ -8,8 +8,7 @@
         "jsx": "react",
         "allowImportingTsExtensions": true,
         "noEmit": true,
-        "noUnusedLocals": true,
-        "noUnusedParameters": true
+        "noUnusedLocals": true
     },
     "exclude": [
         "demo",
