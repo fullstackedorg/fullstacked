@@ -8,20 +8,20 @@ import { Duplex } from "../bridge/duplex.ts";
 import EventEmitter from "events";
 
 type SocketOpts = {
-    allowHalfOpen: boolean,
+    allowHalfOpen: boolean;
     // blockList
     // fd
-    keepAlive: boolean
-    keepAliveInitialDelay: number
-    noDelay: boolean
+    keepAlive: boolean;
+    keepAliveInitialDelay: number;
+    noDelay: boolean;
     onread: {
-        buffer: Buffer | Uint8Array | Function,
-        callback: (chunk: Buffer) => void
-    }
+        buffer: Buffer | Uint8Array | Function;
+        callback: (chunk: Buffer) => void;
+    };
     // readable
     // signal
     // writable
-}
+};
 
 export class Socket extends EventEmitter {
     private duplex: Duplex = null;
@@ -71,72 +71,87 @@ export class Socket extends EventEmitter {
         return this;
     }
 
-    pause(){
+    pause() {
         return this;
     }
 
-    resume(){
+    resume() {
         return this;
     }
 
-    pipe(){
+    pipe() {
         return this;
     }
 }
 
 type ConnectOpts = SocketOpts & {
+    port: number;
+    host: string;
+    path: string;
+};
+
+type ConnectListener = () => void;
+
+export function connect(
+    options: Partial<ConnectOpts>,
+    connectListener?: ConnectListener
+): Socket;
+export function connect(
+    path: string,
+    connectListener?: ConnectListener
+): Socket;
+export function connect(
     port: number,
-    host: string,
-    path: string
-}
-
-type ConnectListener = () => void
-
-export function connect(options: Partial<ConnectOpts>, connectListener?: ConnectListener): Socket
-export function connect(path: string, connectListener?: ConnectListener): Socket
-export function connect(port: number, host?: string, connectListener?: ConnectListener): Socket
-export function connect(pathOrPortOrOptions: Partial<ConnectOpts> | string | number, connectListenerOrHost?: string | ConnectListener, connectListener?: ConnectListener) {
-    const path = typeof pathOrPortOrOptions === "string" 
-        ? pathOrPortOrOptions
-        : typeof pathOrPortOrOptions === "object" 
-            ? pathOrPortOrOptions?.path
-            : null;
-
+    host?: string,
+    connectListener?: ConnectListener
+): Socket;
+export function connect(
+    pathOrPortOrOptions: Partial<ConnectOpts> | string | number,
+    connectListenerOrHost?: string | ConnectListener,
+    connectListener?: ConnectListener
+) {
+    const path =
+        typeof pathOrPortOrOptions === "string"
+            ? pathOrPortOrOptions
+            : typeof pathOrPortOrOptions === "object"
+              ? pathOrPortOrOptions?.path
+              : null;
 
     // connect path
     if (path) {
-        throw "socket to unix file unavailable"
+        throw "socket to unix file unavailable";
     }
 
-
-    const port = typeof pathOrPortOrOptions === "number"
-        ? pathOrPortOrOptions
-        : typeof pathOrPortOrOptions === "object" 
-            ? pathOrPortOrOptions?.port
-            : null;
+    const port =
+        typeof pathOrPortOrOptions === "number"
+            ? pathOrPortOrOptions
+            : typeof pathOrPortOrOptions === "object"
+              ? pathOrPortOrOptions?.port
+              : null;
 
     if (!port) {
-        throw "undefined port for socket connection"
+        throw "undefined port for socket connection";
     }
 
-    const host = typeof connectListenerOrHost === "string"
-        ? connectListenerOrHost
-        : typeof pathOrPortOrOptions === "object" 
-            ? pathOrPortOrOptions?.host
-            : null;
+    const host =
+        typeof connectListenerOrHost === "string"
+            ? connectListenerOrHost
+            : typeof pathOrPortOrOptions === "object"
+              ? pathOrPortOrOptions?.host
+              : null;
 
-    const options = typeof pathOrPortOrOptions === "object"
-        ? pathOrPortOrOptions
-        : null;
-    
-    const onConnectListener = typeof connectListenerOrHost === "function"
-        ? connectListenerOrHost
-        : connectListener;
+    const options =
+        typeof pathOrPortOrOptions === "object" ? pathOrPortOrOptions : null;
+
+    const onConnectListener =
+        typeof connectListenerOrHost === "function"
+            ? connectListenerOrHost
+            : connectListener;
 
     const socket = new Socket(options);
 
-    if(onConnectListener) {
-        socket.addListener("connect", onConnectListener)
+    if (onConnectListener) {
+        socket.addListener("connect", onConnectListener);
     }
 
     socket.connect(port, host);
@@ -144,7 +159,8 @@ export function connect(pathOrPortOrOptions: Partial<ConnectOpts> | string | num
     return socket;
 }
 
-export const createConnection: typeof connect = (...args: any) => connect(...(args as [any]));
+export const createConnection: typeof connect = (...args: any) =>
+    connect(...(args as [any]));
 
 export default {
     Socket,

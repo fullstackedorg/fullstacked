@@ -10,7 +10,7 @@ import {
     ResolveTXT
 } from "../@types/dns.ts";
 
-export async function resolve(hostname: string, rrtype: string) { }
+export async function resolve(hostname: string, rrtype: string) {}
 
 export function resolve4(hostname: string, rrtype?: string): Promise<string[]> {
     return bridge({
@@ -75,5 +75,5 @@ export default {
     resolveMx,
     resolveNs,
     resolveSrv,
-    resolveTxt,
+    resolveTxt
 };

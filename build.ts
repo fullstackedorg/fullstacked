@@ -53,7 +53,7 @@ packagesToBundle.forEach(({ entryPoint, outfile }) =>
         platform: "node",
         external: ["process/"],
         alias: {
-            "randombytes": "randombytes/browser"
+            randombytes: "randombytes/browser"
         }
     })
 );
