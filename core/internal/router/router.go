@@ -3,6 +3,7 @@ package router
 import (
 	"errors"
 	"fullstackedorg/fullstacked/internal/bundle"
+	"fullstackedorg/fullstacked/internal/dns"
 	"fullstackedorg/fullstacked/internal/fetch"
 	"fullstackedorg/fullstacked/internal/fs"
 	"fullstackedorg/fullstacked/internal/net"
@@ -93,6 +94,7 @@ var modules = map[types.CoreModule]types.ModuleSwitch{
 	types.Fetch:  fetch.Switch,
 	types.Bundle: bundle.Switch,
 	types.Net:    net.Switch,
+	types.Dns:    dns.Switch,
 	types.Test:   test.Switch,
 }
 

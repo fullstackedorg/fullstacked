@@ -18,6 +18,6 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { "x-header-test": "test" });
     const responseBody = req.method === "POST" ? await readBody(req) : "test";
     res.end(responseBody);
-}).listen(9090);
-
-parentPort.postMessage("ready");
+}).listen(9090, () => {
+    parentPort.postMessage("ready");
+});

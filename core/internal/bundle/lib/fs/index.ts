@@ -3,13 +3,19 @@
 import { bridge } from "../bridge/index.ts";
 import { Exists, GoFileInfo, ReadDir, ReadFile, Stats } from "../@types/fs.ts";
 import { Fs } from "../@types/index.ts";
-import { fromByteArray } from "../bridge/base64.ts";
-
-type PathLike = string | URL | Buffer;
-
-function formatPathLike(path: PathLike) {
-    return path instanceof URL ? path.pathname : path.toString();
-}
+import {
+    convertGoFileInfo,
+    decodeStringData,
+    Dirent,
+    fileInfoToStat,
+    formatPathLike,
+    PathLike,
+    ReadDirOpts,
+    ReadFileOpts,
+    StatOpts,
+    Stats as StatsInterface
+} from "./common.ts";
+import promises from "./promises.ts";
 
 export function existsSync(path: PathLike): boolean {
     return bridge(
@@ -22,62 +28,7 @@ export function existsSync(path: PathLike): boolean {
     );
 }
 
-export interface Stats {
-    // dev: 2114,
-    // ino: 48064969,
-    mode: number;
-    // nlink: 1,
-    // uid: 85,
-    // gid: 100,
-    // rdev: 0,
-    size: number;
-    // blksize: 4096,
-    // blocks: 8,
-    atimeMs: number;
-    mtimeMs: number;
-    ctimeMs: number;
-    birthtimeMs: number;
-    atime: Date;
-    mtime: Date;
-    ctime: Date;
-    birthtime: Date;
-    // isBlockDevice(): boolean
-    // isCharacterDevice(): boolean
-    // isFIFO(): boolean
-    isDirectory(): boolean;
-    isFile(): boolean;
-    // isSocket(): boolean
-    // isSymbolicLink(): boolean
-}
-
-function fileInfoToStat(fileInfo: GoFileInfo): Stats {
-    const typeFlag = fileInfo.IsDir
-        ? 16384 // fs.constants.S_IFDIR
-        : 32768; // fs.constants.S_IFREG
-
-    const mode = typeFlag | fileInfo.Mode;
-
-    return {
-        mode,
-        size: fileInfo.Size,
-        atimeMs: fileInfo.ATime / 1e6,
-        mtimeMs: fileInfo.MTime / 1e6,
-        ctimeMs: fileInfo.CTime / 1e6,
-        birthtimeMs: fileInfo.BirthTime / 1e6,
-        atime: new Date(fileInfo.ATime / 1e6),
-        mtime: new Date(fileInfo.MTime / 1e6),
-        ctime: new Date(fileInfo.CTime / 1e6),
-        birthtime: new Date(fileInfo.BirthTime / 1e6),
-        isDirectory: () => fileInfo.IsDir,
-        isFile: () => !fileInfo.IsDir
-    };
-}
-
-type StatOpts = {
-    throwIfNoEntry?: boolean;
-};
-
-export function statSync(path: PathLike, options?: StatOpts): Stats {
+export function statSync(path: PathLike, options?: StatOpts): StatsInterface {
     const fileInfo: GoFileInfo = bridge(
         {
             mod: Fs,
@@ -90,17 +41,7 @@ export function statSync(path: PathLike, options?: StatOpts): Stats {
     return fileInfoToStat(fileInfo);
 }
 
-async function statPromise(path: PathLike, options?: StatOpts): Promise<Stats> {
-    const fileInfo: GoFileInfo = await bridge({
-        mod: Fs,
-        fn: Stats,
-        data: [formatPathLike(path)]
-    });
-
-    return fileInfoToStat(fileInfo);
-}
-
-type StatCallback = (err: Error, stat: Stats) => void;
+type StatCallback = (err: Error, stat: StatsInterface) => void;
 
 export function stat(path: PathLike, callback: StatCallback): void;
 export function stat(
@@ -116,23 +57,10 @@ export function stat(
     const cb =
         typeof options === "function" ? (options as StatCallback) : callback;
     const opts = typeof options === "function" ? null : options;
-    statPromise(path, opts)
+    promises
+        .stat(path, opts)
         .then((stats) => cb(null, stats))
         .catch((e) => cb(e, null));
-}
-
-type ReadFileOpts = {
-    encoding: string;
-};
-
-function decodeStringData(data: Uint8Array, options: ReadFileOpts) {
-    if (!options?.encoding) return Buffer.from(data);
-
-    if (options.encoding === "base64") {
-        return fromByteArray(data);
-    }
-
-    return new TextDecoder(options.encoding).decode(data);
 }
 
 export function readFileSync(path: PathLike): Buffer<ArrayBuffer>;
@@ -146,21 +74,6 @@ export function readFileSync(path: PathLike, options?: ReadFileOpts) {
         },
         true
     );
-
-    return decodeStringData(data, options);
-}
-
-async function readFilePromise(path: PathLike): Promise<Buffer<ArrayBuffer>>;
-async function readFilePromise(
-    path: PathLike,
-    options: ReadFileOpts
-): Promise<string>;
-async function readFilePromise(path: PathLike, options?: ReadFileOpts) {
-    const data: Uint8Array = await bridge({
-        mod: Fs,
-        fn: ReadFile,
-        data: [formatPathLike(path)]
-    });
 
     return decodeStringData(data, options);
 }
@@ -181,48 +94,10 @@ export function readFile(
 ) {
     const cb = typeof options === "function" ? options : callback;
     const opts = typeof options === "function" ? null : options;
-    readFilePromise(path, opts)
+    promises
+        .readFile(path, opts)
         .then((data) => cb(null, data))
         .catch((e) => cb(e, null));
-}
-
-export interface Dirent {
-    name: string;
-    parentPath: string;
-    // isBlockDevice(): boolean
-    // isCharacterDevice(): boolean
-    isDirectory(): boolean;
-    // isFIFO(): boolean
-    isFile(): boolean;
-    // isSocket(): boolean
-    // isSymbolicLink(): boolean
-}
-
-type ReadDirOpts = {
-    recursive: boolean;
-    withFileTypes: boolean;
-};
-
-function convertGoFileInfo(
-    baseDir: string,
-    items: GoFileInfo[],
-    withFileTypes: boolean
-): Dirent[] | string[] {
-    if (withFileTypes) {
-        return items.map((item) => {
-            const itemNameComponents = item.Name.split("/");
-            const name = itemNameComponents.pop();
-            const parentPath = [baseDir, ...itemNameComponents].join("/");
-            return {
-                name,
-                parentPath,
-                isDirectory: () => item.IsDir,
-                isFile: () => !item.IsDir
-            };
-        }) as Dirent[];
-    }
-
-    return items.map(({ Name }) => Name);
 }
 
 export function readdirSync(
@@ -247,27 +122,6 @@ export function readdirSync(
         true
     );
 
-    return convertGoFileInfo(baseDir, items, options?.withFileTypes);
-}
-
-async function readdirPromise(
-    path: PathLike,
-    options: { withFileTypes: true; recursive?: boolean }
-): Promise<Dirent[]>;
-async function readdirPromise(
-    path: PathLike,
-    options?: { withFileTypes?: false; recursive?: boolean }
-): Promise<string[]>;
-async function readdirPromise(
-    path: PathLike,
-    options?: Partial<ReadDirOpts>
-): Promise<string[] | Dirent[]> {
-    const baseDir = formatPathLike(path);
-    const items: GoFileInfo[] = await bridge({
-        mod: Fs,
-        fn: ReadDir,
-        data: [baseDir, options?.recursive ?? false]
-    });
     return convertGoFileInfo(baseDir, items, options?.withFileTypes);
 }
 
@@ -307,11 +161,9 @@ export function readdir(
         .catch((e) => cb(e, null));
 }
 
-export const promises = {
-    stat: statPromise,
-    readFile: readFilePromise,
-    readdir: readdirPromise
-};
+export type { Stats, Dirent } from "./common.ts";
+
+export * as promises from "./promises.ts";
 
 export default {
     existsSync,

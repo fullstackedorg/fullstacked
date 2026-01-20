@@ -1,3 +1,4 @@
+import "process";
 import { toByteArray } from "../base64.ts";
 
 globalThis.global = globalThis;
@@ -24,7 +25,7 @@ function webSocketForCallback() {
 function Sync(payload: ArrayBuffer) {
     const xmlHttpRequest = new XMLHttpRequest();
     xmlHttpRequest.open("POST", "/call-sync", false);
-    xmlHttpRequest.send(payload);
+    xmlHttpRequest.send(new Uint8Array(payload));
     return toByteArray(xmlHttpRequest.response).buffer;
 }
 

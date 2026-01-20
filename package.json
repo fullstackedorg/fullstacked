@@ -58,5 +58,8 @@
     },
     "overrides": {
         "debug": "4.3.4"
+    },
+    "devDependencies": {
+        "dns2": "^2.1.0"
     }
 }

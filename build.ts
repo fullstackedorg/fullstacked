@@ -51,6 +51,9 @@ packagesToBundle.forEach(({ entryPoint, outfile }) =>
         bundle: true,
         // format: "esm",
         platform: "node",
-        external: ["process/"]
+        external: ["process/"],
+        alias: {
+            "randombytes": "randombytes/browser"
+        }
     })
 );
