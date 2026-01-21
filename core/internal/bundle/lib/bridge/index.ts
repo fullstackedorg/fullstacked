@@ -33,7 +33,7 @@ export function bridge(opts: BridgeOpts, sync?: boolean) {
             : null;
         const payload = new Uint8Array(4 + (data?.byteLength ?? 0));
 
-        payload[0] = platformBridge.ctx;
+        payload[0] = platformBridge.bridge.ctx;
         payload[1] = id;
         payload[2] = opts.mod;
         payload[3] = opts.fn;
@@ -44,13 +44,15 @@ export function bridge(opts: BridgeOpts, sync?: boolean) {
     };
 
     if (sync) {
-        if (platformBridge.ctx === null) {
-            throw new Error("cannot call sync that quickly");
+        if (platformBridge.bridge === null) {
+            throw new Error(
+                'cannot call sync that quickly. import "fullstacked"; beforehand.'
+            );
         }
         const payload = preparePayload();
-        let responseBuffer = platformBridge.Sync(payload.buffer);
-        if (responseBuffer == null && platformBridge.GetResponseSync) {
-            responseBuffer = platformBridge.GetResponseSync(id);
+        let responseBuffer = platformBridge.bridge.Sync(payload.buffer);
+        if (!responseBuffer && platformBridge.bridge.GetResponseSync) {
+            responseBuffer = platformBridge.bridge.GetResponseSync(id);
         }
         const response = processResponse(responseBuffer);
         if (response instanceof Error) {
@@ -62,7 +64,9 @@ export function bridge(opts: BridgeOpts, sync?: boolean) {
     return new Promise<SerializableData>(async (resolve, reject) => {
         await platformBridge.ready;
         const payload = preparePayload();
-        const responseBuffer = await platformBridge.Async(payload.buffer);
+        const responseBuffer = await platformBridge.bridge.Async(
+            payload.buffer
+        );
         const response = processResponse(responseBuffer);
         if (response instanceof Error) {
             reject(response);
@@ -72,7 +76,11 @@ export function bridge(opts: BridgeOpts, sync?: boolean) {
     });
 }
 
-function processResponse(buffer: ArrayBuffer) {
+function processResponse(buffer: ArrayBuffer | void) {
+    if (!buffer) {
+        return new Error("received empty response");
+    }
+
     const responseType = new DataView(buffer, 0, 1).getUint8(
         0
     ) as CoreCallResponseType;
@@ -88,7 +96,7 @@ function processResponse(buffer: ArrayBuffer) {
             return deserialize(buffer, 1).data;
         case CoreResponseStream:
             const streamId = deserialize(buffer, 1).data as number;
-            return createDuplex(streamId);
+            return createDuplex(streamId, bridge);
         case CoreResponseEventEmitter:
             throw new Error("not yet implemented");
     }

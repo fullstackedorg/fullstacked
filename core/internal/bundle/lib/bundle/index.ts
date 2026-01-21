@@ -3,8 +3,7 @@ import { Bundle } from "../@types/index.ts";
 import {
     EsbuildErrorsAndWarning,
     EsbuildVersion,
-    Bundle as BundleFn,
-    PlatformBundle
+    Bundle as BundleFn
 } from "../@types/bundle.ts";
 
 export function esbuildVersion(): Promise<string> {
@@ -15,12 +14,11 @@ export function esbuildVersion(): Promise<string> {
 }
 
 export function bundle(
-    platform: PlatformBundle,
     ...entryPoints: string[]
 ): Promise<EsbuildErrorsAndWarning> {
     return bridge({
         mod: Bundle,
         fn: BundleFn,
-        data: [platform, ...entryPoints]
+        data: [...entryPoints]
     });
 }

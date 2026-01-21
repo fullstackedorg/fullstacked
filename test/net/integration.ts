@@ -3,7 +3,6 @@ import assert from "node:assert";
 import { Worker } from "node:worker_threads";
 import { Browser, createBrowser } from "../browser.ts";
 import * as bundle from "../../core/internal/bundle/lib/bundle/index.ts";
-import { Node } from "../../core/internal/bundle/lib/@types/bundle.ts";
 import { startServer } from "./server.ts";
 
 suite("net - integration", () => {
@@ -15,7 +14,7 @@ suite("net - integration", () => {
     });
 
     test("socket", async () => {
-        const result = await bundle.bundle(Node, "test/net/sample/index.ts");
+        const result = await bundle.bundle("test/net/sample/index.ts");
         assert.deepEqual(result.Errors, null);
         assert.deepEqual(result.Warnings, null);
         const page = await browser.createPage();

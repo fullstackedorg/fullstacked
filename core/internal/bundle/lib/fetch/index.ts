@@ -30,7 +30,7 @@ function urlOrStringToUrl(url: URL | string) {
     return url instanceof URL ? url : new URL(url, globalThis?.location?.host);
 }
 
-async function fetch(
+async function fetchCore(
     request: string | URL | Request,
     init?: RequestInit
 ): Promise<Response> {
@@ -112,4 +112,5 @@ async function fetch(
     return response;
 }
 
-globalThis.fetch = fetch;
+globalThis.originalFetch = fetch;
+globalThis.fetch = fetchCore;

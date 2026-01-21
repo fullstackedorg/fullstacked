@@ -66,12 +66,20 @@ async function coreCall(core: Core, req: http.IncomingMessage) {
     return new Uint8Array(data);
 }
 
+const platform = te.encode("node");
+
 function createHandler(core: Core, ctx: number) {
     return async (req: http.IncomingMessage, res: http.ServerResponse) => {
         let [pathname] = req.url.split("?");
         pathname = decodeURI(pathname);
 
-        if (pathname === "/ctx") {
+        if (pathname === "/platform") {
+            res.writeHead(200, {
+                "content-type": "text/plain",
+                "content-length": platform.length
+            });
+            return res.end(platform);
+        } else if (pathname === "/ctx") {
             const ctxStr = ctx.toString();
             res.writeHead(200, {
                 "content-type": "text/plain",

@@ -1,8 +1,6 @@
 import core from "./core.ts";
 import { after, before } from "node:test";
 
-globalThis.nodeFetch = fetch;
-
 before(core.start);
 
 await import("./serialization/index.ts");

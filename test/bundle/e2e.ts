@@ -2,7 +2,6 @@ import test, { suite } from "node:test";
 import assert from "node:assert";
 import fs from "node:fs";
 import * as bundle from "../../core/internal/bundle/lib/bundle/index.ts";
-import { Node } from "../../core/internal/bundle/lib/@types/bundle.ts";
 
 suite("bundle - e2e", () => {
     test("esbuild version", async () => {
@@ -18,7 +17,6 @@ suite("bundle - e2e", () => {
 
     test("bundle - ts", async () => {
         const errorsAndWarnings = await bundle.bundle(
-            Node,
             "test/bundle/samples/basic/index.ts"
         );
         assert.deepEqual(errorsAndWarnings.Errors, null);
@@ -28,7 +26,6 @@ suite("bundle - e2e", () => {
 
     test("bundle - css", async () => {
         const errorsAndWarnings = await bundle.bundle(
-            Node,
             "test/bundle/samples/css/index.ts"
         );
         assert.deepEqual(errorsAndWarnings.Errors, null);

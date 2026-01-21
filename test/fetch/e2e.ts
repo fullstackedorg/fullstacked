@@ -13,9 +13,9 @@ suite("fetch - e2e", () => {
     });
 
     test("head", async () => {
-        assert.notEqual(fetch, globalThis.nodeFetch);
+        assert.notEqual(fetch, globalThis.originalFetch);
 
-        const responseNode = await globalThis.nodeFetch(
+        const responseNode = await globalThis.originalFetch(
             "http://localhost:9090"
         );
         const responseGo = await fetch("http://localhost:9090");
@@ -30,7 +30,7 @@ suite("fetch - e2e", () => {
     });
 
     test("response body - stream", async () => {
-        const responseNode = await globalThis.nodeFetch(
+        const responseNode = await globalThis.originalFetch(
             "http://localhost:9090"
         );
         let streamedNode = new Uint8Array();
@@ -48,7 +48,7 @@ suite("fetch - e2e", () => {
     });
 
     test("response body - bytes", async () => {
-        const responseNode = await globalThis.nodeFetch(
+        const responseNode = await globalThis.originalFetch(
             "http://localhost:9090"
         );
         const responseGo = await fetch("http://localhost:9090");
@@ -56,7 +56,7 @@ suite("fetch - e2e", () => {
     });
 
     test("response body - arraybuffer", async () => {
-        const responseNode = await globalThis.nodeFetch(
+        const responseNode = await globalThis.originalFetch(
             "http://localhost:9090"
         );
         const responseGo = await fetch("http://localhost:9090");
@@ -67,7 +67,7 @@ suite("fetch - e2e", () => {
     });
 
     test("response body - text", async () => {
-        const responseNode = await globalThis.nodeFetch(
+        const responseNode = await globalThis.originalFetch(
             "http://localhost:9090"
         );
         const responseGo = await fetch("http://localhost:9090");
@@ -82,7 +82,7 @@ suite("fetch - e2e", () => {
         });
         const responseGoBytes = await responseGo.bytes();
         assert.deepEqual(responseGoBytes, body);
-        const responseNode = await globalThis.nodeFetch(
+        const responseNode = await globalThis.originalFetch(
             "http://localhost:9090",
             {
                 method: "POST",

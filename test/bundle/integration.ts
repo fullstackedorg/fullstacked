@@ -1,7 +1,6 @@
 import { after, before, suite, test } from "node:test";
 import { Browser, createBrowser } from "../browser.ts";
 import * as bundle from "../../core/internal/bundle/lib/bundle/index.ts";
-import { Node } from "../../core/internal/bundle/lib/@types/bundle.ts";
 import assert from "node:assert";
 import fs from "node:fs";
 
@@ -13,7 +12,7 @@ suite("bundle - integration", () => {
     });
 
     test("basic (fs)", async () => {
-        await bundle.bundle(Node, "test/bundle/samples/basic/index.ts");
+        await bundle.bundle("test/bundle/samples/basic/index.ts");
         const page = await browser.createPage(
             `http://localhost:${browser.webview.port}/basic/`
         );
@@ -28,7 +27,7 @@ suite("bundle - integration", () => {
     });
 
     test("css", async () => {
-        await bundle.bundle(Node, "test/bundle/samples/css/index.ts");
+        await bundle.bundle("test/bundle/samples/css/index.ts");
         const page = await browser.createPage(
             `http://localhost:${browser.webview.port}/css/`
         );

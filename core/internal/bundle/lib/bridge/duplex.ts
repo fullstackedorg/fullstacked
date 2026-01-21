@@ -1,8 +1,8 @@
 import { toByteArray } from "./base64.ts";
 import { Stream } from "../@types/index.ts";
-import { bridge } from "./index.ts";
 import { Close, Open, Write } from "../@types/stream.ts";
 import { mergeUint8Arrays } from "./serialization.ts";
+import type { bridge } from "./index.ts";
 
 type DuplexItem = {
     opening: Promise<void>;
@@ -71,7 +71,7 @@ export interface Duplex extends ReadableStream<Uint8Array> {
     ): void;
 }
 
-export function createDuplex(id: number): Duplex {
+export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
     const duplex: DuplexItem = {
         opening: null,
         open: false,
@@ -95,7 +95,7 @@ export function createDuplex(id: number): Duplex {
         }
 
         duplex.opening = new Promise(async (resolveOpening) => {
-            await bridge({
+            await bridgeFn({
                 mod: Stream,
                 fn: Open,
                 data: [id]
@@ -161,14 +161,14 @@ export function createDuplex(id: number): Duplex {
     };
 
     stream.write = (data: Uint8Array) =>
-        bridge({
+        bridgeFn({
             mod: Stream,
             fn: Write,
             data: [id, data]
         });
 
     stream.end = () =>
-        bridge({
+        bridgeFn({
             mod: Stream,
             fn: Close,
             data: [id]

@@ -1,4 +1,4 @@
-import "fetch";
+import "fullstacked";
 
 const head = document.createElement("pre");
 head.id = "head";

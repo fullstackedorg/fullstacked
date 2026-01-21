@@ -4,7 +4,6 @@ import { Worker } from "node:worker_threads";
 import assert from "node:assert";
 import { Browser, createBrowser } from "../browser.ts";
 import * as bundle from "../../core/internal/bundle/lib/bundle/index.ts";
-import { Node } from "../../core/internal/bundle/lib/@types/bundle.ts";
 
 suite("fetch - integration", () => {
     let browser: Browser = null,
@@ -16,7 +15,7 @@ suite("fetch - integration", () => {
     });
 
     test("fetch", async () => {
-        const result = await bundle.bundle(Node, "test/fetch/sample/index.ts");
+        const result = await bundle.bundle("test/fetch/sample/index.ts");
         assert.deepEqual(result.Errors, null);
         assert.deepEqual(result.Warnings, null);
         const page = await browser.createPage();
@@ -26,7 +25,7 @@ suite("fetch - integration", () => {
                 'document.body.classList.contains("done")'
             );
 
-            const response = await (globalThis.nodeFetch as typeof fetch)(
+            const response = await (globalThis.originalFetch as typeof fetch)(
                 "http://localhost:9090",
                 {
                     method: "POST",

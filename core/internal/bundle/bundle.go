@@ -24,6 +24,8 @@ var libModules = map[string]string{
 	"fetch":           "/lib/fetch/index.ts",
 	"fs":              "/lib/fs/index.ts",
 	"fs/promises":     "/lib/fs/promises.ts",
+	"fullstacked":     "/lib/fullstacked/index.ts",
+	"http":            "/lib/unavailable/index.ts",
 	"net":             "/lib/net/index.ts",
 	"os":              "/lib/os/index.ts",
 	"path":            "/lib/path/index.ts",
@@ -42,23 +44,6 @@ var libModules = map[string]string{
 
 // https://github.com/evanw/esbuild/blob/main/pkg/api/api_impl.go#L502
 var BundleExtensions = []string{".tsx", ".ts", ".jsx", ".js"}
-
-type PlatformBundle = float64
-
-const (
-	Node     = 0
-	Apple    = 1
-	Android  = 2
-	Windows  = 3
-	Wasm     = 4
-	LinuxGTK = 5
-	LinuxQt  = 6
-	Electron = 7
-)
-
-var platformBridge = map[PlatformBundle]string{
-	Node: "/lib/bridge/platform/node.ts",
-}
 
 type BundleFn = uint8
 
@@ -80,11 +65,11 @@ func Switch(
 		return nil
 	case Bundle:
 		entryPoints := []string{}
-		for _, f := range data[1:] {
+		for _, f := range data {
 			entryPoints = append(entryPoints, f.Data.(string))
 		}
 		response.Type = types.CoreResponseData
-		response.Data = BundleFnApply(data[0].Data.(float64), entryPoints)
+		response.Data = BundleFnApply(entryPoints)
 		return nil
 	}
 
@@ -108,7 +93,7 @@ type EsbuildErrorsAndWarning struct {
 	Warnings []esbuild.Message
 }
 
-func BundleFnApply(platform PlatformBundle, entryPoints []string) EsbuildErrorsAndWarning {
+func BundleFnApply(entryPoints []string) EsbuildErrorsAndWarning {
 	entryPointsAdvanced := []esbuild.EntryPoint{}
 
 	for _, f := range entryPoints {
@@ -131,7 +116,6 @@ func BundleFnApply(platform PlatformBundle, entryPoints []string) EsbuildErrorsA
 			{
 				Name: "lib",
 				Setup: func(build esbuild.PluginBuild) {
-
 					// catch lib module entry
 					build.OnResolve(esbuild.OnResolveOptions{Filter: ".*"}, func(args esbuild.OnResolveArgs) (esbuild.OnResolveResult, error) {
 						libModulePath, isLibModule := libModules[args.Path]
@@ -149,24 +133,9 @@ func BundleFnApply(platform PlatformBundle, entryPoints []string) EsbuildErrorsA
 					// resolve relative import in lib modules
 					build.OnResolve(esbuild.OnResolveOptions{Filter: ".*", Namespace: "lib"}, func(args esbuild.OnResolveArgs) (esbuild.OnResolveResult, error) {
 						Path := path.Join(args.ResolveDir, args.Path)
-						Errors := []esbuild.Message{}
-						if Path == "/lib/bridge/platform/index.ts" {
-							bridge, hasPlatform := platformBridge[platform]
-							if !hasPlatform {
-								Errors = append(Errors, esbuild.Message{
-									Notes: []esbuild.Note{
-										{
-											Text: "unknown platform bridge",
-										},
-									},
-								})
-							}
-							Path = bridge
-						}
 						return esbuild.OnResolveResult{
 							Path:      Path,
 							Namespace: "lib",
-							Errors:    Errors,
 						}, nil
 					})
 
