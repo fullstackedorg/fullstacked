@@ -34,7 +34,7 @@ function _byteLength(_, validLen, placeHoldersLen) {
     return ((validLen + placeHoldersLen) * 3) / 4 - placeHoldersLen;
 }
 
-export function toByteArray(b64: string) {
+export function toByteArray(b64: string): Uint8Array<ArrayBuffer> {
     //@ts-ignore
     if (typeof Uint8Array.prototype.fromBase64 === "function") {
         //@ts-ignore
@@ -106,7 +106,7 @@ function encodeChunk(uint8, start, end) {
     return output.join("");
 }
 
-export function fromByteArray(uint8: Uint8Array) {
+export function fromByteArray(uint8: Uint8Array): string {
     //@ts-ignore
     if (typeof uint8.toBase64 === "function") {
         //@ts-ignore

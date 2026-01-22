@@ -37,6 +37,9 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         fatalError("init(coder:) has not been implemented")
     }
 
+    func onStreamData(streamId: UInt8, buffer: Data){
+        self.evaluateJavaScript("window.callback(\(streamId),`\(buffer.base64EncodedString())`)")
+    }
     
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         if(navigationAction.shouldPerformDownload) {
@@ -56,7 +59,7 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         let payload = Data(base64Encoded: message.body as! String)!
         let response = coreCall(payload: payload)
-        self.evaluateJavaScript("window.respond(`\(response.base64EncodedString())`)")
+        self.evaluateJavaScript("window.respond(\(payload[payload.startIndex + 1]),`\(response.base64EncodedString())`)")
     }
     
     func webView(_ webView:WKWebView, didFinish didFinishNavigation: WKNavigation){

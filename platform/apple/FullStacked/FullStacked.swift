@@ -25,22 +25,40 @@ func getBestSuitedColorScheme(c: Int) -> ColorScheme {
     return o >= 180 ? .light : .dark
 }
 
-
 @main
 struct FullStackedApp: App {
-    var webViews: [WebView] = []
-    
-    init() {
-        webViews.append(WebView(directory: Bundle.main.path(forResource: "build", ofType: nil)!))
-    }
-    
+    @ObservedObject var webViewStore = WebViewStore()
+
     var body: some Scene {
         WindowGroup("FullStacked"){
             ZStack{
-                ForEach(webViews, id: \.self) { webView in //
+                ForEach(webViewStore.webViews, id: \.self) { webView in //
                     WebViewRepresentable(webView: webView)
                 }
             }
+            .onAppear(){
+                coreInit()
+                webViewStore.addWebView(directory: Bundle.main.path(forResource: "build", ofType: nil)!)
+            }
         }
+    }
+}
+
+
+class WebViewStore: ObservableObject {
+    static var singleton: WebViewStore?;
+    @Published var webViews: [WebView] = []
+    
+    init(){
+        WebViewStore.singleton = self
+    }
+    
+    func addWebView(directory: String) {
+        let webView = WebView(directory: directory)
+        webViews.append(webView)
+    }
+    
+    func getWebView(ctx: UInt8) -> WebView? {
+        return webViews.first(where: { $0.requestHandler.ctx == ctx })
     }
 }
