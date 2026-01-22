@@ -116,6 +116,13 @@ func storeResponseStream(
 	return len(payload), nil
 }
 
+/*
+*
+* 1 byte type
+* n bytes data
+*
+ */
+
 func GetCorePayload(
 	ctxId uint8,
 	coreType types.CoreCallResponseType,

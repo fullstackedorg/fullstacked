@@ -1,5 +1,19 @@
 import SwiftUI
 
+#if os(macOS)
+let isMacOS = true
+let isIPadOS = false
+#else
+let isMacOS = false
+let isIPadOS = WebViewRepresentable.isIPadOS
+#endif
+
+#if targetEnvironment(simulator)
+let isSimulator = true
+#else
+let isSimulator = false
+#endif
+
 let EditorColor = 0x1E293B
 
 // source: https://github.com/scottcorgan/contrast/blob/master/index.js
@@ -11,95 +25,20 @@ func getBestSuitedColorScheme(c: Int) -> ColorScheme {
     return o >= 180 ? .light : .dark
 }
 
+
 @main
 struct FullStackedApp: App {
-    static var singleton: FullStackedApp?
-    @ObservedObject var webViews = WebViews()
-
+    var webViews: [WebView] = []
+    
     init() {
-        FullStackedApp.singleton = self;
-        
-        setCallback()
-        setDirectories()
+        webViews.append(WebView(directory: Bundle.main.path(forResource: "build", ofType: nil)!))
     }
     
     var body: some Scene {
-        #if os(macOS)
-        Window("FullStacked", id: "Editor"){
-            Color(hex: EditorColor)
-                .ignoresSafeArea(.all)
-                .overlay {
-                    WebViewsStacked(webViews: self.webViews)
-                        .padding(EdgeInsets(top: 1.0, leading: 0, bottom: 0, trailing: 0))
-                        .toolbar {
-                            Spacer()
-                        }
-                        .toolbarBackground(Color(hex: EditorColor))
-                        .navigationTitle("FullStacked")
-                        .preferredColorScheme(.dark)
-                        .onDisappear {
-                            exit(0)
-                        }
-                }
-        }
-        #else
         WindowGroup("FullStacked"){
-            if #available(iOS 16.0, *) {
-                if isIPadOS {
-                    NavigationStack {
-                        WebViewsStacked(webViews: self.webViews)
-                            .onDisappear {
-                                exit(0)
-                            }
-                            .preferredColorScheme(.dark)
-                            .navigationBarTitleDisplayMode(.inline)
-                            .navigationTitle("FullStacked")
-                    }
-                } else {
-                    WebViewsStacked(webViews: self.webViews)
-                        .onDisappear {
-                            exit(0)
-                        }
-                }
-                
-            } else {
-                WebViewsStackedLegacy(webViews: self.webViews)
-                    .onDisappear{
-                        exit(0)
-                    }
-            }
-        }
-        #endif
-        
-        if #available(iOS 16.1, *) {
-            WindowGroup(id: "window-webview", for: String.self) { $projectId in
-                Color(hex: webViews.getColor(projectId: projectId))
-                    .ignoresSafeArea(.all)
-                    .overlay {
-                        #if os(macOS)
-                            WebViewInWindow(projectId: projectId)
-                                .toolbar {
-                                    Spacer()
-                                }
-                                .padding(EdgeInsets(top: 1.0, leading: 0, bottom: 0, trailing: 0))
-                                .toolbarBackground(Color(hex: webViews.getColor(projectId: projectId)))
-                                .preferredColorScheme(getBestSuitedColorScheme(c: webViews.getColor(projectId: projectId)))
-                                .navigationTitle(webViews.getTitle(projectId: projectId))
-                        #else
-                            NavigationStack {
-                                WebViewInWindow(projectId: projectId)
-                                    .navigationBarTitleDisplayMode(.inline)
-                                    .preferredColorScheme(getBestSuitedColorScheme(c: webViews.getColor(projectId: projectId)))
-                                    .navigationTitle(webViews.getTitle(projectId: projectId))
-                            }
-                        #endif
-                    }
-                    .navigationTitle(webViews.getTitle(projectId: projectId))
-            }
-            
-            .commands {
-                CommandGroup(replacing: CommandGroupPlacement.newItem) {
-                    EmptyView()
+            ZStack{
+                ForEach(webViews, id: \.self) { webView in //
+                    WebViewRepresentable(webView: webView)
                 }
             }
         }

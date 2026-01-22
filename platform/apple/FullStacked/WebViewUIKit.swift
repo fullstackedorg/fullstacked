@@ -19,18 +19,18 @@ class WebViewExtended: WKWebView {
     }
     
     // source: https://stackoverflow.com/a/28528496
-    func snapshotImageToWindowColor(projectId: String, image: UIImage){
-        let imageRef = image.cgImage
-        
-        let pixelData = imageRef?.dataProvider?.data
-        let pixelDataPtr = CFDataGetBytePtr(pixelData)!
-        let r = pixelDataPtr[0]
-        let g = pixelDataPtr[1]
-        let b = pixelDataPtr[2]
-        
-        let colorInt = (Int(r) << 16) | (Int(g) << 8) | Int(b);
-        FullStackedApp.singleton?.webViews.setColor(projectId: projectId, color: colorInt)
-    }
+//    func snapshotImageToWindowColor(projectId: String, image: UIImage){
+//        let imageRef = image.cgImage
+//        
+//        let pixelData = imageRef?.dataProvider?.data
+//        let pixelDataPtr = CFDataGetBytePtr(pixelData)!
+//        let r = pixelDataPtr[0]
+//        let g = pixelDataPtr[1]
+//        let b = pixelDataPtr[2]
+//        
+//        let colorInt = (Int(r) << 16) | (Int(g) << 8) | Int(b);
+//        FullStackedApp.singleton?.webViews.setColor(projectId: projectId, color: colorInt)
+//    }
 }
 
 struct WebViewRepresentable: UIViewRepresentable {

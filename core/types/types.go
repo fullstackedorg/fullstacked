@@ -79,9 +79,9 @@ const (
 	UNDEFINED SerializableDataType = 0
 	BOOLEAN   SerializableDataType = 1
 	STRING    SerializableDataType = 2
-	NUMBER    SerializableDataType = 4
-	BUFFER    SerializableDataType = 5
-	OBJECT    SerializableDataType = 6
+	NUMBER    SerializableDataType = 3
+	BUFFER    SerializableDataType = 4
+	OBJECT    SerializableDataType = 5
 )
 
 const MAX_UINT_4_BYTES = 4294967295

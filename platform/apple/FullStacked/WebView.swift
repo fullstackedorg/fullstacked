@@ -1,31 +1,29 @@
-@preconcurrency import WebKit
+import WebKit
 
 let platform = "apple"
 let downloadDirectory = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first! + "/downloads";
 
 class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WKDownloadDelegate {
     public let requestHandler: RequestHandler
-    var firstContact = false
-    private var messageToBeSent = [(String, String)]()
-    public var mounted = false
     
-    init(instance: Instance) {
-        self.requestHandler = RequestHandler(instance: instance)
+    init(directory: String) {
+        let ctx = start(directory.ptr())
+        self.requestHandler = RequestHandler(ctx: ctx)
         
+        // inspector / debug console
         let wkWebViewConfig = WKWebViewConfiguration()
         wkWebViewConfig.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        
         let userContentController = WKUserContentController()
         wkWebViewConfig.userContentController = userContentController
         wkWebViewConfig.setURLSchemeHandler(self.requestHandler, forURLScheme: "fs")
         
         super.init(frame: CGRect(), configuration: wkWebViewConfig)
+        
+        
+        self.isInspectable = true
         self.navigationDelegate = self
-        
         userContentController.add(self, name: "bridge")
-        
-        if #available(iOS 16.4, macOS 13.3, *) {
-            self.isInspectable = true
-        }
         
         self.load(URLRequest(url: URL(string: "fs://localhost")!))
     }
@@ -56,43 +54,21 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     }
     
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        if(!self.firstContact){
-            self.firstContact = true
-            self.messageToBeSent.forEach({ self.onMessage(messageType: $0.0, message: $0.1) })
-            self.messageToBeSent.removeAll()
-        }
-        let data = Data(base64Encoded: message.body as! String)!
-        var response = data[0...3]
-        let payload = data[4...]
-        let responsePayload = self.requestHandler.instance.callLib(payload: payload)
-        response.append(responsePayload)
+        let payload = Data(base64Encoded: message.body as! String)!
+        let response = coreCall(payload: payload)
         self.evaluateJavaScript("window.respond(`\(response.base64EncodedString())`)")
     }
     
-    func onMessage(messageType: String, message: String) {
-        if(!self.firstContact) {
-            self.messageToBeSent.append((messageType, message))
-            return;
-        }
-        
-        let escapedMessage = message
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "`", with: "\\`")
-        DispatchQueue.main.async() {
-            self.evaluateJavaScript("window.oncoremessage(`\(messageType)`,`\(escapedMessage)`)")
-        }
-    }
-    
     func webView(_ webView:WKWebView, didFinish didFinishNavigation: WKNavigation){
-        let wkSnapConfig = WKSnapshotConfiguration()
-        wkSnapConfig.rect = CGRect(x: 0, y: 0, width: 1, height: 1)
-        takeSnapshot(with: wkSnapConfig) { image, err in
-            if(err != nil) {
-                print(err!)
-                return
-            }
-            self.snapshotImageToWindowColor(projectId: self.requestHandler.instance.id, image: image!)
-        }
+//        let wkSnapConfig = WKSnapshotConfiguration()
+//        wkSnapConfig.rect = CGRect(x: 0, y: 0, width: 1, height: 1)
+//        takeSnapshot(with: wkSnapConfig) { image, err in
+//            if(err != nil) {
+//                print(err!)
+//                return
+//            }
+//            self.snapshotImageToWindowColor(projectId: self.requestHandler.instance.id, image: image!)
+//        }
     }
     
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
@@ -122,10 +98,10 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
 
 
 class RequestHandler: NSObject, WKURLSchemeHandler {
-    let instance: Instance
+    let ctx: UInt8
     
-    init(instance: Instance) {
-        self.instance = instance
+    init(ctx: UInt8) {
+        self.ctx = ctx
     }
     
     func send(urlSchemeTask: WKURLSchemeTask,
@@ -172,14 +148,19 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
         
         let pathnameData = pathname.data(using: .utf8)!
         var payload = Data([
-            1, // static file method
-            2 // STRING
+            self.ctx,
+            0, // req id
+            0, // Core Module
+            0, // Fn Static File
+            
+            SerializableDataType.STRING.rawValue,
         ])
-        payload.append(pathnameData.count.toBytes())
+        payload.append(NumberToUint4Bytes(num: pathnameData.count))
         payload.append(pathnameData)
         
-        let response = self.instance.callLib(payload: payload)
-        let args = response.deserializeArgs()
+        let responseData = coreCall(payload: payload)
+        let (response, _) = Deserialize(buffer: responseData, index: 1)
+        let args = DeserializeAll(buffer: response as! Data)
         
         if(args.count < 2 || args[0] == nil) {
             send(urlSchemeTask: urlSchemeTask,
@@ -200,15 +181,9 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
     func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) { }
 }
 
-
-extension Int {
-    func toBytes() -> Data {
-        var bytes = Data(count: 4)
-        bytes[0] = UInt8((self & 0xff000000) >> 24);
-        bytes[1] = UInt8((self & 0x00ff0000) >> 16)
-        bytes[2] = UInt8((self & 0x0000ff00) >> 8)
-        bytes[3] = UInt8((self & 0x000000ff) >> 0)
-        return bytes
+extension String {
+    func ptr() -> UnsafeMutableRawPointer? {
+        return Data(self.utf8).ptr()
     }
 }
 
@@ -217,60 +192,18 @@ extension Data {
         return UnsafeMutableRawPointer(mutating: (self as NSData).bytes)
     }
     
-    func toInt() -> Int {
-        let bytes = [UInt8](self)
-        var value : UInt = 0
-        for byte in bytes {
-            value = value << 8
-            value = value | UInt(byte)
-        }
-        return Int(value)
-    }
-    
-    func deserializeArgs() -> [Any?] {
-        var args: [Any?] = []
-        
-        var cursor = 0;
-        while(cursor < self.count) {
-            let type = DataType(rawValue: self[cursor])
-            cursor += 1
-            let length = self[cursor...(cursor + 3)].toInt()
-            cursor += 4
-            let arg = length > 0 ? self[cursor...(cursor + length - 1)] : Data()
-            cursor += length
-            
-            switch (type) {
-            case .UNDEFINED:
-                args.append(nil)
-                break
-            case .BOOLEAN:
-                args.append(arg[0] == 1 ? true : false)
-                break
-            case .STRING:
-                args.append(String(data: arg, encoding: .utf8))
-                break
-            case .NUMBER:
-                args.append(nil);
-                print("Deserializing number not implemented in iOS")
-                break
-            case .UINT8ARRAY:
-                args.append(arg)
-                break
-            case .none:
-                print("Unknown type to deserialize")
+    func print(){
+        var str = "["
+        for i in 0...(self.count - 1) {
+            str += String(self[self.startIndex + i])
+            if(i < self.count - 1){
+                str += ", "
+            } else {
+                str += "]"
             }
         }
-        
-        return args
+        Swift.print(str)
     }
-}
-
-enum DataType: UInt8 {
-    case UNDEFINED = 0
-    case BOOLEAN = 1
-    case STRING = 2
-    case NUMBER = 3
-    case UINT8ARRAY = 4
 }
 
 

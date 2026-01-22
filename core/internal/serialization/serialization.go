@@ -9,7 +9,7 @@ import (
 	"strconv"
 )
 
-func NumberToUin4Bytes(num int) ([]byte, error) {
+func NumberToUint4Bytes(num int) ([]byte, error) {
 	if num < 0 {
 		return nil, errors.New("cannot convert negative number to uint 4 bytes")
 	}
@@ -87,7 +87,7 @@ func deserializeBoolean(buffer []byte, index int) (bool, int, error) {
 func serializeString(str string) ([]byte, error) {
 	strData := []byte(str)
 	strSize := len(strData)
-	size, err := NumberToUin4Bytes(strSize)
+	size, err := NumberToUint4Bytes(strSize)
 
 	if err != nil {
 		return nil, errors.New("problem with str size serialize")
@@ -144,7 +144,7 @@ func deserializeNumber(buffer []byte, index int) (float64, int, error) {
 
 func serializeBuffer(buffer []byte) ([]byte, error) {
 	bufferSize := len(buffer)
-	size, err := NumberToUin4Bytes(bufferSize)
+	size, err := NumberToUint4Bytes(bufferSize)
 
 	if err != nil {
 		return nil, errors.New("problem with buffer size serialize")
@@ -184,7 +184,7 @@ func serializeObject(obj any) ([]byte, error) {
 	}
 
 	jsonBufferSize := len(jsonBuffer)
-	size, err := NumberToUin4Bytes(jsonBufferSize)
+	size, err := NumberToUint4Bytes(jsonBufferSize)
 
 	if err != nil {
 		return nil, errors.New("problem with object size serialize")

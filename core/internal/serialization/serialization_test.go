@@ -18,7 +18,7 @@ func TestUint4BytesToInt(t *testing.T) {
 	}
 
 	for v, buf := range testData {
-		serialized, err := NumberToUin4Bytes(v)
+		serialized, err := NumberToUint4Bytes(v)
 		if !slices.Equal(serialized, buf) || err != nil {
 			t.Errorf(`Failed Uint4BytesToInt`)
 		}
@@ -36,11 +36,11 @@ func TestUint4BytesToInt(t *testing.T) {
 	if err == nil {
 		t.Errorf(`Failed Uint4BytesToInt`)
 	}
-	_, err = NumberToUin4Bytes(-1)
+	_, err = NumberToUint4Bytes(-1)
 	if err == nil {
 		t.Errorf(`Failed Uint4BytesToInt`)
 	}
-	_, err = NumberToUin4Bytes(types.MAX_UINT_4_BYTES + 1)
+	_, err = NumberToUint4Bytes(types.MAX_UINT_4_BYTES + 1)
 	if err == nil {
 		t.Errorf(`Failed Uint4BytesToInt`)
 	}
