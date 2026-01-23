@@ -1,10 +1,13 @@
 import { PlatformBridge } from "./index.ts";
 import { fromByteArray, toByteArray } from "../base64.ts";
 
-const asyncResponsePromises = new Map<number, (response: ArrayBuffer) => void>();
+const asyncResponsePromises = new Map<
+    number,
+    (response: ArrayBuffer) => void
+>();
 
 export function BridgeAppleInit(): PlatformBridge {
-    globalThis.respond = function(id: number, responseB64: string) {
+    globalThis.respond = function (id: number, responseB64: string) {
         const promise = asyncResponsePromises.get(id);
         promise?.(toByteArray(responseB64).buffer);
         asyncResponsePromises.delete(id);
