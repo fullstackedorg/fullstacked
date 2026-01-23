@@ -3,7 +3,6 @@ import net from "node:net";
 import { Duplex } from "node:stream";
 import open from "open";
 import { WebSocket, WebSocketServer } from "ws";
-// import { getEnvVar } from ".";
 import type { Core } from "./core.ts";
 import {
     deserialize,
@@ -15,7 +14,6 @@ import {
     STRING
 } from "../../../core/internal/bundle/lib/@types/index.ts";
 import { StaticFile } from "../../../core/internal/bundle/lib/@types/router.ts";
-import { fromByteArray } from "../../../core/internal/bundle/lib/bridge/base64.ts";
 
 // export let mainPort = parseInt(getEnvVar("port"));
 // if (!mainPort || isNaN(mainPort)) {
@@ -94,15 +92,14 @@ function createHandler(core: Core, ctx: number) {
                 "cache-control": "no-cache"
             });
             return res.end(payload);
-        } else if (pathname === "/call-sync") {
+        } else if (pathname === "/sync") {
             const payload = await coreCall(core, req);
-            const payloadBase64 = fromByteArray(payload);
             res.writeHead(200, {
-                "content-type": "text/plain",
-                "content-length": payloadBase64.length,
+                "content-type": "application/octet-stream",
+                "content-length": payload.byteLength,
                 "cache-control": "no-cache"
             });
-            return res.end(payloadBase64);
+            return res.end(payload);
         }
 
         const staticFile = coreStaticFile(core, ctx, pathname);
@@ -131,6 +128,7 @@ export function coreStaticFile(
         0, // id
         CoreModule, // Module
         StaticFile, // Fn
+        0, // Async
 
         STRING,
         ...numberToUint4Bytes(pathnameData.length), // arg length

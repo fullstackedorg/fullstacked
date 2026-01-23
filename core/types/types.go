@@ -41,6 +41,7 @@ type CoreCallResponse struct {
 }
 
 type CoreCallHeader struct {
+	Sync   uint8
 	Id     uint8
 	Module CoreModule
 	Fn     uint8

@@ -38,7 +38,9 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     }
 
     func onStreamData(streamId: UInt8, buffer: Data){
-        self.evaluateJavaScript("window.callback(\(streamId),`\(buffer.base64EncodedString())`)")
+        DispatchQueue.main.async {
+            self.evaluateJavaScript("window.callback(\(streamId),`\(buffer.base64EncodedString())`)")
+        }
     }
     
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
@@ -59,7 +61,16 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         let payload = Data(base64Encoded: message.body as! String)!
         let response = coreCall(payload: payload)
-        self.evaluateJavaScript("window.respond(\(payload[payload.startIndex + 1]),`\(response.base64EncodedString())`)")
+        
+        // Sync
+        if(payload[payload.startIndex + 4] == 1) {
+            let id = payload[payload.startIndex + 1]
+            self.requestHandler.resolveSyncAwaiter(id: id, payload: response)
+        }
+        // Async
+        else {
+            self.evaluateJavaScript("window.respond(\(payload[payload.startIndex + 1]),`\(response.base64EncodedString())`)")
+        }
     }
     
     func webView(_ webView:WKWebView, didFinish didFinishNavigation: WKNavigation){
@@ -102,9 +113,22 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
 
 class RequestHandler: NSObject, WKURLSchemeHandler {
     let ctx: UInt8
+    private var syncAwaitersResolve: [UInt8:((_ payload: Data) -> Void)] = [:]
+    private var syncAwaitersPayload: [UInt8:Data] = [:]
     
     init(ctx: UInt8) {
         self.ctx = ctx
+    }
+    
+    func resolveSyncAwaiter(id: UInt8, payload: Data) {
+        print(id)
+        payload.print()
+        if let resolve = syncAwaitersResolve[id] {
+            resolve(payload)
+            syncAwaitersResolve.removeValue(forKey: id)
+        } else {
+            syncAwaitersPayload[id] = payload
+        }
     }
     
     func send(urlSchemeTask: WKURLSchemeTask,
@@ -137,6 +161,8 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
             pathname = "/"
         }
         
+        print(pathname)
+        
         if(pathname == "platform") {
             let data = platform.data(using: .utf8)!
             self.send(urlSchemeTask: urlSchemeTask,
@@ -144,6 +170,32 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
                       statusCode: 200,
                       mimeType: "text/plain",
                       data: data)
+            return
+        } else if (pathname.starts(with: "sync")) {
+            let idStr = pathname.split(separator: "/").last!
+            let id = UInt8(idStr)!
+            
+            print(id)
+            
+            let sendCallback = {(payload: Data) -> Void in
+                DispatchQueue.main.async {
+                    self.send(
+                        urlSchemeTask: urlSchemeTask,
+                        url: request.url!,
+                        statusCode: 200,
+                        mimeType: "application/octet-stream",
+                        data: payload
+                    )
+                }
+            }
+            
+            if let payload = self.syncAwaitersPayload[id] {
+                sendCallback(payload)
+                self.syncAwaitersPayload.removeValue(forKey: id)
+            } else {
+                self.syncAwaitersResolve[id] = sendCallback
+            }
+            
             return
         }
         
@@ -155,6 +207,7 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
             0, // req id
             0, // Core Module
             0, // Fn Static File
+            0, // Async
             
             SerializableDataType.STRING.rawValue,
         ])

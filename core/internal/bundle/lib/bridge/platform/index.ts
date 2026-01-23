@@ -42,7 +42,7 @@ if (globalThis.process) {
                     platformBridge.bridge = await BridgeNodeInit();
                     break;
                 case "apple":
-                    platformBridge.bridge = await BridgeAppleInit();
+                    platformBridge.bridge = BridgeAppleInit();
                     break;
             }
             res();

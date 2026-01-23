@@ -31,14 +31,15 @@ export function bridge(opts: BridgeOpts, sync?: boolean) {
         const data = opts.data
             ? mergeUint8Arrays(...opts.data.map(serialize))
             : null;
-        const payload = new Uint8Array(4 + (data?.byteLength ?? 0));
+        const payload = new Uint8Array(5 + (data?.byteLength ?? 0));
 
         payload[0] = platformBridge.bridge.ctx;
         payload[1] = id;
         payload[2] = opts.mod;
         payload[3] = opts.fn;
+        payload[4] = sync ? 1 : 0;
         if (data != null) {
-            payload.set(data, 4);
+            payload.set(data, 5);
         }
         return payload;
     };

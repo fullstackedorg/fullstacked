@@ -23,11 +23,12 @@ const (
 )
 
 /*
-1 byte ctx
-1 byte id
-1 byte module
-1 byte fn
-n bytes data
+0: 1 byte ctx
+1: 1 byte id
+2: 1 byte module
+3: 1 byte fn
+4: 1 byte (0 = async, 1 sync)
+5: n bytes data
 */
 
 func Call(payload []byte) (int, error) {
@@ -56,9 +57,10 @@ func Call(payload []byte) (int, error) {
 		Id:     payload[1],
 		Module: payload[2],
 		Fn:     payload[3],
+		Sync:   payload[4],
 	}
 
-	data, err := serialization.DeserializeAll(payload[4:])
+	data, err := serialization.DeserializeAll(payload[5:])
 
 	if err != nil {
 		return 0, errors.New("failed to deserialize payload data")
