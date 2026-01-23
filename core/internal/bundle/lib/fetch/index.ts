@@ -27,7 +27,7 @@ function bodyInitToBuffer(body: BodyInit) {
 }
 
 function urlOrStringToUrl(url: URL | string) {
-    return url instanceof URL ? url : new URL(url, globalThis?.location?.host);
+    return url instanceof URL ? url : new URL(url, url.startsWith("/") ? globalThis?.location?.host : undefined);
 }
 
 async function fetchCore(

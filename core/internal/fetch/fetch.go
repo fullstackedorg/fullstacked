@@ -10,7 +10,6 @@ import (
 	"io"
 	"net/http"
 	"sync"
-	"time"
 )
 
 type FetchFn = uint8
@@ -102,7 +101,7 @@ func FetchFnApply(requestHead RequestHead, body []byte) (ResponseHead, error) {
 	}
 
 	// infinite timeout
-	client.Timeout = time.Duration(1) * time.Second
+	client.Timeout = 0
 
 	response, err := client.Do(request)
 

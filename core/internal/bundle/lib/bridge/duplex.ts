@@ -20,7 +20,7 @@ type DuplexItem = {
 
 const activeDuplexes = new Map<number, DuplexItem>();
 
-globalThis.callback = async function (
+globalThis.callback = async function(
     id: number,
     payload: ArrayBuffer | string
 ) {
@@ -116,13 +116,17 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
     };
 
     const next = async () => {
+        if (duplex.done) {
+            return { done: true }
+        }
+
         if (duplex.asyncRead === null) {
             duplex.asyncRead = {
                 data: null
             };
         }
 
-        if (!duplex.open) {
+        if (!duplex.open && !duplex.opening) {
             await open();
         }
 
@@ -135,15 +139,17 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
 
         return {
             value,
-            done: duplex.done
+            done: value ? false : duplex.done
         };
     };
-
-    const it = {
-        next
-    };
-
-    const stream = iteratorToStream(it as AsyncIterator<Uint8Array>);
+    
+    const stream: any = {
+        [Symbol.asyncIterator]() {
+            return {
+                next
+            }
+        }
+    }
 
     stream.on = (event: string, cb) => {
         switch (event) {
@@ -175,20 +181,4 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
         });
 
     return stream;
-}
-
-// https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream#convert_an_iterator_or_async_iterator_to_a_stream
-function iteratorToStream(iterator: AsyncIterator<Uint8Array>) {
-    return new ReadableStream({
-        async pull(controller) {
-            const { value, done } = await iterator.next();
-
-            if (value) {
-                controller.enqueue(value);
-            }
-            if (done) {
-                controller.close();
-            }
-        }
-    }) as any;
 }
