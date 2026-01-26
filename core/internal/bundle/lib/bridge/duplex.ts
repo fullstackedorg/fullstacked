@@ -20,7 +20,7 @@ type DuplexItem = {
 
 const activeDuplexes = new Map<number, DuplexItem>();
 
-globalThis.callback = async function(
+globalThis.callback = async function (
     id: number,
     payload: ArrayBuffer | string
 ) {
@@ -117,7 +117,7 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
 
     const next = async () => {
         if (duplex.done) {
-            return { done: true }
+            return { done: true };
         }
 
         if (duplex.asyncRead === null) {
@@ -142,14 +142,14 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
             done: value ? false : duplex.done
         };
     };
-    
+
     const stream: any = {
         [Symbol.asyncIterator]() {
             return {
                 next
-            }
+            };
         }
-    }
+    };
 
     stream.on = (event: string, cb) => {
         switch (event) {

@@ -15,6 +15,7 @@ const (
 	Fetch  CoreModule = 7
 	Bundle CoreModule = 8
 	Dns    CoreModule = 9
+	Git    CoreModule = 10
 )
 
 type ModuleSwitch = func(*CoreCallContext, CoreCallHeader, []DeserializedData, *CoreCallResponse) error

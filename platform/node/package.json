@@ -1,11 +1,6 @@
 {
     "name": "fullstacked",
     "version": "0.12.3-1442",
-    "scripts": {
-        "build": "node build.js",
-        "start": "npm run build && node index.js ",
-        "prepack": "node build.js --fullstacked_modules"
-    },
     "bin": {
         "fullstacked": "index.js"
     },

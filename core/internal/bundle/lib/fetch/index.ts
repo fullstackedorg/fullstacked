@@ -27,7 +27,12 @@ function bodyInitToBuffer(body: BodyInit) {
 }
 
 function urlOrStringToUrl(url: URL | string) {
-    return url instanceof URL ? url : new URL(url, url.startsWith("/") ? globalThis?.location?.host : undefined);
+    return url instanceof URL
+        ? url
+        : new URL(
+              url,
+              url.startsWith("/") ? globalThis?.location?.host : undefined
+          );
 }
 
 async function fetchCore(

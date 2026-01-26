@@ -74,7 +74,6 @@ suite("fetch - e2e", () => {
         assert.deepEqual(await responseNode.text(), await responseGo.text());
     });
 
-
     test("response body - json", async () => {
         const responseNode = await globalThis.originalFetch(
             "http://localhost:9090/json"
@@ -82,10 +81,10 @@ suite("fetch - e2e", () => {
         const jsonNode = await responseNode.json();
 
         const responseGo = await fetch("http://localhost:9090/json");
-        const jsonGo = await responseGo.json()
+        const jsonGo = await responseGo.json();
 
         assert.deepEqual(jsonNode, jsonGo);
-    })
+    });
 
     test("request body", async () => {
         const body = new Uint8Array([1, 2, 3, 4]);

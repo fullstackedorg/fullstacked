@@ -1,10 +1,8 @@
 {
     "version": "0.12.3",
     "scripts": {
-        "prebuild": "esbuild --bundle --platform=node --format=esm --packages=external --outfile=build.js build.ts",
-        "build": "node build.js",
-        "postbuild": "node -e \"require('node:fs').rmSync('build.js')\"",
-        "start": "npm run build && npm start -w platform/node --ignore-scripts",
+        "build": "node -r @nitrogql/esbuild-register build",
+        "start": "node -r @nitrogql/esbuild-register index",
         "fmt": "sh ./fmt.sh",
         "typecheck": "tsc --noEmit",
         "test": "node --experimental-test-coverage -r @nitrogql/esbuild-register test"

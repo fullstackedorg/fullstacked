@@ -6,6 +6,7 @@ import (
 	"fullstackedorg/fullstacked/internal/dns"
 	"fullstackedorg/fullstacked/internal/fetch"
 	"fullstackedorg/fullstacked/internal/fs"
+	"fullstackedorg/fullstacked/internal/git"
 	"fullstackedorg/fullstacked/internal/net"
 	"fullstackedorg/fullstacked/internal/os"
 	"fullstackedorg/fullstacked/internal/path"
@@ -97,6 +98,7 @@ var modules = map[types.CoreModule]types.ModuleSwitch{
 	types.Bundle: bundle.Switch,
 	types.Net:    net.Switch,
 	types.Dns:    dns.Switch,
+	types.Git:    git.Switch,
 	types.Test:   test.Switch,
 }
 

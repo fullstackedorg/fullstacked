@@ -2,10 +2,10 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 import zlib from "node:zlib";
+import { createRequire } from "node:module";
 import cliProgress from "cli-progress";
 import prettyBytes from "pretty-bytes";
 import tar from "tar-stream";
-import { createRequire } from "node:module";
 
 globalThis.require = createRequire(import.meta.url);
 

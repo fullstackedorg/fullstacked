@@ -1,3 +1,10 @@
+import os from "node:os";
+import child_process from "child_process";
+import esbuild from "esbuild";
+import path from "node:path";
+
+// shims
+
 // events : https://www.npmjs.com/package/events
 // util : https://www.npmjs.com/package/util
 // string_decoder : https://www.npmjs.com/package/string_decoder
@@ -6,8 +13,6 @@
 // process : https://www.npmjs.com/package/process
 // crypto : https://www.npmjs.com/package/crypto-browserify
 // zlib : https://www.npmjs.com/package/browserify-zlib
-
-import esbuild from "esbuild";
 
 const packagesToBundle = [
     {
@@ -56,4 +61,32 @@ packagesToBundle.forEach(({ entryPoint, outfile }) =>
             randombytes: "randombytes/browser"
         }
     })
+);
+
+// types
+
+child_process.execSync("go run ./generate.go", { cwd: "types" });
+
+// core
+
+const platform = os.platform();
+const arch = os.arch();
+
+if (platform === "win32") {
+    child_process.execSync(`call ./windows.bat ${arch}`, {
+        stdio: "inherit",
+        cwd: "core/build"
+    });
+} else {
+    const target_name = platform + "-" + arch + "-shared";
+    child_process.execSync(`make ${target_name}`, {
+        stdio: "inherit",
+        cwd: "core/build"
+    });
+}
+
+export const sharedLibLocation = path.resolve(
+    "core",
+    "bin",
+    `${platform}-${arch}.${platform === "win32" ? "dll" : "so"}`
 );
