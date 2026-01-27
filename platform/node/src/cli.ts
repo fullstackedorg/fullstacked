@@ -23,7 +23,7 @@ export async function execute(command: string[]) {
         out = await out;
     }
 
-    if (out[Symbol.asyncIterator]) {
+    if (out?.[Symbol.asyncIterator]) {
         for await (const chunk of out) {
             process.stdout.write(chunk);
         }

@@ -3,6 +3,7 @@ import { Git } from "../@types/index.ts";
 import {
     Add,
     Clone,
+    Commit,
     GitCommit,
     GitStatus,
     Log,
@@ -49,6 +50,17 @@ export function clone(url: string, directory?: string): Duplex {
             mod: Git,
             fn: Clone,
             data: [url, directory]
+        },
+        true
+    );
+}
+
+export function commit(message: string, authorName?: string, authorEmail?: string, directory?: string) {
+    return bridge(
+        {
+            mod: Git,
+            fn: Commit,
+            data: [directory, message, authorName, authorEmail]
         },
         true
     );

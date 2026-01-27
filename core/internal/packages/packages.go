@@ -1,6 +1,7 @@
 package packages
 
 import (
+	"encoding/json"
 	"errors"
 	"fullstackedorg/fullstacked/types"
 )
@@ -22,5 +23,17 @@ func Switch(
 
 	}
 
-	return errors.New("unknown git function")
+	return errors.New("unknown packages function")
+}
+
+type PackageJSON struct {
+	Name            string            `json:"name"`
+	Version         string            `json:"version"`
+	Dependencies    map[string]string `json:"dependencies"`
+	DevDependencies map[string]string `json:"devDependencies"`
+
+	Main    string          `json:"main"`
+	Browser json.RawMessage `json:"browser"`
+	Module  string          `json:"module"`
+	Exports json.RawMessage `json:"exports"`
 }

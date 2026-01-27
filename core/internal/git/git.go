@@ -1,7 +1,6 @@
 package git
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"fullstackedorg/fullstacked/internal/store"
@@ -30,6 +29,7 @@ const (
 	Checkout GitFn = 7
 	Reset    GitFn = 8
 	Restore  GitFn = 9
+	Merge    GitFn = 10
 )
 
 func directory(ctx *types.CoreCallContext, data types.DeserializedData) string {
@@ -78,8 +78,10 @@ func Switch(
 	case Commit:
 		response.Type = types.CoreResponseData
 
-		author := GitAuthor{}
-		json.Unmarshal(data[2].Data.(types.DeserializedRawObject).Data, &author)
+		author := GitAuthor{
+			Name:  data[2].Data.(string),
+			Email: data[3].Data.(string),
+		}
 
 		err := commit(directory(ctx, data[0]), data[1].Data.(string), author)
 		if err != nil {
@@ -217,7 +219,14 @@ func add(directory string, path string) error {
 		return err
 	}
 
-	_, err = worktree.Add(path)
+	if path == "." {
+		err = worktree.AddWithOptions(&git.AddOptions{
+			All: true,
+		})
+	} else {
+
+		_, err = worktree.Add(path)
+	}
 
 	return err
 }
@@ -260,7 +269,6 @@ func log(directory string, n int) ([]GitCommit, error) {
 		} else if err != nil {
 			return nil, err
 		}
-		commit.String()
 
 		logs = append(logs, GitCommit{
 			Hash: commit.Hash.String(),
