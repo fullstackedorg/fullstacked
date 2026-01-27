@@ -7,11 +7,14 @@ import {
     GitCommit,
     GitStatus,
     Log,
+    Pull,
+    Push,
+    Reset,
     Status
 } from "../@types/git.ts";
 import type { Duplex } from "../bridge/duplex.ts";
 
-export function status(directory?: string): GitStatus {
+export function status(directory: string): GitStatus {
     return bridge(
         {
             mod: Git,
@@ -22,7 +25,7 @@ export function status(directory?: string): GitStatus {
     );
 }
 
-export function add(path: string, directory?: string) {
+export function add(path: string, directory: string) {
     return bridge(
         {
             mod: Git,
@@ -33,7 +36,7 @@ export function add(path: string, directory?: string) {
     );
 }
 
-export function log(directory?: string): GitCommit[] {
+export function log(directory: string): GitCommit[] {
     return bridge(
         {
             mod: Git,
@@ -44,7 +47,7 @@ export function log(directory?: string): GitCommit[] {
     );
 }
 
-export function clone(url: string, directory?: string): Duplex {
+export function clone(url: string, directory: string): Duplex {
     return bridge(
         {
             mod: Git,
@@ -55,7 +58,12 @@ export function clone(url: string, directory?: string): Duplex {
     );
 }
 
-export function commit(message: string, authorName?: string, authorEmail?: string, directory?: string) {
+export function commit(
+    message: string,
+    authorName: string,
+    authorEmail: string,
+    directory: string
+): string {
     return bridge(
         {
             mod: Git,
@@ -66,9 +74,46 @@ export function commit(message: string, authorName?: string, authorEmail?: strin
     );
 }
 
+export function pull(directory: string): Duplex {
+    return bridge(
+        {
+            mod: Git,
+            fn: Pull,
+            data: [directory]
+        },
+        true
+    );
+}
+
+export function push(directory: string): Duplex {
+    return bridge(
+        {
+            mod: Git,
+            fn: Push,
+            data: [directory]
+        },
+        true
+    );
+}
+
+export function reset(directory: string, ...files: string[]) {
+    return bridge(
+        {
+            mod: Git,
+            fn: Reset,
+            data: [directory, ...(files || [])]
+        },
+        true
+    );
+}
+
 export default {
     status,
     add,
     log,
-    clone
+    clone,
+    commit,
+    pull,
+    push,
+    reset
 };

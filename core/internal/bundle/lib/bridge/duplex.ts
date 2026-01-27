@@ -69,6 +69,7 @@ export interface Duplex extends ReadableStream<Uint8Array> {
         encoding?: string | EndCallback,
         callback?: EndCallback
     ): void;
+    promise(): Promise<any>;
 }
 
 export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
@@ -179,6 +180,14 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
             fn: Close,
             data: [id]
         });
+
+    stream.promise = async () => {
+        let data = new Uint8Array();
+        for await (const chunk of stream) {
+            data = mergeUint8Arrays(data, chunk);
+        }
+        return data;
+    };
 
     return stream;
 }

@@ -26,10 +26,11 @@ const (
 	Clone    GitFn = 4
 	Pull     GitFn = 5
 	Push     GitFn = 6
-	Checkout GitFn = 7
-	Reset    GitFn = 8
-	Restore  GitFn = 9
-	Merge    GitFn = 10
+	Reset    GitFn = 7
+	Branch   GitFn = 8
+	Checkout GitFn = 9
+	Restore  GitFn = 10
+	Merge    GitFn = 11
 )
 
 func directory(ctx *types.CoreCallContext, data types.DeserializedData) string {
@@ -59,13 +60,7 @@ func Switch(
 		return nil
 	case Add:
 		response.Type = types.CoreResponseData
-
-		err := add(directory(ctx, data[0]), data[1].Data.(string))
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return add(directory(ctx, data[0]), data[1].Data.(string))
 	case Log:
 		response.Type = types.CoreResponseData
 		logs, err := log(directory(ctx, data[0]), int(data[1].Data.(float64)))
@@ -83,10 +78,11 @@ func Switch(
 			Email: data[3].Data.(string),
 		}
 
-		err := commit(directory(ctx, data[0]), data[1].Data.(string), author)
+		hash, err := commit(directory(ctx, data[0]), data[1].Data.(string), author)
 		if err != nil {
 			return err
 		}
+		response.Data = hash
 
 		return nil
 	case Clone:
@@ -103,6 +99,36 @@ func Switch(
 		}
 		response.Stream = stream
 		return nil
+	case Pull:
+		response.Type = types.CoreResponseStream
+
+		stream, err := pull(directory(ctx, data[0]))
+		if err != nil {
+			return err
+		}
+		response.Stream = stream
+		return nil
+	case Push:
+		response.Type = types.CoreResponseStream
+
+		stream, err := push(directory(ctx, data[0]))
+		if err != nil {
+			return err
+		}
+		response.Stream = stream
+		return nil
+	case Reset:
+		response.Type = types.CoreResponseData
+
+		files := []string{}
+		if len(data) > 1 {
+			for _, f := range data[1:] {
+				files = append(files, f.Data.(string))
+			}
+		}
+
+		return reset(directory(ctx, data[0]), files)
+	case Checkout:
 	}
 
 	return errors.New("unknown git function")
@@ -284,20 +310,20 @@ func log(directory string, n int) ([]GitCommit, error) {
 	return logs, nil
 }
 
-func commit(directory string, message string, author GitAuthor) error {
+func commit(directory string, message string, author GitAuthor) (string, error) {
 	repository, err := git.PlainOpen(directory)
 
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	worktree, err := repository.Worktree()
 
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	_, err = worktree.Commit(message, &git.CommitOptions{
+	hash, err := worktree.Commit(message, &git.CommitOptions{
 		Author: &object.Signature{
 			Name:  author.Name,
 			Email: author.Email,
@@ -305,15 +331,19 @@ func commit(directory string, message string, author GitAuthor) error {
 		},
 	})
 
-	return err
+	if err != nil {
+		return "", err
+	}
+
+	return hash.String(), nil
 }
 
-type GitCloneStream struct {
+type GitStream struct {
 	ctx      *types.CoreCallContext
 	streamId uint8
 }
 
-func (progress *GitCloneStream) Write(p []byte) (n int, err error) {
+func (progress *GitStream) Write(p []byte) (n int, err error) {
 	store.StreamChunk(progress.ctx, progress.streamId, p, false)
 	return len(p), nil
 }
@@ -333,7 +363,7 @@ func clone(urlStr string, directory string) (*types.ResponseStream, error) {
 		Open: func(ctx *types.CoreCallContext, streamId uint8) {
 			_, err := git.PlainClone(directory, &git.CloneOptions{
 				URL: urlStr,
-				Progress: &GitCloneStream{
+				Progress: &GitStream{
 					ctx:      ctx,
 					streamId: streamId,
 				},
@@ -348,4 +378,97 @@ func clone(urlStr string, directory string) (*types.ResponseStream, error) {
 			store.StreamChunk(ctx, streamId, nil, true)
 		},
 	}, nil
+}
+
+func pull(directory string) (*types.ResponseStream, error) {
+	repository, err := git.PlainOpen(directory)
+
+	if err != nil {
+		return nil, err
+	}
+
+	worktree, err := repository.Worktree()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.ResponseStream{
+		Open: func(ctx *types.CoreCallContext, streamId uint8) {
+			err := worktree.Pull(&git.PullOptions{
+				Progress: &GitStream{
+					ctx:      ctx,
+					streamId: streamId,
+				},
+			})
+
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			store.StreamChunk(ctx, streamId, nil, true)
+		},
+	}, nil
+}
+
+func push(directory string) (*types.ResponseStream, error) {
+	repository, err := git.PlainOpen(directory)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.ResponseStream{
+		Open: func(ctx *types.CoreCallContext, streamId uint8) {
+			err := repository.Push(&git.PushOptions{
+				Progress: &GitStream{
+					ctx:      ctx,
+					streamId: streamId,
+				},
+			})
+
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			store.StreamChunk(ctx, streamId, nil, true)
+		},
+	}, nil
+}
+
+func reset(directory string, files []string) error {
+	repository, err := git.PlainOpen(directory)
+
+	if err != nil {
+		return err
+	}
+
+	worktree, err := repository.Worktree()
+
+	if err != nil {
+		return err
+	}
+
+	return worktree.Reset(&git.ResetOptions{
+		Files: files,
+	})
+}
+
+type GitBranch struct {
+	Name   string `json:"name"`
+	Remote bool   `json:"remote"`
+	Local  bool   `json:"local"`
+}
+
+// func branch(directory string) ([]GitBranch, error) {
+// 	repository, err := git.PlainOpen(directory)
+
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// }
+
+func checkout() {
+
 }

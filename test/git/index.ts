@@ -20,11 +20,8 @@ function resetRepositories() {
     );
 }
 
-function cloneRepository(name: "test" | "empty") {
-    return new Promise<void>((res) => {
-        const c = git.clone(`http://localhost:8080/${name}`, testDirectory);
-        c.on("close", res);
-    });
+function cloneRepository(name: "test" | "empty", directory = testDirectory) {
+    return git.clone(`http://localhost:8080/${name}`, directory).promise();
 }
 
 suite("git - e2e", () => {
@@ -137,6 +134,73 @@ suite("git - e2e", () => {
         const untracked = gitStatus.trim().split("\n")?.at(-1).trim();
         assert.ok(untracked);
         assert.deepEqual(untracked, status.untracked.at(0));
+    });
+
+    test("commit", async () => {
+        await cloneRepository("empty");
+        fs.writeFileSync(`${testDirectory}/test.txt`, "123");
+        git.add(".", testDirectory);
+        const name = "user test";
+        const email = "test@testing.com";
+        const message = "test commit";
+        const hash = git.commit(message, name, email, testDirectory);
+        const [log] = git.log(testDirectory);
+        assert.deepEqual(log.hash, hash);
+        assert.deepEqual(log.author.name, name);
+        assert.deepEqual(log.author.email, email);
+        assert.deepEqual(log.message, message);
+    });
+
+    test("pull", async () => {
+        const testingDirectory = `${testDirectory}/test`;
+        const actualDirectory = `${testDirectory}/actual`;
+        await cloneRepository("test", testingDirectory);
+        await cloneRepository("test", actualDirectory);
+        assert.deepEqual(git.log(testingDirectory).length, 1);
+        fs.writeFileSync(`${actualDirectory}/test.txt`, "123");
+        child_process.execSync(
+            `git commit -a --author="test user <test@testing.com>" -m "test commit 2"`,
+            {
+                cwd: actualDirectory,
+                stdio: "ignore"
+            }
+        );
+        child_process.execSync(`git push`, {
+            cwd: actualDirectory,
+            stdio: "ignore"
+        });
+        await git.pull(testingDirectory).promise();
+        assert.deepEqual(git.log(testingDirectory).length, 2);
+    });
+
+    test("push", async () => {
+        await cloneRepository("test");
+        assert.deepEqual(git.log(testDirectory).length, 1);
+        fs.writeFileSync(`${testDirectory}/test.txt`, "testing 2");
+        git.add(".", testDirectory);
+        git.commit(
+            "test commit 2",
+            "test user",
+            "test@testing.com",
+            testDirectory
+        );
+        await git.push(testDirectory).promise();
+        fs.rmSync(testDirectory, { recursive: true });
+        await cloneRepository("test");
+        assert.deepEqual(git.log(testDirectory).length, 2);
+    });
+
+    test("reset", async () => {
+        await cloneRepository("test");
+        const status1 = git.status(testDirectory);
+        fs.writeFileSync(`${testDirectory}/test.txt`, "test 2");
+        const status2 = git.status(testDirectory);
+        assert.notDeepEqual(status1, status2);
+        git.add(".", testDirectory);
+        const status3 = git.status(testDirectory);
+        assert.notDeepEqual(status2, status3);
+        git.reset(testDirectory);
+        assert.deepEqual(git.status(testDirectory), status2);
     });
 
     after(() => {
