@@ -59,7 +59,7 @@ func openStream(ctx *types.CoreCallContext, streamId uint8) error {
 	stream.Opened = true
 
 	if stream.Open != nil {
-		stream.Open(ctx, streamId)
+		go stream.Open(ctx, streamId)
 	}
 
 	return nil

@@ -1,10 +1,20 @@
 package git
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/types"
+	"io"
+	"net/url"
+	"path"
+	"strings"
+	"time"
 
-	git "github.com/go-git/go-git/v5"
+	git "github.com/go-git/go-git/v6"
+	"github.com/go-git/go-git/v6/plumbing/object"
+	"github.com/go-git/go-git/v6/plumbing/transport"
 )
 
 type GitFn = uint8
@@ -13,6 +23,8 @@ const (
 	Status GitFn = 0
 	Add    GitFn = 1
 	Log    GitFn = 2
+	Commit GitFn = 3
+	Clone  GitFn = 4
 )
 
 func directory(ctx *types.CoreCallContext, data types.DeserializedData) string {
@@ -58,23 +70,48 @@ func Switch(
 		response.Data = logs
 
 		return nil
+	case Commit:
+		response.Type = types.CoreResponseData
 
+		author := GitAuthor{}
+		json.Unmarshal(data[2].Data.(types.DeserializedRawObject).Data, &author)
+
+		err := commit(directory(ctx, data[0]), data[1].Data.(string), author)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	case Clone:
+		response.Type = types.CoreResponseStream
+
+		directory := "."
+		if data[1].Type == types.STRING {
+			directory = data[1].Data.(string)
+		}
+
+		stream, err := clone(data[0].Data.(string), directory)
+		if err != nil {
+			return err
+		}
+		response.Stream = stream
+		return nil
 	}
 
 	return errors.New("unknown git function")
 }
 
 type GitHead struct {
-	Branch string
-	Hash   string
-	Type   string
+	Branch string `json:"branch"`
+	Hash   string `json:"hash"`
+	Type   string `json:"type"`
 }
 
 type GitStatus struct {
-	Head      GitHead
-	Staged    map[string][]string
-	Unstaged  map[string][]string
-	Untracked []string
+	Head      GitHead             `json:"head"`
+	Staged    map[string][]string `json:"staged"`
+	Unstaged  map[string][]string `json:"unstaged"`
+	Untracked []string            `json:"untracked"`
 }
 
 func statusCodeToString(statusCode git.StatusCode) string {
@@ -120,7 +157,7 @@ func status(directory string) (GitStatus, error) {
 	}
 
 	s.Head = GitHead{
-		Branch: head.Name().String(),
+		Branch: head.Name().Short(),
 		Hash:   head.Hash().String(),
 	}
 
@@ -213,7 +250,9 @@ func log(directory string, n int) ([]GitCommit, error) {
 	for n > len(logs) {
 		commit, err := iter.Next()
 
-		if err != nil {
+		if err == io.EOF {
+			break
+		} else if err != nil {
 			return nil, err
 		}
 		commit.String()
@@ -225,9 +264,75 @@ func log(directory string, n int) ([]GitCommit, error) {
 				Email: commit.Author.Email,
 			},
 			Date:    commit.Author.When.Format(DateFormat),
-			Message: commit.Message,
+			Message: strings.TrimSpace(commit.Message),
 		})
 	}
 
 	return logs, nil
+}
+
+func commit(directory string, message string, author GitAuthor) error {
+	repository, err := git.PlainOpen(directory)
+
+	if err != nil {
+		return err
+	}
+
+	worktree, err := repository.Worktree()
+
+	if err != nil {
+		return err
+	}
+
+	_, err = worktree.Commit(message, &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  author.Name,
+			Email: author.Email,
+			When:  time.Now(),
+		},
+	})
+
+	return err
+}
+
+type GitCloneStream struct {
+	ctx      *types.CoreCallContext
+	streamId uint8
+}
+
+func (progress *GitCloneStream) Write(p []byte) (n int, err error) {
+	store.StreamChunk(progress.ctx, progress.streamId, p, false)
+	return len(p), nil
+}
+
+func clone(urlStr string, directory string) (*types.ResponseStream, error) {
+	url, err := url.Parse(urlStr)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if directory == "." {
+		directory = strings.TrimSuffix(path.Base(url.Path), path.Ext(url.Path))
+	}
+
+	return &types.ResponseStream{
+		Open: func(ctx *types.CoreCallContext, streamId uint8) {
+			_, err := git.PlainClone(directory, &git.CloneOptions{
+				URL: urlStr,
+				Progress: &GitCloneStream{
+					ctx:      ctx,
+					streamId: streamId,
+				},
+			})
+
+			if err == transport.ErrEmptyRemoteRepository {
+				store.StreamChunk(ctx, streamId, []byte(err.Error()), false)
+			} else if err != nil {
+				fmt.Println(err)
+			}
+
+			store.StreamChunk(ctx, streamId, nil, true)
+		},
+	}, nil
 }

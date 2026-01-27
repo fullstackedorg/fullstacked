@@ -12,3 +12,4 @@ core/internal/bundle/lib/**/*.js
 **/*/_*.js
 **/*/_*.css
 !test/static-file/sample/_index.ts.js
+test/**/test

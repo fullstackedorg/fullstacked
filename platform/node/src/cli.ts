@@ -17,5 +17,17 @@ export async function execute(command: string[]) {
     const libModule = await import(
         libModulesLocation + "/" + command[0] + "/index.ts"
     );
-    console.log(libModule[command[1]](...command.slice(2)));
+    let out = libModule[command[1]](...command.slice(2));
+
+    if (out instanceof Promise) {
+        out = await out;
+    }
+
+    if (out[Symbol.asyncIterator]) {
+        for await (const chunk of out) {
+            process.stdout.write(chunk);
+        }
+    } else {
+        console.log(out)
+    }
 }

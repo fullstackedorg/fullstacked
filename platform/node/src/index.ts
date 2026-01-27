@@ -4,7 +4,7 @@ import url from "node:url";
 import { load } from "./core";
 import { bundle } from "../../../core/internal/bundle/lib/bundle";
 import { createWebView } from "./webview";
-import { execute } from "./cli/index.ts";
+import { execute } from "./cli.ts";
 
 ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) =>
     process.on(signal, () => process.exit())
@@ -19,7 +19,7 @@ const core = await load(
         if (webview) {
             webview.callback(streamId, buffer);
         } else {
-            console.log(ctx, streamId, buffer);
+            globalThis.callback(streamId, buffer)
         }
     },
     true
