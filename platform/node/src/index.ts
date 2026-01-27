@@ -19,7 +19,7 @@ const core = await load(
         if (webview) {
             webview.callback(streamId, buffer);
         } else {
-            globalThis.callback(streamId, buffer)
+            globalThis.callback(streamId, buffer);
         }
     },
     true

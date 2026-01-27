@@ -9,6 +9,7 @@ import (
 	"fullstackedorg/fullstacked/internal/git"
 	"fullstackedorg/fullstacked/internal/net"
 	"fullstackedorg/fullstacked/internal/os"
+	"fullstackedorg/fullstacked/internal/packages"
 	"fullstackedorg/fullstacked/internal/path"
 	"fullstackedorg/fullstacked/internal/serialization"
 	"fullstackedorg/fullstacked/internal/store"
@@ -33,8 +34,8 @@ const (
 */
 
 func Call(payload []byte) (int, error) {
-	if len(payload) < 4 {
-		return 0, errors.New("payload needs at least ctx, id, module, function")
+	if len(payload) < 5 {
+		return 0, errors.New("payload needs at least ctx, id, module, function, sync/async")
 	}
 
 	ctxId := payload[0]
@@ -89,17 +90,18 @@ func Call(payload []byte) (int, error) {
 }
 
 var modules = map[types.CoreModule]types.ModuleSwitch{
-	types.Core:   Switch,
-	types.Stream: stream.Switch,
-	types.Path:   path.Switch,
-	types.Fs:     fs.Switch,
-	types.Os:     os.Switch,
-	types.Fetch:  fetch.Switch,
-	types.Bundle: bundle.Switch,
-	types.Net:    net.Switch,
-	types.Dns:    dns.Switch,
-	types.Git:    git.Switch,
-	types.Test:   test.Switch,
+	types.Core:     Switch,
+	types.Stream:   stream.Switch,
+	types.Path:     path.Switch,
+	types.Fs:       fs.Switch,
+	types.Os:       os.Switch,
+	types.Fetch:    fetch.Switch,
+	types.Bundle:   bundle.Switch,
+	types.Net:      net.Switch,
+	types.Dns:      dns.Switch,
+	types.Git:      git.Switch,
+	types.Packages: packages.Switch,
+	types.Test:     test.Switch,
 }
 
 func callProcess(

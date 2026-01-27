@@ -1,6 +1,13 @@
 import { bridge } from "../bridge/index.ts";
 import { Git } from "../@types/index.ts";
-import { Add, Clone, GitCommit, GitStatus, Log, Status } from "../@types/git.ts";
+import {
+    Add,
+    Clone,
+    GitCommit,
+    GitStatus,
+    Log,
+    Status
+} from "../@types/git.ts";
 import type { Duplex } from "../bridge/duplex.ts";
 
 export function status(directory?: string): GitStatus {
@@ -45,7 +52,7 @@ export function clone(url: string, directory?: string): Duplex {
         },
         true
     );
-} 
+}
 
 export default {
     status,

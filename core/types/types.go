@@ -5,17 +5,18 @@ import "sync"
 type CoreModule = uint8
 
 const (
-	Core   CoreModule = 0
-	Stream CoreModule = 1
-	Test   CoreModule = 2
-	Fs     CoreModule = 3
-	Path   CoreModule = 4
-	Os     CoreModule = 5
-	Net    CoreModule = 6
-	Fetch  CoreModule = 7
-	Bundle CoreModule = 8
-	Dns    CoreModule = 9
-	Git    CoreModule = 10
+	Core     CoreModule = 0
+	Stream   CoreModule = 1
+	Test     CoreModule = 2
+	Fs       CoreModule = 3
+	Path     CoreModule = 4
+	Os       CoreModule = 5
+	Net      CoreModule = 6
+	Fetch    CoreModule = 7
+	Bundle   CoreModule = 8
+	Dns      CoreModule = 9
+	Git      CoreModule = 10
+	Packages CoreModule = 11
 )
 
 type ModuleSwitch = func(*CoreCallContext, CoreCallHeader, []DeserializedData, *CoreCallResponse) error

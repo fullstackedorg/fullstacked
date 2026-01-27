@@ -20,11 +20,16 @@ import (
 type GitFn = uint8
 
 const (
-	Status GitFn = 0
-	Add    GitFn = 1
-	Log    GitFn = 2
-	Commit GitFn = 3
-	Clone  GitFn = 4
+	Status   GitFn = 0
+	Add      GitFn = 1
+	Log      GitFn = 2
+	Commit   GitFn = 3
+	Clone    GitFn = 4
+	Pull     GitFn = 5
+	Push     GitFn = 6
+	Checkout GitFn = 7
+	Reset    GitFn = 8
+	Restore  GitFn = 9
 )
 
 func directory(ctx *types.CoreCallContext, data types.DeserializedData) string {

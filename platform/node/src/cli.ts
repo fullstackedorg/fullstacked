@@ -28,6 +28,6 @@ export async function execute(command: string[]) {
             process.stdout.write(chunk);
         }
     } else {
-        console.log(out)
+        console.log(out);
     }
 }
