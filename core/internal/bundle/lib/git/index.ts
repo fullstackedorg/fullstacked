@@ -2,17 +2,33 @@ import { bridge } from "../bridge/index.ts";
 import { Git } from "../@types/index.ts";
 import {
     Add,
+    Branch,
     Clone,
     Commit,
+    GitBranch,
     GitCommit,
     GitStatus,
+    GitTag,
+    Init,
     Log,
     Pull,
     Push,
     Reset,
-    Status
+    Status,
+    Tags
 } from "../@types/git.ts";
 import type { Duplex } from "../bridge/duplex.ts";
+
+export function init(url: string, directory: string) {
+    return bridge(
+        {
+            mod: Git,
+            fn: Init,
+            data: [directory, url]
+        },
+        true
+    );
+}
 
 export function status(directory: string): GitStatus {
     return bridge(
@@ -107,7 +123,41 @@ export function reset(directory: string, ...files: string[]) {
     );
 }
 
+export function branch(directory: string): GitBranch[] {
+    return bridge(
+        {
+            mod: Git,
+            fn: Branch,
+            data: [directory]
+        },
+        true
+    );
+}
+
+export function tags(directory: string): GitTag[] {
+    return bridge(
+        {
+            mod: Git,
+            fn: Tags,
+            data: [directory]
+        },
+        true
+    );
+}
+
+export function checkout(ref: string, create: boolean, directory: string) {
+    return bridge(
+        {
+            mod: Git,
+            fn: Tags,
+            data: [directory, ref, create]
+        },
+        true
+    );
+}
+
 export default {
+    init,
     status,
     add,
     log,
@@ -115,5 +165,7 @@ export default {
     commit,
     pull,
     push,
-    reset
+    reset,
+    branch,
+    tags,
 };

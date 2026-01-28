@@ -12,25 +12,29 @@ import (
 	"time"
 
 	git "github.com/go-git/go-git/v6"
+	"github.com/go-git/go-git/v6/config"
+	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/go-git/go-git/v6/plumbing/object"
+	"github.com/go-git/go-git/v6/plumbing/storer"
 	"github.com/go-git/go-git/v6/plumbing/transport"
 )
 
 type GitFn = uint8
 
 const (
-	Status   GitFn = 0
-	Add      GitFn = 1
-	Log      GitFn = 2
-	Commit   GitFn = 3
-	Clone    GitFn = 4
-	Pull     GitFn = 5
-	Push     GitFn = 6
-	Reset    GitFn = 7
-	Branch   GitFn = 8
-	Checkout GitFn = 9
-	Restore  GitFn = 10
-	Merge    GitFn = 11
+	Init     GitFn = 0
+	Status   GitFn = 1
+	Add      GitFn = 2
+	Log      GitFn = 3
+	Commit   GitFn = 4
+	Clone    GitFn = 5
+	Pull     GitFn = 6
+	Push     GitFn = 7
+	Reset    GitFn = 8
+	Branch   GitFn = 9
+	Tags     GitFn = 10
+	Checkout GitFn = 11
+	Merge    GitFn = 12
 )
 
 func directory(ctx *types.CoreCallContext, data types.DeserializedData) string {
@@ -48,6 +52,9 @@ func Switch(
 	response *types.CoreCallResponse,
 ) error {
 	switch header.Fn {
+	case Init:
+		response.Type = types.CoreResponseData
+		return initFn(directory(ctx, data[0]), data[1].Data.(string))
 	case Status:
 		response.Type = types.CoreResponseData
 
@@ -128,10 +135,51 @@ func Switch(
 		}
 
 		return reset(directory(ctx, data[0]), files)
+	case Branch:
+		response.Type = types.CoreResponseData
+
+		branches, err := branch(directory(ctx, data[0]))
+		if err != nil {
+			return err
+		}
+		response.Data = branches
+
+		return nil
+	case Tags:
+		response.Type = types.CoreResponseData
+
+		tags, err := tags(directory(ctx, data[0]))
+		if err != nil {
+			return err
+		}
+		response.Data = tags
+
+		return nil
 	case Checkout:
+		response.Type = types.CoreResponseData
+		create := false
+		if len(data) > 2 && data[2].Type == types.BOOLEAN {
+			create = data[2].Data.(bool)
+		}
+		return checkout(directory(ctx, data[0]), data[1].Data.(string), create)
 	}
 
 	return errors.New("unknown git function")
+}
+
+func initFn(directory string, url string) error {
+	repository, err := git.PlainInit(directory, false, git.WithDefaultBranch(plumbing.Main))
+
+	if err != nil {
+		return err
+	}
+
+	_, err = repository.CreateRemote(&config.RemoteConfig{
+		Name: "origin",
+		URLs: []string{url},
+	})
+
+	return err
 }
 
 type GitHead struct {
@@ -177,7 +225,13 @@ func status(directory string) (GitStatus, error) {
 		Untracked: []string{},
 	}
 
-	repository, err := git.PlainOpen(directory)
+	dir, err := OpenGitDirectory(directory)
+
+	if err != nil {
+		return s, err
+	}
+
+	repository, err := dir.Repository()
 
 	if err != nil {
 		return s, err
@@ -192,6 +246,7 @@ func status(directory string) (GitStatus, error) {
 	s.Head = GitHead{
 		Branch: head.Name().Short(),
 		Hash:   head.Hash().String(),
+		Type:   head.Type().String(),
 	}
 
 	worktree, err := repository.Worktree()
@@ -233,7 +288,13 @@ func status(directory string) (GitStatus, error) {
 }
 
 func add(directory string, path string) error {
-	repository, err := git.PlainOpen(directory)
+	dir, err := OpenGitDirectory(directory)
+
+	if err != nil {
+		return err
+	}
+
+	repository, err := dir.Repository()
 
 	if err != nil {
 		return err
@@ -272,7 +333,13 @@ type GitCommit struct {
 const DateFormat = "Mon Jan 02 15:04:05 2006 -0700"
 
 func log(directory string, n int) ([]GitCommit, error) {
-	repository, err := git.PlainOpen(directory)
+	dir, err := OpenGitDirectory(directory)
+
+	if err != nil {
+		return nil, err
+	}
+
+	repository, err := dir.Repository()
 
 	if err != nil {
 		return nil, err
@@ -311,7 +378,13 @@ func log(directory string, n int) ([]GitCommit, error) {
 }
 
 func commit(directory string, message string, author GitAuthor) (string, error) {
-	repository, err := git.PlainOpen(directory)
+	dir, err := OpenGitDirectory(directory)
+
+	if err != nil {
+		return "", err
+	}
+
+	repository, err := dir.Repository()
 
 	if err != nil {
 		return "", err
@@ -381,7 +454,13 @@ func clone(urlStr string, directory string) (*types.ResponseStream, error) {
 }
 
 func pull(directory string) (*types.ResponseStream, error) {
-	repository, err := git.PlainOpen(directory)
+	dir, err := OpenGitDirectory(directory)
+
+	if err != nil {
+		return nil, err
+	}
+
+	repository, err := dir.Repository()
 
 	if err != nil {
 		return nil, err
@@ -412,7 +491,13 @@ func pull(directory string) (*types.ResponseStream, error) {
 }
 
 func push(directory string) (*types.ResponseStream, error) {
-	repository, err := git.PlainOpen(directory)
+	dir, err := OpenGitDirectory(directory)
+
+	if err != nil {
+		return nil, err
+	}
+
+	repository, err := dir.Repository()
 
 	if err != nil {
 		return nil, err
@@ -437,7 +522,13 @@ func push(directory string) (*types.ResponseStream, error) {
 }
 
 func reset(directory string, files []string) error {
-	repository, err := git.PlainOpen(directory)
+	dir, err := OpenGitDirectory(directory)
+
+	if err != nil {
+		return err
+	}
+
+	repository, err := dir.Repository()
 
 	if err != nil {
 		return err
@@ -460,15 +551,255 @@ type GitBranch struct {
 	Local  bool   `json:"local"`
 }
 
-// func branch(directory string) ([]GitBranch, error) {
-// 	repository, err := git.PlainOpen(directory)
+func branchRemote(directory string, remoteName string) ([]GitBranch, error) {
+	repository, err := git.PlainOpen(directory)
 
-// 	if err != nil {
-// 		return nil, err
-// 	}
+	if err != nil {
+		return nil, err
+	}
 
-// }
+	remote, err := repository.Remote(remoteName)
 
-func checkout() {
+	if err != nil {
+		return nil, err
+	}
 
+	refs, err := remote.List(&git.ListOptions{})
+
+	if err != nil {
+		return nil, err
+	}
+
+	branches := []GitBranch{}
+	for _, r := range refs {
+		if r.Name().IsBranch() {
+			branches = append(branches, GitBranch{
+				Name:   r.Name().Short(),
+				Remote: true,
+			})
+		}
+	}
+
+	return branches, nil
+}
+
+func branchLocal(directory string) ([]GitBranch, error) {
+	repository, err := git.PlainOpen(directory)
+
+	if err != nil {
+		return nil, err
+	}
+
+	refs, err := repository.Branches()
+
+	if err != nil {
+		return nil, err
+	}
+
+	branches := []GitBranch{}
+	refs.ForEach(func(r *plumbing.Reference) error {
+		if r.Name().IsBranch() {
+			branches = append(branches, GitBranch{
+				Name:  r.Name().Short(),
+				Local: true,
+			})
+		}
+		return nil
+	})
+
+	return branches, nil
+}
+
+func refIteratorToReferenceSlice(iter storer.ReferenceIter) []*plumbing.Reference {
+	refs := []*plumbing.Reference{}
+	iter.ForEach(func(r *plumbing.Reference) error {
+		refs = append(refs, r)
+		return nil
+	})
+
+	return refs
+}
+
+func branch(directory string) ([]GitBranch, error) {
+	dir, err := OpenGitDirectory(directory)
+
+	if err != nil {
+		return nil, err
+	}
+
+	refsRemote, err := dir.LsRemote("origin")
+
+	if err != nil {
+		return nil, err
+	}
+
+	repository, err := dir.Repository()
+
+	if err != nil {
+		return nil, err
+	}
+
+	branchIter, err := repository.Branches()
+
+	if err != nil {
+		return nil, err
+	}
+
+	refsLocal := refIteratorToReferenceSlice(branchIter)
+
+	branches := []GitBranch{}
+	mergeBranches := func(refs []*plumbing.Reference, remote bool) {
+		for _, ref := range refs {
+			if !ref.Name().IsBranch() {
+				continue
+			}
+
+			index := -1
+			for i, b := range branches {
+				if b.Name == ref.Name().Short() {
+					index = i
+					break
+				}
+			}
+
+			if index == -1 {
+				index = len(branches)
+				branches = append(branches, GitBranch{
+					Name: ref.Name().Short(),
+				})
+			}
+
+			if remote {
+				branches[index].Remote = true
+			} else {
+				branches[index].Local = true
+			}
+		}
+	}
+	mergeBranches(refsRemote, true)
+	mergeBranches(refsLocal, false)
+
+	return branches, nil
+}
+
+type GitTag struct {
+	Name   string `json:"name"`
+	Hash   string `json:"hash"`
+	Remote bool   `json:"remote"`
+	Local  bool   `json:"local"`
+}
+
+func tags(directory string) ([]GitTag, error) {
+	dir, err := OpenGitDirectory(directory)
+
+	if err != nil {
+		return nil, err
+	}
+
+	refsRemote, err := dir.LsRemote("origin")
+
+	if err != nil {
+		return nil, err
+	}
+
+	repository, err := dir.Repository()
+
+	if err != nil {
+		return nil, err
+	}
+
+	tagsIter, err := repository.Tags()
+
+	if err != nil {
+		return nil, err
+	}
+
+	refsLocal := refIteratorToReferenceSlice(tagsIter)
+
+	tags := []GitTag{}
+	mergeTags := func(refs []*plumbing.Reference, remote bool) {
+		for _, ref := range refs {
+			if !ref.Name().IsTag() {
+				continue
+			}
+
+			index := -1
+			for i, b := range tags {
+				if b.Name == ref.Name().Short() {
+					index = i
+					break
+				}
+			}
+
+			if index == -1 {
+				index = len(tags)
+				tags = append(tags, GitTag{
+					Name: ref.Name().Short(),
+					Hash: ref.Hash().String(),
+				})
+			}
+
+			if remote {
+				tags[index].Remote = true
+			} else {
+				tags[index].Local = true
+			}
+		}
+	}
+	mergeTags(refsRemote, true)
+	mergeTags(refsLocal, false)
+
+	return tags, nil
+}
+
+func checkout(directory string, ref string, create bool) error {
+	dir, err := OpenGitDirectory(directory)
+
+	if err != nil {
+		return err
+	}
+
+	refType, err := dir.FindRefType(ref)
+
+	if err != nil {
+		return err
+	}
+
+	if create {
+		refType = RefBranch
+	}
+
+	repository, err := dir.Repository()
+
+	if err != nil {
+		return err
+	}
+
+	worktree, err := repository.Worktree()
+
+	if err != nil {
+		return err
+	}
+
+	switch refType {
+	case RefCommit:
+		err = worktree.Checkout(&git.CheckoutOptions{
+			Hash: plumbing.NewHash(ref),
+		})
+	case RefTag:
+		tag, err := dir.Tag(ref)
+		if err != nil {
+			return err
+		}
+		err = worktree.Checkout(&git.CheckoutOptions{
+			Hash: tag.Hash(),
+		})
+	case RefBranch:
+		err = worktree.Checkout(&git.CheckoutOptions{
+			Branch: plumbing.ReferenceName(ref),
+			Create: create,
+		})
+	}
+
+	return err
 }

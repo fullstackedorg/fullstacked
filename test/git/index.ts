@@ -203,6 +203,113 @@ suite("git - e2e", () => {
         assert.deepEqual(git.status(testDirectory), status2);
     });
 
+    test("branch", async () => {
+        await cloneRepository("test");
+        assert.deepEqual(
+            [
+                {
+                    name: "main",
+                    local: true,
+                    remote: true
+                }
+            ],
+            git.branch(testDirectory)
+        );
+        const name = "test-branch";
+        child_process.execSync(`git checkout -b ${name}`, {
+            cwd: testDirectory,
+            stdio: "ignore"
+        });
+        assert.deepEqual(
+            [
+                {
+                    name: "main",
+                    local: true,
+                    remote: true
+                },
+                {
+                    name,
+                    local: true,
+                    remote: false
+                }
+            ],
+            git.branch(testDirectory)
+        );
+        child_process.execSync(`git push --set-upstream origin ${name}`, {
+            cwd: testDirectory,
+            stdio: "ignore"
+        });
+        assert.deepEqual(
+            [
+                {
+                    name: "main",
+                    local: true,
+                    remote: true
+                },
+                {
+                    name,
+                    local: true,
+                    remote: true
+                }
+            ],
+            git.branch(testDirectory)
+        );
+    });
+
+    test("tags", async () => {
+        const actualDirectory = `${testDirectory}/actual`
+        const testingDirectory = `${testDirectory}/test`
+        await cloneRepository("test", actualDirectory);
+        await cloneRepository("test", testingDirectory);
+        assert.deepEqual(
+            [],
+            git.tags(testingDirectory)
+        );
+        const name = "0.0.0";
+        child_process.execSync(`git tag ${name}`, {
+            cwd: actualDirectory,
+            stdio: "ignore"
+        });
+        child_process.execSync(`git push origin tag ${name}`, {
+            cwd: actualDirectory,
+            stdio: "ignore"
+        });
+        const [log] = git.log(testingDirectory)
+        assert.deepEqual(
+            [{
+                hash: log.hash,
+                name,
+                local: false,
+                remote: true
+            }],
+            git.tags(testingDirectory)
+        );
+        await git.pull(testingDirectory).promise()
+        assert.deepEqual(
+            [{
+                hash: log.hash,
+                name,
+                local: true,
+                remote: true
+            }],
+            git.tags(testingDirectory)
+        );
+    });
+
+    
+
+    test("init", async () => {
+        git.init("http://localhost:8080/empty", testDirectory)
+        assert.deepEqual([".git"], fs.readdirSync(`${testDirectory}`));
+        fs.writeFileSync(`${testDirectory}/test.txt`, "testing");
+        git.add(".", testDirectory)
+        git.commit("test commit", "test user", "test@testing.com", testDirectory);
+        await git.push(testDirectory).promise()
+        fs.rmSync(testDirectory, { recursive: true })
+        await cloneRepository("empty")
+        assert.deepEqual(1, git.log(testDirectory).length)
+    })
+
     after(() => {
         resetRepositories();
         child_process.execSync("docker compose down", {
