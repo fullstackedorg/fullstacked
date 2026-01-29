@@ -24,10 +24,9 @@ type ModuleSwitch = func(*CoreCallContext, CoreCallHeader, []DeserializedData, *
 type CoreCallResponseType = uint8
 
 const (
-	CoreResponseError        CoreCallResponseType = 0
-	CoreResponseData         CoreCallResponseType = 1
-	CoreResponseStream       CoreCallResponseType = 2
-	CoreResponseEventEmitter CoreCallResponseType = 3
+	CoreResponseError  CoreCallResponseType = 0
+	CoreResponseData   CoreCallResponseType = 1
+	CoreResponseStream CoreCallResponseType = 2
 )
 
 type ResponseStream struct {

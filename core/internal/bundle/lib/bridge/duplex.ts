@@ -3,6 +3,7 @@ import { Stream } from "../@types/index.ts";
 import { Close, Open, Write } from "../@types/stream.ts";
 import { mergeUint8Arrays } from "./serialization.ts";
 import type { bridge } from "./index.ts";
+import { createEventEmitter } from "./eventEmitter.ts";
 
 type DuplexItem = {
     opening: Promise<void>;
@@ -70,6 +71,7 @@ export interface Duplex extends ReadableStream<Uint8Array> {
         callback?: EndCallback
     ): void;
     promise(): Promise<any>;
+    eventEmitter(): ReturnType<typeof createEventEmitter>;
 }
 
 export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
@@ -187,6 +189,10 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
             data = mergeUint8Arrays(data, chunk);
         }
         return data;
+    };
+
+    stream.eventEmitter = () => {
+        return createEventEmitter(stream);
     };
 
     return stream;

@@ -16,6 +16,7 @@ const (
 	SerializationIndex TestFn = 2
 	Stream             TestFn = 3
 	StreamWrite        TestFn = 4
+	EventEmitter       TestFn = 5
 )
 
 type TestObject struct {
@@ -66,6 +67,31 @@ func Switch(
 		response.Stream = &types.ResponseStream{
 			Write: func(ctx *types.CoreCallContext, streamId uint8, data []byte) {
 				store.StreamChunk(ctx, streamId, data, false)
+			},
+		}
+		return nil
+	case EventEmitter:
+		response.Type = types.CoreResponseStream
+
+		intervalMs := data[0].Data.(float64)
+
+		response.Stream = &types.ResponseStream{
+			Open: func(ctx *types.CoreCallContext, streamId uint8) {
+				for i, d := range data {
+					if i == 0 {
+						continue
+					}
+
+					eventData := d.Data
+
+					if d.Type == types.OBJECT {
+						eventData = TestObject{}
+						json.Unmarshal(d.Data.(types.DeserializedRawObject).Data, &eventData)
+					}
+
+					time.Sleep(time.Millisecond * time.Duration(intervalMs))
+					store.StreamEvent(ctx, streamId, "event", []types.SerializableData{eventData}, i == len(data)-1)
+				}
 			},
 		}
 		return nil

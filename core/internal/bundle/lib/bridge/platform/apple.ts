@@ -13,6 +13,8 @@ export function BridgeAppleInit(): PlatformBridge {
         asyncResponsePromises.delete(id);
     };
 
+    const te = new TextEncoder();
+
     return {
         ctx: globalThis.ctx,
         async Async(payload) {
@@ -30,10 +32,13 @@ export function BridgeAppleInit(): PlatformBridge {
             const id = uint8array[1];
             globalThis.webkit.messageHandlers.bridge.postMessage(base64);
             const xmlHttpRequest = new XMLHttpRequest();
-            xmlHttpRequest.responseType = "arraybuffer";
             xmlHttpRequest.open("POST", `/sync/${id}`, false);
             xmlHttpRequest.send();
-            return xmlHttpRequest.response;
+            const response = xmlHttpRequest.response;
+            if (typeof response === "string") {
+                return te.encode(response).buffer;
+            }
+            return response;
         }
     };
 }

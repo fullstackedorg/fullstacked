@@ -20,14 +20,19 @@ export async function BridgeNodeInit(): Promise<PlatformBridge> {
 
     await webSocketForCallback;
 
+    const te = new TextEncoder();
+
     return {
         ctx,
         Sync(payload: ArrayBuffer) {
             const xmlHttpRequest = new XMLHttpRequest();
-            xmlHttpRequest.responseType = "arraybuffer";
             xmlHttpRequest.open("POST", "/sync", false);
             xmlHttpRequest.send(new Uint8Array(payload));
-            return xmlHttpRequest.response;
+            const response = xmlHttpRequest.response;
+            if (typeof response === "string") {
+                return te.encode(response).buffer;
+            }
+            return response;
         },
         async Async(payload: ArrayBuffer) {
             const response = await globalThis.originalFetch("/call", {

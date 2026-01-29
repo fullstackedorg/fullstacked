@@ -1,6 +1,7 @@
 import { bridge } from "../bridge/index.ts";
 import { DeserializedData, SerializableData, Test } from "../@types/index.ts";
 import {
+    EventEmitter as EventEmitterFn,
     Hello,
     Serialization,
     SerializationIndex,
@@ -8,6 +9,7 @@ import {
     StreamWrite
 } from "../@types/test.ts";
 import { Duplex } from "../bridge/duplex.ts";
+import { EventEmitter } from "../bridge/eventEmitter.ts";
 
 function hello(): string {
     return bridge(
@@ -74,12 +76,31 @@ function streamWrite(async: boolean) {
     );
 }
 
+function eventEmitter(
+    delay: number,
+    ...data: SerializableData[]
+): EventEmitter<{
+    event: [any];
+}> {
+    return (
+        bridge(
+            {
+                mod: Test,
+                fn: EventEmitterFn,
+                data: [delay, ...data]
+            },
+            true
+        ) as Duplex
+    ).eventEmitter();
+}
+
 const test = {
     hello,
     serialization,
     serializationIndex,
     streaming,
-    streamWrite
+    streamWrite,
+    eventEmitter
 };
 
 export default test;

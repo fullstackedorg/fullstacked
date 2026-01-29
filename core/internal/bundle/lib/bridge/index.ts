@@ -4,7 +4,6 @@ import {
     CoreModule,
     CoreResponseData,
     CoreResponseError,
-    CoreResponseEventEmitter,
     CoreResponseStream,
     SerializableData
 } from "../@types/index.ts";
@@ -98,8 +97,6 @@ function processResponse(buffer: ArrayBuffer | void) {
         case CoreResponseStream:
             const streamId = deserialize(buffer, 1).data as number;
             return createDuplex(streamId, bridge);
-        case CoreResponseEventEmitter:
-            throw new Error("not yet implemented");
     }
 
     throw new Error("don't know how to process response from core");

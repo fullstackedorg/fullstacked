@@ -230,3 +230,55 @@ func StreamChunk(
 	// add 1 to size for the done byte prepended in front
 	OnStreamData(ctx.Id, storedStreamId, size+1)
 }
+
+func StreamEvent(
+	ctx *types.CoreCallContext,
+	storedStreamId uint8,
+	name string,
+	data []types.SerializableData,
+	end bool,
+) {
+	payload, err := serialization.Serialize(name)
+
+	if err != nil {
+		panic(err)
+	}
+
+	if len(data) > 0 {
+		for _, d := range data {
+			dataSerialized, err := serialization.Serialize(d)
+
+			if err != nil {
+				panic(err)
+			}
+
+			payload, err = serialization.MergeBuffers(payload, dataSerialized)
+
+			if err != nil {
+				panic(err)
+			}
+		}
+	} else {
+		nilSerialzied, err := serialization.Serialize(nil)
+
+		if err != nil {
+			panic(err)
+		}
+
+		payload, err = serialization.MergeBuffers(payload, nilSerialzied)
+
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	buffer, err := serialization.NumberToUint4Bytes(len(payload))
+
+	if err != nil {
+		panic(err)
+	}
+
+	buffer, err = serialization.MergeBuffers(buffer, payload)
+
+	StreamChunk(ctx, storedStreamId, buffer, end)
+}

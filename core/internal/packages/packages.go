@@ -20,7 +20,6 @@ func Switch(
 	response *types.CoreCallResponse,
 ) error {
 	switch header.Fn {
-
 	}
 
 	return errors.New("unknown packages function")
@@ -36,4 +35,8 @@ type PackageJSON struct {
 	Browser json.RawMessage `json:"browser"`
 	Module  string          `json:"module"`
 	Exports json.RawMessage `json:"exports"`
+}
+
+func install(directory string, packagesName []string, devDependencies bool) {
+
 }
