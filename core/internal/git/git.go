@@ -156,12 +156,20 @@ func Switch(
 
 		return nil
 	case Checkout:
-		response.Type = types.CoreResponseData
+		response.Type = types.CoreResponseStream
 		create := false
 		if len(data) > 2 && data[2].Type == types.BOOLEAN {
 			create = data[2].Data.(bool)
 		}
-		return checkout(directory(ctx, data[0]), data[1].Data.(string), create)
+		stream, err := checkout(directory(ctx, data[0]), data[1].Data.(string), create)
+		if err != nil {
+			return err
+		}
+		response.Stream = stream
+		return nil
+	case Merge:
+		response.Type = types.CoreResponseData
+		return merge(directory(ctx, data[0]), data[1].Data.(string))
 	}
 
 	return errors.New("unknown git function")
@@ -474,11 +482,13 @@ func pull(directory string) (*types.ResponseStream, error) {
 
 	return &types.ResponseStream{
 		Open: func(ctx *types.CoreCallContext, streamId uint8) {
-			err := worktree.Pull(&git.PullOptions{
-				Progress: &GitStream{
-					ctx:      ctx,
-					streamId: streamId,
-				},
+			progress := GitStream{
+				ctx:      ctx,
+				streamId: streamId,
+			}
+
+			err = worktree.Pull(&git.PullOptions{
+				Progress: &progress,
 			})
 
 			if err != nil {
@@ -549,65 +559,6 @@ type GitBranch struct {
 	Name   string `json:"name"`
 	Remote bool   `json:"remote"`
 	Local  bool   `json:"local"`
-}
-
-func branchRemote(directory string, remoteName string) ([]GitBranch, error) {
-	repository, err := git.PlainOpen(directory)
-
-	if err != nil {
-		return nil, err
-	}
-
-	remote, err := repository.Remote(remoteName)
-
-	if err != nil {
-		return nil, err
-	}
-
-	refs, err := remote.List(&git.ListOptions{})
-
-	if err != nil {
-		return nil, err
-	}
-
-	branches := []GitBranch{}
-	for _, r := range refs {
-		if r.Name().IsBranch() {
-			branches = append(branches, GitBranch{
-				Name:   r.Name().Short(),
-				Remote: true,
-			})
-		}
-	}
-
-	return branches, nil
-}
-
-func branchLocal(directory string) ([]GitBranch, error) {
-	repository, err := git.PlainOpen(directory)
-
-	if err != nil {
-		return nil, err
-	}
-
-	refs, err := repository.Branches()
-
-	if err != nil {
-		return nil, err
-	}
-
-	branches := []GitBranch{}
-	refs.ForEach(func(r *plumbing.Reference) error {
-		if r.Name().IsBranch() {
-			branches = append(branches, GitBranch{
-				Name:  r.Name().Short(),
-				Local: true,
-			})
-		}
-		return nil
-	})
-
-	return branches, nil
 }
 
 func refIteratorToReferenceSlice(iter storer.ReferenceIter) []*plumbing.Reference {
@@ -752,17 +703,17 @@ func tags(directory string) ([]GitTag, error) {
 	return tags, nil
 }
 
-func checkout(directory string, ref string, create bool) error {
+func checkout(directory string, ref string, create bool) (*types.ResponseStream, error) {
 	dir, err := OpenGitDirectory(directory)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	refType, err := dir.FindRefType(ref)
+	refType, remote, err := dir.FindRefType(ref)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if create {
@@ -772,34 +723,88 @@ func checkout(directory string, ref string, create bool) error {
 	repository, err := dir.Repository()
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	worktree, err := repository.Worktree()
 
 	if err != nil {
+		return nil, err
+	}
+
+	return &types.ResponseStream{
+		Open: func(ctx *types.CoreCallContext, streamId uint8) {
+			switch refType {
+			case RefCommit:
+				err = worktree.Checkout(&git.CheckoutOptions{
+					Hash: plumbing.NewHash(ref),
+				})
+			case RefTag:
+				tag, err := dir.Tag(ref)
+				if err != nil {
+					fmt.Println(err)
+				}
+				err = worktree.Checkout(&git.CheckoutOptions{
+					Hash: tag.Hash(),
+				})
+			case RefBranch:
+				if remote {
+					err = dir.FetchBranch(ref, &GitStream{
+						ctx:      ctx,
+						streamId: streamId,
+					})
+				}
+
+				if err != nil {
+					fmt.Println(err)
+				}
+
+				err = worktree.Checkout(&git.CheckoutOptions{
+					Branch: plumbing.NewBranchReferenceName(ref),
+					Create: create,
+				})
+				if err != nil {
+					fmt.Println(err)
+				}
+			}
+
+			store.StreamChunk(ctx, streamId, nil, true)
+		},
+	}, nil
+}
+
+func merge(directory string, branchName string) error {
+	dir, err := OpenGitDirectory(directory)
+
+	if err != nil {
 		return err
 	}
 
-	switch refType {
-	case RefCommit:
-		err = worktree.Checkout(&git.CheckoutOptions{
-			Hash: plumbing.NewHash(ref),
-		})
-	case RefTag:
-		tag, err := dir.Tag(ref)
-		if err != nil {
-			return err
-		}
-		err = worktree.Checkout(&git.CheckoutOptions{
-			Hash: tag.Hash(),
-		})
-	case RefBranch:
-		err = worktree.Checkout(&git.CheckoutOptions{
-			Branch: plumbing.ReferenceName(ref),
-			Create: create,
-		})
+	branch, err := dir.Branch(branchName)
+
+	if err != nil {
+		return err
 	}
 
-	return err
+	repository, err := dir.Repository()
+
+	if err != nil {
+		return err
+	}
+
+	err = repository.Merge(*branch, git.MergeOptions{})
+
+	if err != nil {
+		return err
+	}
+
+	worktree, err := dir.Worktree()
+
+	if err != nil {
+		return err
+	}
+
+	return worktree.Reset(&git.ResetOptions{
+		Mode: git.HardReset,
+	})
 }

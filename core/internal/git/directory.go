@@ -1,7 +1,10 @@
 package git
 
 import (
+	"errors"
+
 	git "github.com/go-git/go-git/v6"
+	"github.com/go-git/go-git/v6/config"
 	"github.com/go-git/go-git/v6/plumbing"
 )
 
@@ -90,6 +93,32 @@ func (r *GitDirectory) Tag(tag string) (*plumbing.Reference, error) {
 	return repository.Tag(tag)
 }
 
+func (r *GitDirectory) Branch(branch string) (*plumbing.Reference, error) {
+	repository, err := r.Repository()
+
+	if err != nil {
+		return nil, err
+	}
+
+	branches, err := repository.Branches()
+
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		b, err := branches.Next()
+		if err != nil {
+			break
+		}
+		if b.Name().Short() == branch {
+			return b, nil
+		}
+	}
+
+	return nil, errors.New("cannot find branch")
+}
+
 type GitRefType = string
 
 const (
@@ -98,11 +127,11 @@ const (
 	RefTag    GitRefType = "tag"
 )
 
-func (r *GitDirectory) FindRefType(ref string) (GitRefType, error) {
+func (r *GitDirectory) FindRefType(ref string) (GitRefType, bool, error) {
 	repository, err := r.Repository()
 
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 
 	branches, err := repository.Branches()
@@ -113,12 +142,12 @@ func (r *GitDirectory) FindRefType(ref string) (GitRefType, error) {
 			break
 		}
 		if branch.Name().Short() == ref {
-			return RefBranch, nil
+			return RefBranch, false, nil
 		}
 	}
 
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 
 	tags, err := repository.Tags()
@@ -129,13 +158,53 @@ func (r *GitDirectory) FindRefType(ref string) (GitRefType, error) {
 			break
 		}
 		if tag.Name().Short() == ref {
-			return RefTag, nil
+			return RefTag, false, nil
 		}
 	}
 
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 
-	return RefCommit, nil
+	refsRemote, err := r.LsRemote("origin")
+
+	if err != nil {
+		return "", false, err
+	}
+
+	for _, refRemote := range refsRemote {
+		if refRemote.Name().Short() != ref {
+			continue
+		}
+
+		if refRemote.Name().IsBranch() {
+			return RefBranch, true, nil
+		} else if refRemote.Name().IsTag() {
+			return RefTag, true, nil
+		}
+	}
+
+	return RefCommit, false, nil
+}
+
+// https://github.com/go-git/go-git/blob/main/_examples/checkout-branch/main.go#L66
+func (r *GitDirectory) FetchBranch(branchName string, progress *GitStream) error {
+	repository, err := r.Repository()
+
+	if err != nil {
+		return err
+	}
+
+	remote, err := repository.Remote("origin")
+
+	if err != nil {
+		return err
+	}
+	refSpecs := []config.RefSpec{config.RefSpec("refs/heads/" + branchName + ":" + "refs/heads/" + branchName)}
+
+	return remote.Fetch(&git.FetchOptions{
+		RefSpecs: refSpecs,
+		Progress: progress,
+	})
+
 }

@@ -3,6 +3,7 @@ import { Git } from "../@types/index.ts";
 import {
     Add,
     Branch,
+    Checkout,
     Clone,
     Commit,
     GitBranch,
@@ -11,6 +12,7 @@ import {
     GitTag,
     Init,
     Log,
+    Merge,
     Pull,
     Push,
     Reset,
@@ -145,12 +147,27 @@ export function tags(directory: string): GitTag[] {
     );
 }
 
-export function checkout(ref: string, create: boolean, directory: string) {
+export function checkout(
+    ref: string,
+    create: boolean,
+    directory: string
+): Duplex {
     return bridge(
         {
             mod: Git,
-            fn: Tags,
+            fn: Checkout,
             data: [directory, ref, create]
+        },
+        true
+    );
+}
+
+export function merge(branch: string, directory: string) {
+    return bridge(
+        {
+            mod: Git,
+            fn: Merge,
+            data: [directory, branch]
         },
         true
     );
@@ -168,4 +185,6 @@ export default {
     reset,
     branch,
     tags,
+    checkout,
+    merge
 };

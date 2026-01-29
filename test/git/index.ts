@@ -257,14 +257,11 @@ suite("git - e2e", () => {
     });
 
     test("tags", async () => {
-        const actualDirectory = `${testDirectory}/actual`
-        const testingDirectory = `${testDirectory}/test`
+        const actualDirectory = `${testDirectory}/actual`;
+        const testingDirectory = `${testDirectory}/test`;
         await cloneRepository("test", actualDirectory);
         await cloneRepository("test", testingDirectory);
-        assert.deepEqual(
-            [],
-            git.tags(testingDirectory)
-        );
+        assert.deepEqual([], git.tags(testingDirectory));
         const name = "0.0.0";
         child_process.execSync(`git tag ${name}`, {
             cwd: actualDirectory,
@@ -274,41 +271,97 @@ suite("git - e2e", () => {
             cwd: actualDirectory,
             stdio: "ignore"
         });
-        const [log] = git.log(testingDirectory)
+        const [log] = git.log(testingDirectory);
         assert.deepEqual(
-            [{
-                hash: log.hash,
-                name,
-                local: false,
-                remote: true
-            }],
+            [
+                {
+                    hash: log.hash,
+                    name,
+                    local: false,
+                    remote: true
+                }
+            ],
             git.tags(testingDirectory)
         );
-        await git.pull(testingDirectory).promise()
+        await git.pull(testingDirectory).promise();
         assert.deepEqual(
-            [{
-                hash: log.hash,
-                name,
-                local: true,
-                remote: true
-            }],
+            [
+                {
+                    hash: log.hash,
+                    name,
+                    local: true,
+                    remote: true
+                }
+            ],
             git.tags(testingDirectory)
         );
     });
 
-    
-
     test("init", async () => {
-        git.init("http://localhost:8080/empty", testDirectory)
+        git.init("http://localhost:8080/empty", testDirectory);
         assert.deepEqual([".git"], fs.readdirSync(`${testDirectory}`));
         fs.writeFileSync(`${testDirectory}/test.txt`, "testing");
-        git.add(".", testDirectory)
-        git.commit("test commit", "test user", "test@testing.com", testDirectory);
-        await git.push(testDirectory).promise()
-        fs.rmSync(testDirectory, { recursive: true })
-        await cloneRepository("empty")
-        assert.deepEqual(1, git.log(testDirectory).length)
-    })
+        git.add(".", testDirectory);
+        git.commit(
+            "test commit",
+            "test user",
+            "test@testing.com",
+            testDirectory
+        );
+        await git.push(testDirectory).promise();
+        fs.rmSync(testDirectory, { recursive: true });
+        await cloneRepository("empty");
+        assert.deepEqual(1, git.log(testDirectory).length);
+    });
+
+    test("checkout", async () => {
+        await cloneRepository("test");
+        const initialContent = fs.readFileSync(`${testDirectory}/test.txt`);
+        fs.writeFileSync(`${testDirectory}/test.txt`, "testing 1");
+        git.add(".", testDirectory);
+        git.commit("commit 1", "test user", "test@testing.com", testDirectory);
+        const finalContent = Buffer.from("testing 2");
+        fs.writeFileSync(`${testDirectory}/test.txt`, finalContent);
+        git.add(".", testDirectory);
+        git.commit("commit 2", "test user", "test@testing.com", testDirectory);
+        const logs = git.log(testDirectory);
+        await git.checkout(logs.at(-1).hash, false, testDirectory).promise();
+        assert.deepEqual(
+            initialContent,
+            fs.readFileSync(`${testDirectory}/test.txt`)
+        );
+        const [branch] = git.branch(testDirectory);
+        await git.checkout(branch.name, false, testDirectory).promise();
+        assert.deepEqual(
+            finalContent,
+            fs.readFileSync(`${testDirectory}/test.txt`)
+        );
+    });
+
+    test("merge", async () => {
+        const actualDirectory = `${testDirectory}/actual`;
+        const testingDirectory = `${testDirectory}/test`;
+        await cloneRepository("test", actualDirectory);
+        await cloneRepository("test", testingDirectory);
+        const branch = "branch-2";
+        const file1 = Buffer.from("file 1 content");
+        const file2 = Buffer.from("file 2 content");
+        await git.checkout(branch, true, actualDirectory).promise();
+        fs.writeFileSync(`${actualDirectory}/test.txt`, file1);
+        fs.writeFileSync(`${actualDirectory}/file2.txt`, file2);
+        git.add(".", actualDirectory);
+        git.commit("commit", "test user", "test@testing.com", actualDirectory);
+        await git.push(actualDirectory).promise();
+        await git.pull(testingDirectory).promise();
+        await git.checkout(branch, false, testingDirectory).promise();
+        await git.checkout("main", false, testingDirectory).promise();
+        git.merge(branch, testingDirectory);
+        assert.deepEqual(2, git.log(testingDirectory).length);
+        assert.deepEqual(
+            file2,
+            fs.readFileSync(`${testingDirectory}/file2.txt`)
+        );
+    });
 
     after(() => {
         resetRepositories();
