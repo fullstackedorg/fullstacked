@@ -38,9 +38,15 @@ const toPatch = [
             }
         ]
     },
-     {
+    {
         // android hangs trying to convert nil req.ID to string
-        file: path.resolve(tsgoDirectory, "internal", "lsp", "lsproto", "jsonrpc.go"),
+        file: path.resolve(
+            tsgoDirectory,
+            "internal",
+            "lsp",
+            "lsproto",
+            "jsonrpc.go"
+        ),
         replace: [
             {
                 from: `func (id *ID) String() string {`,
