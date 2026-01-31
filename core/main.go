@@ -1,6 +1,7 @@
 package main
 
 /*
+// #include <android/log.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -33,6 +34,7 @@ func directories(
 	editor *C.char,
 	tmp *C.char,
 ) {
+	// androidPrintToLogCat()
 
 	setup.SetupDirectories(
 		C.GoString(root),
@@ -128,3 +130,25 @@ func call(id C.int, buffer unsafe.Pointer, length C.int) C.int {
 func freePtr(ptr unsafe.Pointer) {
 	C.free(ptr)
 }
+
+// func androidPrintToLogCat() {
+// 	r, w, _ := os.Pipe()
+// 	os.Stdout = w
+// 	os.Stderr = w
+
+// 	go func() {
+// 		for {
+// 			buffer := make([]byte, 2048)
+// 			n, _ := r.Read(buffer)
+
+// 			if n > 0 {
+// 				ctag := C.CString("go")
+// 				cstr := C.CString(string(buffer[0:n]))
+// 				C.__android_log_write(C.ANDROID_LOG_INFO, ctag, cstr)
+// 				C.free(unsafe.Pointer(ctag))
+// 				C.free(unsafe.Pointer(cstr))
+// 			}
+
+// 		}
+// 	}()
+// }

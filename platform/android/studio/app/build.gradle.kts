@@ -1,5 +1,5 @@
 plugins {
-    id("com.android.application") version "8.7.3"
+    id("com.android.application") version "8.10.1"
     id("org.jetbrains.kotlin.android") version "1.9.25"
 }
 
@@ -7,7 +7,7 @@ android {
     namespace = "org.fullstacked.editor"
     compileSdk = 35
 
-    ndkVersion = "28.2.13676358"
+    ndkVersion = "29.0.14206865"
 
     defaultConfig {
         applicationId = "org.fullstacked.editor"

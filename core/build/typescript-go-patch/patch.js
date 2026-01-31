@@ -37,6 +37,16 @@ const toPatch = [
                 to__: `if runtime.GOOS == "windows" || runtime.GOOS == "ios" {`
             }
         ]
+    },
+     {
+        // android hangs trying to convert nil req.ID to string
+        file: path.resolve(tsgoDirectory, "internal", "lsp", "lsproto", "jsonrpc.go"),
+        replace: [
+            {
+                from: `func (id *ID) String() string {`,
+                to__: `func (id *ID) String() string  { if id == nil { return "<nil>" }`
+            }
+        ]
     }
 ];
 
