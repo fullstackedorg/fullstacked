@@ -9,7 +9,7 @@ Create, run and share projects built with web technologies in a fully cross-plat
 [Documentation](https://docs.fullstacked.org) | [Demo](https://demo.fullstacked.org) | [Roadmap](https://fullstacked.notion.site/FullStacked-Editor-Roadmap-ebfcb685b77446c7a7898c05b219215e) | [Figma](https://www.figma.com/design/xb3JBRCvEWpbwGda03T5QQ/Mockups)
 
 ![FullStacked](https://files.fullstacked.org/fullstacked.png)
-
+ 
 ## Installation
 
 ### The latest stable release is available on all major app marketplaces.
