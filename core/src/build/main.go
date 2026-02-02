@@ -234,7 +234,7 @@ func (p *ProjectBuild) buildJS(
 		Outdir:         tmpBuildDirectory,
 		Bundle:         true,
 		Format:         esbuild.FormatESModule,
-		Sourcemap:      esbuild.SourceMapInlineAndExternal,
+		Sourcemap:      esbuild.SourceMapLinked,
 		Write:          false,
 		Plugins:        plugins,
 		NodePaths:      nodePaths,
