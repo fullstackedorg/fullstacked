@@ -14,6 +14,7 @@ import {
     STRING
 } from "../../../core/internal/bundle/lib/@types/index.ts";
 import { StaticFile } from "../../../core/internal/bundle/lib/@types/router.ts";
+import { fromByteArray } from "../../../fullstacked_modules/base64.ts";
 
 // export let mainPort = parseInt(getEnvVar("port"));
 // if (!mainPort || isNaN(mainPort)) {
@@ -94,12 +95,13 @@ function createHandler(core: Core, ctx: number) {
             return res.end(payload);
         } else if (pathname === "/sync") {
             const payload = await coreCall(core, req);
+            const b64 = fromByteArray(payload);
             res.writeHead(200, {
                 "content-type": "application/octet-stream",
-                "content-length": payload.byteLength,
+                "content-length": b64.length,
                 "cache-control": "no-cache"
             });
-            return res.end(payload);
+            return res.end(b64);
         }
 
         const staticFile = coreStaticFile(core, ctx, pathname);

@@ -13,7 +13,7 @@ const libModulesLocation = path.resolve(
     "lib"
 );
 
-export async function execute(command: string[]) {
+async function execute(command: string[]) {
     const libModule = await import(
         libModulesLocation + "/" + command[0] + "/index.ts"
     );

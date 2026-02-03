@@ -68,12 +68,31 @@ func Switch(
 		for _, f := range data {
 			entryPoints = append(entryPoints, f.Data.(string))
 		}
+
+		if len(entryPoints) == 0 {
+			entryPoint := findEntryPoint(ctx.BaseDirectory)
+			if entryPoint == "" {
+				return errors.New("no entry point found")
+			}
+			entryPoints = append(entryPoints, entryPoint)
+		}
+
 		response.Type = types.CoreResponseData
 		response.Data = BundleFnApply(entryPoints)
 		return nil
 	}
 
 	return errors.New("unknown bundle function")
+}
+
+func findEntryPoint(dir string) string {
+	for _, f := range BundleExtensions {
+		if fs.ExistsFn(path.Join(dir, "index"+f)) {
+			return path.Join(dir, "index"+f)
+		}
+	}
+
+	return ""
 }
 
 func EsbuildVersionFn() string {

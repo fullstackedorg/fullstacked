@@ -5,6 +5,10 @@
         "fullstacked": "index.js"
     },
     "type": "module",
+    "scripts": {
+        "build": "node -r @nitrogql/esbuild-register build",
+        "prepack": "npm run build"
+    },
     "dependencies": {
         "cli-progress": "^3.12.0",
         "jsdom": "^27.2.0",
@@ -15,10 +19,12 @@
         "ws": "^8.18.3"
     },
     "devDependencies": {
+        "@nitrogql/esbuild-register": "^1.7.2",
         "@types/cli-progress": "^3.11.6",
         "@types/jsdom": "^27.0.0",
         "@types/tar-stream": "^3.1.4",
         "@types/ws": "^8.18.1",
+        "esbuild": "^0.27.2",
         "node-addon-api": "^8.5.0"
     },
     "overrides": {

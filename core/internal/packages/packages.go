@@ -410,36 +410,6 @@ func install(
 		}
 	}
 
-	// 4. Pruning Step
-	onProgress(Progress{Stage: "Pruning", Progress: 0.5})
-	pathsToRemove := make(map[string]bool)
-	// From Old Lock
-	if oldLock != nil {
-		for pathKey := range oldLock.Packages {
-			if pathKey == "" {
-				continue
-			}
-			if _, ok := newLock.Packages[pathKey]; !ok {
-				pathsToRemove[pathKey] = true
-			}
-		}
-	}
-	// From Disk
-	if entries, err := fs.ReadDirFn(path.Join(directory, "node_modules")); err == nil {
-		for _, entry := range entries {
-			if entry.IsDir {
-				// Simple check for now (ignoring scopes for now for basic pruning)
-				key := path.Join("node_modules", entry.Name)
-				if _, ok := newLock.Packages[key]; !ok {
-					pathsToRemove[key] = true
-				}
-			}
-		}
-	}
-	for p := range pathsToRemove {
-		fs.RmFn(path.Join(directory, p))
-	}
-
 	// 5. Install Step
 	onProgress(Progress{Stage: "Installing", Progress: 0.6})
 
@@ -484,7 +454,7 @@ func install(
 			fs.RmFn(tDir)
 			fs.MkdirFn(tDir)
 
-			downloadAndExtract(ver.Resolved, tDir, func(p float64) {
+			downloadAndExtract(ver.Resolved, tDir, pName, func(p float64) {
 				threadSafeProgress(Progress{
 					Name:     pName,
 					Version:  ver.Version,
@@ -578,6 +548,9 @@ func uninstall(directory string, packagesName []string, onProgress ProgressCallb
 		if pkgJSON.DevDependencies != nil {
 			delete(pkgJSON.DevDependencies, name)
 		}
+
+		// Explicitly remove the package from disk
+		fs.RmFn(path.Join(directory, "node_modules", name))
 	}
 
 	// 3. Save package.json
@@ -720,7 +693,7 @@ func resolveVersion(metadata PackageMetadata, versionRange string) (PackageVersi
 	return bestVersion, nil
 }
 
-func downloadAndExtract(url string, dest string, onProgress func(float64)) error {
+func downloadAndExtract(url string, dest string, packageName string, onProgress func(float64)) error {
 	resp, err := httpClient.Get(url)
 	if err != nil {
 		return err
@@ -770,6 +743,17 @@ func downloadAndExtract(url string, dest string, onProgress func(float64)) error
 		if len(name) > 8 && name[0:8] == "package/" {
 			name = name[8:]
 		} else if name == "package" {
+			continue
+		} else if packageName != "" {
+			prefix := packageName + "/"
+			if strings.HasPrefix(name, prefix) {
+				name = strings.TrimPrefix(name, prefix)
+			} else if name == packageName {
+				continue
+			}
+		}
+
+		if name == "" {
 			continue
 		}
 

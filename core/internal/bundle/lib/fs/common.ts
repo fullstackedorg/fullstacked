@@ -1,3 +1,4 @@
+import "../buffer/index.ts";
 import { GoFileInfo } from "../@types/fs";
 import { fromByteArray } from "../bridge/base64.ts";
 

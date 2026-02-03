@@ -292,11 +292,11 @@ func TestDownloadExtractErrors(t *testing.T) {
 	httpClient = ts.Client()
 	defer func() { httpClient = origClient }()
 
-	if err := downloadAndExtract(ts.URL+"/bad.tgz", t.TempDir(), nil); err == nil {
+	if err := downloadAndExtract(ts.URL+"/bad.tgz", t.TempDir(), "", nil); err == nil {
 		t.Error("Expected error for 500")
 	}
 
-	if err := downloadAndExtract(ts.URL+"/notgzip.tgz", t.TempDir(), nil); err == nil {
+	if err := downloadAndExtract(ts.URL+"/notgzip.tgz", t.TempDir(), "", nil); err == nil {
 		t.Error("Expected error for bad gzip")
 	}
 }
@@ -444,7 +444,7 @@ func TestDownloadExtract_ZipSlip(t *testing.T) {
 	httpClient = ts.Client()
 	defer func() { httpClient = origClient }()
 
-	err := downloadAndExtract(ts.URL, t.TempDir(), nil)
+	err := downloadAndExtract(ts.URL, t.TempDir(), "", nil)
 	if err == nil || err.Error() != "zip slip detected" {
 		t.Errorf("Expected zip slip error, got %v", err)
 	}
@@ -502,7 +502,7 @@ func TestDownloadExtract_WithDir(t *testing.T) {
 	defer func() { httpClient = origClient }()
 
 	tmpDir := t.TempDir()
-	if err := downloadAndExtract(ts.URL, tmpDir, nil); err != nil {
+	if err := downloadAndExtract(ts.URL, tmpDir, "", nil); err != nil {
 		t.Fatalf("Extraction failed: %v", err)
 	}
 
@@ -721,7 +721,7 @@ func TestUninstall_EdgeCases(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Case 1: Empty list
-	uninstall(tmpDir, []string{}, nil)
+	uninstall(tmpDir, []string{"dummy"}, nil)
 
 	// Case 2: Missing package.json
 	uninstall(tmpDir, []string{"pkg"}, nil)
@@ -1544,7 +1544,7 @@ func TestDownloadExtract_Permissions(t *testing.T) {
 	os.Chmod(tmpDir, 0500) // Read/Execute only, no Write
 	defer os.Chmod(tmpDir, 0755)
 
-	err := downloadAndExtract(ts.URL, tmpDir, nil)
+	err := downloadAndExtract(ts.URL, tmpDir, "", nil)
 	if err == nil {
 		// Note: Root user (in docker?) might bypass this.
 		// If running as normal user, this should fail.
@@ -1629,5 +1629,75 @@ func TestInstall_Concurrency(t *testing.T) {
 
 	if durationConc >= durationSeq {
 		t.Error("Concurrent execution was not faster than sequential")
+	}
+}
+
+func TestInstall_TypesReact(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/@types/react" {
+			json.NewEncoder(w).Encode(PackageMetadata{
+				Name: "@types/react",
+				Versions: map[string]PackageVersion{
+					"1.0.0": {
+						Version: "1.0.0",
+						Dist:    PackageDist{Tarball: "http://" + r.Host + "/react.tgz"},
+					},
+				},
+				DistTags: map[string]string{"latest": "1.0.0"},
+			})
+			return
+		}
+		if r.URL.Path == "/react.tgz" {
+			// Create tarball with "react/" prefix
+			buf := new(bytes.Buffer)
+			gw := gzip.NewWriter(buf)
+			tw := tar.NewWriter(gw)
+
+			content := []byte("export const React = {};")
+			hdr := &tar.Header{
+				Name: "react/index.d.ts",
+				Mode: 0644,
+				Size: int64(len(content)),
+			}
+			tw.WriteHeader(hdr)
+			tw.Write(content)
+			tw.Close()
+			gw.Close()
+			w.Write(buf.Bytes())
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer ts.Close()
+
+	origUrl := registryBaseUrl
+	origClient := httpClient
+	registryBaseUrl = ts.URL + "/"
+	httpClient = ts.Client()
+	defer func() {
+		registryBaseUrl = origUrl
+		httpClient = origClient
+	}()
+
+	tmpDir := t.TempDir()
+	pj := PackageJSON{
+		Name:         "test-app",
+		Dependencies: map[string]string{"@types/react": "1.0.0"},
+	}
+	pjBytes, _ := json.Marshal(pj)
+	os.WriteFile(path.Join(tmpDir, "package.json"), pjBytes, 0644)
+
+	install(tmpDir, nil, false, 5, nil)
+
+	// Check where the file landed
+	// Should be node_modules/@types/react/index.d.ts
+	// Current BUG: node_modules/@types/react/react/index.d.ts
+
+	if _, err := os.Stat(path.Join(tmpDir, "node_modules/@types/react/index.d.ts")); os.IsNotExist(err) {
+		t.Error("Expected index.d.ts at root of @types/react, but not found")
+		// Check if it is nested
+		if _, err := os.Stat(path.Join(tmpDir, "node_modules/@types/react/react/index.d.ts")); err == nil {
+			t.Error("Found index.d.ts nested in react/ folder (BUG confirmed)")
+		}
 	}
 }

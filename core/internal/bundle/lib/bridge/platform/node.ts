@@ -1,3 +1,4 @@
+import { toByteArray } from "../base64.ts";
 import type { PlatformBridge } from "./index.ts";
 
 export async function BridgeNodeInit(): Promise<PlatformBridge> {
@@ -20,8 +21,6 @@ export async function BridgeNodeInit(): Promise<PlatformBridge> {
 
     await webSocketForCallback;
 
-    const te = new TextEncoder();
-
     return {
         ctx,
         Sync(payload: ArrayBuffer) {
@@ -29,10 +28,7 @@ export async function BridgeNodeInit(): Promise<PlatformBridge> {
             xmlHttpRequest.open("POST", "/sync", false);
             xmlHttpRequest.send(new Uint8Array(payload));
             const response = xmlHttpRequest.response;
-            if (typeof response === "string") {
-                return te.encode(response).buffer;
-            }
-            return response;
+            return toByteArray(response).buffer;
         },
         async Async(payload: ArrayBuffer) {
             const response = await globalThis.originalFetch("/call", {

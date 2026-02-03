@@ -56,9 +56,12 @@ packagesToBundle.forEach(({ entryPoint, outfile }) =>
         bundle: true,
         // format: "esm",
         platform: "node",
-        external: ["process/"],
+        external: ["process/", "create-hash/browser/md5"],
         alias: {
-            randombytes: "randombytes/browser"
+            randombytes: "randombytes/browser",
+            "create-ecdh": "create-ecdh/browser",
+            "create-hash": "create-hash/browser",
+            "create-hmac": "create-hmac/browser"
         }
     })
 );

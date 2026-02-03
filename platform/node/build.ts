@@ -4,7 +4,18 @@ import fs from "node:fs";
 import os from "node:os";
 import child_process from "node:child_process";
 import esbuild from "esbuild";
-import { sharedLibLocation } from "../../build.ts";
+
+const platform = os.platform();
+const archArgIndex = process.argv.indexOf("--arch");
+const arch =
+    archArgIndex === -1 ? os.arch() : process.argv.at(archArgIndex + 1);
+
+export const sharedLibLocation = path.resolve(
+    "../../",
+    "core",
+    "bin",
+    `${platform}-${arch}.${platform === "win32" ? "dll" : "so"}`
+);
 
 if (!fs.existsSync(sharedLibLocation)) {
     console.log("cannot find core lib binary");
@@ -17,12 +28,6 @@ fs.cpSync(
     sharedLibLocation,
     path.resolve(currentDirectory, path.basename(sharedLibLocation))
 );
-
-const platform = os.platform();
-
-const archArgIndex = process.argv.indexOf("--arch");
-const arch =
-    archArgIndex === -1 ? os.arch() : process.argv.at(archArgIndex + 1);
 
 const target_name = platform + "-" + arch;
 
