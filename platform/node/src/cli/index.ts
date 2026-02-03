@@ -17,7 +17,7 @@ export async function execute(args: string[], core: Core) {
             await executeBundle(args.slice(1));
             break;
         default:
-            console.log(`Unknown command: ${ command } `);
+            console.log(`Unknown command: ${command} `);
             console.log("Available commands: git, npm, bundle");
     }
 }

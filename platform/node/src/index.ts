@@ -46,5 +46,5 @@ if (command.length === 0) {
     }
 } else {
     await execute(command, core);
-    core.end()
+    core.end();
 }

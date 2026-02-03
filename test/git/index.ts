@@ -178,14 +178,10 @@ suite("git - e2e", () => {
         assert.deepEqual(git.log(testDirectory).length, 1);
         fs.writeFileSync(`${testDirectory}/test.txt`, "testing 2");
         git.add(testDirectory, ".");
-        git.commit(
-            testDirectory,
-            "test commit 2",
-            {
-                name: "test user",
-                email: "test@testing.com",
-            }
-        );
+        git.commit(testDirectory, "test commit 2", {
+            name: "test user",
+            email: "test@testing.com"
+        });
         await git.push(testDirectory).promise();
         fs.rmSync(testDirectory, { recursive: true });
         await cloneRepository("test");
@@ -304,14 +300,10 @@ suite("git - e2e", () => {
         assert.deepEqual([".git"], fs.readdirSync(`${testDirectory}`));
         fs.writeFileSync(`${testDirectory}/test.txt`, "testing");
         git.add(testDirectory, ".");
-        git.commit(
-            testDirectory,
-            "test commit",
-            {
-                name: "test user",
-                email: "test@testing.com",
-            }
-        );
+        git.commit(testDirectory, "test commit", {
+            name: "test user",
+            email: "test@testing.com"
+        });
         await git.push(testDirectory).promise();
         fs.rmSync(testDirectory, { recursive: true });
         await cloneRepository("empty");
@@ -323,11 +315,17 @@ suite("git - e2e", () => {
         const initialContent = fs.readFileSync(`${testDirectory}/test.txt`);
         fs.writeFileSync(`${testDirectory}/test.txt`, "testing 1");
         git.add(testDirectory, ".");
-        git.commit(testDirectory, "commit 1", { name: "test user", email: "test@testing.com" });
+        git.commit(testDirectory, "commit 1", {
+            name: "test user",
+            email: "test@testing.com"
+        });
         const finalContent = Buffer.from("testing 2");
         fs.writeFileSync(`${testDirectory}/test.txt`, finalContent);
         git.add(testDirectory, ".");
-        git.commit(testDirectory, "commit 2", { name: "test user", email: "test@testing.com" });
+        git.commit(testDirectory, "commit 2", {
+            name: "test user",
+            email: "test@testing.com"
+        });
         const logs = git.log(testDirectory);
         await git.checkout(testDirectory, logs.at(-1).hash).promise();
         assert.deepEqual(
@@ -354,7 +352,10 @@ suite("git - e2e", () => {
         fs.writeFileSync(`${actualDirectory}/test.txt`, file1);
         fs.writeFileSync(`${actualDirectory}/file2.txt`, file2);
         git.add(actualDirectory, ".");
-        git.commit(actualDirectory, "commit", { name: "test user", email: "test@testing.com" });
+        git.commit(actualDirectory, "commit", {
+            name: "test user",
+            email: "test@testing.com"
+        });
         await git.push(actualDirectory).promise();
         await git.pull(testingDirectory).promise();
         await git.checkout(testingDirectory, branch).promise();

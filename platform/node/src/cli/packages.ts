@@ -15,11 +15,15 @@ export async function executePackages(args: string[]) {
             // We probably want to listen to events or something, but the lib signature says:
             // Promise<EventEmitter<{ "progress": Progress[] }>>
 
-            const emitter = await packagesLib.install(directory, saveDev, ...positionals);
+            const emitter = await packagesLib.install(
+                directory,
+                saveDev,
+                ...positionals
+            );
 
             // Listen to progress?
             emitter.on("progress", (progress) => {
-                // Format progress? 
+                // Format progress?
                 console.log(JSON.stringify(progress));
             });
 
@@ -27,7 +31,10 @@ export async function executePackages(args: string[]) {
             break;
         case "uninstall":
             // uninstall [packages...]
-            const uninstallEmitter = await packagesLib.uninstall(directory, ...positionals);
+            const uninstallEmitter = await packagesLib.uninstall(
+                directory,
+                ...positionals
+            );
             uninstallEmitter.on("progress", (progress) => {
                 console.log(JSON.stringify(progress));
             });

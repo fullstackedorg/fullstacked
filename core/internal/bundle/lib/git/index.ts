@@ -150,7 +150,7 @@ export function tags(directory: string): GitTag[] {
 export function checkout(
     directory: string,
     ref: string,
-    create?: boolean,
+    create?: boolean
 ): Duplex {
     return bridge(
         {
