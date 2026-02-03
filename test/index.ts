@@ -15,6 +15,7 @@ await import("./fetch/index.ts");
 await import("./net/index.ts");
 await import("./dns/index.ts");
 await import("./git/index.ts");
+await import("./packages/index.ts");
 
 // hangs if C++ callback not released
 after(core.instance.end);

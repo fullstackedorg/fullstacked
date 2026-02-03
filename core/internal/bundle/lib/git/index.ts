@@ -6,6 +6,7 @@ import {
     Checkout,
     Clone,
     Commit,
+    GitAuthor,
     GitBranch,
     GitCommit,
     GitStatus,
@@ -21,7 +22,7 @@ import {
 } from "../@types/git.ts";
 import type { Duplex } from "../bridge/duplex.ts";
 
-export function init(url: string, directory: string) {
+export function init(directory: string, url: string) {
     return bridge(
         {
             mod: Git,
@@ -43,7 +44,7 @@ export function status(directory: string): GitStatus {
     );
 }
 
-export function add(path: string, directory: string) {
+export function add(directory: string, path: string) {
     return bridge(
         {
             mod: Git,
@@ -77,16 +78,15 @@ export function clone(url: string, directory: string): Duplex {
 }
 
 export function commit(
+    directory: string,
     message: string,
-    authorName: string,
-    authorEmail: string,
-    directory: string
+    author: GitAuthor
 ): string {
     return bridge(
         {
             mod: Git,
             fn: Commit,
-            data: [directory, message, authorName, authorEmail]
+            data: [directory, message, author]
         },
         true
     );
@@ -148,21 +148,21 @@ export function tags(directory: string): GitTag[] {
 }
 
 export function checkout(
+    directory: string,
     ref: string,
-    create: boolean,
-    directory: string
+    create?: boolean,
 ): Duplex {
     return bridge(
         {
             mod: Git,
             fn: Checkout,
-            data: [directory, ref, create]
+            data: [directory, ref, !!create]
         },
         true
     );
 }
 
-export function merge(branch: string, directory: string) {
+export function merge(directory: string, branch: string) {
     return bridge(
         {
             mod: Git,

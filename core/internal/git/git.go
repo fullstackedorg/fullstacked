@@ -1,6 +1,7 @@
 package git
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"fullstackedorg/fullstacked/internal/store"
@@ -37,14 +38,6 @@ const (
 	Merge    GitFn = 12
 )
 
-func directory(ctx *types.CoreCallContext, data types.DeserializedData) string {
-	if data.Type == types.UNDEFINED {
-		return ctx.BaseDirectory
-	}
-
-	return data.Data.(string)
-}
-
 func Switch(
 	ctx *types.CoreCallContext,
 	header types.CoreCallHeader,
@@ -54,11 +47,11 @@ func Switch(
 	switch header.Fn {
 	case Init:
 		response.Type = types.CoreResponseData
-		return initFn(directory(ctx, data[0]), data[1].Data.(string))
+		return initFn(data[0].Data.(string), data[1].Data.(string))
 	case Status:
 		response.Type = types.CoreResponseData
 
-		s, err := status(directory(ctx, data[0]))
+		s, err := status(data[0].Data.(string))
 		if err != nil {
 			return err
 		}
@@ -67,10 +60,10 @@ func Switch(
 		return nil
 	case Add:
 		response.Type = types.CoreResponseData
-		return add(directory(ctx, data[0]), data[1].Data.(string))
+		return add(data[0].Data.(string), data[1].Data.(string))
 	case Log:
 		response.Type = types.CoreResponseData
-		logs, err := log(directory(ctx, data[0]), int(data[1].Data.(float64)))
+		logs, err := log(data[0].Data.(string), int(data[1].Data.(float64)))
 		if err != nil {
 			return err
 		}
@@ -80,12 +73,11 @@ func Switch(
 	case Commit:
 		response.Type = types.CoreResponseData
 
-		author := GitAuthor{
-			Name:  data[2].Data.(string),
-			Email: data[3].Data.(string),
-		}
+		author := GitAuthor{}
 
-		hash, err := commit(directory(ctx, data[0]), data[1].Data.(string), author)
+		json.Unmarshal(data[2].Data.(types.DeserializedRawObject).Data, &author)
+
+		hash, err := commit(data[0].Data.(string), data[1].Data.(string), author)
 		if err != nil {
 			return err
 		}
@@ -109,7 +101,7 @@ func Switch(
 	case Pull:
 		response.Type = types.CoreResponseStream
 
-		stream, err := pull(directory(ctx, data[0]))
+		stream, err := pull(data[0].Data.(string))
 		if err != nil {
 			return err
 		}
@@ -118,7 +110,7 @@ func Switch(
 	case Push:
 		response.Type = types.CoreResponseStream
 
-		stream, err := push(directory(ctx, data[0]))
+		stream, err := push(data[0].Data.(string))
 		if err != nil {
 			return err
 		}
@@ -134,11 +126,11 @@ func Switch(
 			}
 		}
 
-		return reset(directory(ctx, data[0]), files)
+		return reset(data[0].Data.(string), files)
 	case Branch:
 		response.Type = types.CoreResponseData
 
-		branches, err := branch(directory(ctx, data[0]))
+		branches, err := branch(data[0].Data.(string))
 		if err != nil {
 			return err
 		}
@@ -148,7 +140,7 @@ func Switch(
 	case Tags:
 		response.Type = types.CoreResponseData
 
-		tags, err := tags(directory(ctx, data[0]))
+		tags, err := tags(data[0].Data.(string))
 		if err != nil {
 			return err
 		}
@@ -161,7 +153,7 @@ func Switch(
 		if len(data) > 2 && data[2].Type == types.BOOLEAN {
 			create = data[2].Data.(bool)
 		}
-		stream, err := checkout(directory(ctx, data[0]), data[1].Data.(string), create)
+		stream, err := checkout(data[0].Data.(string), data[1].Data.(string), create)
 		if err != nil {
 			return err
 		}
@@ -169,7 +161,7 @@ func Switch(
 		return nil
 	case Merge:
 		response.Type = types.CoreResponseData
-		return merge(directory(ctx, data[0]), data[1].Data.(string))
+		return merge(data[0].Data.(string), data[1].Data.(string))
 	}
 
 	return errors.New("unknown git function")
@@ -338,7 +330,7 @@ type GitCommit struct {
 	Message string    `json:"message"`
 }
 
-const DateFormat = "Mon Jan 02 15:04:05 2006 -0700"
+const DateFormat = "Mon Jan 2 15:04:05 2006 -0700"
 
 func log(directory string, n int) ([]GitCommit, error) {
 	dir, err := OpenGitDirectory(directory)

@@ -180,3 +180,15 @@ func ReadDirFnRecursive(p string) ([]GoFileInfo, error) {
 
 	return items, err
 }
+
+func MkdirFn(p string) error {
+	return os.MkdirAll(p, 0755)
+}
+
+func RmFn(p string) error {
+	return os.RemoveAll(p)
+}
+
+func CreateFn(p string) (*os.File, error) {
+	return os.Create(p)
+}
