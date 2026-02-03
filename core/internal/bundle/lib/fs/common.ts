@@ -1,6 +1,9 @@
-import "../buffer/index.ts";
 import { GoFileInfo } from "../@types/fs";
 import { fromByteArray } from "../bridge/base64.ts";
+
+if (!globalThis.Buffer) {
+    await import("../buffer/index.ts");
+}
 
 export type PathLike = string | URL | Buffer;
 
