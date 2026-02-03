@@ -1,5 +1,5 @@
 {
-    "version": "0.12.3",
+    "version": "0.12.4",
     "scripts": {
         "prebuild": "esbuild --bundle --platform=node --format=esm --packages=external --outfile=build.js build.ts",
         "build": "node build.js",
