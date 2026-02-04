@@ -60,7 +60,7 @@ packagesToBundle.forEach(({ entryPoint, outfile }) =>
         alias: {
             // sourcehttps://soatok.blog/2025/11/19/moving-beyond-the-npm-elliptic-package/
             elliptic: "@soatok/elliptic-to-noble",
-            
+
             randombytes: "randombytes/browser",
             "create-ecdh": "create-ecdh/browser",
             "create-hash": "create-hash/browser",
