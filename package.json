@@ -29,6 +29,7 @@
         "@fullstacked/stack-navigation": "github:fullstackedorg/stack-navigation#888302a680bcc501639dfdb0a6aede3da91f06ff",
         "@fullstacked/ui": "github:fullstackedorg/ui#2020b31ae235a40f19a2329bd8b1f13808b7bfec",
         "@nitrogql/esbuild-register": "^1.7.2",
+        "@soatok/elliptic-to-noble": "^9999.0.0",
         "@types/node": "^25.0.3",
         "@types/semver": "^7.7.1",
         "browserify-zlib": "^0.2.0",
@@ -36,6 +37,7 @@
         "crypto-browserify": "^3.12.1",
         "csstype": "^3.2.3",
         "dotenv": "^17.2.3",
+        "elliptic": "@soatok/elliptic-to-noble",
         "esbuild": "^0.27.2",
         "events": "^3.3.0",
         "fuse.js": "^7.1.0",
@@ -58,7 +60,8 @@
         "glob": "12.0.0",
         "tar": "7.5.7",
         "fast-xml-parser": ">=5.3.4",
-        "@isaacs/brace-expansion": ">=5.0.1"
+        "@isaacs/brace-expansion": ">=5.0.1",
+        "elliptic": "$elliptic"
     },
     "devDependencies": {
         "dns2": "^2.1.0"
