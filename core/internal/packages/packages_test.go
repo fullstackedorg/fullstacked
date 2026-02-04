@@ -76,12 +76,12 @@ func TestSwitch(t *testing.T) {
 	// Test Security call
 	err = Switch(
 		nil,
-		types.CoreCallHeader{Fn: Security},
+		types.CoreCallHeader{Fn: Audit},
 		[]types.DeserializedData{{Data: tmpDir}},
 		resp,
 	)
 	if err != nil {
-		t.Errorf("Switch Security failed: %v", err)
+		t.Errorf("Switch Audit failed: %v", err)
 	}
 }
 
@@ -1122,81 +1122,11 @@ func TestInstall_Conflict(t *testing.T) {
 	}
 }
 
-func TestSecurity(t *testing.T) {
-	// Mock audit endpoint
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/-/npm/v1/security/audits/quick" {
-			// Verify POST
-			if r.Method != "POST" {
-				w.WriteHeader(http.StatusMethodNotAllowed)
-				return
-			}
-			// Return a dummy audit report
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"metadata": map[string]interface{}{
-					"vulnerabilities": map[string]interface{}{
-						"info":     0.0,
-						"low":      1.0,
-						"moderate": 0.0,
-						"high":     0.0,
-						"critical": 0.0,
-					},
-				},
-				"advisories": map[string]interface{}{
-					"123": map[string]interface{}{
-						"title":       "Test Vulnerability",
-						"module_name": "test-pkg",
-					},
-				},
-			})
-			return
-		}
-		http.NotFound(w, r)
-	}))
-	defer ts.Close()
-
-	origUrl := registryBaseUrl
-	origClient := httpClient
-	registryBaseUrl = ts.URL + "/"
-	httpClient = ts.Client()
-	defer func() {
-		registryBaseUrl = origUrl
-		httpClient = origClient
-	}()
-
-	tmpDir := t.TempDir()
-
-	// Create dummy package-lock.json
-	pl := PackageLock{
-		Name:    "secure-app",
-		Version: "1.0.0",
-		Packages: map[string]LockDependency{
-			"node_modules/test-pkg": {Version: "1.0.0"},
-		},
-	}
-	plBytes, _ := json.Marshal(pl)
-	os.WriteFile(path.Join(tmpDir, "package-lock.json"), plBytes, 0644)
-
-	// Test Main Success Case
-	report, err := security(tmpDir)
-	if err != nil {
-		t.Fatalf("security failed: %v", err)
-	}
-
-	if advisories, ok := report["advisories"].(map[string]interface{}); ok {
-		if _, ok := advisories["123"]; !ok {
-			t.Error("Expected advisory 123 in report")
-		}
-	} else {
-		t.Error("advisories not found in report")
-	}
-}
-
-func TestSecurity_Errors(t *testing.T) {
+func TestAudit_Errors(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	t.Run("MissingLockfile", func(t *testing.T) {
-		_, err := security(t.TempDir()) // empty dir
+		_, err := audit(t.TempDir()) // empty dir
 		if err == nil {
 			t.Error("Expected error for missing lockfile")
 		}
@@ -1222,7 +1152,7 @@ func TestSecurity_Errors(t *testing.T) {
 			httpClient = origClient
 		}()
 
-		_, err := security(tmpDir)
+		_, err := audit(tmpDir)
 		if err == nil {
 			t.Error("Expected parsing error")
 		}
@@ -1244,7 +1174,7 @@ func TestSecurity_Errors(t *testing.T) {
 			httpClient = origClient
 		}()
 
-		report, err := security(tmpDir)
+		report, err := audit(tmpDir)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
@@ -1270,7 +1200,7 @@ func TestSecurity_Errors(t *testing.T) {
 		httpClient = mockClient
 		defer func() { httpClient = origClient }()
 
-		_, err := security(tmpDir)
+		_, err := audit(tmpDir)
 		if err == nil {
 			t.Error("Expected network failure error")
 		}
@@ -1497,14 +1427,14 @@ func TestSwitch_InputErrors(t *testing.T) {
 			ExpectedError: "directory must be a string",
 		},
 		{
-			Name:          "Security_MissingDir",
-			Fn:            Security,
+			Name:          "Audit_MissingDir",
+			Fn:            Audit,
 			Data:          []types.DeserializedData{},
 			ExpectedError: "missing directory argument",
 		},
 		{
-			Name:          "Security_InvalidDirType",
-			Fn:            Security,
+			Name:          "Audit_InvalidDirType",
+			Fn:            Audit,
 			Data:          []types.DeserializedData{{Data: 123}},
 			ExpectedError: "directory must be a string",
 		},

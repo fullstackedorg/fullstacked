@@ -5,12 +5,15 @@ import os from "node:os";
 import child_process from "node:child_process";
 import esbuild from "esbuild";
 
+const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
+
 const platform = os.platform();
 const archArgIndex = process.argv.indexOf("--arch");
 const arch =
     archArgIndex === -1 ? os.arch() : process.argv.at(archArgIndex + 1);
 
-export const sharedLibLocation = path.resolve(
+const sharedLibLocation = path.resolve(
+    currentDirectory,
     "../../",
     "core",
     "bin",
@@ -22,7 +25,6 @@ if (!fs.existsSync(sharedLibLocation)) {
     process.exit(1);
 }
 
-const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
 
 fs.cpSync(
     sharedLibLocation,

@@ -1,5 +1,5 @@
 import { Packages } from "../@types/index.ts";
-import { Install, Progress, Uninstall } from "../@types/packages.ts";
+import { Install, Progress, Audit, Uninstall } from "../@types/packages.ts";
 import { Duplex } from "../bridge/duplex.ts";
 import { EventEmitter } from "../bridge/eventEmitter.ts";
 import { bridge } from "../bridge/index.ts";
@@ -32,10 +32,16 @@ export async function uninstall(directory: string, ...packages: string[]) {
     ).eventEmitter();
 }
 
-export function security() {}
+export function audit(directory: string) {
+    return bridge({
+        mod: Packages,
+        fn: Audit,
+        data: [directory]
+    });
+}
 
 export default {
     install,
     uninstall,
-    security
+    audit
 };

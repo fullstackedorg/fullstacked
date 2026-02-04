@@ -2,7 +2,6 @@ package packages
 
 import (
 	"archive/tar"
-	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"errors"
@@ -25,7 +24,7 @@ type PackagesFn = uint8
 const (
 	Install   PackagesFn = 0
 	Uninstall PackagesFn = 1
-	Security  PackagesFn = 2
+	Audit     PackagesFn = 2
 )
 
 type Progress struct {
@@ -114,7 +113,7 @@ func Switch(
 		}
 		return nil
 
-	case Security:
+	case Audit:
 		if len(data) < 1 {
 			return errors.New("missing directory argument")
 		}
@@ -123,7 +122,7 @@ func Switch(
 			return errors.New("directory must be a string")
 		}
 
-		report, err := security(directory)
+		report, err := audit(directory)
 		if err != nil {
 			return err
 		}
@@ -564,43 +563,6 @@ func uninstall(directory string, packagesName []string, onProgress ProgressCallb
 
 	// 4. Run Install (Reconcile)
 	install(directory, nil, false, 10, onProgress)
-}
-
-func security(directory string) (map[string]interface{}, error) {
-	// 1. Read package-lock.json
-	packageLockPath := path.Join(directory, "package-lock.json")
-	lockContent, err := fs.ReadFileFn(packageLockPath)
-	if err != nil {
-		return nil, errors.New("failed to read package-lock.json: " + err.Error())
-	}
-
-	// 2. Prepare Payload
-	url := registryBaseUrl + "-/npm/v1/security/audits/quick"
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(lockContent))
-	if err != nil {
-		return nil, errors.New("failed to create request: " + err.Error())
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, errors.New("failed to perform audit: " + err.Error())
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, errors.New("audit failed: " + resp.Status + " " + string(body))
-	}
-
-	// 3. Parse Response
-	var report map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&report); err != nil {
-		return nil, errors.New("failed to parse audit report: " + err.Error())
-	}
-
-	return report, nil
 }
 
 var (

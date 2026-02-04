@@ -40,6 +40,11 @@ export async function executePackages(args: string[]) {
             });
             await uninstallEmitter.duplex.promise();
             break;
+        case "audit":
+            // audit
+            const securityAudit = await packagesLib.audit(directory);
+            console.log(securityAudit);
+            break;
         default:
             console.log(`Unknown packages command: ${command}`);
     }

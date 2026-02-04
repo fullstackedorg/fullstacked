@@ -25,6 +25,13 @@ suite("packages - e2e", () => {
 
     afterEach(clean);
 
+    test("go", () => {
+        child_process.execSync("go test -cover", {
+            cwd: "core/internal/packages",
+            stdio: ["ignore", "ignore", "inherit"]
+        });
+    });
+
     test("install", async () => {
         await new Promise<void>(async (res) => {
             const ee = await packages.install(testDirectoryGo, false, "react");
