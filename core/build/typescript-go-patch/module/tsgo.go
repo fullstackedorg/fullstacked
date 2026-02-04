@@ -85,7 +85,7 @@ func runLSP(
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	fmt.Println("LSP START")
+	fmt.Println("LSP START for", directory)
 	if err := s.Run(ctx); err != nil {
 		if err.Error() == "context canceled" {
 			os.Exit(0)
