@@ -25,7 +25,6 @@ if (!fs.existsSync(sharedLibLocation)) {
     process.exit(1);
 }
 
-
 fs.cpSync(
     sharedLibLocation,
     path.resolve(currentDirectory, path.basename(sharedLibLocation))
