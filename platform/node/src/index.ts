@@ -35,9 +35,10 @@ const core = await load(
             return;
         }
 
-        createWebView(core, ctx, true).then((webview) => {
-            webviews.set(ctx, webview);
-        });
+        createWebView(core, ctx, true)
+            .then((webview) => {
+                webviews.set(ctx, webview);
+            });
     },
     true
 );

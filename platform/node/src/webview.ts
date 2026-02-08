@@ -33,7 +33,7 @@ export async function createWebView(
     const server = http.createServer(createHandler(core, ctx));
 
     const close = () => {
-        // core.stop(ctx);
+        core.stop(ctx);
         server.close();
     };
 
