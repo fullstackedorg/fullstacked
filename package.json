@@ -5,6 +5,7 @@
         "start": "node -r @nitrogql/esbuild-register index",
         "fmt": "sh ./fmt.sh",
         "typecheck": "tsc --noEmit",
+        "pretest": "npm run build && npm run build -w platform/node",
         "test": "node --experimental-test-coverage -r @nitrogql/esbuild-register test"
     },
     "workspaces": [
