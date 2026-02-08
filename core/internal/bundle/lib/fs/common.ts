@@ -1,10 +1,6 @@
 import { GoFileInfo } from "../@types/fs";
 import { fromByteArray } from "../bridge/base64.ts";
 
-if (!globalThis.Buffer) {
-    await import("../buffer/index.ts");
-}
-
 export type PathLike = string | URL | Buffer;
 
 export function formatPathLike(path: PathLike) {
@@ -16,6 +12,10 @@ export type ReadFileOpts = {
 };
 
 export function decodeStringData(data: Uint8Array, options: ReadFileOpts) {
+    if (typeof options === "string") {
+        options = { encoding: options };
+    }
+
     if (!options?.encoding) return Buffer.from(data);
 
     if (options.encoding === "base64") {

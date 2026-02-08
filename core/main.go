@@ -1,6 +1,7 @@
 package main
 
 /*
+// #include <android/log.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -43,6 +44,8 @@ var cCallback = (unsafe.Pointer)(nil)
 
 //export setOnStreamData
 func setOnStreamData(cb unsafe.Pointer) {
+	// androidPrintToLogCat()
+
 	cCallback = cb
 
 	store.OnStreamData = func(ctx uint8, streamId uint8, size int) {
@@ -85,3 +88,25 @@ func call(buffer unsafe.Pointer, length C.int) C.int {
 
 	return C.int(size)
 }
+
+// func androidPrintToLogCat() {
+// 	r, w, _ := os.Pipe()
+// 	os.Stdout = w
+// 	os.Stderr = w
+
+// 	go func() {
+// 		for {
+// 			buffer := make([]byte, 2048)
+// 			n, _ := r.Read(buffer)
+
+// 			if n > 0 {
+// 				ctag := C.CString("go")
+// 				cstr := C.CString(string(buffer[0:n]))
+// 				C.__android_log_write(C.ANDROID_LOG_INFO, ctag, cstr)
+// 				C.free(unsafe.Pointer(ctag))
+// 				C.free(unsafe.Pointer(cstr))
+// 			}
+
+// 		}
+// 	}()
+// }

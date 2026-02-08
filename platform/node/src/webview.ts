@@ -26,19 +26,18 @@ const te = new TextEncoder();
 
 export async function createWebView(
     core: Core,
-    directory: string,
+    ctx: number,
     openBrowser = false
 ) {
-    const ctx = core.start(directory);
     const port = await getNextAvailablePort(mainPort);
     const server = http.createServer(createHandler(core, ctx));
 
     const close = () => {
-        core.stop(ctx);
+        // core.stop(ctx);
         server.close();
     };
 
-    const webSockets = createWebSocketServer(server);
+    const webSockets = createWebSocketServer(server, close);
     const callback = (id: number, buffer: ArrayBuffer) => {
         const payload = new Uint8Array(buffer.byteLength + 1);
         payload[0] = id;
@@ -240,13 +239,23 @@ function getNextAvailablePort(
     });
 }
 
-function createWebSocketServer(server: http.Server) {
+function createWebSocketServer(server: http.Server, close: () => void) {
     const webSockets = new Set<WebSocket>();
     const wss = new WebSocketServer({ noServer: true });
+    let closeTimeout: NodeJS.Timeout | undefined;
+
     const onClose = (ws: WebSocket) => {
         webSockets.delete(ws);
+        if (webSockets.size === 0) {
+            closeTimeout = setTimeout(close, 5000);
+        }
     };
     const handleUpgrade = (ws: WebSocket) => {
+        if (closeTimeout) {
+            clearTimeout(closeTimeout);
+            closeTimeout = undefined;
+        }
+
         webSockets.add(ws);
 
         ws.on("close", () => onClose(ws));

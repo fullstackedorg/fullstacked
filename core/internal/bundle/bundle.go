@@ -4,6 +4,7 @@ import (
 	"embed"
 	"errors"
 	"fullstackedorg/fullstacked/internal/fs"
+	fspath "fullstackedorg/fullstacked/internal/path"
 	"fullstackedorg/fullstacked/types"
 	"path"
 	"runtime/debug"
@@ -16,7 +17,9 @@ import (
 var lib embed.FS
 
 var libModules = map[string]string{
+	"assert":          "/lib/assert/index.js",
 	"buffer":          "/lib/buffer/index.ts",
+	"bundle":          "/lib/bundle/index.ts",
 	"child_process":   "/lib/unavailable/index.ts",
 	"crypto":          "/lib/crypto/index.js",
 	"dns":             "/lib/dns/index.js",
@@ -25,18 +28,26 @@ var libModules = map[string]string{
 	"fs":              "/lib/fs/index.ts",
 	"fs/promises":     "/lib/fs/promises.ts",
 	"fullstacked":     "/lib/fullstacked/index.ts",
+	"git":             "/lib/git/index.ts",
 	"http":            "/lib/unavailable/index.ts",
+	"module":          "/lib/unavailable/index.ts",
 	"net":             "/lib/net/index.ts",
 	"os":              "/lib/os/index.ts",
+	"packages":        "/lib/packages/index.ts",
 	"path":            "/lib/path/index.ts",
+	"perf_hooks":      "/lib/unavailable/index.ts",
 	"process":         "/lib/process/index.ts",
+	"run":             "/lib/run/index.ts",
 	"stream":          "/lib/stream/index.js",
 	"string_decoder":  "/lib/string_decoder/index.js",
 	"timers":          "/lib/timers/index.ts",
 	"timers/promises": "/lib/timers/promises.ts",
 	"tls":             "/lib/unavailable/index.ts",
+	"tty":             "/lib/tty/index.ts",
 	"url":             "/lib/url/index.ts",
 	"util":            "/lib/util/index.js",
+	"vm":              "/lib/unavailable/index.ts",
+	"v8":              "/lib/unavailable/index.ts",
 	"zlib":            "/lib/zlib/index.js",
 
 	"test": "/lib/test/index.ts",
@@ -66,7 +77,7 @@ func Switch(
 	case Bundle:
 		entryPoints := []string{}
 		for _, f := range data {
-			entryPoints = append(entryPoints, f.Data.(string))
+			entryPoints = append(entryPoints, fspath.ResolveWithContext(ctx, f.Data.(string)))
 		}
 
 		if len(entryPoints) == 0 {
@@ -116,6 +127,42 @@ func BundleFnApply(entryPoints []string) EsbuildErrorsAndWarning {
 	entryPointsAdvanced := []esbuild.EntryPoint{}
 
 	for _, f := range entryPoints {
+		exists := fs.ExistsFn(f)
+		if !exists {
+			return EsbuildErrorsAndWarning{
+				Errors: []esbuild.Message{
+					{
+						Text: "entry point not found: " + f,
+					},
+				},
+			}
+		}
+
+		stats, err := fs.StatsFn(f)
+		if err != nil {
+			return EsbuildErrorsAndWarning{
+				Errors: []esbuild.Message{
+					{
+						Text: "failed to stats: " + f,
+					},
+				},
+			}
+		}
+
+		if stats.IsDir {
+			foundEntrypoint := findEntryPoint(f)
+			if foundEntrypoint == "" {
+				return EsbuildErrorsAndWarning{
+					Errors: []esbuild.Message{
+						{
+							Text: "no entry point found in directory: " + f,
+						},
+					},
+				}
+			}
+			f = foundEntrypoint
+		}
+
 		dir := path.Dir(f)
 		name := path.Base(f)
 		entryPointsAdvanced = append(entryPointsAdvanced, esbuild.EntryPoint{
@@ -137,6 +184,14 @@ func BundleFnApply(entryPoints []string) EsbuildErrorsAndWarning {
 				Setup: func(build esbuild.PluginBuild) {
 					// catch lib module entry
 					build.OnResolve(esbuild.OnResolveOptions{Filter: ".*"}, func(args esbuild.OnResolveArgs) (esbuild.OnResolveResult, error) {
+						if strings.HasSuffix(args.Path, ".node") {
+							return esbuild.OnResolveResult{
+								External: true,
+							}, nil
+						}
+
+						args.Path = strings.TrimPrefix(args.Path, "node:")
+
 						libModulePath, isLibModule := libModules[args.Path]
 
 						if !isLibModule {

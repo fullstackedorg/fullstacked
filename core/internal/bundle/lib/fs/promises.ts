@@ -10,7 +10,15 @@ import {
     StatOpts,
     Stats as StatsInterface
 } from "./common.ts";
-import { GoFileInfo, ReadDir, ReadFile, Stats } from "../@types/fs.ts";
+import {
+    GoFileInfo,
+    ReadDir,
+    ReadFile,
+    Stats,
+    Mkdir,
+    Rm,
+    WriteFile
+} from "../@types/fs.ts";
 import { bridge } from "../bridge/index.ts";
 import { Fs } from "../@types/index.ts";
 
@@ -63,8 +71,44 @@ export async function stat(
     return fileInfoToStat(fileInfo);
 }
 
+export function writeFile(path: PathLike, data: string | Uint8Array) {
+    return bridge({
+        mod: Fs,
+        fn: WriteFile,
+        data: [formatPathLike(path), data]
+    });
+}
+
+export function mkdir(path: PathLike) {
+    return bridge({
+        mod: Fs,
+        fn: Mkdir,
+        data: [formatPathLike(path)]
+    });
+}
+
+export function rm(path: PathLike) {
+    return bridge({
+        mod: Fs,
+        fn: Rm,
+        data: [formatPathLike(path)]
+    });
+}
+
+export function unlink(path: PathLike) {
+    return bridge({
+        mod: Fs,
+        fn: Rm,
+        data: [formatPathLike(path)]
+    });
+}
+
 export default {
     stat,
     readFile,
-    readdir
+    readdir,
+    mkdir,
+    rm,
+    unlink,
+    writeFile
 };

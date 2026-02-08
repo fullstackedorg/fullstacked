@@ -9,6 +9,7 @@ export type EventEmitter<K extends Record<string, any[]>> = {
     duplex: Duplex;
     on(event: keyof K, callback: (...args: K[keyof K]) => void): void;
     off(event: keyof K, callback: (...args: K[keyof K]) => void): void;
+    writeEvent(event: keyof K, ...args: K[keyof K]): void;
 };
 
 export function createEventEmitter<K extends Record<string, any[]>>(
@@ -73,6 +74,9 @@ export function createEventEmitter<K extends Record<string, any[]>>(
         off(event: keyof K, callback: (...args: K[keyof K]) => void) {
             let listeners = eventListeners.get(event);
             listeners?.delete(callback);
+        },
+        writeEvent(event: keyof K, ...args: K[keyof K]) {
+            duplex.writeEvent(event as string, ...args);
         }
     };
 }

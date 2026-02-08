@@ -1,3 +1,6 @@
+_*.js
+_*.css
+
 ./build
 dist
 node_modules
@@ -24,5 +27,3 @@ platform/apple/*.xcarchive
 platform/apple/pkg*
 platform/apple/FullStacked.xcodeproj/xcshareddate
 platform/apple/FullStacked.xcodeproj/xcuserdata
-
-platform/windows

@@ -7,3 +7,6 @@
 [submodule "core/typescript-go"]
 	path = core/typescript-go
 	url = https://github.com/microsoft/typescript-go.git
+[submodule "app"]
+	path = app
+	url = https://github.com/fullstackedorg/app.git

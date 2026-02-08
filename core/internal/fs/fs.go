@@ -14,10 +14,13 @@ import (
 type FsFn = uint8
 
 const (
-	Exists   FsFn = 0
-	Stats    FsFn = 1
-	ReadFile FsFn = 2
-	ReadDir  FsFn = 3
+	Exists    FsFn = 0
+	Stats     FsFn = 1
+	ReadFile  FsFn = 2
+	ReadDir   FsFn = 3
+	Mkdir     FsFn = 4
+	Rm        FsFn = 5
+	WriteFile FsFn = 6
 )
 
 func Switch(
@@ -62,6 +65,24 @@ func Switch(
 		response.Data = items
 		response.Type = types.CoreResponseData
 		return nil
+	case Mkdir:
+		response.Type = types.CoreResponseData
+		return MkdirFn(path.ResolveWithContext(ctx, data[0].Data.(string)))
+	case Rm:
+		response.Type = types.CoreResponseData
+		return RmFn(path.ResolveWithContext(ctx, data[0].Data.(string)))
+	case WriteFile:
+		response.Type = types.CoreResponseData
+
+		var contents []byte
+		switch data[1].Type {
+		case types.STRING:
+			contents = []byte(data[1].Data.(string))
+		case types.BUFFER:
+			contents = data[1].Data.([]byte)
+		}
+
+		return WriteFileFn(path.ResolveWithContext(ctx, data[0].Data.(string)), contents)
 	}
 
 	return errors.New("unkown fs function")
@@ -116,7 +137,7 @@ func StatsFn(p string) (GoFileInfo, error) {
 		CTime:     cTime.UnixNano(),
 		BirthTime: birthTime.UnixNano(),
 		IsDir:     fileInfo.IsDir(),
-		Mode:      fileInfo.Mode(),
+		Mode:      fileInfo.Mode().Perm(),
 	}, nil
 }
 

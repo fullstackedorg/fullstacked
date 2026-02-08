@@ -5,16 +5,6 @@ const tsgoDirectory = path.resolve("..", "typescript-go");
 
 const toPatch = [
     {
-        // /dev/null/infered crashes everything
-        file: path.resolve(tsgoDirectory, "internal", "project", "project.go"),
-        replace: [
-            {
-                from: `inferredProjectName = "/dev/null/inferred"`,
-                to__: `inferredProjectName = ".inferred"`
-            }
-        ]
-    },
-    {
         // fix invalid utf8 panic
         file: path.resolve(tsgoDirectory, "internal", "ls", "signaturehelp.go"),
         replace: [

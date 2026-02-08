@@ -2,6 +2,7 @@
 #include <functional>
 #include <iostream>
 #include <map>
+#include <string>
 
 #ifdef _MSC_VER
 #include "./win.h"
@@ -49,7 +50,9 @@ TSFN tsfn;
 void n_onStreamData(uint8_t ctx, uint8_t streamId, int size) {
     std::vector<uint8_t> buffer(size, 0);
     // 2 for CoreType Stream
-    lib.getCorePayload(ctx, 2, streamId, buffer.data());
+    if (streamId != 0 || size != 0) {
+        lib.getCorePayload(ctx, 2, streamId, buffer.data());
+    }
     StreamChunk *chunk = new StreamChunk;
     chunk->ctx = ctx;
     chunk->id = streamId;

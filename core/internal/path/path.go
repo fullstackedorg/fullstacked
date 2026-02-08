@@ -39,7 +39,11 @@ func Switch(
 		return nil
 	case Resolve:
 		response.Type = types.CoreResponseData
-		response.Data = ResolveWithContext(ctx, DataToStringSlice(data...)...)
+		strSlice := []string{
+			"/",
+		}
+		strSlice = append(strSlice, DataToStringSlice(data...)...)
+		response.Data = goPath.Clean(goPath.Join(strSlice...))
 		return nil
 	case Normalize:
 		response.Type = types.CoreResponseData
@@ -62,8 +66,13 @@ func Switch(
 }
 
 func ResolveWithContext(ctx *types.CoreCallContext, paths ...string) string {
+	var baseDir string
+	if ctx != nil {
+		baseDir = ctx.BaseDirectory
+	}
+
 	strSlice := []string{
-		ctx.BaseDirectory,
+		baseDir,
 	}
 	strSlice = append(strSlice, paths...)
 	return goPath.Join(strSlice...)

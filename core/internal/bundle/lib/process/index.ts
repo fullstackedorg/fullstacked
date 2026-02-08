@@ -1,5 +1,6 @@
 //@ts-ignore
 import p from "./index.js";
+import path from "path";
 
 // polyfil for window.performance.now
 var performance = globalThis.performance || {};
@@ -37,6 +38,15 @@ function hrtime(previousTimestamp) {
 }
 
 p.hrtime = hrtime;
+let currentDir = "/";
+p.chdir = (dir: string) => {
+    if (dir.startsWith("/")) {
+        currentDir = dir;
+    } else {
+        currentDir = path.resolve(currentDir, dir);
+    }
+};
+p.cwd = () => currentDir;
 
 globalThis.process = p;
 export * from "./index.js";

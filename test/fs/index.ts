@@ -300,4 +300,115 @@ suite("fs - e2e", () => {
             assert.deepStrictEqual(item.isFile(), nodeItems.at(index).isFile());
         });
     });
+
+    test("mkdirSync", () => {
+        const path = "test-mkdir-sync";
+        if (nodeFs.existsSync(path)) {
+            nodeFs.rmdirSync(path);
+        }
+
+        fs.mkdirSync(path);
+        assert.ok(nodeFs.existsSync(path));
+
+        const stats = fs.statSync(path);
+        const nodeStats = nodeFs.statSync(path);
+        assert.deepEqual(stats.mode, nodeStats.mode);
+
+        nodeFs.rmdirSync(path);
+    });
+
+    test("mkdir", (_, done) => {
+        const path = "test-mkdir-callback";
+        if (nodeFs.existsSync(path)) {
+            nodeFs.rmdirSync(path);
+        }
+
+        fs.mkdir(path, (err) => {
+            if (err) return done(err);
+
+            try {
+                assert.ok(nodeFs.existsSync(path));
+                const stats = fs.statSync(path);
+                const nodeStats = nodeFs.statSync(path);
+                assert.deepEqual(stats.mode, nodeStats.mode);
+                nodeFs.rmdirSync(path);
+                done();
+            } catch (e) {
+                done(e);
+            }
+        });
+    });
+
+    test("promises.mkdir", async () => {
+        const path = "test-mkdir-promise";
+        if (nodeFs.existsSync(path)) {
+            nodeFs.rmdirSync(path);
+        }
+
+        await fs.promises.mkdir(path);
+        assert.ok(nodeFs.existsSync(path));
+
+        const stats = await fs.promises.stat(path);
+        const nodeStats = await nodeFs.promises.stat(path);
+        assert.deepEqual(stats.mode, nodeStats.mode);
+
+        nodeFs.rmdirSync(path);
+    });
+
+    test("rmSync", () => {
+        const path = "test-rm-sync";
+        if (nodeFs.existsSync(path)) {
+            nodeFs.rmSync(path, { recursive: true, force: true });
+        }
+        nodeFs.mkdirSync(path);
+        fs.rmSync(path);
+        assert.equal(nodeFs.existsSync(path), false);
+
+        nodeFs.writeFileSync(path, "test");
+        fs.rmSync(path);
+        assert.equal(nodeFs.existsSync(path), false);
+    });
+
+    test("rm", (_, done) => {
+        const path = "test-rm-callback";
+        if (nodeFs.existsSync(path)) {
+            nodeFs.rmSync(path, { recursive: true, force: true });
+        }
+        nodeFs.mkdirSync(path);
+
+        fs.rm(path, (err) => {
+            if (err) return done(err);
+            try {
+                assert.equal(nodeFs.existsSync(path), false);
+
+                nodeFs.writeFileSync(path, "test");
+                fs.rm(path, (err) => {
+                    if (err) return done(err);
+                    try {
+                        assert.equal(nodeFs.existsSync(path), false);
+                        done();
+                    } catch (e) {
+                        done(e);
+                    }
+                });
+            } catch (e) {
+                done(e);
+            }
+        });
+    });
+
+    test("promises.rm", async () => {
+        const path = "test-rm-promise";
+        if (nodeFs.existsSync(path)) {
+            nodeFs.rmSync(path, { recursive: true, force: true });
+        }
+        nodeFs.mkdirSync(path);
+
+        await fs.promises.rm(path);
+        assert.equal(nodeFs.existsSync(path), false);
+
+        nodeFs.writeFileSync(path, "test");
+        await fs.promises.rm(path);
+        assert.equal(nodeFs.existsSync(path), false);
+    });
 });

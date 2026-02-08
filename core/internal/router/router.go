@@ -16,12 +16,14 @@ import (
 	"fullstackedorg/fullstacked/internal/stream"
 	"fullstackedorg/fullstacked/internal/test"
 	"fullstackedorg/fullstacked/types"
+	"path/filepath"
 )
 
 type CoreFn = uint8
 
 const (
 	StaticFile CoreFn = 0
+	Run        CoreFn = 1
 )
 
 /*
@@ -119,6 +121,8 @@ func callProcess(
 	return moduleSwitch(ctx, header, data, response)
 }
 
+var OnNewContext = func(ctx uint8) {}
+
 func Switch(
 	ctx *types.CoreCallContext,
 	header types.CoreCallHeader,
@@ -129,6 +133,17 @@ func Switch(
 	case StaticFile:
 		response.Type = types.CoreResponseData
 		response.Data = staticFile(ctx, data[0].Data.(string))
+		return nil
+	case Run:
+		response.Type = types.CoreResponseData
+		directory := filepath.Join(ctx.BaseDirectory, data[0].Data.(string))
+		id := store.NewContext(directory)
+
+		if store.OnStreamData == nil {
+			return errors.New("onStreamData not set")
+		}
+
+		store.OnStreamData(id, 0, 0)
 		return nil
 	}
 

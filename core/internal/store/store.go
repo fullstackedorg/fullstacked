@@ -75,8 +75,6 @@ func storeResponseData(
 	return len(payload), nil
 }
 
-var streamId = uint8(0)
-
 func storeResponseStream(
 	ctx *types.CoreCallContext,
 	header types.CoreCallHeader,
@@ -86,17 +84,22 @@ func storeResponseStream(
 		return 0, errors.New("cannot store response stream with stream nil")
 	}
 
+	streamId := uint8(1)
+	for ctx.Streams[streamId] != nil {
+		streamId++
+	}
+
 	ctx.StreamsMutex.Lock()
 	storedStreamId := streamId
 	ctx.Streams[storedStreamId] = &types.StoredStream{
-		Open:   response.Stream.Open,
-		Close:  response.Stream.Close,
-		Write:  response.Stream.Write,
-		Opened: false,
-		Ended:  false,
-		Buffer: []byte{},
+		Open:       response.Stream.Open,
+		Close:      response.Stream.Close,
+		Write:      response.Stream.Write,
+		WriteEvent: response.Stream.WriteEvent,
+		Opened:     false,
+		Ended:      false,
+		Buffer:     []byte{},
 	}
-	streamId += 1
 	ctx.StreamsMutex.Unlock()
 
 	payload := []byte{response.Type}
@@ -215,13 +218,13 @@ func StreamChunk(
 	}
 
 	size := 0
-	ctx.ResponsesMutex.Lock()
+	ctx.StreamsMutex.Lock()
 	if buffer != nil {
 		stream.Buffer = append(stream.Buffer, buffer...)
 	}
 	stream.Ended = end
 	size = len(stream.Buffer)
-	ctx.ResponsesMutex.Unlock()
+	ctx.StreamsMutex.Unlock()
 
 	if OnStreamData == nil {
 		panic("did not set OnStreamData")

@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fullstackedorg/fullstacked/internal/fs"
+	fspath "fullstackedorg/fullstacked/internal/path"
 	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/types"
 	"io"
 	"net/http"
 	"os"
 	"path"
-	"sort"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -51,6 +52,7 @@ func Switch(
 		if !ok {
 			return errors.New("directory must be a string")
 		}
+		directory = fspath.ResolveWithContext(ctx, directory)
 
 		saveDev := false
 		packagesStartIndex := 1
@@ -91,6 +93,7 @@ func Switch(
 		if !ok {
 			return errors.New("directory must be a string")
 		}
+		directory = fspath.ResolveWithContext(ctx, directory)
 
 		packagesName := []string{}
 		if len(data) > 1 {
@@ -121,6 +124,7 @@ func Switch(
 		if !ok {
 			return errors.New("directory must be a string")
 		}
+		directory = fspath.ResolveWithContext(ctx, directory)
 
 		report, err := audit(directory)
 		if err != nil {
@@ -199,10 +203,10 @@ func install(
 		onProgress = func(p Progress) {}
 	}
 
-	onProgress(Progress{Stage: "Initialization", Progress: 0.0})
+	onProgress(Progress{Stage: "Initialization"})
 
 	// 1. Read package.json
-	packageJsonPath := path.Join(directory, "package.json")
+	packageJsonPath := filepath.Join(directory, "package.json")
 	packageJsonContent, err := fs.ReadFileFn(packageJsonPath)
 
 	// Handle missing package.json by initializing empty struct
@@ -220,7 +224,7 @@ func install(
 
 	// 1.5 Handle packagesName (Install Specific Packages)
 	if len(packagesName) > 0 {
-		for i, nameWithVersion := range packagesName {
+		for _, nameWithVersion := range packagesName {
 			name := nameWithVersion
 			rangeStr := "latest"
 			lastAt := strings.LastIndex(nameWithVersion, "@")
@@ -230,9 +234,8 @@ func install(
 			}
 
 			onProgress(Progress{
-				Name:     name,
-				Stage:    "Resolving",
-				Progress: 0.1 * (float64(i) / float64(len(packagesName))),
+				Name:  name,
+				Stage: "Resolving",
 			})
 
 			meta, err := fetchPackageMetadata(name)
@@ -264,7 +267,7 @@ func install(
 		}
 	}
 
-	onProgress(Progress{Stage: "Initialization", Progress: 0.1})
+	onProgress(Progress{Stage: "Initialization"})
 
 	// 2. Load Existing Lockfile (for Pruning/Comparison)
 	var oldLock *PackageLock
@@ -276,7 +279,7 @@ func install(
 		}
 	}
 
-	onProgress(Progress{Stage: "Resolving", Progress: 0.15})
+	onProgress(Progress{Stage: "Resolving"})
 
 	name := pkgJSON.Name
 	if name == "" {
@@ -314,107 +317,11 @@ func install(
 	}
 	queue := []QueueItem{{ParentPath: "", Deps: rootDeps}}
 
-	resolvedCount := 0
-
-	for len(queue) > 0 {
-		item := queue[0]
-		queue = queue[1:]
-
-		// Sort dependencies for deterministic resolution
-		var deps []string
-		for name := range item.Deps {
-			deps = append(deps, name)
-		}
-		sort.Strings(deps)
-
-		for _, name := range deps {
-			rangeStr := item.Deps[name]
-			resolvedCount++
-			// Heuristic progress: limit to 0.5 max during resolution
-			prog := 0.15 + (0.35 * (1.0 - (1.0 / (1.0 + float64(resolvedCount)*0.1))))
-
-			// We don't have exact version yet, so just Name + Stage
-			onProgress(Progress{
-				Name:     name,
-				Stage:    "Resolving",
-				Progress: prog,
-			})
-
-			meta, err := fetchPackageMetadata(name)
-			if err != nil {
-				continue
-			}
-			ver, err := resolveVersion(meta, rangeStr)
-			if err != nil {
-				continue
-			}
-
-			// Hoisting Logic
-			targetPath := ""
-			rootSlot := path.Join("node_modules", name)
-
-			if existingVer, ok := installedPaths[rootSlot]; ok {
-				if existingVer == ver.Version {
-					targetPath = rootSlot // Dedupe
-				} else {
-					// Conflict at root
-					if item.ParentPath == "" {
-						targetPath = rootSlot // Overwrite root if we are root
-					} else {
-						targetPath = path.Join(item.ParentPath, "node_modules", name)
-					}
-				}
-			} else {
-				targetPath = rootSlot // Claim root
-			}
-
-			// Check if chosen path occupied (if different version)
-			if existingVer, ok := installedPaths[targetPath]; ok {
-				if existingVer == ver.Version {
-					continue // Already processed
-				}
-				// Conflict/Overwrite behavior: Overwrite.
-			}
-
-			integrity := ver.Dist.Integrity
-			if integrity == "" {
-				integrity = ver.Dist.Shasum
-			}
-
-			newLock.Packages[targetPath] = LockDependency{
-				Version:          ver.Version,
-				Resolved:         ver.Dist.Tarball,
-				Integrity:        integrity,
-				Dependencies:     ver.Dependencies,
-				License:          ver.License,
-				Engines:          ver.Engines,
-				PeerDependencies: ver.PeerDependencies,
-			}
-			installedPaths[targetPath] = ver.Version
-
-			combinedDeps := make(map[string]string)
-			for k, v := range ver.Dependencies {
-				combinedDeps[k] = v
-			}
-			for k, v := range ver.PeerDependencies {
-				combinedDeps[k] = v
-			}
-
-			if len(combinedDeps) > 0 {
-				queue = append(queue, QueueItem{
-					ParentPath: targetPath,
-					Deps:       combinedDeps,
-				})
-			}
-		}
-	}
-
-	// 5. Install Step
-	onProgress(Progress{Stage: "Installing", Progress: 0.6})
-
+	// Concurrency control for installation
 	sem := make(chan struct{}, maxConcurrent)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
+	var downloadCount int
 
 	threadSafeProgress := func(p Progress) {
 		mu.Lock()
@@ -422,30 +329,43 @@ func install(
 		onProgress(p)
 	}
 
-	for k, v := range newLock.Packages {
-		if k == "" {
-			continue
+	// Helper to trigger install if needed
+	triggerInstall := func(pathKey string, dep LockDependency) {
+		if pathKey == "" {
+			return
 		}
 
-		targetDir := path.Join(directory, k)
+		targetDir := path.Join(directory, pathKey)
 
 		needsInstall := true
 		if fs.ExistsFn(targetDir) {
 			if oldLock != nil {
-				if oldPkg, ok := oldLock.Packages[k]; ok {
-					if oldPkg.Version == v.Version && oldPkg.Integrity == v.Integrity {
+				if oldPkg, ok := oldLock.Packages[pathKey]; ok {
+					if oldPkg.Version == dep.Version && oldPkg.Integrity == dep.Integrity {
 						needsInstall = false
 					}
 				}
 			}
 		}
-		if !needsInstall {
-			continue
+
+		pkgName := path.Base(pathKey)
+		displayName := pkgName
+		if strings.HasPrefix(path.Base(path.Dir(pathKey)), "@") {
+			displayName = path.Join(path.Base(path.Dir(pathKey)), pkgName)
 		}
 
-		pkgName := path.Base(k)
+		if !needsInstall {
+			threadSafeProgress(Progress{
+				Name:     displayName,
+				Version:  dep.Version,
+				Stage:    "Extracting",
+				Progress: 1,
+			})
+			return
+		}
+
 		wg.Add(1)
-		go func(ver LockDependency, tDir string, pName string) {
+		go func(ver LockDependency, tDir string, pDisplay string, pFlat string) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
@@ -453,17 +373,150 @@ func install(
 			fs.RmFn(tDir)
 			fs.MkdirFn(tDir)
 
-			downloadAndExtract(ver.Resolved, tDir, pName, func(p float64) {
+			err := downloadAndExtract(ver.Resolved, tDir, pFlat, func(p float64) {
 				threadSafeProgress(Progress{
-					Name:     pName,
+					Name:     pDisplay,
 					Version:  ver.Version,
 					Stage:    "Extracting",
 					Progress: p,
 				})
 			})
-		}(v, targetDir, pkgName)
+
+			if err == nil {
+				mu.Lock()
+				downloadCount++
+				mu.Unlock()
+			}
+			threadSafeProgress(Progress{
+				Name:     pDisplay,
+				Version:  ver.Version,
+				Stage:    "Extracting",
+				Progress: 1,
+			})
+		}(dep, targetDir, displayName, pkgName)
 	}
 
+	resolvedCount := 0
+	// Global state lock for resolution maps
+	var stateMu sync.Mutex
+
+	for len(queue) > 0 {
+		// Snapshot current level for concurrent processing
+		currentLevel := queue
+		queue = nil // Clear for next level
+
+		var levelWG sync.WaitGroup
+		var nextLevelQueue []QueueItem
+		var nextQueueMu sync.Mutex
+
+		for _, item := range currentLevel {
+			// Process each dependency in the item concurrently
+			for name, rangeStr := range item.Deps {
+				levelWG.Add(1)
+				go func(pName, pRange, parentPath string) {
+					defer levelWG.Done()
+
+					// Acquire semaphore to limit concurrency
+					sem <- struct{}{}
+					defer func() { <-sem }()
+
+					stateMu.Lock()
+					resolvedCount++
+					// Progress update
+					onProgress(Progress{
+						Name:  pName,
+						Stage: "Resolving",
+					})
+					stateMu.Unlock()
+
+					meta, err := fetchPackageMetadata(pName)
+					if err != nil {
+						return
+					}
+					ver, err := resolveVersion(meta, pRange)
+					if err != nil {
+						return
+					}
+
+					// Critical Section: Hoisting & State Update
+					stateMu.Lock()
+
+					// Hoisting Logic
+					targetPath := ""
+					rootSlot := path.Join("node_modules", pName)
+
+					if existingVer, ok := installedPaths[rootSlot]; ok {
+						if existingVer == ver.Version {
+							targetPath = rootSlot // Dedupe
+						} else {
+							// Conflict at root
+							if parentPath == "" {
+								targetPath = rootSlot // Overwrite root if we are root
+							} else {
+								targetPath = path.Join(parentPath, "node_modules", pName)
+							}
+						}
+					} else {
+						targetPath = rootSlot // Claim root
+					}
+
+					// Check if chosen path occupied
+					if existingVer, ok := installedPaths[targetPath]; ok {
+						if existingVer == ver.Version {
+							stateMu.Unlock()
+							return // Already processed
+						}
+					}
+
+					integrity := ver.Dist.Integrity
+					if integrity == "" {
+						integrity = ver.Dist.Shasum
+					}
+
+					depEntry := LockDependency{
+						Version:          ver.Version,
+						Resolved:         ver.Dist.Tarball,
+						Integrity:        integrity,
+						Dependencies:     ver.Dependencies,
+						License:          ver.License,
+						Engines:          ver.Engines,
+						PeerDependencies: ver.PeerDependencies,
+					}
+					newLock.Packages[targetPath] = depEntry
+					installedPaths[targetPath] = ver.Version
+
+					// Must capture deps before unlocking or just use local var
+					combinedDeps := make(map[string]string)
+					for k, v := range ver.Dependencies {
+						combinedDeps[k] = v
+					}
+					for k, v := range ver.PeerDependencies {
+						combinedDeps[k] = v
+					}
+
+					// Release state lock before triggering install (which might block/spawn)
+					stateMu.Unlock()
+
+					// Trigger installation immediately
+					triggerInstall(targetPath, depEntry)
+
+					if len(combinedDeps) > 0 {
+						nextQueueMu.Lock()
+						nextLevelQueue = append(nextLevelQueue, QueueItem{
+							ParentPath: targetPath,
+							Deps:       combinedDeps,
+						})
+						nextQueueMu.Unlock()
+					}
+				}(name, rangeStr, item.ParentPath)
+			}
+		}
+		// Wait for this level to complete before moving to next depth
+		levelWG.Wait()
+		queue = nextLevelQueue
+	}
+
+	// Wait for all installations to complete
 	wg.Wait()
 
 	// 5.5 Mark peers
@@ -503,7 +556,7 @@ func install(
 	}
 
 	// 6. Save Lockfile
-	onProgress(Progress{Stage: "Finalizing", Progress: 0.95})
+	onProgress(Progress{Stage: "Finalizing"})
 	if f, err := fs.CreateFn(packageLockPath); err == nil {
 		defer f.Close()
 		enc := json.NewEncoder(f)
@@ -512,7 +565,7 @@ func install(
 		enc.Encode(newLock)
 	}
 
-	onProgress(Progress{Stage: "Done"})
+	onProgress(Progress{Stage: "Done", Progress: float64(downloadCount)})
 }
 
 func uninstall(directory string, packagesName []string, onProgress ProgressCallback) {

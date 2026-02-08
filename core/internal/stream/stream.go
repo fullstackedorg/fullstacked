@@ -9,9 +9,10 @@ import (
 type StreamFn = uint8
 
 const (
-	Open  StreamFn = 0
-	Write StreamFn = 1
-	Close StreamFn = 2
+	Open       StreamFn = 0
+	Write      StreamFn = 1
+	WriteEvent StreamFn = 2
+	Close      StreamFn = 3
 )
 
 func Switch(
@@ -28,6 +29,12 @@ func Switch(
 		err = openStream(ctx, streamId)
 	case Write:
 		err = writeStream(ctx, streamId, data[1].Data.([]byte))
+	case WriteEvent:
+		dataArgs := []types.DeserializedData{}
+		if len(data) > 2 {
+			dataArgs = data[2:]
+		}
+		err = writeEventStream(ctx, streamId, data[1].Data.(string), dataArgs)
 	case Close:
 		err = closeStream(ctx, streamId)
 	default:
@@ -83,6 +90,28 @@ func writeStream(ctx *types.CoreCallContext, streamId uint8, data []byte) error 
 	}
 
 	stream.Write(ctx, streamId, data)
+
+	return nil
+}
+
+func writeEventStream(ctx *types.CoreCallContext, streamId uint8, event string, data []types.DeserializedData) error {
+	ctx.StreamsMutex.Lock()
+	stream, ok := ctx.Streams[streamId]
+	ctx.StreamsMutex.Unlock()
+
+	if !ok {
+		return errors.New("no stream for id")
+	}
+
+	if !stream.Opened {
+		return errors.New("stream is not opened")
+	}
+
+	if stream.WriteEvent == nil {
+		return errors.New("stream has no write event function")
+	}
+
+	stream.WriteEvent(ctx, streamId, event, data)
 
 	return nil
 }

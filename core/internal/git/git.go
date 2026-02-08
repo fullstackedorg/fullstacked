@@ -4,12 +4,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"fullstackedorg/fullstacked/internal/fs"
+	"fullstackedorg/fullstacked/internal/path"
 	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/types"
 	"io"
+	nethttp "net/http"
 	"net/url"
-	"path"
+	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	git "github.com/go-git/go-git/v6"
@@ -18,25 +22,102 @@ import (
 	"github.com/go-git/go-git/v6/plumbing/object"
 	"github.com/go-git/go-git/v6/plumbing/storer"
 	"github.com/go-git/go-git/v6/plumbing/transport"
+	"github.com/go-git/go-git/v6/plumbing/transport/http"
 )
 
 type GitFn = uint8
 
 const (
-	Init     GitFn = 0
-	Status   GitFn = 1
-	Add      GitFn = 2
-	Log      GitFn = 3
-	Commit   GitFn = 4
-	Clone    GitFn = 5
-	Pull     GitFn = 6
-	Push     GitFn = 7
-	Reset    GitFn = 8
-	Branch   GitFn = 9
-	Tags     GitFn = 10
-	Checkout GitFn = 11
-	Merge    GitFn = 12
+	AuthManager GitFn = 0
+	Init        GitFn = 1
+	Status      GitFn = 2
+	Add         GitFn = 3
+	Log         GitFn = 4
+	Commit      GitFn = 5
+	Clone       GitFn = 6
+	Pull        GitFn = 7
+	Push        GitFn = 8
+	Reset       GitFn = 9
+	Branch      GitFn = 10
+	Tags        GitFn = 11
+	Checkout    GitFn = 12
+	Merge       GitFn = 13
 )
+
+type gitAuthManager struct {
+	ctx      *types.CoreCallContext
+	streamId uint8
+	auths    map[string]GitAuth
+	requests map[string]*authRequest
+}
+
+type authRequest struct {
+	wg   *sync.WaitGroup
+	auth *GitAuth
+}
+
+var gitAuthManagers = make(map[uint8]gitAuthManager)
+
+var ErrNoGitAuthManager = errors.New("no git auth manager found for context")
+
+func getGitAuthManager(ctx *types.CoreCallContext) (*gitAuthManager, error) {
+	gitAuthManager, ok := gitAuthManagers[ctx.Id]
+	if !ok {
+		return nil, ErrNoGitAuthManager
+	}
+	return &gitAuthManager, nil
+}
+
+func RequestAuth(ctx *types.CoreCallContext, urlStr string, requestUser bool) (*GitAuth, error) {
+	url, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, err
+	}
+
+	gitAuthManager, err := getGitAuthManager(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	auth := gitAuthManager.auths[url.Host]
+	if !requestUser {
+		return &auth, nil
+	}
+
+	request, ok := gitAuthManager.requests[url.Host]
+	if !ok {
+		newRequest := authRequest{
+			wg: &sync.WaitGroup{},
+		}
+		newRequest.wg.Add(1)
+		request = &newRequest
+		gitAuthManager.requests[url.Host] = request
+		defer delete(gitAuthManager.requests, url.Host)
+		store.StreamEvent(gitAuthManager.ctx, gitAuthManager.streamId, "auth", []types.SerializableData{url.Host}, false)
+	}
+
+	request.wg.Wait()
+
+	gitAuthManager.auths[url.Host] = GitAuth{
+		Host:     url.Host,
+		Username: request.auth.Username,
+		Password: request.auth.Password,
+		Email:    request.auth.Email,
+	}
+
+	return RequestAuth(ctx, urlStr, false)
+}
+
+func gitAuthToHttpAuth(gitAuth *GitAuth) *http.BasicAuth {
+	if gitAuth == nil {
+		return nil
+	}
+
+	return &http.BasicAuth{
+		Username: gitAuth.Username,
+		Password: gitAuth.Password,
+	}
+}
 
 func Switch(
 	ctx *types.CoreCallContext,
@@ -45,13 +126,53 @@ func Switch(
 	response *types.CoreCallResponse,
 ) error {
 	switch header.Fn {
+	case AuthManager:
+		response.Type = types.CoreResponseStream
+
+		gitAuthManager := gitAuthManager{
+			requests: make(map[string]*authRequest),
+			auths:    make(map[string]GitAuth),
+		}
+
+		stream := types.ResponseStream{
+			Open: func(ctx *types.CoreCallContext, streamId uint8) {
+				gitAuthManager.ctx = ctx
+				gitAuthManager.streamId = streamId
+				gitAuthManagers[ctx.Id] = gitAuthManager
+			},
+			Close: func(ctx *types.CoreCallContext, streamId uint8) {
+				delete(gitAuthManagers, ctx.Id)
+			},
+			WriteEvent: func(ctx *types.CoreCallContext, streamId uint8, event string, data []types.DeserializedData) {
+				if event != "authResponse" {
+					return
+				}
+
+				host := data[0].Data.(string)
+				request, ok := gitAuthManager.requests[host]
+				if !ok {
+					return
+				}
+
+				gitAuth := GitAuth{}
+				if data[1].Type == types.OBJECT {
+					json.Unmarshal(data[1].Data.(types.DeserializedRawObject).Data, &gitAuth)
+				}
+				request.auth = &gitAuth
+				request.wg.Done()
+			},
+		}
+
+		response.Stream = &stream
+
+		return nil
 	case Init:
 		response.Type = types.CoreResponseData
-		return initFn(data[0].Data.(string), data[1].Data.(string))
+		return initFn(path.ResolveWithContext(ctx, data[0].Data.(string)), data[1].Data.(string))
 	case Status:
 		response.Type = types.CoreResponseData
 
-		s, err := status(data[0].Data.(string))
+		s, err := status(path.ResolveWithContext(ctx, data[0].Data.(string)))
 		if err != nil {
 			return err
 		}
@@ -60,10 +181,10 @@ func Switch(
 		return nil
 	case Add:
 		response.Type = types.CoreResponseData
-		return add(data[0].Data.(string), data[1].Data.(string))
+		return add(path.ResolveWithContext(ctx, data[0].Data.(string)), data[1].Data.(string))
 	case Log:
 		response.Type = types.CoreResponseData
-		logs, err := log(data[0].Data.(string), int(data[1].Data.(float64)))
+		logs, err := log(path.ResolveWithContext(ctx, data[0].Data.(string)), int(data[1].Data.(float64)))
 		if err != nil {
 			return err
 		}
@@ -77,7 +198,7 @@ func Switch(
 
 		json.Unmarshal(data[2].Data.(types.DeserializedRawObject).Data, &author)
 
-		hash, err := commit(data[0].Data.(string), data[1].Data.(string), author)
+		hash, err := commit(path.ResolveWithContext(ctx, data[0].Data.(string)), data[1].Data.(string), author)
 		if err != nil {
 			return err
 		}
@@ -86,13 +207,10 @@ func Switch(
 		return nil
 	case Clone:
 		response.Type = types.CoreResponseStream
-
-		directory := "."
-		if data[1].Type == types.STRING {
-			directory = data[1].Data.(string)
-		}
-
-		stream, err := clone(data[0].Data.(string), directory)
+		stream, err := clone(
+			data[0].Data.(string),
+			path.ResolveWithContext(ctx, data[1].Data.(string)),
+		)
 		if err != nil {
 			return err
 		}
@@ -101,7 +219,7 @@ func Switch(
 	case Pull:
 		response.Type = types.CoreResponseStream
 
-		stream, err := pull(data[0].Data.(string))
+		stream, err := pull(path.ResolveWithContext(ctx, data[0].Data.(string)))
 		if err != nil {
 			return err
 		}
@@ -110,7 +228,7 @@ func Switch(
 	case Push:
 		response.Type = types.CoreResponseStream
 
-		stream, err := push(data[0].Data.(string))
+		stream, err := push(path.ResolveWithContext(ctx, data[0].Data.(string)))
 		if err != nil {
 			return err
 		}
@@ -126,25 +244,35 @@ func Switch(
 			}
 		}
 
-		return reset(data[0].Data.(string), files)
+		return reset(path.ResolveWithContext(ctx, data[0].Data.(string)), files)
 	case Branch:
-		response.Type = types.CoreResponseData
+		response.Type = types.CoreResponseStream
 
-		branches, err := branch(data[0].Data.(string))
-		if err != nil {
-			return err
+		response.Stream = &types.ResponseStream{
+			Open: func(ctx *types.CoreCallContext, streamId uint8) {
+				branches, err := branch(ctx, path.ResolveWithContext(ctx, data[0].Data.(string)))
+				if err != nil {
+					return
+				}
+				jsonBytes, _ := json.Marshal(branches)
+				store.StreamChunk(ctx, streamId, jsonBytes, true)
+			},
 		}
-		response.Data = branches
 
 		return nil
 	case Tags:
-		response.Type = types.CoreResponseData
+		response.Type = types.CoreResponseStream
 
-		tags, err := tags(data[0].Data.(string))
-		if err != nil {
-			return err
+		response.Stream = &types.ResponseStream{
+			Open: func(ctx *types.CoreCallContext, streamId uint8) {
+				tags, err := tags(ctx, path.ResolveWithContext(ctx, data[0].Data.(string)))
+				if err != nil {
+					return
+				}
+				jsonBytes, _ := json.Marshal(tags)
+				store.StreamChunk(ctx, streamId, jsonBytes, true)
+			},
 		}
-		response.Data = tags
 
 		return nil
 	case Checkout:
@@ -153,7 +281,12 @@ func Switch(
 		if len(data) > 2 && data[2].Type == types.BOOLEAN {
 			create = data[2].Data.(bool)
 		}
-		stream, err := checkout(data[0].Data.(string), data[1].Data.(string), create)
+		stream, err := checkout(
+			ctx,
+			path.ResolveWithContext(ctx, data[0].Data.(string)),
+			data[1].Data.(string),
+			create,
+		)
 		if err != nil {
 			return err
 		}
@@ -161,7 +294,7 @@ func Switch(
 		return nil
 	case Merge:
 		response.Type = types.CoreResponseData
-		return merge(data[0].Data.(string), data[1].Data.(string))
+		return merge(path.ResolveWithContext(ctx, data[0].Data.(string)), data[1].Data.(string))
 	}
 
 	return errors.New("unknown git function")
@@ -421,31 +554,79 @@ func (progress *GitStream) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func clone(urlStr string, directory string) (*types.ResponseStream, error) {
+type GitAuth struct {
+	Host     string `json:"host"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Email    string `json:"email"`
+}
+
+func clone(
+	urlStr string,
+	directory string,
+) (*types.ResponseStream, error) {
+	err := testHost(urlStr)
+
+	if err != nil {
+		return nil, err
+	}
+
 	url, err := url.Parse(urlStr)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if directory == "." {
-		directory = strings.TrimSuffix(path.Base(url.Path), path.Ext(url.Path))
+	exists := fs.ExistsFn(directory)
+
+	if exists {
+		directory = filepath.Join(directory, strings.TrimSuffix(filepath.Base(url.Path), ".git"))
+		exists = fs.ExistsFn(directory)
+	}
+
+	processErr := func(ctx *types.CoreCallContext, streamId uint8, err error, print bool) {
+		if err == nil {
+			return
+		}
+
+		if !exists && err != transport.ErrEmptyRemoteRepository {
+			fs.RmFn(directory)
+		}
+
+		if print {
+			store.StreamChunk(ctx, streamId, []byte(err.Error()+"\n"), false)
+		}
 	}
 
 	return &types.ResponseStream{
 		Open: func(ctx *types.CoreCallContext, streamId uint8) {
-			_, err := git.PlainClone(directory, &git.CloneOptions{
-				URL: urlStr,
+
+			gitAuth, _ := RequestAuth(ctx, urlStr, false)
+			// run once
+			options := git.CloneOptions{
+				URL:  urlStr,
+				Auth: gitAuthToHttpAuth(gitAuth),
 				Progress: &GitStream{
 					ctx:      ctx,
 					streamId: streamId,
 				},
-			})
+			}
 
-			if err == transport.ErrEmptyRemoteRepository {
-				store.StreamChunk(ctx, streamId, []byte(err.Error()), false)
-			} else if err != nil {
-				fmt.Println(err)
+			_, err := git.PlainClone(directory, &options)
+
+			if err != nil {
+				processErr(ctx, streamId, err, false)
+
+				if errIsAuthenticationRequired(err) {
+					// retry with new auth
+					gitAuth, err = RequestAuth(ctx, urlStr, true)
+					if err == nil {
+						options.Auth = gitAuthToHttpAuth(gitAuth)
+						_, err = git.PlainClone(directory, &options)
+					}
+				}
+
+				processErr(ctx, streamId, err, true)
 			}
 
 			store.StreamChunk(ctx, streamId, nil, true)
@@ -460,13 +641,19 @@ func pull(directory string) (*types.ResponseStream, error) {
 		return nil, err
 	}
 
-	repository, err := dir.Repository()
+	urlStr, err := dir.GetUrl()
 
 	if err != nil {
 		return nil, err
 	}
 
-	worktree, err := repository.Worktree()
+	err = testHost(urlStr)
+
+	if err != nil {
+		return nil, err
+	}
+
+	worktree, err := dir.Worktree()
 
 	if err != nil {
 		return nil, err
@@ -474,17 +661,28 @@ func pull(directory string) (*types.ResponseStream, error) {
 
 	return &types.ResponseStream{
 		Open: func(ctx *types.CoreCallContext, streamId uint8) {
-			progress := GitStream{
-				ctx:      ctx,
-				streamId: streamId,
+			options := git.PullOptions{
+				Progress: &GitStream{
+					ctx:      ctx,
+					streamId: streamId,
+				},
 			}
 
-			err = worktree.Pull(&git.PullOptions{
-				Progress: &progress,
-			})
+			auth, _ := RequestAuth(ctx, urlStr, false)
+			options.Auth = gitAuthToHttpAuth(auth)
+
+			err = worktree.Pull(&options)
+
+			if errIsAuthenticationRequired(err) {
+				auth, err := RequestAuth(ctx, urlStr, true)
+				if err == nil {
+					options.Auth = gitAuthToHttpAuth(auth)
+					err = worktree.Pull(&options)
+				}
+			}
 
 			if err != nil {
-				fmt.Println(err)
+				store.StreamChunk(ctx, streamId, []byte(err.Error()+"\n"), false)
 			}
 
 			store.StreamChunk(ctx, streamId, nil, true)
@@ -499,6 +697,18 @@ func push(directory string) (*types.ResponseStream, error) {
 		return nil, err
 	}
 
+	urlStr, err := dir.GetUrl()
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = testHost(urlStr)
+
+	if err != nil {
+		return nil, err
+	}
+
 	repository, err := dir.Repository()
 
 	if err != nil {
@@ -507,15 +717,28 @@ func push(directory string) (*types.ResponseStream, error) {
 
 	return &types.ResponseStream{
 		Open: func(ctx *types.CoreCallContext, streamId uint8) {
-			err := repository.Push(&git.PushOptions{
+			options := git.PushOptions{
 				Progress: &GitStream{
 					ctx:      ctx,
 					streamId: streamId,
 				},
-			})
+			}
+
+			auth, _ := RequestAuth(ctx, urlStr, false)
+			options.Auth = gitAuthToHttpAuth(auth)
+
+			err := repository.Push(&options)
+
+			if errIsAuthenticationRequired(err) {
+				auth, err := RequestAuth(ctx, urlStr, true)
+				if err == nil {
+					options.Auth = gitAuthToHttpAuth(auth)
+					err = repository.Push(&options)
+				}
+			}
 
 			if err != nil {
-				fmt.Println(err)
+				store.StreamChunk(ctx, streamId, []byte(err.Error()+"\n"), false)
 			}
 
 			store.StreamChunk(ctx, streamId, nil, true)
@@ -563,14 +786,14 @@ func refIteratorToReferenceSlice(iter storer.ReferenceIter) []*plumbing.Referenc
 	return refs
 }
 
-func branch(directory string) ([]GitBranch, error) {
+func branch(ctx *types.CoreCallContext, directory string) ([]GitBranch, error) {
 	dir, err := OpenGitDirectory(directory)
 
 	if err != nil {
 		return nil, err
 	}
 
-	refsRemote, err := dir.LsRemote("origin")
+	refsRemote, err := dir.LsRemote(ctx, "origin")
 
 	if err != nil {
 		return nil, err
@@ -632,14 +855,14 @@ type GitTag struct {
 	Local  bool   `json:"local"`
 }
 
-func tags(directory string) ([]GitTag, error) {
+func tags(ctx *types.CoreCallContext, directory string) ([]GitTag, error) {
 	dir, err := OpenGitDirectory(directory)
 
 	if err != nil {
 		return nil, err
 	}
 
-	refsRemote, err := dir.LsRemote("origin")
+	refsRemote, err := dir.LsRemote(ctx, "origin")
 
 	if err != nil {
 		return nil, err
@@ -695,14 +918,14 @@ func tags(directory string) ([]GitTag, error) {
 	return tags, nil
 }
 
-func checkout(directory string, ref string, create bool) (*types.ResponseStream, error) {
+func checkout(ctx *types.CoreCallContext, directory string, ref string, create bool) (*types.ResponseStream, error) {
 	dir, err := OpenGitDirectory(directory)
 
 	if err != nil {
 		return nil, err
 	}
 
-	refType, remote, err := dir.FindRefType(ref)
+	refType, remote, err := dir.FindRefType(ctx, ref)
 
 	if err != nil {
 		return nil, err
@@ -799,4 +1022,29 @@ func merge(directory string, branchName string) error {
 	return worktree.Reset(&git.ResetOptions{
 		Mode: git.HardReset,
 	})
+}
+
+func errIsAuthenticationRequired(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.HasPrefix(err.Error(), transport.ErrAuthenticationRequired.Error())
+}
+
+func testHost(urlStr string) error {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return err
+	}
+
+	client := nethttp.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	resp, err := client.Head(fmt.Sprintf("%s://%s", u.Scheme, u.Host))
+	if err != nil {
+		return err
+	}
+
+	return resp.Body.Close()
 }

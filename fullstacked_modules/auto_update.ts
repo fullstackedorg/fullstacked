@@ -2,7 +2,6 @@ import git from "./git";
 import { SnackBar } from "./components/snackbar";
 import packages from "./packages";
 import build from "./build";
-import debug from "./debug";
 
 let lastUpdateCheck = 0;
 const updateCheckDelay = 1000 * 10; // 10sec;

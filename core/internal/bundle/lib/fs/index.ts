@@ -1,7 +1,16 @@
 // nodejs source: https://nodejs.org/docs/latest/api/fs.html
 
 import { bridge } from "../bridge/index.ts";
-import { Exists, GoFileInfo, ReadDir, ReadFile, Stats } from "../@types/fs.ts";
+import {
+    Exists,
+    GoFileInfo,
+    Mkdir,
+    ReadDir,
+    ReadFile,
+    Rm,
+    Stats,
+    WriteFile
+} from "../@types/fs.ts";
 import { Fs } from "../@types/index.ts";
 import {
     convertGoFileInfo,
@@ -161,6 +170,91 @@ export function readdir(
         .catch((e) => cb(e, null));
 }
 
+export function mkdirSync(path: PathLike) {
+    return bridge(
+        {
+            mod: Fs,
+            fn: Mkdir,
+            data: [formatPathLike(path)]
+        },
+        true
+    );
+}
+
+export async function mkdir(path: PathLike, callback: (err: Error) => void) {
+    const err = await bridge({
+        mod: Fs,
+        fn: Mkdir,
+        data: [formatPathLike(path)]
+    });
+    callback(err);
+}
+
+export function rmSync(path: PathLike) {
+    return bridge(
+        {
+            mod: Fs,
+            fn: Rm,
+            data: [formatPathLike(path)]
+        },
+        true
+    );
+}
+
+export async function rm(path: PathLike, callback: (err: Error) => void) {
+    const err = await bridge({
+        mod: Fs,
+        fn: Rm,
+        data: [formatPathLike(path)]
+    });
+    callback(err);
+}
+
+export function unlinkSync(path: PathLike) {
+    return bridge(
+        {
+            mod: Fs,
+            fn: Rm,
+            data: [formatPathLike(path)]
+        },
+        true
+    );
+}
+
+export async function unlink(path: PathLike, callback: (err: Error) => void) {
+    const err = await bridge({
+        mod: Fs,
+        fn: Rm,
+        data: [formatPathLike(path)]
+    });
+    callback(err);
+}
+
+export function writeFileSync(path: PathLike, data: string | Uint8Array) {
+    return bridge(
+        {
+            mod: Fs,
+            fn: WriteFile,
+            data: [formatPathLike(path), data]
+        },
+        true
+    );
+}
+
+export function writeFile(
+    path: PathLike,
+    data: string | Uint8Array,
+    callback: (err: Error) => void
+) {
+    bridge({
+        mod: Fs,
+        fn: WriteFile,
+        data: [formatPathLike(path), data]
+    })
+        .then(() => callback(null))
+        .catch((e) => callback(e));
+}
+
 export type { Stats, Dirent } from "./common.ts";
 
 export * as promises from "./promises.ts";
@@ -172,6 +266,15 @@ export default {
     readFileSync,
     readFile,
     readdirSync,
+    readdir,
+    mkdirSync,
+    mkdir,
+    rmSync,
+    rm,
+    unlinkSync,
+    unlink,
+    writeFileSync,
+    writeFile,
 
     promises
 };

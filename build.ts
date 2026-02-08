@@ -1,10 +1,11 @@
 import os from "node:os";
-import child_process from "child_process";
-import esbuild from "esbuild";
+import child_process from "node:child_process";
 import path from "node:path";
+import esbuild from "esbuild";
 
 // shims
 
+// assert : https://www.npmjs.com/package/assert
 // events : https://www.npmjs.com/package/events
 // util : https://www.npmjs.com/package/util
 // string_decoder : https://www.npmjs.com/package/string_decoder
@@ -15,6 +16,10 @@ import path from "node:path";
 // zlib : https://www.npmjs.com/package/browserify-zlib
 
 const packagesToBundle = [
+    {
+        entryPoint: "node_modules/assert/build/assert.js",
+        outfile: "core/internal/bundle/lib/assert/index.js"
+    },
     {
         entryPoint: "node_modules/events/events.js",
         outfile: "core/internal/bundle/lib/events/index.js"

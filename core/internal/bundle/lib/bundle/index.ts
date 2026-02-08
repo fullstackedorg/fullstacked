@@ -22,3 +22,8 @@ export function bundle(
         data: [...entryPoints]
     });
 }
+
+export default {
+    esbuildVersion,
+    bundle
+};

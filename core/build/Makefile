@@ -61,7 +61,7 @@ ios-arm64:
 ###### Android #######
 
 ANDROID_OUT = $(CURDIR)/../../platform/android/studio/app/src/main/cpp/core
-NDK_VERSION = 28.2.13676358
+NDK_VERSION = 29.0.14206865
 
 android-arm:
 	mkdir -p $(ANDROID_OUT)/armeabi-v7a && \

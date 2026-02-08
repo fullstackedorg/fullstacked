@@ -85,3 +85,15 @@ export function relative(from: string, to: string) {
         true
     );
 }
+
+export default {
+    resolve,
+    join,
+    normalize,
+    parse,
+    extname,
+    dirname,
+    basename,
+    isAbsolute,
+    relative
+};

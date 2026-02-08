@@ -51,7 +51,7 @@ func Switch(
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
 			Open: func(ctx *types.CoreCallContext, streamId uint8) {
-				go StreamResponse(ctx, streamId, id)
+				StreamResponse(ctx, streamId, id)
 			},
 		}
 		return nil

@@ -1,6 +1,6 @@
 import { toByteArray } from "./base64.ts";
-import { Stream } from "../@types/index.ts";
-import { Close, Open, Write } from "../@types/stream.ts";
+import { SerializableData, Stream } from "../@types/index.ts";
+import { Close, Open, Write, WriteEvent } from "../@types/stream.ts";
 import { mergeUint8Arrays } from "./serialization.ts";
 import type { bridge } from "./index.ts";
 import { createEventEmitter } from "./eventEmitter.ts";
@@ -65,6 +65,7 @@ export interface Duplex extends ReadableStream<Uint8Array> {
     ): void;
     on(event: "close", callback: EndCallback): void;
     write(data: StreamData): void;
+    writeEvent(event: string, ...args: SerializableData[]): void;
     end(
         chunk?: StreamData,
         encoding?: string | EndCallback,
@@ -174,6 +175,13 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
             mod: Stream,
             fn: Write,
             data: [id, data]
+        });
+
+    stream.writeEvent = (event: string, ...args: SerializableData[]) =>
+        bridgeFn({
+            mod: Stream,
+            fn: WriteEvent,
+            data: [id, event, ...args]
         });
 
     stream.end = () =>

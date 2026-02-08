@@ -2,6 +2,7 @@ package git
 
 import (
 	"errors"
+	"fullstackedorg/fullstacked/types"
 
 	git "github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/config"
@@ -61,7 +62,19 @@ func (r *GitDirectory) Worktree() (*git.Worktree, error) {
 	return r.worktree, nil
 }
 
-func (r *GitDirectory) LsRemote(remoteName string) ([]*plumbing.Reference, error) {
+func (r *GitDirectory) LsRemote(ctx *types.CoreCallContext, remoteName string) ([]*plumbing.Reference, error) {
+	urlStr, err := r.GetUrl()
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = testHost(urlStr)
+
+	if err != nil {
+		return nil, err
+	}
+
 	repository, err := r.Repository()
 
 	if err != nil {
@@ -74,7 +87,22 @@ func (r *GitDirectory) LsRemote(remoteName string) ([]*plumbing.Reference, error
 		return nil, err
 	}
 
-	refs, err := remote.List(&git.ListOptions{})
+	options := git.ListOptions{}
+
+	auth, _ := RequestAuth(ctx, urlStr, false)
+
+	options.Auth = gitAuthToHttpAuth(auth)
+
+	refs, err := remote.List(&options)
+
+	if errIsAuthenticationRequired(err) {
+		auth, err = RequestAuth(ctx, urlStr, true)
+
+		if err == nil {
+			options.Auth = gitAuthToHttpAuth(auth)
+			refs, err = remote.List(&options)
+		}
+	}
 
 	if err != nil {
 		return nil, err
@@ -119,6 +147,20 @@ func (r *GitDirectory) Branch(branch string) (*plumbing.Reference, error) {
 	return nil, errors.New("cannot find branch")
 }
 
+func (r *GitDirectory) GetUrl() (string, error) {
+	repository, err := r.Repository()
+	if err != nil {
+		return "", err
+	}
+
+	remote, err := repository.Remote("origin")
+	if err != nil {
+		return "", err
+	}
+
+	return remote.Config().URLs[0], nil
+}
+
 type GitRefType = string
 
 const (
@@ -127,7 +169,7 @@ const (
 	RefTag    GitRefType = "tag"
 )
 
-func (r *GitDirectory) FindRefType(ref string) (GitRefType, bool, error) {
+func (r *GitDirectory) FindRefType(ctx *types.CoreCallContext, ref string) (GitRefType, bool, error) {
 	repository, err := r.Repository()
 
 	if err != nil {
@@ -166,7 +208,7 @@ func (r *GitDirectory) FindRefType(ref string) (GitRefType, bool, error) {
 		return "", false, err
 	}
 
-	refsRemote, err := r.LsRemote("origin")
+	refsRemote, err := r.LsRemote(ctx, "origin")
 
 	if err != nil {
 		return "", false, err
@@ -206,5 +248,4 @@ func (r *GitDirectory) FetchBranch(branchName string, progress *GitStream) error
 		RefSpecs: refSpecs,
 		Progress: progress,
 	})
-
 }

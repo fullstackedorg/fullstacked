@@ -2,10 +2,12 @@ import { bridge } from "../bridge/index.ts";
 import { Git } from "../@types/index.ts";
 import {
     Add,
+    AuthManager,
     Branch,
     Checkout,
     Clone,
     Commit,
+    GitAuth,
     GitAuthor,
     GitBranch,
     GitCommit,
@@ -21,159 +23,139 @@ import {
     Tags
 } from "../@types/git.ts";
 import type { Duplex } from "../bridge/duplex.ts";
+import { EventEmitter } from "../bridge/eventEmitter.ts";
 
-export function init(directory: string, url: string) {
-    return bridge(
-        {
+export async function createGitAuthManager() {
+    return (
+        await bridge({
             mod: Git,
-            fn: Init,
-            data: [directory, url]
-        },
-        true
-    );
+            fn: AuthManager,
+            data: []
+        })
+    ).eventEmitter() as EventEmitter<{
+        auth: [string];
+        authResponse: [string, Partial<GitAuth>];
+    }>;
 }
 
-export function status(directory: string): GitStatus {
-    return bridge(
-        {
-            mod: Git,
-            fn: Status,
-            data: [directory]
-        },
-        true
-    );
+export function init(directory: string, url: string) {
+    return bridge({
+        mod: Git,
+        fn: Init,
+        data: [directory, url]
+    });
+}
+
+export function status(directory: string): Promise<GitStatus> {
+    return bridge({
+        mod: Git,
+        fn: Status,
+        data: [directory]
+    });
 }
 
 export function add(directory: string, path: string) {
-    return bridge(
-        {
-            mod: Git,
-            fn: Add,
-            data: [directory, path]
-        },
-        true
-    );
+    return bridge({
+        mod: Git,
+        fn: Add,
+        data: [directory, path]
+    });
 }
 
-export function log(directory: string): GitCommit[] {
-    return bridge(
-        {
-            mod: Git,
-            fn: Log,
-            data: [directory, 10]
-        },
-        true
-    );
+export function log(directory: string): Promise<GitCommit[]> {
+    return bridge({
+        mod: Git,
+        fn: Log,
+        data: [directory, 10]
+    });
 }
 
-export function clone(url: string, directory: string): Duplex {
-    return bridge(
-        {
-            mod: Git,
-            fn: Clone,
-            data: [url, directory]
-        },
-        true
-    );
+export function clone(url: string, directory: string): Promise<Duplex> {
+    return bridge({
+        mod: Git,
+        fn: Clone,
+        data: [url, directory]
+    });
 }
 
 export function commit(
     directory: string,
     message: string,
     author: GitAuthor
-): string {
-    return bridge(
-        {
-            mod: Git,
-            fn: Commit,
-            data: [directory, message, author]
-        },
-        true
-    );
+): Promise<string> {
+    return bridge({
+        mod: Git,
+        fn: Commit,
+        data: [directory, message, author]
+    });
 }
 
-export function pull(directory: string): Duplex {
-    return bridge(
-        {
-            mod: Git,
-            fn: Pull,
-            data: [directory]
-        },
-        true
-    );
+export function pull(directory: string): Promise<Duplex> {
+    return bridge({
+        mod: Git,
+        fn: Pull,
+        data: [directory]
+    });
 }
 
-export function push(directory: string): Duplex {
-    return bridge(
-        {
-            mod: Git,
-            fn: Push,
-            data: [directory]
-        },
-        true
-    );
+export function push(directory: string): Promise<Duplex> {
+    return bridge({
+        mod: Git,
+        fn: Push,
+        data: [directory]
+    });
 }
 
 export function reset(directory: string, ...files: string[]) {
-    return bridge(
-        {
-            mod: Git,
-            fn: Reset,
-            data: [directory, ...(files || [])]
-        },
-        true
-    );
+    return bridge({
+        mod: Git,
+        fn: Reset,
+        data: [directory, ...(files || [])]
+    });
 }
 
-export function branch(directory: string): GitBranch[] {
-    return bridge(
-        {
-            mod: Git,
-            fn: Branch,
-            data: [directory]
-        },
-        true
-    );
+export async function branch(directory: string): Promise<GitBranch[]> {
+    const duplex = (await bridge({
+        mod: Git,
+        fn: Branch,
+        data: [directory]
+    })) as Duplex;
+    const data = await duplex.promise();
+    return JSON.parse(new TextDecoder().decode(data));
 }
 
-export function tags(directory: string): GitTag[] {
-    return bridge(
-        {
-            mod: Git,
-            fn: Tags,
-            data: [directory]
-        },
-        true
-    );
+export async function tags(directory: string): Promise<GitTag[]> {
+    const duplex = (await bridge({
+        mod: Git,
+        fn: Tags,
+        data: [directory]
+    })) as Duplex;
+    const data = await duplex.promise();
+    return JSON.parse(new TextDecoder().decode(data));
 }
 
 export function checkout(
     directory: string,
     ref: string,
     create?: boolean
-): Duplex {
-    return bridge(
-        {
-            mod: Git,
-            fn: Checkout,
-            data: [directory, ref, !!create]
-        },
-        true
-    );
+): Promise<Duplex> {
+    return bridge({
+        mod: Git,
+        fn: Checkout,
+        data: [directory, ref, !!create]
+    });
 }
 
 export function merge(directory: string, branch: string) {
-    return bridge(
-        {
-            mod: Git,
-            fn: Merge,
-            data: [directory, branch]
-        },
-        true
-    );
+    return bridge({
+        mod: Git,
+        fn: Merge,
+        data: [directory, branch]
+    });
 }
 
 export default {
+    createGitAuthManager,
     init,
     status,
     add,
