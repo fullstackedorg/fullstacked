@@ -89,6 +89,11 @@ func call(buffer unsafe.Pointer, length C.int) C.int {
 	return C.int(size)
 }
 
+//export freePtr
+func freePtr(ptr unsafe.Pointer) {
+	C.free(ptr)
+}
+
 // func androidPrintToLogCat() {
 // 	r, w, _ := os.Pipe()
 // 	os.Stdout = w

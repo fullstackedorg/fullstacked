@@ -66,8 +66,5 @@
         "@isaacs/brace-expansion": ">=5.0.1",
         "elliptic": "$elliptic",
         "debug": "4.3.4"
-    },
-    "devDependencies": {
-        "dns2": "^2.1.0"
     }
 }
