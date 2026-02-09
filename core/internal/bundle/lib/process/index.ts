@@ -1,6 +1,10 @@
 //@ts-ignore
-import p from "./index.js";
+import p from "./process.js";
 import path from "path";
+
+export const isWorker =
+    typeof globalThis.WorkerGlobalScope !== "undefined" &&
+    self instanceof globalThis.WorkerGlobalScope;
 
 // polyfil for window.performance.now
 var performance = globalThis.performance || {};
@@ -22,7 +26,7 @@ var performanceNow =
 
 // generate timestamp or delta
 // see http://nodejs.org/api/process.html#process_process_hrtime
-function hrtime(previousTimestamp) {
+export function hrtime(previousTimestamp) {
     var clocktime = performanceNow.call(performance) * 1e-3;
     var seconds = Math.floor(clocktime);
     var nanoseconds = Math.floor((clocktime % 1) * 1e9);
@@ -37,20 +41,34 @@ function hrtime(previousTimestamp) {
     return [seconds, nanoseconds];
 }
 
-p.hrtime = hrtime;
 let currentDir = "/";
-p.chdir = (dir: string) => {
+export function cwd() {
+    return currentDir;
+}
+export function chdir(dir: string) {
     if (dir.startsWith("/")) {
         currentDir = dir;
     } else {
         currentDir = path.resolve(currentDir, dir);
     }
-};
-p.cwd = () => currentDir;
-
-p.versions = {
+}
+export const versions = {
     node: "0.0.0"
 };
+export function exit() {
+    if (isWorker) {
+        self.postMessage("exit");
+        self.close();
+    }
+}
 
-globalThis.process = p;
+p.hrtime = hrtime;
+p.cwd = cwd;
+p.chdir = chdir;
+p.versions = versions;
+p.exit = exit;
+
+if (globalThis.process === undefined) {
+    globalThis.process = p;
+}
 export * from "./index.js";

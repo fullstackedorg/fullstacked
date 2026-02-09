@@ -44,11 +44,6 @@ export function bridge(opts: BridgeOpts, sync?: boolean) {
     };
 
     if (sync) {
-        if (platformBridge.bridge === null) {
-            throw new Error(
-                'cannot call sync that quickly. import "fullstacked"; beforehand.'
-            );
-        }
         const payload = preparePayload();
         let responseBuffer = platformBridge.bridge.Sync(payload.buffer);
         if (!responseBuffer && platformBridge.bridge.GetResponseSync) {

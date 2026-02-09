@@ -1,10 +1,11 @@
 import { bridge } from "../bridge/index.ts";
 import { Bundle } from "../@types/index.ts";
 import {
-    EsbuildErrorsAndWarning,
     EsbuildVersion,
-    Bundle as BundleFn
+    Bundle as BundleFn,
+    EsbuildResult
 } from "../@types/bundle.ts";
+import path from "../path/index.ts";
 
 export function esbuildVersion(): Promise<string> {
     return bridge({
@@ -13,13 +14,12 @@ export function esbuildVersion(): Promise<string> {
     });
 }
 
-export function bundle(
-    ...entryPoints: string[]
-): Promise<EsbuildErrorsAndWarning> {
+export function bundle(entryPoint: string): Promise<EsbuildResult> {
+    const resolve = path.resolve(entryPoint);
     return bridge({
         mod: Bundle,
         fn: BundleFn,
-        data: [...entryPoints]
+        data: [resolve]
     });
 }
 

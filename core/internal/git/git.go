@@ -42,6 +42,7 @@ const (
 	Tags        GitFn = 11
 	Checkout    GitFn = 12
 	Merge       GitFn = 13
+	Restore     GitFn = 14
 )
 
 type gitAuthManager struct {
@@ -238,13 +239,17 @@ func Switch(
 		response.Type = types.CoreResponseData
 
 		files := []string{}
+		hard := false
 		if len(data) > 1 {
-			for _, f := range data[1:] {
+			hard = data[1].Data.(bool)
+		}
+		if len(data) > 2 {
+			for _, f := range data[2:] {
 				files = append(files, f.Data.(string))
 			}
 		}
 
-		return reset(path.ResolveWithContext(ctx, data[0].Data.(string)), files)
+		return reset(path.ResolveWithContext(ctx, data[0].Data.(string)), hard, files)
 	case Branch:
 		response.Type = types.CoreResponseStream
 
@@ -295,6 +300,15 @@ func Switch(
 	case Merge:
 		response.Type = types.CoreResponseData
 		return merge(path.ResolveWithContext(ctx, data[0].Data.(string)), data[1].Data.(string))
+	case Restore:
+		response.Type = types.CoreResponseData
+		files := []string{}
+		if len(data) > 1 {
+			for _, f := range data[1:] {
+				files = append(files, f.Data.(string))
+			}
+		}
+		return restore(path.ResolveWithContext(ctx, data[0].Data.(string)), files)
 	}
 
 	return errors.New("unknown git function")
@@ -653,19 +667,33 @@ func pull(directory string) (*types.ResponseStream, error) {
 		return nil, err
 	}
 
-	worktree, err := dir.Worktree()
+	repository, err := dir.Repository()
 
 	if err != nil {
 		return nil, err
 	}
 
+	head, err := repository.Head()
+
+	if err != nil {
+		return nil, err
+	}
+
+	worktree, err := dir.Worktree()
+
+	if err != nil {
+		return nil, err
+	}
 	return &types.ResponseStream{
 		Open: func(ctx *types.CoreCallContext, streamId uint8) {
+
 			options := git.PullOptions{
 				Progress: &GitStream{
 					ctx:      ctx,
 					streamId: streamId,
 				},
+				RemoteName:    "origin",
+				ReferenceName: head.Name(),
 			}
 
 			auth, _ := RequestAuth(ctx, urlStr, false)
@@ -746,7 +774,7 @@ func push(directory string) (*types.ResponseStream, error) {
 	}, nil
 }
 
-func reset(directory string, files []string) error {
+func reset(directory string, hard bool, files []string) error {
 	dir, err := OpenGitDirectory(directory)
 
 	if err != nil {
@@ -765,8 +793,14 @@ func reset(directory string, files []string) error {
 		return err
 	}
 
+	mode := git.MixedReset
+	if hard {
+		mode = git.HardReset
+	}
+
 	return worktree.Reset(&git.ResetOptions{
 		Files: files,
+		Mode:  mode,
 	})
 }
 
@@ -1047,4 +1081,24 @@ func testHost(urlStr string) error {
 	}
 
 	return resp.Body.Close()
+}
+
+func restore(directory string, paths []string) error {
+	dir, err := OpenGitDirectory(directory)
+
+	if err != nil {
+		return err
+	}
+
+	worktree, err := dir.Worktree()
+
+	if err != nil {
+		return err
+	}
+
+	return worktree.Restore(&git.RestoreOptions{
+		Staged:   true,
+		Worktree: true,
+		Files:    paths,
+	})
 }

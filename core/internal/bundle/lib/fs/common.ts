@@ -4,7 +4,9 @@ import { fromByteArray } from "../bridge/base64.ts";
 export type PathLike = string | URL | Buffer;
 
 export function formatPathLike(path: PathLike) {
-    return path instanceof URL ? path.pathname : path.toString();
+    const pathStr = path instanceof URL ? path.pathname : path.toString();
+
+    return pathStr;
 }
 
 export type ReadFileOpts = {

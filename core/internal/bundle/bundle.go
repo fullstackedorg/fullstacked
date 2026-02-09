@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fullstackedorg/fullstacked/internal/fs"
 	fspath "fullstackedorg/fullstacked/internal/path"
+	"fullstackedorg/fullstacked/internal/serialization"
 	"fullstackedorg/fullstacked/types"
 	"path"
 	"runtime/debug"
@@ -55,7 +56,7 @@ var libModules = map[string]string{
 	"util/types":          "/lib/util/types/index.js",
 	"vm":                  "/lib/unavailable/index.ts",
 	"v8":                  "/lib/unavailable/index.ts",
-	"worker_threads":      "/lib/unavailable/index.ts",
+	"worker_threads":      "/lib/worker_threads/index.ts",
 	"zlib":                "/lib/zlib/index.js",
 
 	"test": "/lib/test/index.ts",
@@ -83,21 +84,13 @@ func Switch(
 		response.Data = EsbuildVersionFn()
 		return nil
 	case Bundle:
-		entryPoints := []string{}
-		for _, f := range data {
-			entryPoints = append(entryPoints, fspath.ResolveWithContext(ctx, f.Data.(string)))
-		}
-
-		if len(entryPoints) == 0 {
-			entryPoint := findEntryPoint(ctx.BaseDirectory)
-			if entryPoint == "" {
-				return errors.New("no entry point found")
-			}
-			entryPoints = append(entryPoints, entryPoint)
+		entryPoint := ctx.BaseDirectory
+		if len(data) >= 1 {
+			entryPoint = fspath.ResolveWithContext(ctx, data[0].Data.(string))
 		}
 
 		response.Type = types.CoreResponseData
-		response.Data = BundleFnApply(entryPoints)
+		response.Data = BundleFnApply(ctx, entryPoint)
 		return nil
 	}
 
@@ -126,66 +119,96 @@ func EsbuildVersionFn() string {
 	return ""
 }
 
-type EsbuildErrorsAndWarning struct {
-	Errors   []esbuild.Message
-	Warnings []esbuild.Message
+type EsbuildResult struct {
+	OutputFiles []string
+	Errors      []esbuild.Message
+	Warnings    []esbuild.Message
 }
 
-func BundleFnApply(entryPoints []string) EsbuildErrorsAndWarning {
-	entryPointsAdvanced := []esbuild.EntryPoint{}
+var bundleBase = []byte("import \"fullstacked\";\n")
 
-	for _, f := range entryPoints {
-		exists := fs.ExistsFn(f)
-		if !exists {
-			return EsbuildErrorsAndWarning{
+func BundleFnApply(ctx *types.CoreCallContext, entryPoint string) EsbuildResult {
+	exists := fs.ExistsFn(entryPoint)
+	if !exists {
+		return EsbuildResult{
+			Errors: []esbuild.Message{
+				{
+					Text: "entry point not found",
+				},
+			},
+		}
+	}
+
+	stats, err := fs.StatsFn(entryPoint)
+	if err != nil {
+		return EsbuildResult{
+			Errors: []esbuild.Message{
+				{
+					Text: "failed to stats: " + entryPoint,
+				},
+			},
+		}
+	}
+
+	if stats.IsDir {
+		foundEntrypoint := findEntryPoint(entryPoint)
+		if foundEntrypoint == "" {
+			return EsbuildResult{
 				Errors: []esbuild.Message{
 					{
-						Text: "entry point not found: " + f,
+						Text: "no entry point found in directory: " + entryPoint,
 					},
 				},
 			}
 		}
+		entryPoint = foundEntrypoint
+	}
 
-		stats, err := fs.StatsFn(f)
-		if err != nil {
-			return EsbuildErrorsAndWarning{
-				Errors: []esbuild.Message{
-					{
-						Text: "failed to stats: " + f,
-					},
+	contents, err := fs.ReadFileFn(entryPoint)
+	if err != nil {
+		return EsbuildResult{
+			Errors: []esbuild.Message{
+				{
+					Text: "failed to read file: " + entryPoint,
 				},
-			}
+			},
 		}
+	}
 
-		if stats.IsDir {
-			foundEntrypoint := findEntryPoint(f)
-			if foundEntrypoint == "" {
-				return EsbuildErrorsAndWarning{
-					Errors: []esbuild.Message{
-						{
-							Text: "no entry point found in directory: " + f,
-						},
-					},
-				}
-			}
-			f = foundEntrypoint
+	contents, err = serialization.MergeBuffers(bundleBase, contents)
+	if err != nil {
+		return EsbuildResult{
+			Errors: []esbuild.Message{
+				{
+					Text: "failed to merge buffers: " + entryPoint,
+				},
+			},
 		}
+	}
 
-		dir := path.Dir(f)
-		name := path.Base(f)
-		entryPointsAdvanced = append(entryPointsAdvanced, esbuild.EntryPoint{
-			InputPath:  f,
-			OutputPath: path.Join(dir, "_"+name),
-		})
+	ext := path.Ext(entryPoint)
+	loader := esbuild.LoaderJS
+	switch ext {
+	case ".ts":
+		loader = esbuild.LoaderTS
+	case ".tsx":
+		loader = esbuild.LoaderTSX
+	case ".jsx":
+		loader = esbuild.LoaderJSX
 	}
 
 	result := esbuild.Build(esbuild.BuildOptions{
-		EntryPointsAdvanced: entryPointsAdvanced,
-		Format:              esbuild.FormatESModule,
-		Bundle:              true,
-		Sourcemap:           esbuild.SourceMapNone,
-		Outdir:              ".",
-		Write:               false,
+		Stdin: &esbuild.StdinOptions{
+			Contents:   string(contents),
+			Sourcefile: entryPoint,
+			ResolveDir: path.Dir(entryPoint),
+			Loader:     loader,
+		},
+		Format:    esbuild.FormatESModule,
+		Bundle:    true,
+		Sourcemap: esbuild.SourceMapNone,
+		Outdir:    ".",
+		Write:     false,
 		Plugins: []esbuild.Plugin{
 			{
 				Name: "lib",
@@ -236,16 +259,23 @@ func BundleFnApply(entryPoints []string) EsbuildErrorsAndWarning {
 		},
 	})
 
+	esbuildResult := EsbuildResult{
+		Errors:      result.Errors,
+		Warnings:    result.Warnings,
+		OutputFiles: []string{},
+	}
+
 	if len(result.Errors) == 0 {
 		for _, f := range result.OutputFiles {
+			dir := path.Dir(entryPoint)
+			baseName := path.Base(entryPoint)
+			ext := path.Ext(f.Path)
+			baseName = "_" + baseName + ext
+			f.Path = path.Join(dir, baseName)
 			fs.WriteFileFn(f.Path, f.Contents)
+			esbuildResult.OutputFiles = append(esbuildResult.OutputFiles, strings.TrimPrefix(f.Path, ctx.BaseDirectory))
 		}
 	}
 
-	errorsAndWarnings := EsbuildErrorsAndWarning{
-		Errors:   result.Errors,
-		Warnings: result.Warnings,
-	}
-
-	return errorsAndWarnings
+	return esbuildResult
 }

@@ -2,13 +2,23 @@
 
 import { bridge } from "../bridge/index.ts";
 import { Os } from "../@types/index.ts";
-import { Endieness, Platform, Uname, UnameInfo } from "../@types/os.ts";
+import { Arch, Endieness, Platform, Uname, UnameInfo } from "../@types/os.ts";
 
 export function platform(): string {
     return bridge(
         {
             mod: Os,
             fn: Platform
+        },
+        true
+    );
+}
+
+export function arch(): string {
+    return bridge(
+        {
+            mod: Os,
+            fn: Arch
         },
         true
     );
@@ -49,6 +59,7 @@ export function type(): string {
 
 export default {
     platform,
+    arch,
     endianness,
     release
 };

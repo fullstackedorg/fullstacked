@@ -10,8 +10,12 @@ import {
     Relative,
     Resolve
 } from "../@types/path.ts";
+import { cwd } from "../process/index.ts";
 
 export function resolve(...paths: string[]): string {
+    if (!paths[0].startsWith("/")) {
+        paths.unshift(cwd());
+    }
     return bridge(
         {
             mod: Path,

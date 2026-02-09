@@ -25,13 +25,14 @@ import {
     Stats as StatsInterface
 } from "./common.ts";
 import promises from "./promises.ts";
+import { resolve } from "../path/index.ts";
 
 export function existsSync(path: PathLike): boolean {
     return bridge(
         {
             mod: Fs,
             fn: Exists,
-            data: [formatPathLike(path)]
+            data: [resolve(formatPathLike(path))]
         },
         true
     );
@@ -42,7 +43,7 @@ export function statSync(path: PathLike, options?: StatOpts): StatsInterface {
         {
             mod: Fs,
             fn: Stats,
-            data: [formatPathLike(path)]
+            data: [resolve(formatPathLike(path))]
         },
         true
     );
@@ -67,7 +68,7 @@ export function stat(
         typeof options === "function" ? (options as StatCallback) : callback;
     const opts = typeof options === "function" ? null : options;
     promises
-        .stat(path, opts)
+        .stat(resolve(formatPathLike(path)), opts)
         .then((stats) => cb(null, stats))
         .catch((e) => cb(e, null));
 }
@@ -79,7 +80,7 @@ export function readFileSync(path: PathLike, options?: ReadFileOpts) {
         {
             mod: Fs,
             fn: ReadFile,
-            data: [formatPathLike(path)]
+            data: [resolve(formatPathLike(path))]
         },
         true
     );
@@ -104,7 +105,7 @@ export function readFile(
     const cb = typeof options === "function" ? options : callback;
     const opts = typeof options === "function" ? null : options;
     promises
-        .readFile(path, opts)
+        .readFile(resolve(formatPathLike(path)), opts)
         .then((data) => cb(null, data))
         .catch((e) => cb(e, null));
 }
@@ -122,11 +123,12 @@ export function readdirSync(
     options?: Partial<ReadDirOpts>
 ): string[] | Dirent[] {
     const baseDir = formatPathLike(path);
+    const resolved = resolve(baseDir);
     const items: GoFileInfo[] = bridge(
         {
             mod: Fs,
             fn: ReadDir,
-            data: [baseDir, options?.recursive ?? false]
+            data: [resolved, options?.recursive ?? false]
         },
         true
     );
@@ -156,10 +158,11 @@ export function readdir(
     const cb = typeof options === "function" ? options : callback;
     const opts = typeof options === "function" ? {} : options;
     const baseDir = formatPathLike(path);
+    const resolved = resolve(baseDir);
     bridge({
         mod: Fs,
         fn: ReadDir,
-        data: [baseDir, opts?.recursive ?? false]
+        data: [resolved, opts?.recursive ?? false]
     })
         .then((items: GoFileInfo[]) =>
             cb(
@@ -171,71 +174,78 @@ export function readdir(
 }
 
 export function mkdirSync(path: PathLike) {
+    const resolved = resolve(formatPathLike(path));
     return bridge(
         {
             mod: Fs,
             fn: Mkdir,
-            data: [formatPathLike(path)]
+            data: [resolved]
         },
         true
     );
 }
 
 export async function mkdir(path: PathLike, callback: (err: Error) => void) {
+    const resolved = resolve(formatPathLike(path));
     const err = await bridge({
         mod: Fs,
         fn: Mkdir,
-        data: [formatPathLike(path)]
+        data: [resolved]
     });
     callback(err);
 }
 
 export function rmSync(path: PathLike) {
+    const resolved = resolve(formatPathLike(path));
     return bridge(
         {
             mod: Fs,
             fn: Rm,
-            data: [formatPathLike(path)]
+            data: [resolved]
         },
         true
     );
 }
 
 export async function rm(path: PathLike, callback: (err: Error) => void) {
+    const resolved = resolve(formatPathLike(path));
     const err = await bridge({
         mod: Fs,
         fn: Rm,
-        data: [formatPathLike(path)]
+        data: [resolved]
     });
     callback(err);
 }
 
 export function unlinkSync(path: PathLike) {
+    const resolved = resolve(formatPathLike(path));
     return bridge(
         {
             mod: Fs,
             fn: Rm,
-            data: [formatPathLike(path)]
+            data: [resolved]
         },
         true
     );
 }
 
 export async function unlink(path: PathLike, callback: (err: Error) => void) {
+    const resolved = resolve(formatPathLike(path));
     const err = await bridge({
         mod: Fs,
         fn: Rm,
-        data: [formatPathLike(path)]
+        data: [resolved]
     });
     callback(err);
 }
 
 export function writeFileSync(path: PathLike, data: string | Uint8Array) {
+    const resolved = resolve(formatPathLike(path));
     return bridge(
         {
             mod: Fs,
             fn: WriteFile,
-            data: [formatPathLike(path), data]
+            data: [resolved, data]
         },
         true
     );
@@ -249,7 +259,7 @@ export function writeFile(
     bridge({
         mod: Fs,
         fn: WriteFile,
-        data: [formatPathLike(path), data]
+        data: [resolve(formatPathLike(path)), data]
     })
         .then(() => callback(null))
         .catch((e) => callback(e));

@@ -14,7 +14,7 @@ import {
     STRING
 } from "../../../core/internal/bundle/lib/@types/index.ts";
 import { StaticFile } from "../../../core/internal/bundle/lib/@types/router.ts";
-import { fromByteArray } from "../../../fullstacked_modules/base64.ts";
+import { fromByteArray } from "../../../core/internal/bundle/lib/bridge/base64.ts";
 
 // export let mainPort = parseInt(getEnvVar("port"));
 // if (!mainPort || isNaN(mainPort)) {

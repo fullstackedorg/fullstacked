@@ -13,8 +13,9 @@ type OsFn = uint8
 
 const (
 	Platform  OsFn = 0
-	Endieness OsFn = 1
-	Uname     OsFn = 2
+	Arch      OsFn = 1
+	Endieness OsFn = 2
+	Uname     OsFn = 3
 )
 
 func Switch(
@@ -27,6 +28,10 @@ func Switch(
 	case Platform:
 		response.Type = types.CoreResponseData
 		response.Data = runtime.GOOS
+		return nil
+	case Arch:
+		response.Type = types.CoreResponseData
+		response.Data = runtime.GOARCH
 		return nil
 	case Endieness:
 		response.Type = types.CoreResponseData

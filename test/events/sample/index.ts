@@ -1,6 +1,4 @@
 // @ts-ignore
-import "fullstacked";
-// @ts-ignore
 import t from "test";
 import type test from "../../../core/internal/bundle/lib/test/index.ts";
 

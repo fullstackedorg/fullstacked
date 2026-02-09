@@ -21,6 +21,7 @@ import {
 } from "../@types/fs.ts";
 import { bridge } from "../bridge/index.ts";
 import { Fs } from "../@types/index.ts";
+import { resolve } from "../path/index.ts";
 
 export async function readFile(path: PathLike): Promise<Buffer<ArrayBuffer>>;
 export async function readFile(
@@ -31,7 +32,7 @@ export async function readFile(path: PathLike, options?: ReadFileOpts) {
     const data: Uint8Array = await bridge({
         mod: Fs,
         fn: ReadFile,
-        data: [formatPathLike(path)]
+        data: [resolve(formatPathLike(path))]
     });
 
     return decodeStringData(data, options);
@@ -53,7 +54,7 @@ export async function readdir(
     const items: GoFileInfo[] = await bridge({
         mod: Fs,
         fn: ReadDir,
-        data: [baseDir, options?.recursive ?? false]
+        data: [resolve(baseDir), options?.recursive ?? false]
     });
     return convertGoFileInfo(baseDir, items, options?.withFileTypes);
 }
@@ -65,17 +66,19 @@ export async function stat(
     const fileInfo: GoFileInfo = await bridge({
         mod: Fs,
         fn: Stats,
-        data: [formatPathLike(path)]
+        data: [resolve(formatPathLike(path))]
     });
 
     return fileInfoToStat(fileInfo);
 }
 
 export function writeFile(path: PathLike, data: string | Uint8Array) {
+    const resolved = resolve(formatPathLike(path));
+    console.log(resolved);
     return bridge({
         mod: Fs,
         fn: WriteFile,
-        data: [formatPathLike(path), data]
+        data: [resolved, data]
     });
 }
 
@@ -83,7 +86,7 @@ export function mkdir(path: PathLike) {
     return bridge({
         mod: Fs,
         fn: Mkdir,
-        data: [formatPathLike(path)]
+        data: [resolve(formatPathLike(path))]
     });
 }
 
@@ -91,7 +94,7 @@ export function rm(path: PathLike) {
     return bridge({
         mod: Fs,
         fn: Rm,
-        data: [formatPathLike(path)]
+        data: [resolve(formatPathLike(path))]
     });
 }
 
@@ -99,7 +102,7 @@ export function unlink(path: PathLike) {
     return bridge({
         mod: Fs,
         fn: Rm,
-        data: [formatPathLike(path)]
+        data: [resolve(formatPathLike(path))]
     });
 }
 

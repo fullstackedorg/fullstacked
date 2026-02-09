@@ -201,7 +201,7 @@ suite("git - e2e", () => {
         await git.add(testDirectory, ".");
         const status3 = await git.status(testDirectory);
         assert.notDeepEqual(status2, status3);
-        await git.reset(testDirectory);
+        await git.reset(testDirectory, false);
         assert.deepEqual(await git.status(testDirectory), status2);
     });
 

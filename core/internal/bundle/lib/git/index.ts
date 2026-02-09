@@ -19,6 +19,7 @@ import {
     Pull,
     Push,
     Reset,
+    Restore,
     Status,
     Tags
 } from "../@types/git.ts";
@@ -106,11 +107,11 @@ export function push(directory: string): Promise<Duplex> {
     });
 }
 
-export function reset(directory: string, ...files: string[]) {
+export function reset(directory: string, hard: boolean, ...files: string[]) {
     return bridge({
         mod: Git,
         fn: Reset,
-        data: [directory, ...(files || [])]
+        data: [directory, hard, ...(files || [])]
     });
 }
 
@@ -154,6 +155,14 @@ export function merge(directory: string, branch: string) {
     });
 }
 
+export function restore(directory: string, ...files: string[]) {
+    return bridge({
+        mod: Git,
+        fn: Restore,
+        data: [directory, ...(files || [])]
+    });
+}
+
 export default {
     createGitAuthManager,
     init,
@@ -168,5 +177,6 @@ export default {
     branch,
     tags,
     checkout,
-    merge
+    merge,
+    restore
 };

@@ -48,7 +48,7 @@ const packagesToBundle = [
     },
     {
         entryPoint: "node_modules/process/browser.js",
-        outfile: "core/internal/bundle/lib/process/index.js"
+        outfile: "core/internal/bundle/lib/process/process.js"
     },
     {
         entryPoint: "node_modules/crypto-browserify/index.js",
@@ -73,7 +73,7 @@ packagesToBundle.forEach(({ entryPoint, outfile }) =>
         entryPoints: [entryPoint],
         outfile,
         bundle: true,
-        // format: "esm",
+        format: "esm",
         platform: "node",
         external: ["process/", "create-hash/browser/md5"],
         alias: {

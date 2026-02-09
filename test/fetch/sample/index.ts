@@ -1,5 +1,3 @@
-import "fullstacked";
-
 const head = document.createElement("pre");
 head.id = "head";
 const headers = document.createElement("pre");
@@ -21,3 +19,5 @@ const payload = await response.arrayBuffer();
 body.innerHTML = `[ ${new Uint8Array(payload).join(", ")} ]`;
 
 document.body.classList.add("done");
+
+export {};

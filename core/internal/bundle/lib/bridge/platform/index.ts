@@ -30,9 +30,21 @@ if (globalThis.process) {
     globalThis.global = globalThis;
     platformBridge = {
         ready: new Promise<void>(async (res) => {
+            const p: any = await import("process");
+
+            if (p.isWorker) {
+                await new Promise<void>((res) => {
+                    self.onmessage = (message: MessageEvent) => {
+                        if (message.data.cwd) {
+                            process.chdir(message.data.cwd);
+                            res();
+                        }
+                    };
+                });
+            }
+
             // @ts-ignore
             await import("fetch");
-            await import("process");
 
             const platform = await (
                 await globalThis.originalFetch("/platform")
