@@ -14,6 +14,8 @@ import esbuild from "esbuild";
 // process : https://www.npmjs.com/package/process
 // crypto : https://www.npmjs.com/package/crypto-browserify
 // zlib : https://www.npmjs.com/package/browserify-zlib
+// querystring : https://www.npmjs.com/package/fast-querystring
+// diagnostics_channel : https://www.npmjs.com/package/dc-polyfill
 
 const packagesToBundle = [
     {
@@ -27,6 +29,10 @@ const packagesToBundle = [
     {
         entryPoint: "node_modules/util/util.js",
         outfile: "core/internal/bundle/lib/util/index.js"
+    },
+    {
+        entryPoint: "node_modules/util/support/types.js",
+        outfile: "core/internal/bundle/lib/util/types/index.js"
     },
     {
         entryPoint: "node_modules/string_decoder/lib/string_decoder.js",
@@ -51,6 +57,14 @@ const packagesToBundle = [
     {
         entryPoint: "node_modules/browserify-zlib/lib/index.js",
         outfile: "core/internal/bundle/lib/zlib/index.js"
+    },
+    {
+        entryPoint: "node_modules/fast-querystring/lib/index.js",
+        outfile: "core/internal/bundle/lib/querystring/index.js"
+    },
+    {
+        entryPoint: "node_modules/dc-polyfill/dc-polyfill.js",
+        outfile: "core/internal/bundle/lib/diagnostics_channel/index.js"
     }
 ];
 

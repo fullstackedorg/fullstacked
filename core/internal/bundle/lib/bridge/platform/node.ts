@@ -2,7 +2,7 @@ import { toByteArray } from "../base64.ts";
 import type { PlatformBridge } from "./index.ts";
 
 export async function BridgeNodeInit(): Promise<PlatformBridge> {
-    const webSocketUrl = new URL(window.location.href);
+    const webSocketUrl = new URL(self.location.href);
     webSocketUrl.protocol = webSocketUrl.protocol === "https:" ? "wss:" : "ws:";
 
     const ctx = await (await globalThis.originalFetch("/ctx")).json();

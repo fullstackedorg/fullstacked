@@ -162,8 +162,8 @@ type PackageVersion struct {
 	Dependencies map[string]string `json:"dependencies"`
 	// DevDependencies removed as unused in sub-deps logic
 	Dist             PackageDist       `json:"dist"`
-	License          string            `json:"license,omitempty"`
-	Engines          map[string]string `json:"engines,omitempty"`
+	License          interface{}       `json:"license,omitempty"`
+	Engines          interface{}       `json:"engines,omitempty"`
 	PeerDependencies map[string]string `json:"peerDependencies,omitempty"`
 }
 
@@ -478,9 +478,26 @@ func install(
 						Resolved:         ver.Dist.Tarball,
 						Integrity:        integrity,
 						Dependencies:     ver.Dependencies,
-						License:          ver.License,
-						Engines:          ver.Engines,
 						PeerDependencies: ver.PeerDependencies,
+					}
+
+					if l, ok := ver.License.(string); ok {
+						depEntry.License = l
+					} else if lMap, ok := ver.License.(map[string]interface{}); ok {
+						if t, ok := lMap["type"].(string); ok {
+							depEntry.License = t
+						}
+					}
+
+					if engines, ok := ver.Engines.(map[string]interface{}); ok {
+						depEntry.Engines = make(map[string]string)
+						for k, v := range engines {
+							if s, ok := v.(string); ok {
+								depEntry.Engines[k] = s
+							}
+						}
+					} else if engines, ok := ver.Engines.(map[string]string); ok {
+						depEntry.Engines = engines
 					}
 					newLock.Packages[targetPath] = depEntry
 					installedPaths[targetPath] = ver.Version

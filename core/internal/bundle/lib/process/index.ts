@@ -48,5 +48,9 @@ p.chdir = (dir: string) => {
 };
 p.cwd = () => currentDir;
 
+p.versions = {
+    node: "0.0.0"
+};
+
 globalThis.process = p;
 export * from "./index.js";

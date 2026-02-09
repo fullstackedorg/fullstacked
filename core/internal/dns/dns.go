@@ -117,6 +117,7 @@ func resolve6(host string) ([]string, error) {
 type MX struct {
 	Exchange string `json:"exchange"`
 	Priority uint16 `json:"priority"`
+	Type     string `json:"type"`
 }
 
 func resolveMx(host string) ([]MX, error) {
@@ -131,6 +132,7 @@ func resolveMx(host string) ([]MX, error) {
 		mxs = append(mxs, MX{
 			Exchange: strings.TrimSuffix(r.Host, "."),
 			Priority: r.Pref,
+			Type:     "MX",
 		})
 	}
 
@@ -142,6 +144,7 @@ type SRV struct {
 	Port     uint16 `json:"port"`
 	Priority uint16 `json:"priority"`
 	Weight   uint16 `json:"weight"`
+	Type     string `json:"type"`
 }
 
 func resolveSrv(host string) ([]SRV, error) {
@@ -157,6 +160,7 @@ func resolveSrv(host string) ([]SRV, error) {
 			Port:     r.Port,
 			Priority: r.Priority,
 			Weight:   r.Weight,
+			Type:     "SRV",
 		})
 	}
 
