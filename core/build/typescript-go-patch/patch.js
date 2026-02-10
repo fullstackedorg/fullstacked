@@ -6,6 +6,7 @@ const tsgoDirectory = path.resolve("..", "typescript-go");
 const toPatch = [
     {
         // fix invalid utf8 panic
+        // maybe remove: https://github.com/microsoft/typescript-go/pull/2704
         file: path.resolve(tsgoDirectory, "internal", "ls", "signaturehelp.go"),
         replace: [
             {
