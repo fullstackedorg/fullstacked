@@ -7,6 +7,7 @@ import {
     Mkdir,
     ReadDir,
     ReadFile,
+    Rename,
     Rm,
     Stats,
     WriteFile
@@ -186,35 +187,28 @@ export function mkdirSync(path: PathLike) {
 }
 
 export async function mkdir(path: PathLike, callback: (err: Error) => void) {
-    const resolved = resolve(formatPathLike(path));
-    const err = await bridge({
-        mod: Fs,
-        fn: Mkdir,
-        data: [resolved]
-    });
-    callback(err);
+    promises
+        .mkdir(path)
+        .then(() => callback(null))
+        .catch((e) => callback(e));
 }
 
 export function rmSync(path: PathLike) {
-    const resolved = resolve(formatPathLike(path));
     return bridge(
         {
             mod: Fs,
             fn: Rm,
-            data: [resolved]
+            data: [resolve(formatPathLike(path))]
         },
         true
     );
 }
 
 export async function rm(path: PathLike, callback: (err: Error) => void) {
-    const resolved = resolve(formatPathLike(path));
-    const err = await bridge({
-        mod: Fs,
-        fn: Rm,
-        data: [resolved]
-    });
-    callback(err);
+    promises
+        .rm(path)
+        .then(() => callback(null))
+        .catch((e) => callback(e));
 }
 
 export function unlinkSync(path: PathLike) {
@@ -230,13 +224,10 @@ export function unlinkSync(path: PathLike) {
 }
 
 export async function unlink(path: PathLike, callback: (err: Error) => void) {
-    const resolved = resolve(formatPathLike(path));
-    const err = await bridge({
-        mod: Fs,
-        fn: Rm,
-        data: [resolved]
-    });
-    callback(err);
+    promises
+        .unlink(path)
+        .then(() => callback(null))
+        .catch((e) => callback(e));
 }
 
 export function writeFileSync(path: PathLike, data: string | Uint8Array) {
@@ -256,11 +247,32 @@ export function writeFile(
     data: string | Uint8Array,
     callback: (err: Error) => void
 ) {
-    bridge({
-        mod: Fs,
-        fn: WriteFile,
-        data: [resolve(formatPathLike(path)), data]
-    })
+    promises
+        .writeFile(path, data)
+        .then(() => callback(null))
+        .catch((e) => callback(e));
+}
+
+export function renameSync(path: PathLike, path2: PathLike) {
+    const resolved = resolve(formatPathLike(path));
+    const resolved2 = resolve(formatPathLike(path2));
+    return bridge(
+        {
+            mod: Fs,
+            fn: Rename,
+            data: [resolved, resolved2]
+        },
+        true
+    );
+}
+
+export function rename(
+    path: PathLike,
+    path2: PathLike,
+    callback: (err: Error) => void
+) {
+    promises
+        .rename(path, path2)
         .then(() => callback(null))
         .catch((e) => callback(e));
 }
@@ -285,6 +297,8 @@ export default {
     unlink,
     writeFileSync,
     writeFile,
+    renameSync,
+    rename,
 
     promises
 };

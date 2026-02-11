@@ -411,4 +411,68 @@ suite("fs - e2e", () => {
         await fs.promises.rm(path);
         assert.equal(nodeFs.existsSync(path), false);
     });
+    test("renameSync", () => {
+        const path = "test-rename-sync";
+        const newPath = "test-rename-sync-new";
+        if (nodeFs.existsSync(path)) {
+            nodeFs.rmSync(path);
+        }
+        if (nodeFs.existsSync(newPath)) {
+            nodeFs.rmSync(newPath);
+        }
+
+        nodeFs.writeFileSync(path, "test");
+        fs.renameSync(path, newPath);
+
+        assert.equal(nodeFs.existsSync(path), false);
+        assert.equal(nodeFs.existsSync(newPath), true);
+        assert.equal(nodeFs.readFileSync(newPath, "utf-8"), "test");
+
+        nodeFs.rmSync(newPath);
+    });
+
+    test("rename", (_, done) => {
+        const path = "test-rename-callback";
+        const newPath = "test-rename-callback-new";
+        if (nodeFs.existsSync(path)) {
+            nodeFs.rmSync(path);
+        }
+        if (nodeFs.existsSync(newPath)) {
+            nodeFs.rmSync(newPath);
+        }
+
+        nodeFs.writeFileSync(path, "test");
+        fs.rename(path, newPath, (err) => {
+            if (err) return done(err);
+            try {
+                assert.equal(nodeFs.existsSync(path), false);
+                assert.equal(nodeFs.existsSync(newPath), true);
+                assert.equal(nodeFs.readFileSync(newPath, "utf-8"), "test");
+                nodeFs.rmSync(newPath);
+                done();
+            } catch (e) {
+                done(e);
+            }
+        });
+    });
+
+    test("promises.rename", async () => {
+        const path = "test-rename-promise";
+        const newPath = "test-rename-promise-new";
+        if (nodeFs.existsSync(path)) {
+            nodeFs.rmSync(path);
+        }
+        if (nodeFs.existsSync(newPath)) {
+            nodeFs.rmSync(newPath);
+        }
+
+        nodeFs.writeFileSync(path, "test");
+        await fs.promises.rename(path, newPath);
+
+        assert.equal(nodeFs.existsSync(path), false);
+        assert.equal(nodeFs.existsSync(newPath), true);
+        assert.equal(nodeFs.readFileSync(newPath, "utf-8"), "test");
+
+        nodeFs.rmSync(newPath);
+    });
 });

@@ -3,19 +3,28 @@ import { after, before } from "node:test";
 
 before(core.start);
 
-await import("./serialization/index.ts");
-await import("./path/index.ts");
-await import("./os/index.ts");
-await import("./fs/index.ts");
-await import("./static-file/index.ts");
-await import("./bundle/index.ts");
-await import("./stream/index.ts");
-await import("./events/index.ts");
-await import("./fetch/index.ts");
-await import("./net/index.ts");
-await import("./dns/index.ts");
-await import("./git/index.ts");
-await import("./packages/index.ts");
+let tests = [
+    "./serialization/index.ts",
+    "./path/index.ts",
+    "./os/index.ts",
+    "./fs/index.ts",
+    "./static-file/index.ts",
+    "./bundle/index.ts",
+    "./stream/index.ts",
+    "./events/index.ts",
+    "./fetch/index.ts",
+    "./net/index.ts",
+    "./dns/index.ts",
+    "./git/index.ts",
+    "./packages/index.ts"
+];
+if (process.argv.length > 2) {
+    tests = process.argv.slice(2).map((test) => "." + test.replace("test", ""));
+}
+
+for (const test of tests) {
+    await import(test);
+}
 
 // hangs if C++ callback not released
 after(core.instance.end);

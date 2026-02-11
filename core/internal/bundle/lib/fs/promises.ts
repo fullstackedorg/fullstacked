@@ -17,7 +17,8 @@ import {
     Stats,
     Mkdir,
     Rm,
-    WriteFile
+    WriteFile,
+    Rename
 } from "../@types/fs.ts";
 import { bridge } from "../bridge/index.ts";
 import { Fs } from "../@types/index.ts";
@@ -106,6 +107,14 @@ export function unlink(path: PathLike) {
     });
 }
 
+export function rename(path: PathLike, path2: PathLike) {
+    return bridge({
+        mod: Fs,
+        fn: Rename,
+        data: [resolve(formatPathLike(path)), resolve(formatPathLike(path2))]
+    });
+}
+
 export default {
     stat,
     readFile,
@@ -113,5 +122,6 @@ export default {
     mkdir,
     rm,
     unlink,
-    writeFile
+    writeFile,
+    rename
 };

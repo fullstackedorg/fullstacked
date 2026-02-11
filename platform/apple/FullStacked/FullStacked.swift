@@ -38,7 +38,7 @@ struct FullStackedApp: App {
             }
             .onAppear(){
                 coreInit()
-                webViewStore.addWebView(directory: Bundle.main.path(forResource: "build", ofType: nil)!)
+                webViewStore.addWebView(directory: Bundle.main.path(forResource: "app", ofType: nil)!)
             }
         }
     }

@@ -35,17 +35,17 @@ class WebViewExtended: WKWebView, WKUIDelegate {
     }
     
     func snapshotImageToWindowColor(projectId: String, image: NSImage){
-        var imageRect = CGRect(x: 0, y: 0, width: image.size.width, height: image.size.height)
-        let imageRef = image.cgImage(forProposedRect: &imageRect, context: nil, hints: nil)
-        
-        let bitmapRep = NSBitmapImageRep(cgImage: imageRef!)
-        let color = bitmapRep.colorAt(x: 0, y: 0)
-        let r = color!.redComponent * 255
-        let g = color!.greenComponent * 255
-        let b = color!.blueComponent * 255
-        
-        let colorInt = (Int(r) << 16) | (Int(g) << 8) | Int(b);
-        FullStackedApp.singleton?.webViews.setColor(projectId: projectId, color: colorInt)
+//        var imageRect = CGRect(x: 0, y: 0, width: image.size.width, height: image.size.height)
+//        let imageRef = image.cgImage(forProposedRect: &imageRect, context: nil, hints: nil)
+//        
+//        let bitmapRep = NSBitmapImageRep(cgImage: imageRef!)
+//        let color = bitmapRep.colorAt(x: 0, y: 0)
+//        let r = color!.redComponent * 255
+//        let g = color!.greenComponent * 255
+//        let b = color!.blueComponent * 255
+//        
+//        let colorInt = (Int(r) << 16) | (Int(g) << 8) | Int(b);
+//        FullStackedApp.singleton?.webViews.setColor(projectId: projectId, color: colorInt)
     }
 }
 

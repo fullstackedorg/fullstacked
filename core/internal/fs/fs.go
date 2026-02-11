@@ -21,6 +21,7 @@ const (
 	Mkdir     FsFn = 4
 	Rm        FsFn = 5
 	WriteFile FsFn = 6
+	Rename    FsFn = 7
 )
 
 func Switch(
@@ -83,6 +84,9 @@ func Switch(
 		}
 
 		return WriteFileFn(path.ResolveWithContext(ctx, data[0].Data.(string)), contents)
+	case Rename:
+		response.Type = types.CoreResponseData
+		return RenameFn(path.ResolveWithContext(ctx, data[0].Data.(string)), path.ResolveWithContext(ctx, data[1].Data.(string)))
 	}
 
 	return errors.New("unkown fs function")
@@ -212,4 +216,8 @@ func RmFn(p string) error {
 
 func CreateFn(p string) (*os.File, error) {
 	return os.Create(p)
+}
+
+func RenameFn(p string, p2 string) error {
+	return os.Rename(p, p2)
 }
