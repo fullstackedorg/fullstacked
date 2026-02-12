@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fullstackedorg/fullstacked/internal/bundle"
 	"fullstackedorg/fullstacked/internal/fs"
+	"fullstackedorg/fullstacked/types"
 	"path"
 	"strings"
 
@@ -93,7 +94,7 @@ func findMainScript(directory string) string {
 	return ""
 }
 
-func generateIndexHTML(directory string) ([]byte, error) {
+func generateIndexHTML(ctx *types.Context, directory string) ([]byte, error) {
 	doc, err := newDoc()
 
 	if err != nil {
@@ -105,11 +106,11 @@ func generateIndexHTML(directory string) ([]byte, error) {
 	if mainScript != "" {
 		err = doc.addInBody("<script src=\"" + mainScript + "\" type=\"module\"></script>")
 
-		bundledMainScript := resolveBundledFile(path.Join(directory, mainScript))
+		bundledMainScript := resolveBundledJsFile(ctx, path.Join(directory, mainScript))
 		bundledCss := bundledMainScript[0:len(bundledMainScript)-len(".js")] + ".css"
 
 		if fs.ExistsFn(bundledCss) {
-			doc.addInHead("<link rel=\"stylesheet\" href=\"" + path.Base(bundledCss) + "\" />")
+			doc.addInHead("<link rel=\"stylesheet\" href=\"" + path.Base(mainScript) + ".css\" />")
 		}
 	}
 

@@ -46,7 +46,7 @@ const (
 )
 
 type gitAuthManager struct {
-	ctx      *types.CoreCallContext
+	ctx      *types.Context
 	streamId uint8
 	auths    map[string]GitAuth
 	requests map[string]*authRequest
@@ -61,7 +61,7 @@ var gitAuthManagers = make(map[uint8]gitAuthManager)
 
 var ErrNoGitAuthManager = errors.New("no git auth manager found for context")
 
-func getGitAuthManager(ctx *types.CoreCallContext) (*gitAuthManager, error) {
+func getGitAuthManager(ctx *types.Context) (*gitAuthManager, error) {
 	gitAuthManager, ok := gitAuthManagers[ctx.Id]
 	if !ok {
 		return nil, ErrNoGitAuthManager
@@ -69,7 +69,7 @@ func getGitAuthManager(ctx *types.CoreCallContext) (*gitAuthManager, error) {
 	return &gitAuthManager, nil
 }
 
-func RequestAuth(ctx *types.CoreCallContext, urlStr string, requestUser bool) (*GitAuth, error) {
+func RequestAuth(ctx *types.Context, urlStr string, requestUser bool) (*GitAuth, error) {
 	url, err := url.Parse(urlStr)
 	if err != nil {
 		return nil, err
@@ -121,7 +121,7 @@ func gitAuthToHttpAuth(gitAuth *GitAuth) *http.BasicAuth {
 }
 
 func Switch(
-	ctx *types.CoreCallContext,
+	ctx *types.Context,
 	header types.CoreCallHeader,
 	data []types.DeserializedData,
 	response *types.CoreCallResponse,
@@ -136,15 +136,15 @@ func Switch(
 		}
 
 		stream := types.ResponseStream{
-			Open: func(ctx *types.CoreCallContext, streamId uint8) {
+			Open: func(ctx *types.Context, streamId uint8) {
 				gitAuthManager.ctx = ctx
 				gitAuthManager.streamId = streamId
 				gitAuthManagers[ctx.Id] = gitAuthManager
 			},
-			Close: func(ctx *types.CoreCallContext, streamId uint8) {
+			Close: func(ctx *types.Context, streamId uint8) {
 				delete(gitAuthManagers, ctx.Id)
 			},
-			WriteEvent: func(ctx *types.CoreCallContext, streamId uint8, event string, data []types.DeserializedData) {
+			WriteEvent: func(ctx *types.Context, streamId uint8, event string, data []types.DeserializedData) {
 				if event != "authResponse" {
 					return
 				}
@@ -254,7 +254,7 @@ func Switch(
 		response.Type = types.CoreResponseStream
 
 		response.Stream = &types.ResponseStream{
-			Open: func(ctx *types.CoreCallContext, streamId uint8) {
+			Open: func(ctx *types.Context, streamId uint8) {
 				branches, err := branch(ctx, path.ResolveWithContext(ctx, data[0].Data.(string)))
 				if err != nil {
 					return
@@ -269,7 +269,7 @@ func Switch(
 		response.Type = types.CoreResponseStream
 
 		response.Stream = &types.ResponseStream{
-			Open: func(ctx *types.CoreCallContext, streamId uint8) {
+			Open: func(ctx *types.Context, streamId uint8) {
 				tags, err := tags(ctx, path.ResolveWithContext(ctx, data[0].Data.(string)))
 				if err != nil {
 					return
@@ -559,7 +559,7 @@ func commit(directory string, message string, author GitAuthor) (string, error) 
 }
 
 type GitStream struct {
-	ctx      *types.CoreCallContext
+	ctx      *types.Context
 	streamId uint8
 }
 
@@ -598,7 +598,7 @@ func clone(
 		exists = fs.ExistsFn(directory)
 	}
 
-	processErr := func(ctx *types.CoreCallContext, streamId uint8, err error, print bool) {
+	processErr := func(ctx *types.Context, streamId uint8, err error, print bool) {
 		if err == nil {
 			return
 		}
@@ -613,7 +613,7 @@ func clone(
 	}
 
 	return &types.ResponseStream{
-		Open: func(ctx *types.CoreCallContext, streamId uint8) {
+		Open: func(ctx *types.Context, streamId uint8) {
 
 			gitAuth, _ := RequestAuth(ctx, urlStr, false)
 			// run once
@@ -685,7 +685,7 @@ func pull(directory string) (*types.ResponseStream, error) {
 		return nil, err
 	}
 	return &types.ResponseStream{
-		Open: func(ctx *types.CoreCallContext, streamId uint8) {
+		Open: func(ctx *types.Context, streamId uint8) {
 
 			options := git.PullOptions{
 				Progress: &GitStream{
@@ -744,7 +744,7 @@ func push(directory string) (*types.ResponseStream, error) {
 	}
 
 	return &types.ResponseStream{
-		Open: func(ctx *types.CoreCallContext, streamId uint8) {
+		Open: func(ctx *types.Context, streamId uint8) {
 			options := git.PushOptions{
 				Progress: &GitStream{
 					ctx:      ctx,
@@ -820,7 +820,7 @@ func refIteratorToReferenceSlice(iter storer.ReferenceIter) []*plumbing.Referenc
 	return refs
 }
 
-func branch(ctx *types.CoreCallContext, directory string) ([]GitBranch, error) {
+func branch(ctx *types.Context, directory string) ([]GitBranch, error) {
 	dir, err := OpenGitDirectory(directory)
 
 	if err != nil {
@@ -889,7 +889,7 @@ type GitTag struct {
 	Local  bool   `json:"local"`
 }
 
-func tags(ctx *types.CoreCallContext, directory string) ([]GitTag, error) {
+func tags(ctx *types.Context, directory string) ([]GitTag, error) {
 	dir, err := OpenGitDirectory(directory)
 
 	if err != nil {
@@ -952,7 +952,7 @@ func tags(ctx *types.CoreCallContext, directory string) ([]GitTag, error) {
 	return tags, nil
 }
 
-func checkout(ctx *types.CoreCallContext, directory string, ref string, create bool) (*types.ResponseStream, error) {
+func checkout(ctx *types.Context, directory string, ref string, create bool) (*types.ResponseStream, error) {
 	dir, err := OpenGitDirectory(directory)
 
 	if err != nil {
@@ -982,7 +982,7 @@ func checkout(ctx *types.CoreCallContext, directory string, ref string, create b
 	}
 
 	return &types.ResponseStream{
-		Open: func(ctx *types.CoreCallContext, streamId uint8) {
+		Open: func(ctx *types.Context, streamId uint8) {
 			switch refType {
 			case RefCommit:
 				err = worktree.Checkout(&git.CheckoutOptions{

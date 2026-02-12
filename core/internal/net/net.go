@@ -15,7 +15,7 @@ const (
 )
 
 func Switch(
-	ctx *types.CoreCallContext,
+	ctx *types.Context,
 	header types.CoreCallHeader,
 	data []types.DeserializedData,
 	response *types.CoreCallResponse,
@@ -44,7 +44,7 @@ func createSocket(
 	}
 
 	stream := types.ResponseStream{
-		Open: func(ctx *types.CoreCallContext, streamId uint8) {
+		Open: func(ctx *types.Context, streamId uint8) {
 			go func() {
 				for {
 					buffer := make([]byte, 1024)
@@ -60,10 +60,10 @@ func createSocket(
 
 			}()
 		},
-		Write: func(ctx *types.CoreCallContext, streamId uint8, data []byte) {
+		Write: func(ctx *types.Context, streamId uint8, data []byte) {
 			socket.Write(data)
 		},
-		Close: func(ctx *types.CoreCallContext, streamId uint8) {
+		Close: func(ctx *types.Context, streamId uint8) {
 			socket.Close()
 		},
 	}

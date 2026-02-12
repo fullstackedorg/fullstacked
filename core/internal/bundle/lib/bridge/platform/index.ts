@@ -1,5 +1,6 @@
 import { BridgeNodeInit } from "./node.ts";
 import { BridgeAppleInit } from "./apple.ts";
+import { isWorker } from "../isWorker.ts";
 
 export interface PlatformBridge {
     ctx: number;
@@ -30,18 +31,20 @@ if (globalThis.process) {
     globalThis.global = globalThis;
     platformBridge = {
         ready: new Promise<void>(async (res) => {
-            const p: any = await import("process");
-
-            if (p.isWorker) {
+            let cwd = "/";
+            if (isWorker) {
                 await new Promise<void>((res) => {
                     self.onmessage = (message: MessageEvent) => {
                         if (message.data.cwd) {
-                            process.chdir(message.data.cwd);
+                            cwd = message.data.cwd;
                             res();
                         }
                     };
                 });
             }
+
+            await import("process");
+            process.chdir(cwd);
 
             // @ts-ignore
             await import("fetch");
@@ -54,7 +57,7 @@ if (globalThis.process) {
                     platformBridge.bridge = await BridgeNodeInit();
                     break;
                 case "apple":
-                    platformBridge.bridge = BridgeAppleInit();
+                    platformBridge.bridge = await BridgeAppleInit();
                     break;
             }
             res();

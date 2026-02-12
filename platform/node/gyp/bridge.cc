@@ -15,9 +15,14 @@ using namespace Napi;
 CoreLib lib;
 
 Napi::Number N_Start(const Napi::CallbackInfo &info) {
-    Napi::String directory = info[0].As<Napi::String>().ToString();
+    Napi::String root = info[0].As<Napi::String>().ToString();
+    Napi::String build = root;
+    if (info.Length() > 1 && !info[1].IsUndefined()) {
+        build = info[1].As<Napi::String>().ToString();
+    }
     return Napi::Number::New(info.Env(),
-                             lib.start((char *)directory.Utf8Value().c_str()));
+                             lib.start((char *)root.Utf8Value().c_str(),
+                                       (char *)build.Utf8Value().c_str()));
 }
 
 void N_Stop(const Napi::CallbackInfo &info) {

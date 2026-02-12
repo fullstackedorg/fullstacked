@@ -38,7 +38,7 @@ type Progress struct {
 type ProgressCallback func(Progress)
 
 func Switch(
-	ctx *types.CoreCallContext,
+	ctx *types.Context,
 	header types.CoreCallHeader,
 	data []types.DeserializedData,
 	response *types.CoreCallResponse,
@@ -75,7 +75,7 @@ func Switch(
 
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
-			Open: func(ctx *types.CoreCallContext, streamId uint8) {
+			Open: func(ctx *types.Context, streamId uint8) {
 				install(directory, packagesName, saveDev, 10, func(p Progress) {
 					if ctx != nil {
 						store.StreamEvent(ctx, streamId, "progress", []types.SerializableData{p}, p.Stage == "Done")
@@ -106,7 +106,7 @@ func Switch(
 
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
-			Open: func(ctx *types.CoreCallContext, streamId uint8) {
+			Open: func(ctx *types.Context, streamId uint8) {
 				uninstall(directory, packagesName, func(p Progress) {
 					if ctx != nil {
 						store.StreamEvent(ctx, streamId, "progress", []types.SerializableData{p}, p.Stage == "Done")

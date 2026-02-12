@@ -46,7 +46,7 @@ export default {
                 callbackListeners.forEach((cb) => cb(id, buffer));
             }
         });
-        core.start(process.cwd());
+        core.start(process.cwd(), process.cwd());
         cleanupBundledFiles();
     }
 };

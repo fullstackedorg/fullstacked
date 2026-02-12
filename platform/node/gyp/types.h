@@ -1,6 +1,6 @@
 #include <stdint.h>
 
-typedef uint8_t (*Start)(char *directory);
+typedef uint8_t (*Start)(char *root, char *build);
 typedef void (*Stop)(uint8_t ctx);
 typedef void (*SetOnStreamData)(void *cb);
 typedef int (*Call)(void *buffer, int length);

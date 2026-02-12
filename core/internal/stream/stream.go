@@ -16,7 +16,7 @@ const (
 )
 
 func Switch(
-	ctx *types.CoreCallContext,
+	ctx *types.Context,
 	header types.CoreCallHeader,
 	data []types.DeserializedData,
 	response *types.CoreCallResponse,
@@ -50,7 +50,7 @@ func Switch(
 	return nil
 }
 
-func openStream(ctx *types.CoreCallContext, streamId uint8) error {
+func openStream(ctx *types.Context, streamId uint8) error {
 	ctx.StreamsMutex.Lock()
 	stream, ok := ctx.Streams[streamId]
 	ctx.StreamsMutex.Unlock()
@@ -72,7 +72,7 @@ func openStream(ctx *types.CoreCallContext, streamId uint8) error {
 	return nil
 }
 
-func writeStream(ctx *types.CoreCallContext, streamId uint8, data []byte) error {
+func writeStream(ctx *types.Context, streamId uint8, data []byte) error {
 	ctx.StreamsMutex.Lock()
 	stream, ok := ctx.Streams[streamId]
 	ctx.StreamsMutex.Unlock()
@@ -94,7 +94,7 @@ func writeStream(ctx *types.CoreCallContext, streamId uint8, data []byte) error 
 	return nil
 }
 
-func writeEventStream(ctx *types.CoreCallContext, streamId uint8, event string, data []types.DeserializedData) error {
+func writeEventStream(ctx *types.Context, streamId uint8, event string, data []types.DeserializedData) error {
 	ctx.StreamsMutex.Lock()
 	stream, ok := ctx.Streams[streamId]
 	ctx.StreamsMutex.Unlock()
@@ -116,7 +116,7 @@ func writeEventStream(ctx *types.CoreCallContext, streamId uint8, event string, 
 	return nil
 }
 
-func closeStream(ctx *types.CoreCallContext, streamId uint8) error {
+func closeStream(ctx *types.Context, streamId uint8) error {
 	ctx.StreamsMutex.Lock()
 	stream, ok := ctx.Streams[streamId]
 	ctx.StreamsMutex.Unlock()

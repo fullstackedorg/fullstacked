@@ -73,7 +73,7 @@ packagesToBundle.forEach(({ entryPoint, outfile }) =>
         entryPoints: [entryPoint],
         outfile,
         bundle: true,
-        format: "esm",
+        // format: "esm",
         platform: "node",
         external: ["process/", "create-hash/browser/md5"],
         alias: {

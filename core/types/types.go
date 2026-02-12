@@ -19,7 +19,7 @@ const (
 	Packages CoreModule = 11
 )
 
-type ModuleSwitch = func(*CoreCallContext, CoreCallHeader, []DeserializedData, *CoreCallResponse) error
+type ModuleSwitch = func(*Context, CoreCallHeader, []DeserializedData, *CoreCallResponse) error
 
 type CoreCallResponseType = uint8
 
@@ -30,10 +30,10 @@ const (
 )
 
 type ResponseStream struct {
-	Open       func(ctx *CoreCallContext, streamId uint8)
-	Write      func(ctx *CoreCallContext, streamId uint8, data []byte)
-	WriteEvent func(ctx *CoreCallContext, streamId uint8, event string, data []DeserializedData)
-	Close      func(ctx *CoreCallContext, streamId uint8)
+	Open       func(ctx *Context, streamId uint8)
+	Write      func(ctx *Context, streamId uint8, data []byte)
+	WriteEvent func(ctx *Context, streamId uint8, event string, data []DeserializedData)
+	Close      func(ctx *Context, streamId uint8)
 }
 
 type CoreCallResponse struct {
@@ -51,11 +51,11 @@ type CoreCallHeader struct {
 
 type StoredStream struct {
 	Buffer     []byte
-	Open       func(ctx *CoreCallContext, streamId uint8)
+	Open       func(ctx *Context, streamId uint8)
 	Opened     bool
-	Write      func(ctx *CoreCallContext, streamId uint8, data []byte)
-	WriteEvent func(ctx *CoreCallContext, streamId uint8, event string, data []DeserializedData)
-	Close      func(ctx *CoreCallContext, streamId uint8)
+	Write      func(ctx *Context, streamId uint8, data []byte)
+	WriteEvent func(ctx *Context, streamId uint8, event string, data []DeserializedData)
+	Close      func(ctx *Context, streamId uint8)
 	Ended      bool
 }
 
@@ -64,9 +64,14 @@ type StoredResponse struct {
 	Payload []byte
 }
 
-type CoreCallContext struct {
-	Id            uint8
-	BaseDirectory string
+type ContextDirectories struct {
+	Root  string
+	Build string
+}
+
+type Context struct {
+	Id          uint8
+	Directories ContextDirectories
 
 	Responses      map[uint8][]byte
 	ResponsesMutex *sync.Mutex

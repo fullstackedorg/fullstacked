@@ -27,7 +27,7 @@ type ParsedPath struct {
 }
 
 func Switch(
-	ctx *types.CoreCallContext,
+	ctx *types.Context,
 	header types.CoreCallHeader,
 	data []types.DeserializedData,
 	response *types.CoreCallResponse,
@@ -65,10 +65,10 @@ func Switch(
 	return errors.New("unkown path function")
 }
 
-func ResolveWithContext(ctx *types.CoreCallContext, paths ...string) string {
+func ResolveWithContext(ctx *types.Context, paths ...string) string {
 	var baseDir string
 	if ctx != nil {
-		baseDir = ctx.BaseDirectory
+		baseDir = ctx.Directories.Root
 	}
 
 	strSlice := []string{

@@ -5,7 +5,7 @@ import core from "./core.ts";
 export type Browser = Awaited<ReturnType<typeof createBrowser>>;
 
 export async function createBrowser(directory: string) {
-    const ctx = core.instance.start(directory);
+    const ctx = core.instance.start(directory, directory);
     const webview = await createWebView(core.instance, ctx);
     core.callbackListeners.add(webview.callback);
 

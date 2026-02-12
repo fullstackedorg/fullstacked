@@ -62,7 +62,7 @@ func (r *GitDirectory) Worktree() (*git.Worktree, error) {
 	return r.worktree, nil
 }
 
-func (r *GitDirectory) LsRemote(ctx *types.CoreCallContext, remoteName string) ([]*plumbing.Reference, error) {
+func (r *GitDirectory) LsRemote(ctx *types.Context, remoteName string) ([]*plumbing.Reference, error) {
 	urlStr, err := r.GetUrl()
 
 	if err != nil {
@@ -169,7 +169,7 @@ const (
 	RefTag    GitRefType = "tag"
 )
 
-func (r *GitDirectory) FindRefType(ctx *types.CoreCallContext, ref string) (GitRefType, bool, error) {
+func (r *GitDirectory) FindRefType(ctx *types.Context, ref string) (GitRefType, bool, error) {
 	repository, err := r.Repository()
 
 	if err != nil {

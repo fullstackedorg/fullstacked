@@ -1,4 +1,5 @@
-import { cwd } from "../process/index.ts";
+import platformBridge from "../bridge/platform/index.ts";
+import { cwd } from "../process/cwd/index.ts";
 import events from "events";
 
 export class Worker extends events.EventEmitter {
@@ -11,13 +12,15 @@ export class Worker extends events.EventEmitter {
             type: "module"
         });
 
-        this.w.postMessage({ cwd: cwd() });
+        this.postMessage({ cwd: cwd() });
 
         this.w.onmessage = (e) => {
             if (e.data === "exit") {
                 this.emit("exit");
             } else {
-                this.emit("message", e);
+                platformBridge.bridge.Async(e.data).then((res) => {
+                    this.w.postMessage(new Uint8Array(res));
+                });
             }
         };
     }

@@ -11,15 +11,16 @@ import (
 var OnStreamData = (func(uint8, uint8, int))(nil)
 
 var ctxCount = 0
-var Contexts = map[uint8]types.CoreCallContext{}
+var Contexts = map[uint8]types.Context{}
 var ctxMutex = sync.Mutex{}
 
-func NewContext(directory string) uint8 {
+func NewContext(directories types.ContextDirectories) uint8 {
 	ctxMutex.Lock()
 	id := uint8(ctxCount % 256)
-	Contexts[id] = types.CoreCallContext{
-		Id:            id,
-		BaseDirectory: directory,
+
+	Contexts[id] = types.Context{
+		Id:          id,
+		Directories: directories,
 
 		Responses:      map[uint8][]byte{},
 		ResponsesMutex: &sync.Mutex{},
@@ -34,7 +35,7 @@ func NewContext(directory string) uint8 {
 }
 
 func StoreResponse(
-	ctx *types.CoreCallContext,
+	ctx *types.Context,
 	header types.CoreCallHeader,
 	response types.CoreCallResponse,
 ) (int, error) {
@@ -51,7 +52,7 @@ func StoreResponse(
 }
 
 func storeResponseData(
-	ctx *types.CoreCallContext,
+	ctx *types.Context,
 	header types.CoreCallHeader,
 	response types.CoreCallResponse,
 ) (int, error) {
@@ -76,7 +77,7 @@ func storeResponseData(
 }
 
 func storeResponseStream(
-	ctx *types.CoreCallContext,
+	ctx *types.Context,
 	header types.CoreCallHeader,
 	response types.CoreCallResponse,
 ) (int, error) {
@@ -148,7 +149,7 @@ func GetCorePayload(
 
 	return nil, errors.New("unknown core type")
 }
-func getCorePayloadData(ctx *types.CoreCallContext, id uint8) ([]byte, error) {
+func getCorePayloadData(ctx *types.Context, id uint8) ([]byte, error) {
 	ctx.ResponsesMutex.Lock()
 	response, ok := ctx.Responses[id]
 	ctx.ResponsesMutex.Unlock()
@@ -165,7 +166,7 @@ func getCorePayloadData(ctx *types.CoreCallContext, id uint8) ([]byte, error) {
 
 	return response, nil
 }
-func getCorePayloadStream(ctx *types.CoreCallContext, id uint8) ([]byte, error) {
+func getCorePayloadStream(ctx *types.Context, id uint8) ([]byte, error) {
 	ctx.StreamsMutex.Lock()
 
 	stream, ok := ctx.Streams[id]
@@ -196,7 +197,7 @@ func getCorePayloadStream(ctx *types.CoreCallContext, id uint8) ([]byte, error) 
 }
 
 func StreamChunk(
-	ctx *types.CoreCallContext,
+	ctx *types.Context,
 	storedStreamId uint8,
 	buffer []byte,
 	end bool,
@@ -235,7 +236,7 @@ func StreamChunk(
 }
 
 func StreamEvent(
-	ctx *types.CoreCallContext,
+	ctx *types.Context,
 	storedStreamId uint8,
 	name string,
 	data []types.SerializableData,

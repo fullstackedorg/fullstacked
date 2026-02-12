@@ -42,7 +42,7 @@ const core = await load(
     true
 );
 
-const mainCtx = core.start(process.cwd());
+const mainCtx = core.start(process.cwd(), process.cwd());
 
 globalThis.bridges = {
     ctxId: mainCtx,

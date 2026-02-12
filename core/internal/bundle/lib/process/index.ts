@@ -1,10 +1,12 @@
-//@ts-ignore
-import p from "./process.js";
-import path from "path";
+import { isWorker } from "../bridge/isWorker.ts";
+import { chdir } from "./cwd/chdir.ts";
+import { cwd } from "./cwd/index.ts";
+import process from "./process.js";
+export * from "./process.js";
 
-export const isWorker =
-    typeof globalThis.WorkerGlobalScope !== "undefined" &&
-    self instanceof globalThis.WorkerGlobalScope;
+if (globalThis.process === undefined) {
+    globalThis.process = process;
+}
 
 // polyfil for window.performance.now
 var performance = globalThis.performance || {};
@@ -41,17 +43,6 @@ export function hrtime(previousTimestamp) {
     return [seconds, nanoseconds];
 }
 
-let currentDir = "/";
-export function cwd() {
-    return currentDir;
-}
-export function chdir(dir: string) {
-    if (dir.startsWith("/")) {
-        currentDir = dir;
-    } else {
-        currentDir = path.resolve(currentDir, dir);
-    }
-}
 export const versions = {
     node: "0.0.0"
 };
@@ -62,13 +53,8 @@ export function exit() {
     }
 }
 
-p.hrtime = hrtime;
-p.cwd = cwd;
-p.chdir = chdir;
-p.versions = versions;
-p.exit = exit;
-
-if (globalThis.process === undefined) {
-    globalThis.process = p;
-}
-export * from "./index.js";
+process.hrtime = hrtime;
+process.cwd = cwd;
+process.chdir = chdir;
+process.versions = versions;
+process.exit = exit;

@@ -107,7 +107,7 @@ var modules = map[types.CoreModule]types.ModuleSwitch{
 }
 
 func callProcess(
-	ctx *types.CoreCallContext,
+	ctx *types.Context,
 	header types.CoreCallHeader,
 	data []types.DeserializedData,
 	response *types.CoreCallResponse,
@@ -124,7 +124,7 @@ func callProcess(
 var OnNewContext = func(ctx uint8) {}
 
 func Switch(
-	ctx *types.CoreCallContext,
+	ctx *types.Context,
 	header types.CoreCallHeader,
 	data []types.DeserializedData,
 	response *types.CoreCallResponse,
@@ -136,8 +136,11 @@ func Switch(
 		return nil
 	case Run:
 		response.Type = types.CoreResponseData
-		directory := filepath.Join(ctx.BaseDirectory, data[0].Data.(string))
-		id := store.NewContext(directory)
+		root := filepath.Join(ctx.Directories.Root, data[0].Data.(string))
+		id := store.NewContext(types.ContextDirectories{
+			Root:  root,
+			Build: root,
+		})
 
 		if store.OnStreamData == nil {
 			return errors.New("onStreamData not set")

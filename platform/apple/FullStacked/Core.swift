@@ -14,13 +14,15 @@ func onStreamDataCallback(
     streamId: UInt8,
     size: Int32
 ){
-    let bufferPtr = UnsafeMutableRawPointer.allocate(byteCount: Int(size), alignment: 1)
-    getCorePayload(ctx, 2, streamId, bufferPtr)
-    let buffer = Data(bytes: bufferPtr, count: Int(size))
     if let webView = WebViewStore.singleton?.getWebView(ctx: ctx) {
+        let bufferPtr = UnsafeMutableRawPointer.allocate(byteCount: Int(size), alignment: 1)
+        getCorePayload(ctx, 2, streamId, bufferPtr)
+        let buffer = Data(bytes: bufferPtr, count: Int(size))
         webView.onStreamData(streamId: streamId, buffer: buffer)
+        bufferPtr.deallocate()
+    } else {
+        WebViewStore.singleton?.addWebView(ctx: ctx)
     }
-    bufferPtr.deallocate()
 }
 
 func coreInit(){

@@ -24,7 +24,7 @@ type TestObject struct {
 }
 
 func Switch(
-	ctx *types.CoreCallContext,
+	ctx *types.Context,
 	header types.CoreCallHeader,
 	data []types.DeserializedData,
 	response *types.CoreCallResponse,
@@ -51,7 +51,7 @@ func Switch(
 	case Stream:
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
-			Open: func(ctx *types.CoreCallContext, streamId uint8) {
+			Open: func(ctx *types.Context, streamId uint8) {
 				streamTest(
 					ctx,
 					streamId,
@@ -65,7 +65,7 @@ func Switch(
 	case StreamWrite:
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
-			Write: func(ctx *types.CoreCallContext, streamId uint8, data []byte) {
+			Write: func(ctx *types.Context, streamId uint8, data []byte) {
 				store.StreamChunk(ctx, streamId, data, false)
 			},
 		}
@@ -76,7 +76,7 @@ func Switch(
 		intervalMs := data[0].Data.(float64)
 
 		response.Stream = &types.ResponseStream{
-			Open: func(ctx *types.CoreCallContext, streamId uint8) {
+			Open: func(ctx *types.Context, streamId uint8) {
 				for i, d := range data {
 					if i == 0 {
 						continue
@@ -118,7 +118,7 @@ func testDataCheck(testData types.DeserializedData) types.DeserializedData {
 }
 
 func streamTest(
-	ctx *types.CoreCallContext,
+	ctx *types.Context,
 	streamId uint8,
 	data []byte,
 	intervalMs float64,

@@ -25,40 +25,99 @@ func getBestSuitedColorScheme(c: Int) -> ColorScheme {
     return o >= 180 ? .light : .dark
 }
 
+let root = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first!;
+let build = Bundle.main.path(forResource: "app", ofType: nil)!
+
 @main
 struct FullStackedApp: App {
     @ObservedObject var webViewStore = WebViewStore()
+    
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
+    let firstCtx = start(root.ptr(), build.ptr())
+    
+    init() {
+        coreInit()
+    }
 
     var body: some Scene {
-        WindowGroup("FullStacked"){
+        Window("FullStacked", id: "fullstacked"){
             ZStack{
-                ForEach(webViewStore.webViews, id: \.self) { webView in //
-                    WebViewRepresentable(webView: webView)
+                WebViewRepresentable(ctx: self.firstCtx)
+                ForEach(webViewStore.webViewsPublished, id: \.self) { webView in
+                    Empty()
+                        .onAppear{
+                            openWindow(id: "window-webview", value: webView.requestHandler.ctx)
+                        }
                 }
             }
-            .onAppear(){
-                coreInit()
-                webViewStore.addWebView(directory: Bundle.main.path(forResource: "app", ofType: nil)!)
+        }
+            .defaultSize(width: 700, height: 550)
+            .restorationBehavior(.disabled)
+        
+        WindowGroup(id: "window-webview", for: UInt8.self) { $ctx in
+            if ctx != nil {
+                WebViewRepresentable(ctx: ctx!)
+                    .onDisappear{
+                        self.webViewStore.removeWebView(ctx: ctx!)
+                    }
+            } else {
+                WebViewRepresentable(ctx: start(root.ptr(), build.ptr()))
             }
         }
+            .defaultSize(width: 700, height: 550)
+            .restorationBehavior(.disabled)
+    }
+}
+
+struct Empty: View {
+    var body: some View {
+        Rectangle()
+            .hidden()
     }
 }
 
 
 class WebViewStore: ObservableObject {
     static var singleton: WebViewStore?;
-    @Published var webViews: [WebView] = []
-    
+    var webViews: [WebView] = [];
+    @Published var webViewsPublished: [WebView] = []
+        
     init(){
         WebViewStore.singleton = self
     }
     
-    func addWebView(directory: String) {
-        let webView = WebView(directory: directory)
-        webViews.append(webView)
+    func addWebView(ctx: UInt8) {
+        let webView = WebView(ctx: ctx)
+        self.webViewsPublished.append(webView)
     }
     
     func getWebView(ctx: UInt8) -> WebView? {
-        return webViews.first(where: { $0.requestHandler.ctx == ctx })
+        if let webView = webViewsPublished.first(where: { $0.requestHandler.ctx == ctx }) {
+            return webView
+        }
+        
+        if let webView = webViews.first(where: { $0.requestHandler.ctx == ctx }) {
+            return webView
+        }
+        
+        return nil
+    }
+    
+    func getOrCreateWebView(ctx: UInt8) -> WebView {
+        if let webView = self.getWebView(ctx: ctx) {
+            return webView
+        }
+        
+        let webView = WebView(ctx: ctx)
+        self.webViews.append(webView)
+        
+        return webView
+    }
+    
+    func removeWebView(ctx: UInt8) {
+        webViewsPublished.removeAll(where: { $0.requestHandler.ctx == ctx })
+        webViews.removeAll(where: { $0.requestHandler.ctx == ctx })
+        stop(ctx)
     }
 }

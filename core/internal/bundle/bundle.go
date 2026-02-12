@@ -73,7 +73,7 @@ const (
 )
 
 func Switch(
-	ctx *types.CoreCallContext,
+	ctx *types.Context,
 	header types.CoreCallHeader,
 	data []types.DeserializedData,
 	response *types.CoreCallResponse,
@@ -84,7 +84,7 @@ func Switch(
 		response.Data = EsbuildVersionFn()
 		return nil
 	case Bundle:
-		entryPoint := ctx.BaseDirectory
+		entryPoint := ctx.Directories.Root
 		if len(data) >= 1 {
 			entryPoint = fspath.ResolveWithContext(ctx, data[0].Data.(string))
 		}
@@ -127,7 +127,7 @@ type EsbuildResult struct {
 
 var bundleBase = []byte("import \"fullstacked\";\n")
 
-func BundleFnApply(ctx *types.CoreCallContext, entryPoint string) EsbuildResult {
+func BundleFnApply(ctx *types.Context, entryPoint string) EsbuildResult {
 	exists := fs.ExistsFn(entryPoint)
 	if !exists {
 		return EsbuildResult{
@@ -248,8 +248,18 @@ func BundleFnApply(ctx *types.CoreCallContext, entryPoint string) EsbuildResult 
 					build.OnLoad(esbuild.OnLoadOptions{Namespace: "lib", Filter: ".*"}, func(args esbuild.OnLoadArgs) (esbuild.OnLoadResult, error) {
 						contents, _ := lib.ReadFile(args.Path[1:])
 						str := string(contents)
+						ext := path.Ext(args.Path)
+						loader := esbuild.LoaderJS
+						switch ext {
+						case ".ts":
+							loader = esbuild.LoaderTS
+						case ".tsx":
+							loader = esbuild.LoaderTSX
+						case ".jsx":
+							loader = esbuild.LoaderJSX
+						}
 						return esbuild.OnLoadResult{
-							Loader:     esbuild.LoaderTS,
+							Loader:     loader,
 							Contents:   &str,
 							ResolveDir: path.Dir(args.Path),
 						}, nil
@@ -273,7 +283,7 @@ func BundleFnApply(ctx *types.CoreCallContext, entryPoint string) EsbuildResult 
 			baseName = "_" + baseName + ext
 			f.Path = path.Join(dir, baseName)
 			fs.WriteFileFn(f.Path, f.Contents)
-			esbuildResult.OutputFiles = append(esbuildResult.OutputFiles, strings.TrimPrefix(f.Path, ctx.BaseDirectory))
+			esbuildResult.OutputFiles = append(esbuildResult.OutputFiles, strings.TrimPrefix(f.Path, ctx.Directories.Root))
 		}
 	}
 

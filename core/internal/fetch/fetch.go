@@ -20,7 +20,7 @@ const (
 )
 
 func Switch(
-	ctx *types.CoreCallContext,
+	ctx *types.Context,
 	header types.CoreCallHeader,
 	data []types.DeserializedData,
 	response *types.CoreCallResponse,
@@ -50,7 +50,7 @@ func Switch(
 		}
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
-			Open: func(ctx *types.CoreCallContext, streamId uint8) {
+			Open: func(ctx *types.Context, streamId uint8) {
 				StreamResponse(ctx, streamId, id)
 			},
 		}
@@ -126,7 +126,7 @@ func FetchFnApply(requestHead RequestHead, body []byte) (ResponseHead, error) {
 }
 
 func StreamResponse(
-	ctx *types.CoreCallContext,
+	ctx *types.Context,
 	streamId uint8,
 	responseId int,
 ) {

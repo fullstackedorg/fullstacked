@@ -6,8 +6,7 @@ let downloadDirectory = NSSearchPathForDirectoriesInDomains(.documentDirectory, 
 class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WKDownloadDelegate {
     public let requestHandler: RequestHandler
     
-    init(directory: String) {
-        let ctx = start(directory.ptr())
+    init(ctx: UInt8) {
         self.requestHandler = RequestHandler(ctx: ctx)
         
         // inspector / debug console
@@ -121,8 +120,6 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
     }
     
     func resolveSyncAwaiter(id: UInt8, payload: Data) {
-        print(id)
-        payload.print()
         if let resolve = syncAwaitersResolve[id] {
             resolve(payload)
             syncAwaitersResolve.removeValue(forKey: id)
@@ -171,11 +168,16 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
                       mimeType: "text/plain",
                       data: data)
             return
+        } else if (pathname == "ctx") {
+            self.send(urlSchemeTask: urlSchemeTask,
+                      url: request.url!,
+                      statusCode: 200,
+                      mimeType: "text/plain",
+                      data: Data(String(self.ctx).utf8))
+            return
         } else if (pathname.starts(with: "sync")) {
             let idStr = pathname.split(separator: "/").last!
             let id = UInt8(idStr)!
-            
-            print(id)
             
             let sendCallback = {(payload: Data) -> Void in
                 DispatchQueue.main.async {
@@ -184,7 +186,7 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
                         url: request.url!,
                         statusCode: 200,
                         mimeType: "application/octet-stream",
-                        data: payload
+                        data: payload.base64EncodedData()
                     )
                 }
             }

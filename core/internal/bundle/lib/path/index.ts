@@ -10,7 +10,7 @@ import {
     Relative,
     Resolve
 } from "../@types/path.ts";
-import { cwd } from "../process/index.ts";
+import { cwd } from "../process/cwd/index.ts";
 
 export function resolve(...paths: string[]): string {
     if (!paths[0].startsWith("/")) {
