@@ -36,13 +36,13 @@ class WebViewExtended: WKWebView {
 struct WebViewRepresentable: UIViewRepresentable {
     static let isIPadOS = UIDevice.current.userInterfaceIdiom == .pad
     
-    private let webView: WebView;
-    init(webView: WebView) {
+    private let webView: WebView
+    init(_ webView: WebView) {
         self.webView = webView
     }
     
     func makeUIView(context: Context) -> WebView  {
-        return webView
+        return self.webView
     }
     
     func updateUIView(_ uiView: WebView, context: Context) {

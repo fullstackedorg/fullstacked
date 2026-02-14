@@ -30,94 +30,102 @@ let build = Bundle.main.path(forResource: "app", ofType: nil)!
 
 @main
 struct FullStackedApp: App {
-    @ObservedObject var webViewStore = WebViewStore()
+    
+    @ObservedObject var webViewStore = WebViewStore.getInstance()
     
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.dismissWindow) private var dismissWindow
-    let firstCtx = start(root.ptr(), build.ptr())
+    @Environment(\.supportsMultipleWindows) private var supportsMultipleWindows
     
     init() {
         coreInit()
     }
 
     var body: some Scene {
-        Window("FullStacked", id: "fullstacked"){
-            ZStack{
-                WebViewRepresentable(ctx: self.firstCtx)
-                ForEach(webViewStore.webViewsPublished, id: \.self) { webView in
-                    Empty()
-                        .onAppear{
-                            openWindow(id: "window-webview", value: webView.requestHandler.ctx)
+        WindowGroup(id: "FullStacked", for: WebView.ID.self) { $id in
+            ZStack {
+                WebViewRepresentable(self.webViewStore.getOrCreate(id))
+                    .ignoresSafeArea()
+                    .onAppear{
+                        if(self.supportsMultipleWindows) {
+                            self.webViewStore.openWindow = self.openWindow
                         }
+                    }
+                    .onDisappear{
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                            self.webViewStore.removeWebView(id)
+                       }
+                    } 
+                
+                if(self.webViewStore.getOrCreate(id).main) {
+                    ForEach(self.webViewStore.webViewsPublished, id: \.self) { webView in
+                        VStack {
+                            HStack(alignment: .center) {
+                                Button {
+                                    self.webViewStore.removeWebView(webView.id)
+                                } label: {
+                                    Image(systemName: "xmark")
+                                }
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                                .padding(EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 10))
+                            }
+                            WebViewRepresentable(webView)
+                                .ignoresSafeArea()
+                        }
+                            .background(Color(red: 1.0, green: 1.0, blue: 1.0))
+                    }
                 }
             }
+        } defaultValue: {
+            UUID()
         }
+        #if os(macOS)
             .defaultSize(width: 700, height: 550)
             .restorationBehavior(.disabled)
-        
-        WindowGroup(id: "window-webview", for: UInt8.self) { $ctx in
-            if ctx != nil {
-                WebViewRepresentable(ctx: ctx!)
-                    .onDisappear{
-                        self.webViewStore.removeWebView(ctx: ctx!)
-                    }
-            } else {
-                WebViewRepresentable(ctx: start(root.ptr(), build.ptr()))
-            }
-        }
-            .defaultSize(width: 700, height: 550)
-            .restorationBehavior(.disabled)
+        #endif
     }
 }
-
-struct Empty: View {
-    var body: some View {
-        Rectangle()
-            .hidden()
-    }
-}
-
 
 class WebViewStore: ObservableObject {
-    static var singleton: WebViewStore?;
-    var webViews: [WebView] = [];
+    static private var singleton: WebViewStore?;
+    static func getInstance() -> WebViewStore {
+        if(self.singleton == nil) {
+            self.singleton = WebViewStore()
+        }
+        
+        return self.singleton!
+    }
+    
+    var openWindow: OpenWindowAction?
+    
+    var webViews: [WebView] = []
     @Published var webViewsPublished: [WebView] = []
-        
-    init(){
-        WebViewStore.singleton = self
-    }
     
-    func addWebView(ctx: UInt8) {
-        let webView = WebView(ctx: ctx)
-        self.webViewsPublished.append(webView)
-    }
-    
-    func getWebView(ctx: UInt8) -> WebView? {
-        if let webView = webViewsPublished.first(where: { $0.requestHandler.ctx == ctx }) {
-            return webView
-        }
-        
-        if let webView = webViews.first(where: { $0.requestHandler.ctx == ctx }) {
-            return webView
-        }
-        
-        return nil
-    }
-    
-    func getOrCreateWebView(ctx: UInt8) -> WebView {
-        if let webView = self.getWebView(ctx: ctx) {
-            return webView
-        }
-        
-        let webView = WebView(ctx: ctx)
+    func addWebView(_ webView: WebView) {
         self.webViews.append(webView)
+        if let openWindow = self.openWindow {
+            openWindow(id: "FullStacked", value: webView.id)
+        } else {
+            self.webViewsPublished.append(webView)
+        }
+    }
+    
+    func getOrCreate(_ id: UUID) -> WebView {
+        if let webView = self.webViews.first(where: { $0.id == id }) {
+            return webView
+        }
         
+        let webView = WebView(nil)
+        webView.id = id
+        self.webViews.append(webView)
         return webView
     }
     
-    func removeWebView(ctx: UInt8) {
-        webViewsPublished.removeAll(where: { $0.requestHandler.ctx == ctx })
-        webViews.removeAll(where: { $0.requestHandler.ctx == ctx })
-        stop(ctx)
+    func removeWebView(_ id: UUID){
+        if let index = self.webViewsPublished.firstIndex(where: { $0.id == id }) {
+            self.webViewsPublished.remove(at: index).close()
+        }
+        if let index = self.webViews.firstIndex(where: { $0.id == id }) {
+            self.webViews.remove(at: index).close()
+        }
     }
 }

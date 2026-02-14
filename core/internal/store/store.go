@@ -10,16 +10,31 @@ import (
 // ctxId, storedStreamId, size
 var OnStreamData = (func(uint8, uint8, int))(nil)
 
-var ctxCount = 0
+var nextCtxId uint8 = 0
 var Contexts = map[uint8]types.Context{}
 var ctxMutex = sync.Mutex{}
 
 func NewContext(directories types.ContextDirectories) uint8 {
 	ctxMutex.Lock()
-	id := uint8(ctxCount % 256)
+	id := nextCtxId
 
-	Contexts[id] = types.Context{
-		Id:          id,
+	_, ok := Contexts[id]
+	for ok {
+		id++
+		_, ok = Contexts[id]
+	}
+
+	nextCtxId = id + 1
+	ctxMutex.Unlock()
+
+	NewContextWithCtxId(id, directories)
+	return id
+}
+
+func NewContextWithCtxId(ctxId uint8, directories types.ContextDirectories) {
+	ctxMutex.Lock()
+	Contexts[ctxId] = types.Context{
+		Id:          ctxId,
 		Directories: directories,
 
 		Responses:      map[uint8][]byte{},
@@ -28,10 +43,7 @@ func NewContext(directories types.ContextDirectories) uint8 {
 		Streams:      map[uint8]*types.StoredStream{},
 		StreamsMutex: &sync.Mutex{},
 	}
-	ctxCount++
 	ctxMutex.Unlock()
-
-	return id
 }
 
 func StoreResponse(

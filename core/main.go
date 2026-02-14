@@ -40,6 +40,29 @@ func start(
 	return C.uint8_t(id)
 }
 
+//export startWithCtx
+func startWithCtx(
+	root *C.char,
+	build *C.char,
+	ctxId C.uint8_t,
+) {
+	store.NewContextWithCtxId(uint8(ctxId), types.ContextDirectories{
+		Root:  C.GoString(root),
+		Build: C.GoString(build),
+	})
+}
+
+//export check
+func check(
+	ctxId C.uint8_t,
+) C.int {
+	_, ok := store.Contexts[uint8(ctxId)]
+	if !ok {
+		return 0
+	}
+	return 1
+}
+
 //export stop
 func stop(
 	ctxId C.uint8_t,

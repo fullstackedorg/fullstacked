@@ -3,10 +3,31 @@ import WebKit
 let platform = "apple"
 let downloadDirectory = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first! + "/downloads";
 
-class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WKDownloadDelegate {
+class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WKDownloadDelegate, Codable, Identifiable {
+    var id = UUID()
     public let requestHandler: RequestHandler
+    public var main = false
+    var markForRemoval = false
     
-    init(ctx: UInt8) {
+    required init(from decoder: any Decoder) throws {
+        fatalError("init(coder:) has not been implemented")
+    }
+    func encode(to encoder: any Encoder) throws {
+        
+    }
+    
+    init(_ providedCtx: UInt8?) {
+        if(providedCtx == nil) {
+            self.main = true
+        }
+        
+        let ctx = providedCtx ?? start(root.ptr(), build.ptr())
+        
+        if check(ctx) == 0 {
+            self.main = true
+            startWithCtx(root.ptr(), build.ptr(), ctx)
+        }
+        
         self.requestHandler = RequestHandler(ctx: ctx)
         
         // inspector / debug console
@@ -30,6 +51,7 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     func close(){
         self.navigationDelegate = nil
         self.configuration.userContentController.removeScriptMessageHandler(forName: "bridge")
+        stop(self.requestHandler.ctx)
     }
     
     required init?(coder: NSCoder) {

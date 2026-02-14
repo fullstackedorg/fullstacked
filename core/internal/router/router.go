@@ -17,6 +17,7 @@ import (
 	"fullstackedorg/fullstacked/internal/test"
 	"fullstackedorg/fullstacked/types"
 	"path/filepath"
+	"strconv"
 )
 
 type CoreFn = uint8
@@ -44,7 +45,7 @@ func Call(payload []byte) (int, error) {
 	ctx, ok := store.Contexts[ctxId]
 
 	if !ok {
-		return 0, errors.New("unkown call context")
+		return 0, errors.New("unkown call context " + strconv.Itoa(int(ctxId)))
 	}
 
 	id := payload[1]

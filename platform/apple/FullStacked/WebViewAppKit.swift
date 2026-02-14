@@ -57,9 +57,9 @@ class KeyView: NSView {
 }
 
 struct WebViewRepresentable: NSViewRepresentable {
-    private let ctx: UInt8;
-    init(ctx: UInt8) {
-        self.ctx = ctx
+    private let webView: WebView;
+    init(_ webView: WebView) {
+        self.webView = webView
     }
     
     func makeNSView(context: Context) -> NSView  {
@@ -67,8 +67,8 @@ struct WebViewRepresentable: NSViewRepresentable {
         DispatchQueue.main.async {
             view.window?.makeFirstResponder(view)
         }
-        let webView = WebViewStore.singleton!.getOrCreateWebView(ctx: self.ctx)
-        webView.autoresizingMask = [.width, .height]
+        
+        self.webView.autoresizingMask = [.width, .height]
         view.addSubview(webView);
         return view
     }
