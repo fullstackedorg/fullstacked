@@ -49,15 +49,15 @@ export function createEventEmitter<K extends Record<string, any[]>>(
             sizeNeeded = -1;
         }
 
-        accumulator = accumulator.slice(cursor);
-        processAccumulator();
+        if (cursor != 0) {
+            accumulator = accumulator.slice(cursor);
+            processAccumulator();
+        }
     };
 
     duplex.on("data", (chunk) => {
-        accumulator = mergeUint8Arrays(
-            accumulator,
-            new Uint8Array(chunk as Buffer)
-        );
+        const uint8Array = new Uint8Array(chunk as Buffer);
+        accumulator = mergeUint8Arrays(accumulator, uint8Array);
         processAccumulator();
     });
 

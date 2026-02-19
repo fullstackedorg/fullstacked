@@ -31,6 +31,9 @@ const core = await load(
 
         const webview = webviews.get(ctx);
         if (webview) {
+            if (new Uint8Array(buffer).every((b) => b === 0)) {
+                console.log("Empty buffer", buffer.byteLength);
+            }
             webview.callback(streamId, buffer);
             return;
         }

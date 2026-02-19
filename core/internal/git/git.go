@@ -702,7 +702,7 @@ func pull(directory string) (*types.ResponseStream, error) {
 			err = worktree.Pull(&options)
 
 			if errIsAuthenticationRequired(err) {
-				auth, err := RequestAuth(ctx, urlStr, true)
+				auth, err = RequestAuth(ctx, urlStr, true)
 				if err == nil {
 					options.Auth = gitAuthToHttpAuth(auth)
 					err = worktree.Pull(&options)
@@ -758,7 +758,7 @@ func push(directory string) (*types.ResponseStream, error) {
 			err := repository.Push(&options)
 
 			if errIsAuthenticationRequired(err) {
-				auth, err := RequestAuth(ctx, urlStr, true)
+				auth, err = RequestAuth(ctx, urlStr, true)
 				if err == nil {
 					options.Auth = gitAuthToHttpAuth(auth)
 					err = repository.Push(&options)

@@ -55,8 +55,8 @@ TSFN tsfn;
 void n_onStreamData(uint8_t ctx, uint8_t streamId, int size) {
     std::vector<uint8_t> buffer(size, 0);
     // 2 for CoreType Stream
-    if (streamId != 0 || size != 0) {
-        lib.getCorePayload(ctx, 2, streamId, buffer.data());
+    if (streamId != 0) {
+        lib.getCorePayload(ctx, 2, streamId, buffer.data(), size);
     }
     StreamChunk *chunk = new StreamChunk;
     chunk->ctx = ctx;
@@ -92,7 +92,7 @@ Napi::ArrayBuffer N_Call(const Napi::CallbackInfo &info) {
     uint8_t id = payload[1];
     Napi::ArrayBuffer response = Napi::ArrayBuffer::New(env, size);
     // 1 for CoreType Data
-    lib.getCorePayload(ctx, 1, id, response.Data());
+    lib.getCorePayload(ctx, 1, id, response.Data(), size);
     return response;
 }
 

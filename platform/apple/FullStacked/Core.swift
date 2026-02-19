@@ -3,7 +3,7 @@ import SwiftUI
 func coreCall(payload: Data) -> Data{
     let responseLength = call(payload.ptr(), Int32(payload.count))
     let responsePtr = UnsafeMutableRawPointer.allocate(byteCount: Int(responseLength), alignment: 1)
-    getCorePayload(payload[0], 1, payload[1], responsePtr)
+    getCorePayload(payload[0], 1, payload[1], responsePtr, responseLength)
     let response = Data(bytes: responsePtr, count: Int(responseLength))
     responsePtr.deallocate()
     return response
@@ -16,7 +16,7 @@ func onStreamDataCallback(
 ){
     if let webView = WebViewStore.getInstance().webViews.first(where: {$0.requestHandler.ctx == ctx}) {
         let bufferPtr = UnsafeMutableRawPointer.allocate(byteCount: Int(size), alignment: 1)
-        getCorePayload(ctx, 2, streamId, bufferPtr)
+        getCorePayload(ctx, 2, streamId, bufferPtr, size)
         let buffer = Data(bytes: bufferPtr, count: Int(size))
         webView.onStreamData(streamId: streamId, buffer: buffer)
         bufferPtr.deallocate()

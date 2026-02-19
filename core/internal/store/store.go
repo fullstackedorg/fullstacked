@@ -16,6 +16,7 @@ var ctxMutex = sync.Mutex{}
 
 func NewContext(directories types.ContextDirectories) uint8 {
 	ctxMutex.Lock()
+
 	id := nextCtxId
 
 	_, ok := Contexts[id]
@@ -25,6 +26,7 @@ func NewContext(directories types.ContextDirectories) uint8 {
 	}
 
 	nextCtxId = id + 1
+
 	ctxMutex.Unlock()
 
 	NewContextWithCtxId(id, directories)
@@ -33,6 +35,8 @@ func NewContext(directories types.ContextDirectories) uint8 {
 
 func NewContextWithCtxId(ctxId uint8, directories types.ContextDirectories) {
 	ctxMutex.Lock()
+	defer ctxMutex.Unlock()
+
 	Contexts[ctxId] = types.Context{
 		Id:          ctxId,
 		Directories: directories,
@@ -43,7 +47,6 @@ func NewContextWithCtxId(ctxId uint8, directories types.ContextDirectories) {
 		Streams:      map[uint8]*types.StoredStream{},
 		StreamsMutex: &sync.Mutex{},
 	}
-	ctxMutex.Unlock()
 }
 
 func StoreResponse(
@@ -68,6 +71,9 @@ func storeResponseData(
 	header types.CoreCallHeader,
 	response types.CoreCallResponse,
 ) (int, error) {
+	ctx.ResponsesMutex.Lock()
+	defer ctx.ResponsesMutex.Unlock()
+
 	payload := []byte{response.Type}
 
 	if response.Data != nil {
@@ -81,9 +87,7 @@ func storeResponseData(
 		}
 	}
 
-	ctx.ResponsesMutex.Lock()
 	ctx.Responses[header.Id] = payload
-	ctx.ResponsesMutex.Unlock()
 
 	return len(payload), nil
 }
@@ -93,6 +97,9 @@ func storeResponseStream(
 	header types.CoreCallHeader,
 	response types.CoreCallResponse,
 ) (int, error) {
+	ctx.StreamsMutex.Lock()
+	defer ctx.StreamsMutex.Unlock()
+
 	if response.Stream == nil {
 		return 0, errors.New("cannot store response stream with stream nil")
 	}
@@ -102,7 +109,6 @@ func storeResponseStream(
 		streamId++
 	}
 
-	ctx.StreamsMutex.Lock()
 	storedStreamId := streamId
 	ctx.Streams[storedStreamId] = &types.StoredStream{
 		Open:       response.Stream.Open,
@@ -113,7 +119,6 @@ func storeResponseStream(
 		Ended:      false,
 		Buffer:     []byte{},
 	}
-	ctx.StreamsMutex.Unlock()
 
 	payload := []byte{response.Type}
 	storedStreamIdSerialized, err := serialization.Serialize(float64(storedStreamId))
@@ -126,8 +131,9 @@ func storeResponseStream(
 	}
 
 	ctx.ResponsesMutex.Lock()
+	defer ctx.ResponsesMutex.Unlock()
+
 	ctx.Responses[header.Id] = payload
-	ctx.ResponsesMutex.Unlock()
 
 	return len(payload), nil
 }
@@ -143,6 +149,7 @@ func GetCorePayload(
 	ctxId uint8,
 	coreType types.CoreCallResponseType,
 	id uint8,
+	size int,
 ) ([]byte, error) {
 	ctxMutex.Lock()
 	ctx, ok := Contexts[ctxId]
@@ -156,53 +163,46 @@ func GetCorePayload(
 	case types.CoreResponseData:
 		return getCorePayloadData(&ctx, id)
 	case types.CoreResponseStream:
-		return getCorePayloadStream(&ctx, id)
+		return getCorePayloadStream(&ctx, id, size)
 	}
 
 	return nil, errors.New("unknown core type")
 }
 func getCorePayloadData(ctx *types.Context, id uint8) ([]byte, error) {
 	ctx.ResponsesMutex.Lock()
-	response, ok := ctx.Responses[id]
-	ctx.ResponsesMutex.Unlock()
+	defer ctx.ResponsesMutex.Unlock()
 
+	response, ok := ctx.Responses[id]
 	if !ok {
 		return nil, errors.New("cannot find response for id")
 	}
 
-	defer func() {
-		ctx.ResponsesMutex.Lock()
-		delete(ctx.Responses, id)
-		ctx.ResponsesMutex.Unlock()
-	}()
+	delete(ctx.Responses, id)
 
 	return response, nil
 }
-func getCorePayloadStream(ctx *types.Context, id uint8) ([]byte, error) {
+func getCorePayloadStream(ctx *types.Context, id uint8, size int) ([]byte, error) {
 	ctx.StreamsMutex.Lock()
 
 	stream, ok := ctx.Streams[id]
 	if !ok {
+		ctx.StreamsMutex.Unlock()
 		return nil, errors.New("cannot find stream for id")
 	}
 
-	buffer, err := serialization.MergeBuffers([]byte{0}, stream.Buffer)
+	buffer, err := serialization.MergeBuffers([]byte{0}, stream.Buffer[0:size-1])
 
 	if err != nil {
+		ctx.StreamsMutex.Unlock()
 		return nil, err
 	}
 
+	stream.Buffer = stream.Buffer[size-1:]
+
 	if stream.Ended {
 		buffer[0] = 1
-		defer func() {
-			ctx.StreamsMutex.Lock()
-			delete(ctx.Streams, id)
-			ctx.StreamsMutex.Unlock()
-		}()
+		delete(ctx.Streams, id)
 	}
-
-	stream.Buffer = []byte{}
-
 	ctx.StreamsMutex.Unlock()
 
 	return buffer, nil
@@ -215,13 +215,14 @@ func StreamChunk(
 	end bool,
 ) {
 	ctx.StreamsMutex.Lock()
+
 	stream, ok := ctx.Streams[storedStreamId]
-	ctx.StreamsMutex.Unlock()
 
 	if !ok {
 		if len(buffer) > 0 || !end {
 			panic("no stream for id")
 		} else {
+			ctx.StreamsMutex.Unlock()
 			return
 		}
 	}
@@ -231,17 +232,21 @@ func StreamChunk(
 	}
 
 	size := 0
-	ctx.StreamsMutex.Lock()
 	if buffer != nil {
-		stream.Buffer = append(stream.Buffer, buffer...)
+		size = len(buffer)
+		buf, err := serialization.MergeBuffers(stream.Buffer, buffer)
+		if err != nil {
+			panic(err)
+		}
+		stream.Buffer = buf
 	}
 	stream.Ended = end
-	size = len(stream.Buffer)
-	ctx.StreamsMutex.Unlock()
 
 	if OnStreamData == nil {
 		panic("did not set OnStreamData")
 	}
+
+	ctx.StreamsMutex.Unlock()
 
 	// add 1 to size for the done byte prepended in front
 	OnStreamData(ctx.Id, storedStreamId, size+1)

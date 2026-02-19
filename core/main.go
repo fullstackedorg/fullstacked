@@ -94,8 +94,9 @@ func getCorePayload(
 	coreType C.uint8_t,
 	id C.uint8_t,
 	ptr unsafe.Pointer,
+	size C.int,
 ) {
-	response, err := store.GetCorePayload(uint8(ctx), uint8(coreType), uint8(id))
+	response, err := store.GetCorePayload(uint8(ctx), uint8(coreType), uint8(id), int(size))
 
 	if err != nil {
 		fmt.Println(err.Error())
