@@ -169,7 +169,7 @@ func TestInstall_FullFlow(t *testing.T) {
 	os.WriteFile(path.Join(tmpDir, "package.json"), pjBytes, 0644)
 
 	// Run Install
-	install(tmpDir, nil, false, 5, nil)
+	install(tmpDir, nil, false, 5, false, nil)
 
 	// Verify Check
 	// 1. node_modules/test-pkg/index.js exists
@@ -206,7 +206,7 @@ func TestInstall_NoPackageJson(t *testing.T) {
 	tmpDir := t.TempDir()
 	// Should just return likely, or log error. Function has no return value.
 	// We just ensure it doesn't panic.
-	install(tmpDir, nil, false, 5, nil)
+	install(tmpDir, nil, false, 5, false, nil)
 }
 
 func TestInstall_WithLockfile(t *testing.T) {
@@ -231,7 +231,7 @@ func TestInstall_WithLockfile(t *testing.T) {
 	lBytes, _ := json.Marshal(lock)
 	os.WriteFile(path.Join(tmpDir, "package-lock.json"), lBytes, 0644)
 
-	install(tmpDir, nil, false, 5, nil)
+	install(tmpDir, nil, false, 5, false, nil)
 
 	// Verify it survives
 	// And verify the new lockfile contains the old entry?
@@ -249,8 +249,8 @@ func TestInstall_WithLockfile(t *testing.T) {
 	var newLock PackageLock
 	json.Unmarshal(newLockBytes, &newLock)
 
-	if _, ok := newLock.Packages["node_modules/existing"]; ok {
-		t.Error("Expected existing lock entry to be pruned (reconciliation)")
+	if _, ok := newLock.Packages["node_modules/existing"]; !ok {
+		t.Error("Expected existing lock entry to remain (Fast Path logic trusts lockfile)")
 	}
 }
 
@@ -306,12 +306,12 @@ func TestInstall_CorruptFiles(t *testing.T) {
 
 	// Corrupt package.json
 	os.WriteFile(path.Join(tmpDir, "package.json"), []byte(`{bad json`), 0644)
-	install(tmpDir, nil, false, 5, nil)
+	install(tmpDir, nil, false, 5, false, nil)
 	// Should return early
 
 	// Corrupt package-lock.json
 	os.WriteFile(path.Join(tmpDir, "package-lock.json"), []byte(`{bad json`), 0644)
-	install(tmpDir, nil, false, 5, nil)
+	install(tmpDir, nil, false, 5, false, nil)
 	// Should ignore bad lockfile and continue
 }
 
@@ -358,7 +358,7 @@ func TestInstall_DevDependencies(t *testing.T) {
 	os.WriteFile(path.Join(tmpDir, "package.json"), pjBytes, 0644)
 
 	// Run with devDependencies=true
-	install(tmpDir, nil, true, 5, nil)
+	install(tmpDir, nil, true, 5, false, nil)
 
 	if _, err := os.Stat(path.Join(tmpDir, "node_modules/dev-pkg/dev.js")); os.IsNotExist(err) {
 		t.Error("dev-pkg not installed")
@@ -410,7 +410,7 @@ func TestInstall_ResolutionFailures(t *testing.T) {
 	pjBytes, _ := json.Marshal(pj)
 	os.WriteFile(path.Join(tmpDir, "package.json"), pjBytes, 0644)
 
-	install(tmpDir, nil, false, 5, nil)
+	install(tmpDir, nil, false, 5, false, nil)
 
 	// good-pkg should be there
 	if _, err := os.Stat(path.Join(tmpDir, "node_modules/good-pkg/index.js")); os.IsNotExist(err) {
@@ -803,7 +803,7 @@ func TestInstall_SpecificPackage(t *testing.T) {
 	os.WriteFile(path.Join(tmpDir, "package.json"), []byte(`{"name":"test"}`), 0644)
 
 	// Install specific package
-	install(tmpDir, []string{"new-pkg"}, false, 5, nil)
+	install(tmpDir, []string{"new-pkg"}, false, 5, false, nil)
 
 	// Verify package.json updated
 	pjBytes, _ := os.ReadFile(path.Join(tmpDir, "package.json"))
@@ -857,7 +857,7 @@ func TestInstall_SaveDev(t *testing.T) {
 	os.WriteFile(path.Join(tmpDir, "package.json"), []byte(`{"name":"test"}`), 0644)
 
 	// Install with saveDev=true
-	install(tmpDir, []string{"dev-tool"}, true, 5, nil)
+	install(tmpDir, []string{"dev-tool"}, true, 5, false, nil)
 
 	// Verify package.json updated
 	pjBytes, _ := os.ReadFile(path.Join(tmpDir, "package.json"))
@@ -873,6 +873,74 @@ func TestInstall_SaveDev(t *testing.T) {
 	// Verify installed
 	if _, err := os.Stat(path.Join(tmpDir, "node_modules/dev-tool/bin.js")); os.IsNotExist(err) {
 		t.Error("dev-tool not installed")
+	}
+}
+
+func TestInstall_FastPath(t *testing.T) {
+	// Setup Mock Registry that FAILS metadata requests but SUCCEEDS tarball requests
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, ".tgz") {
+			tb, _ := createMockTarball(map[string]string{
+				"package/index.js": "fast-path",
+			})
+			w.Write(tb)
+			return
+		}
+		// Fail metadata requests
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	origUrl := registryBaseUrl
+	origClient := httpClient
+	registryBaseUrl = ts.URL + "/"
+	httpClient = ts.Client()
+	defer func() {
+		registryBaseUrl = origUrl
+		httpClient = origClient
+	}()
+
+	tmpDir := t.TempDir()
+
+	// Setup package.json
+	pkgJson := PackageJSON{
+		Name:    "fast-app",
+		Version: "1.0.0",
+		Dependencies: map[string]string{
+			"fast-pkg": "^1.0.0",
+		},
+	}
+	pjBytes, _ := json.Marshal(pkgJson)
+	os.WriteFile(path.Join(tmpDir, "package.json"), pjBytes, 0644)
+
+	// Setup package-lock.json pointing to our mock registry
+	lock := PackageLock{
+		Name:            "fast-app",
+		Version:         "1.0.0",
+		LockfileVersion: 3,
+		Packages: map[string]LockDependency{
+			"": {
+				Version: "1.0.0",
+				Dependencies: map[string]string{
+					"fast-pkg": "^1.0.0",
+				},
+			},
+			"node_modules/fast-pkg": {
+				Version:   "1.0.0",
+				Resolved:  ts.URL + "/fast-pkg/-/fast-pkg-1.0.0.tgz",
+				Integrity: "sha512-mock",
+			},
+		},
+	}
+	lockBytes, _ := json.Marshal(lock)
+	os.WriteFile(path.Join(tmpDir, "package-lock.json"), lockBytes, 0644)
+
+	// Run Install - Should use Fast Path and succeed despite metadata failure
+	install(tmpDir, nil, false, 5, false, nil)
+
+	// Verify installation
+	if _, err := os.Stat(path.Join(tmpDir, "node_modules/fast-pkg/index.js")); os.IsNotExist(err) {
+		t.Error("fast-pkg not installed via Fast Path")
 	}
 }
 
@@ -1017,7 +1085,7 @@ func TestInstall_Flattening(t *testing.T) {
 	pjBytes, _ := json.Marshal(pj)
 	os.WriteFile(path.Join(tmpDir, "package.json"), pjBytes, 0644)
 
-	install(tmpDir, nil, false, 5, nil)
+	install(tmpDir, nil, false, 5, false, nil)
 
 	// Check flattening
 	if _, err := os.Stat(path.Join(tmpDir, "node_modules/test-pkg-c")); os.IsNotExist(err) {
@@ -1102,7 +1170,7 @@ func TestInstall_Conflict(t *testing.T) {
 	pjBytes, _ := json.Marshal(pj)
 	os.WriteFile(path.Join(tmpDir, "package.json"), pjBytes, 0644)
 
-	install(tmpDir, nil, false, 5, nil)
+	install(tmpDir, nil, false, 5, false, nil)
 
 	// C@2.0 at root
 	// We need to verify version but we didn't write checking logic in extraction mock.
@@ -1248,7 +1316,7 @@ func TestProgressReporting(t *testing.T) {
 		events = append(events, p)
 	}
 
-	install(tmpDir, nil, false, 5, cb)
+	install(tmpDir, nil, false, 5, false, cb)
 
 	// Verify events
 	// Expect: Initialization, Resolving, Pruning, Installing, Extracting, Finalizing, Done
@@ -1320,7 +1388,7 @@ func TestInstall_VersionedPackage(t *testing.T) {
 	os.WriteFile(path.Join(tmpDir, "package.json"), []byte(`{"name":"test"}`), 0644)
 
 	// Install specific version
-	install(tmpDir, []string{"v-pkg@1.0.0"}, false, 5, nil)
+	install(tmpDir, []string{"v-pkg@1.0.0"}, false, 5, false, nil)
 
 	// Verify package-lock.json has v1.0.0
 	lockBytes, _ := os.ReadFile(path.Join(tmpDir, "package-lock.json"))
@@ -1374,7 +1442,7 @@ func TestInstall_ScopedPackage(t *testing.T) {
 	os.WriteFile(path.Join(tmpDir, "package.json"), []byte(`{"name":"test"}`), 0644)
 
 	// Install scoped version
-	install(tmpDir, []string{"@scope/pkg@1.0.0"}, false, 5, nil)
+	install(tmpDir, []string{"@scope/pkg@1.0.0"}, false, 5, false, nil)
 
 	// Verify package-lock.json has v1.0.0
 	lockBytes, _ := os.ReadFile(path.Join(tmpDir, "package-lock.json"))
@@ -1543,7 +1611,7 @@ func TestInstall_Concurrency(t *testing.T) {
 
 	// Test 1: Sequential (MaxConcurrent=1)
 	start := time.Now()
-	install(tmpDir, nil, false, 1, nil)
+	install(tmpDir, nil, false, 1, false, nil)
 	durationSeq := time.Since(start)
 
 	// Reset
@@ -1552,7 +1620,7 @@ func TestInstall_Concurrency(t *testing.T) {
 
 	// Test 2: Concurrent (MaxConcurrent=5)
 	start = time.Now()
-	install(tmpDir, nil, false, 5, nil)
+	install(tmpDir, nil, false, 5, false, nil)
 	durationConc := time.Since(start)
 
 	t.Logf("Sequential: %v, Concurrent: %v", durationSeq, durationConc)
@@ -1617,7 +1685,7 @@ func TestInstall_TypesReact(t *testing.T) {
 	pjBytes, _ := json.Marshal(pj)
 	os.WriteFile(path.Join(tmpDir, "package.json"), pjBytes, 0644)
 
-	install(tmpDir, nil, false, 5, nil)
+	install(tmpDir, nil, false, 5, false, nil)
 
 	// Check where the file landed
 	// Should be node_modules/@types/react/index.d.ts

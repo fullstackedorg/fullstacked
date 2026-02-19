@@ -100,7 +100,7 @@ func TestInstall_PeerDependencyDeduplication(t *testing.T) {
 	os.WriteFile(path.Join(tmpDir, "package.json"), pjBytes, 0644)
 
 	// Run Install
-	install(tmpDir, nil, false, 5, nil)
+	install(tmpDir, nil, false, 5, false, nil)
 
 	// Verify Structure
 	// 1. Root peer should be 1.0.0

@@ -76,7 +76,7 @@ func Switch(
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
 			Open: func(ctx *types.Context, streamId uint8) {
-				install(directory, packagesName, saveDev, 10, func(p Progress) {
+				install(directory, packagesName, saveDev, 10, false, func(p Progress) {
 					if ctx != nil {
 						store.StreamEvent(ctx, streamId, "progress", []types.SerializableData{p}, p.Stage == "Done")
 					}
@@ -197,6 +197,7 @@ func install(
 	packagesName []string,
 	saveDev bool,
 	maxConcurrent int,
+	skipFastPath bool,
 	onProgress ProgressCallback,
 ) {
 	if onProgress == nil {
@@ -277,6 +278,77 @@ func install(
 		if err := json.Unmarshal(packageLockContent, oldLock); err != nil {
 			oldLock = nil
 		}
+	}
+
+	// Fast Path: If package-lock exists and no specific packages requested, use lockfile
+	if !skipFastPath && len(packagesName) == 0 && oldLock != nil {
+		onProgress(Progress{Stage: "Verifying Lockfile"})
+		sem := make(chan struct{}, maxConcurrent)
+		var wg sync.WaitGroup
+		var downloadCount int
+		var mu sync.Mutex
+
+		threadSafeProgress := func(p Progress) {
+			mu.Lock()
+			defer mu.Unlock()
+			onProgress(p)
+		}
+
+		for pathKey, pkg := range oldLock.Packages {
+			if pathKey == "" {
+				continue
+			}
+			if pkg.Resolved == "" {
+				continue
+			}
+
+			targetDir := path.Join(directory, pathKey)
+			if fs.ExistsFn(targetDir) {
+				continue
+			}
+
+			wg.Add(1)
+			go func(pKey string, p LockDependency, tDir string) {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+
+				pkgName := path.Base(pKey)
+				// Handle scoped packages in display name
+				displayName := pkgName
+				if strings.HasPrefix(path.Base(path.Dir(pKey)), "@") {
+					displayName = path.Join(path.Base(path.Dir(pKey)), pkgName)
+				}
+
+				fs.MkdirFn(tDir)
+
+				err := downloadAndExtract(p.Resolved, tDir, pkgName, func(prog float64) {
+					threadSafeProgress(Progress{
+						Name:     displayName,
+						Version:  p.Version,
+						Stage:    "Extracting",
+						Progress: prog,
+					})
+				})
+
+				if err == nil {
+					mu.Lock()
+					downloadCount++
+					mu.Unlock()
+				}
+
+				threadSafeProgress(Progress{
+					Name:     displayName,
+					Version:  p.Version,
+					Stage:    "Extracting",
+					Progress: 1,
+				})
+			}(pathKey, pkg, targetDir)
+		}
+
+		wg.Wait()
+		onProgress(Progress{Stage: "Done", Progress: float64(downloadCount)})
+		return
 	}
 
 	onProgress(Progress{Stage: "Resolving"})
@@ -697,7 +769,7 @@ func uninstall(directory string, packagesName []string, onProgress ProgressCallb
 	}
 
 	// 4. Run Install (Reconcile)
-	install(directory, nil, false, 10, onProgress)
+	install(directory, nil, false, 10, true, onProgress)
 }
 
 var (
