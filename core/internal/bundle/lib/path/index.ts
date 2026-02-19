@@ -90,7 +90,7 @@ export function relative(from: string, to: string) {
     );
 }
 
-export default {
+const mod = {
     resolve,
     join,
     normalize,
@@ -101,3 +101,8 @@ export default {
     isAbsolute,
     relative
 };
+
+export const posix = mod;
+export const win32 = mod;
+
+export default mod;

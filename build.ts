@@ -1,6 +1,7 @@
 import os from "node:os";
 import child_process from "node:child_process";
 import path from "node:path";
+import fs from "node:fs";
 import esbuild from "esbuild";
 
 // shims
@@ -16,6 +17,7 @@ import esbuild from "esbuild";
 // zlib : https://www.npmjs.com/package/browserify-zlib
 // querystring : https://www.npmjs.com/package/fast-querystring
 // diagnostics_channel : https://www.npmjs.com/package/dc-polyfill
+// constants : https://www.npmjs.com/package/constants-browserify
 
 const packagesToBundle = [
     {
@@ -65,27 +67,33 @@ const packagesToBundle = [
     {
         entryPoint: "node_modules/dc-polyfill/dc-polyfill.js",
         outfile: "core/internal/bundle/lib/diagnostics_channel/index.js"
+    },
+    {
+        entryPoint: "node_modules/constants-browserify/constants.json",
+        outfile: "core/internal/bundle/lib/constants/index.json"
     }
 ];
 
 packagesToBundle.forEach(({ entryPoint, outfile }) =>
-    esbuild.buildSync({
-        entryPoints: [entryPoint],
-        outfile,
-        bundle: true,
-        // format: "esm",
-        platform: "node",
-        external: ["process/", "create-hash/browser/md5"],
-        alias: {
-            // source: https://soatok.blog/2025/11/19/moving-beyond-the-npm-elliptic-package/
-            elliptic: "@soatok/elliptic-to-noble",
+    entryPoint.endsWith(".json")
+        ? fs.copyFileSync(entryPoint, outfile)
+        : esbuild.buildSync({
+              entryPoints: [entryPoint],
+              outfile,
+              bundle: true,
+              // format: "esm",
+              platform: "node",
+              external: ["process/", "create-hash/browser/md5"],
+              alias: {
+                  // source: https://soatok.blog/2025/11/19/moving-beyond-the-npm-elliptic-package/
+                  elliptic: "@soatok/elliptic-to-noble",
 
-            randombytes: "randombytes/browser",
-            "create-ecdh": "create-ecdh/browser",
-            "create-hash": "create-hash/browser",
-            "create-hmac": "create-hmac/browser"
-        }
-    })
+                  randombytes: "randombytes/browser",
+                  "create-ecdh": "create-ecdh/browser",
+                  "create-hash": "create-hash/browser",
+                  "create-hmac": "create-hmac/browser"
+              }
+          })
 );
 
 // types

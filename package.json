@@ -37,6 +37,7 @@
         "assert": "^2.1.0",
         "browserify-zlib": "^0.2.0",
         "buffer": "^6.0.3",
+        "constants-browserify": "^1.0.0",
         "crypto-browserify": "^3.12.1",
         "csstype": "^3.2.3",
         "dc-polyfill": "^0.1.10",

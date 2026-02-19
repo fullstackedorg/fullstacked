@@ -24,6 +24,7 @@ var libModules = map[string]string{
 	"bundle":              "/lib/bundle/index.ts",
 	"child_process":       "/lib/unavailable/index.ts",
 	"console":             "/lib/console/index.ts",
+	"constants":           "/lib/constants/index.json",
 	"crypto":              "/lib/crypto/index.js",
 	"diagnostics_channel": "/lib/diagnostics_channel/index.js",
 	"dns":                 "/lib/dns/index.js",
@@ -257,6 +258,8 @@ func BundleFnApply(ctx *types.Context, entryPoint string) EsbuildResult {
 							loader = esbuild.LoaderTSX
 						case ".jsx":
 							loader = esbuild.LoaderJSX
+						case ".json":
+							loader = esbuild.LoaderJSON
 						}
 						return esbuild.OnLoadResult{
 							Loader:     loader,
