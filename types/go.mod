@@ -1,6 +1,6 @@
 module fullstackedorg/fullstacked-types
 
-go 1.25
+go 1.26
 
 replace fullstackedorg/fullstacked v0.0.0 => ../core
 
