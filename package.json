@@ -42,7 +42,7 @@
         "dc-polyfill": "^0.1.10",
         "dotenv": "^17.2.3",
         "elliptic": "@soatok/elliptic-to-noble",
-        "esbuild": "^0.27.2",
+        "esbuild": "^0.27.3",
         "events": "^3.3.0",
         "fast-querystring": "^1.1.2",
         "fuse.js": "^7.1.0",
