@@ -30,7 +30,7 @@ export function createEventEmitter<K extends Record<string, any[]>>(
     let accumulator = new Uint8Array();
 
     const processAccumulator = () => {
-        if (accumulator.byteLength === 0) {
+        if (accumulator.byteLength < 4) {
             return;
         }
 

@@ -314,6 +314,7 @@ func install(
 	type QueueItem struct {
 		ParentPath string
 		Deps       map[string]string
+		PeerDeps   map[string]string
 	}
 	queue := []QueueItem{{ParentPath: "", Deps: rootDeps}}
 
@@ -410,8 +411,70 @@ func install(
 		var nextQueueMu sync.Mutex
 
 		for _, item := range currentLevel {
+			// Merge Deps and unsatisfied PeerDeps
+			depsToInstall := make(map[string]string)
+			for k, v := range item.Deps {
+				depsToInstall[k] = v
+			}
+
+			for name, rangeStr := range item.PeerDeps {
+				// Check ancestors for satisfied peer dependency
+				satisfied := false
+				curr := item.ParentPath
+				for {
+					checkPath := path.Join(curr, "node_modules", name)
+					if pkg, ok := newLock.Packages[checkPath]; ok {
+						if v, err := semver.NewVersion(pkg.Version); err == nil {
+							if c, err := semver.NewConstraint(rangeStr); err == nil {
+								if c.Check(v) {
+									satisfied = true
+									break
+								}
+							}
+						}
+					}
+
+					// Move up: find the nearest parent directory that contains "node_modules"
+					// We are at `curr`. We want to go to the folder containing the node_modules that contains `curr`.
+					// E.g. node_modules/a -> .
+					// node_modules/@s/a -> .
+					// node_modules/a/node_modules/b -> node_modules/a
+
+					// Check if we are at root
+					if curr == "" || curr == "." {
+						break
+					}
+
+					// Simple approach: look for last "node_modules"
+					index := strings.LastIndex(curr, "node_modules")
+					if index == -1 {
+						break // Should not happen if we are inside node_modules structure
+					}
+
+					if index == 0 {
+						curr = "" // We are at root node_modules
+					} else {
+						// node_modules/a/node_modules/b
+						// index is 15
+						// we want node_modules/a
+						// curr[:15] is node_modules/a/
+						target := curr[:index]
+						// Clean trailing slash if any (though path.Join usually clean)
+						target = strings.TrimSuffix(target, string(os.PathSeparator))
+						if target == "" {
+							target = "."
+						}
+						curr = target
+					}
+				}
+
+				if !satisfied {
+					depsToInstall[name] = rangeStr
+				}
+			}
+
 			// Process each dependency in the item concurrently
-			for name, rangeStr := range item.Deps {
+			for name, rangeStr := range depsToInstall {
 				levelWG.Add(1)
 				go func(pName, pRange, parentPath string) {
 					defer levelWG.Done()
@@ -503,12 +566,13 @@ func install(
 					installedPaths[targetPath] = ver.Version
 
 					// Must capture deps before unlocking or just use local var
-					combinedDeps := make(map[string]string)
+					deps := make(map[string]string)
 					for k, v := range ver.Dependencies {
-						combinedDeps[k] = v
+						deps[k] = v
 					}
+					peerDeps := make(map[string]string)
 					for k, v := range ver.PeerDependencies {
-						combinedDeps[k] = v
+						peerDeps[k] = v
 					}
 
 					// Release state lock before triggering install (which might block/spawn)
@@ -517,11 +581,12 @@ func install(
 					// Trigger installation immediately
 					triggerInstall(targetPath, depEntry)
 
-					if len(combinedDeps) > 0 {
+					if len(deps) > 0 || len(peerDeps) > 0 {
 						nextQueueMu.Lock()
 						nextLevelQueue = append(nextLevelQueue, QueueItem{
 							ParentPath: targetPath,
-							Deps:       combinedDeps,
+							Deps:       deps,
+							PeerDeps:   peerDeps,
 						})
 						nextQueueMu.Unlock()
 					}
