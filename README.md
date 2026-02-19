@@ -1,5 +1,5 @@
 > [!IMPORTANT]
-> Development is now focused on FullStacked v1:  Node.js API compatibility. [Learn more](https://fullstacked.org/v1)
+> Development is now focused on FullStacked v1: Node.js API compatibility. [Learn more](https://fullstacked.org/v1)
 
 ---
 
