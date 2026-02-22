@@ -43,9 +43,6 @@ export function hrtime(previousTimestamp) {
     return [seconds, nanoseconds];
 }
 
-export const versions = {
-    node: "0.0.0"
-};
 export function exit() {
     if (isWorker) {
         self.postMessage("exit");
@@ -56,5 +53,5 @@ export function exit() {
 process.hrtime = hrtime;
 process.cwd = cwd;
 process.chdir = chdir;
-process.versions = versions;
+process.versions = {};
 process.exit = exit;

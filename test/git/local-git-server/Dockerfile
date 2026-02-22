@@ -17,6 +17,9 @@ RUN chmod +x /home/setup.sh
 
 RUN a2dissite 000-default.conf
 RUN a2ensite git.conf
+RUN a2enmod cgid alias env authn_core
+
+RUN htpasswd -b -c /etc/apache2/passwd.git test testing
 
 RUN git config --system http.receivepack true
 RUN git config --system http.uploadpack true

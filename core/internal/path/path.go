@@ -65,10 +65,23 @@ func Switch(
 	return errors.New("unkown path function")
 }
 
+func RelativeToRoot(ctx *types.Context, path string) string {
+	str, err := filepath.Rel(ctx.Directories.Root, path)
+	if err != nil {
+		return ""
+	}
+	return str
+}
+
 func ResolveWithContext(ctx *types.Context, paths ...string) string {
 	var baseDir string
 	if ctx != nil {
 		baseDir = ctx.Directories.Root
+	}
+
+	if strings.HasPrefix(paths[0], "build:") {
+		baseDir = ctx.Directories.Build
+		paths[0] = strings.TrimPrefix(paths[0], "build:")
 	}
 
 	strSlice := []string{

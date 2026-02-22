@@ -23,16 +23,33 @@ async function cloneRepository(
     name: "test" | "empty",
     directory = testDirectory
 ) {
-    return (
+    await (
         await git.clone(`http://localhost:8080/${name}`, directory)
     ).promise();
+    child_process.execSync(
+        `git remote set-url origin http://test:testing@localhost:8080/${name}`,
+        {
+            cwd: directory,
+            stdio: "ignore"
+        }
+    );
 }
 
 suite("git - e2e", () => {
-    before(() => {
+    let authManager;
+
+    before(async () => {
         child_process.execSync("docker compose up --build -d", {
             cwd: localGitServerDirectory,
             stdio: "ignore"
+        });
+
+        authManager = await git.createGitAuthManager();
+        authManager.on("auth", (host) => {
+            authManager.writeEvent("authResponse", host, {
+                username: "test",
+                password: "testing"
+            });
         });
     });
 

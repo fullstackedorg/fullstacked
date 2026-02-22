@@ -277,6 +277,10 @@ export function rename(
         .catch((e) => callback(e));
 }
 
+export function realpathSync(path: PathLike) {
+    return resolve(formatPathLike(path));
+}
+
 export type { Stats, Dirent } from "./common.ts";
 
 export * as promises from "./promises.ts";
@@ -299,6 +303,7 @@ export default {
     writeFile,
     renameSync,
     rename,
+    realpathSync,
 
     promises
 };

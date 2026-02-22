@@ -5,7 +5,7 @@ mkrepo empty
 
 mkrepo test
 cd ~
-git clone http://0.0.0.0:80/test
+git clone http://test:testing@0.0.0.0:80/test
 cd test
 echo "test file" > test.txt
 git config --global user.email test@testing.com

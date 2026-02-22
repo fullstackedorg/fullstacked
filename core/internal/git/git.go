@@ -57,6 +57,7 @@ type authRequest struct {
 	auth *GitAuth
 }
 
+// ctx.Id -> gitAuthManager
 var gitAuthManagers = make(map[uint8]gitAuthManager)
 
 var ErrNoGitAuthManager = errors.New("no git auth manager found for context")

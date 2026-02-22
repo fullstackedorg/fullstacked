@@ -6,10 +6,12 @@ import (
 	"fullstackedorg/fullstacked/internal/fs"
 	fspath "fullstackedorg/fullstacked/internal/path"
 	"fullstackedorg/fullstacked/internal/serialization"
+	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/types"
 	"path"
 	"runtime/debug"
 	"strings"
+	"sync"
 
 	esbuild "github.com/evanw/esbuild/pkg/api"
 )
@@ -69,9 +71,20 @@ var BundleExtensions = []string{".tsx", ".ts", ".jsx", ".js"}
 type BundleFn = uint8
 
 const (
-	EsbuildVersion BundleFn = 0
-	Bundle         BundleFn = 1
+	EsbuildVersion     BundleFn = 0
+	Bundle             BundleFn = 1
+	BuilderTailwindCSS BundleFn = 2
+	BuilderSASS        BundleFn = 3
 )
+
+type TailwindCSSBuilder struct {
+	ctx      *types.Context
+	streamId uint8
+	wg       *sync.WaitGroup
+}
+
+// ctx.Id -> builderTailwindCSS
+var builderTailwindCSS = make(map[uint8]TailwindCSSBuilder)
 
 func Switch(
 	ctx *types.Context,
@@ -90,8 +103,40 @@ func Switch(
 			entryPoint = fspath.ResolveWithContext(ctx, data[0].Data.(string))
 		}
 
-		response.Type = types.CoreResponseData
-		response.Data = BundleFnApply(ctx, entryPoint)
+		response.Type = types.CoreResponseStream
+		response.Stream = &types.ResponseStream{
+			Open: func(ctx *types.Context, streamId uint8) {
+				result := BundleFnApply(ctx, entryPoint)
+				store.StreamEvent(ctx, streamId, "result", []types.SerializableData{result}, true)
+			},
+		}
+		return nil
+	case BuilderTailwindCSS:
+		response.Type = types.CoreResponseStream
+		response.Stream = &types.ResponseStream{
+			Open: func(ctx *types.Context, streamId uint8) {
+				builderTailwindCSS[ctx.Id] = TailwindCSSBuilder{
+					ctx:      ctx,
+					streamId: streamId,
+					wg:       &sync.WaitGroup{},
+				}
+			},
+			WriteEvent: func(ctx *types.Context, streamId uint8, event string, data []types.DeserializedData) {
+				if event != "build-done" {
+					return
+				}
+
+				builder, ok := builderTailwindCSS[ctx.Id]
+				if !ok {
+					return
+				}
+
+				builder.wg.Done()
+			},
+			Close: func(ctx *types.Context, streamId uint8) {
+				delete(builderTailwindCSS, ctx.Id)
+			},
+		}
 		return nil
 	}
 
@@ -198,6 +243,9 @@ func BundleFnApply(ctx *types.Context, entryPoint string) EsbuildResult {
 		loader = esbuild.LoaderJSX
 	}
 
+	// []string
+	sources := []types.SerializableData{fspath.RelativeToRoot(ctx, entryPoint)}
+
 	result := esbuild.Build(esbuild.BuildOptions{
 		Stdin: &esbuild.StdinOptions{
 			Contents:   string(contents),
@@ -216,12 +264,7 @@ func BundleFnApply(ctx *types.Context, entryPoint string) EsbuildResult {
 				Setup: func(build esbuild.PluginBuild) {
 					// catch lib module entry
 					build.OnResolve(esbuild.OnResolveOptions{Filter: ".*"}, func(args esbuild.OnResolveArgs) (esbuild.OnResolveResult, error) {
-						if strings.HasSuffix(args.Path, ".node") {
-							return esbuild.OnResolveResult{
-								External: true,
-							}, nil
-						}
-
+						// node:fs => fs
 						args.Path = strings.TrimPrefix(args.Path, "node:")
 
 						libModulePath, isLibModule := libModules[args.Path]
@@ -234,6 +277,13 @@ func BundleFnApply(ctx *types.Context, entryPoint string) EsbuildResult {
 							Namespace: "lib",
 							Path:      libModulePath,
 						}, nil
+					})
+
+					build.OnLoad(esbuild.OnLoadOptions{Filter: ".*"}, func(args esbuild.OnLoadArgs) (esbuild.OnLoadResult, error) {
+						if args.Namespace != "lib" && !strings.Contains(args.Path, "node_modules") {
+							sources = append(sources, fspath.RelativeToRoot(ctx, args.Path))
+						}
+						return esbuild.OnLoadResult{}, nil
 					})
 
 					// resolve relative import in lib modules
@@ -279,16 +329,34 @@ func BundleFnApply(ctx *types.Context, entryPoint string) EsbuildResult {
 	}
 
 	if len(result.Errors) == 0 {
+		dir := path.Dir(entryPoint)
+		entrypointBaseName := path.Base(entryPoint)
+
+		tailwindEntry := fspath.RelativeToRoot(ctx, path.Join(dir, "index.css"))
+		tailwindOutput := fspath.RelativeToRoot(ctx, path.Join(dir, "_"+entrypointBaseName+".tailwind.css"))
+		tailwindCSSBuild(ctx, tailwindEntry, tailwindOutput, sources)
+
 		for _, f := range result.OutputFiles {
-			dir := path.Dir(entryPoint)
-			baseName := path.Base(entryPoint)
 			ext := path.Ext(f.Path)
-			baseName = "_" + baseName + ext
-			f.Path = path.Join(dir, baseName)
+			f.Path = path.Join(dir, "_"+entrypointBaseName+ext)
 			fs.WriteFileFn(f.Path, f.Contents)
-			esbuildResult.OutputFiles = append(esbuildResult.OutputFiles, strings.TrimPrefix(f.Path, ctx.Directories.Root))
+			esbuildResult.OutputFiles = append(esbuildResult.OutputFiles, fspath.RelativeToRoot(ctx, f.Path))
 		}
 	}
 
 	return esbuildResult
+}
+
+func tailwindCSSBuild(ctx *types.Context, entry string, outfile string, sources []types.SerializableData) {
+	builder, ok := builderTailwindCSS[ctx.Id]
+	if !ok {
+		return
+	}
+
+	data := []types.SerializableData{entry, outfile}
+	data = append(data, sources...)
+
+	builder.wg.Add(1)
+	store.StreamEvent(ctx, builder.streamId, "build", data, false)
+	builder.wg.Wait()
 }

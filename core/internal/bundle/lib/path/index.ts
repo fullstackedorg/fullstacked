@@ -13,7 +13,9 @@ import {
 import { cwd } from "../process/cwd/index.ts";
 
 export function resolve(...paths: string[]): string {
-    if (!paths[0].startsWith("/")) {
+    if (paths[0].startsWith("build:")) {
+        return paths.join("/");
+    } else if (!paths[0].startsWith("/")) {
         paths.unshift(cwd());
     }
     return bridge(

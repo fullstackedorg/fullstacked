@@ -75,7 +75,6 @@ export async function stat(
 
 export function writeFile(path: PathLike, data: string | Uint8Array) {
     const resolved = resolve(formatPathLike(path));
-    console.log(resolved);
     return bridge({
         mod: Fs,
         fn: WriteFile,

@@ -11,6 +11,8 @@ core/internal/bundle/lib/@types
 core/internal/bundle/lib/**/*.js
 core/internal/bundle/lib/**/*.json
 test/**/_index.ts.js
-test/**/_index.ts.css
 !test/static-file/sample/_index.ts.js
+test/**/_index.ts.css
+test/**/_index.ts.tailwind.css
+test/**/output.css
 test/**/test

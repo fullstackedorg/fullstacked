@@ -112,6 +112,12 @@ func generateIndexHTML(ctx *types.Context, directory string) ([]byte, error) {
 		if fs.ExistsFn(bundledCss) {
 			doc.addInHead("<link rel=\"stylesheet\" href=\"" + path.Base(mainScript) + ".css\" />")
 		}
+
+		tailwindCss := bundledMainScript[0:len(bundledMainScript)-len(".js")] + ".tailwind.css"
+
+		if fs.ExistsFn(tailwindCss) {
+			doc.addInHead("<link rel=\"stylesheet\" href=\"" + path.Base(mainScript) + ".tailwind.css\" />")
+		}
 	}
 
 	HTML := bytes.Buffer{}
