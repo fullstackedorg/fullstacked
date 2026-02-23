@@ -17,7 +17,13 @@ let isSimulator = false
 let EditorColor = 0x1E293B
 
 // source: https://github.com/scottcorgan/contrast/blob/master/index.js
-func getBestSuitedColorScheme(c: Int) -> ColorScheme {
+func getBestSuitedColorScheme(color: Color?) -> ColorScheme? {
+    if color == nil {
+        return nil
+    }
+    
+    let c = color!.hex()
+    
     let r = ((c >> 16) & 0xff)
     let g = ((c >>  8) & 0xff)
     let b = ((c      ) & 0xff)
@@ -33,6 +39,8 @@ struct FullStackedApp: App {
     
     @ObservedObject var webViewStore = WebViewStore.getInstance()
     
+    @State var isToolbarHidden:Bool = false
+    
     @Environment(\.openWindow) private var openWindow
     @Environment(\.supportsMultipleWindows) private var supportsMultipleWindows
     
@@ -42,9 +50,17 @@ struct FullStackedApp: App {
 
     var body: some Scene {
         WindowGroup(id: "FullStacked", for: WebView.ID.self) { $id in
-            ZStack {
+            ZStack(alignment: .top) {
                 WebViewRepresentable(self.webViewStore.getOrCreate(id))
                     .ignoresSafeArea()
+                    .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0))
+                    .toolbar{
+                        Spacer()
+                    }
+                    .navigationTitle(self.webViewStore.webViewsMeta[id]?.0 ?? "FullStacked")
+                    .toolbarBackground(self.webViewStore.webViewsMeta[id]?.1 ?? Color(red: 0, green: 0, blue: 0, opacity: 0))
+                    .background(self.webViewStore.webViewsMeta[id]?.1)
+                    .preferredColorScheme(getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[id]?.1))
                     .onAppear{
                         if(self.supportsMultipleWindows) {
                             self.webViewStore.openWindow = self.openWindow
@@ -54,7 +70,7 @@ struct FullStackedApp: App {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                             self.webViewStore.removeWebView(id)
                        }
-                    } 
+                    }
                 
                 if(self.webViewStore.getOrCreate(id).main) {
                     ForEach(self.webViewStore.webViewsPublished, id: \.self) { webView in
@@ -95,10 +111,26 @@ class WebViewStore: ObservableObject {
         return self.singleton!
     }
     
+    init() {
+        Timer.scheduledTimer(withTimeInterval: 1, repeats: true, block: { _ in
+            self.webViews.forEach { webView in
+                var title = webView.title
+                if(title == nil || title!.isEmpty) {
+                    title = "FullStacked"
+                }
+                
+                self.webViewsMeta[webView.id] =
+                    (title!, webView.getBackgroundColor())
+            }
+        })
+    }
+    
     var openWindow: OpenWindowAction?
     
     var webViews: [WebView] = []
     @Published var webViewsPublished: [WebView] = []
+    // title, bgColor
+    @Published var webViewsMeta: [UUID:(String, Color)] = [:]
     
     func addWebView(_ webView: WebView) {
         self.webViews.append(webView)
@@ -127,5 +159,14 @@ class WebViewStore: ObservableObject {
         if let index = self.webViews.firstIndex(where: { $0.id == id }) {
             self.webViews.remove(at: index).close()
         }
+    }
+}
+
+extension Color {
+    init(hex: Int, opacity: Double = 1.0) {
+        let red = Double((hex & 0xff0000) >> 16) / 255.0
+        let green = Double((hex & 0xff00) >> 8) / 255.0
+        let blue = Double((hex & 0xff) >> 0) / 255.0
+        self.init(.sRGB, red: red, green: green, blue: blue, opacity: opacity)
     }
 }

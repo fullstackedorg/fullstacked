@@ -95,15 +95,6 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     }
     
     func webView(_ webView:WKWebView, didFinish didFinishNavigation: WKNavigation){
-//        let wkSnapConfig = WKSnapshotConfiguration()
-//        wkSnapConfig.rect = CGRect(x: 0, y: 0, width: 1, height: 1)
-//        takeSnapshot(with: wkSnapConfig) { image, err in
-//            if(err != nil) {
-//                print(err!)
-//                return
-//            }
-//            self.snapshotImageToWindowColor(projectId: self.requestHandler.instance.id, image: image!)
-//        }
     }
     
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
@@ -285,5 +276,3 @@ extension Data {
         Swift.print(str)
     }
 }
-
-

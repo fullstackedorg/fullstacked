@@ -34,18 +34,8 @@ class WebViewExtended: WKWebView, WKUIDelegate {
         }
     }
     
-    func snapshotImageToWindowColor(projectId: String, image: NSImage){
-//        var imageRect = CGRect(x: 0, y: 0, width: image.size.width, height: image.size.height)
-//        let imageRef = image.cgImage(forProposedRect: &imageRect, context: nil, hints: nil)
-//        
-//        let bitmapRep = NSBitmapImageRep(cgImage: imageRef!)
-//        let color = bitmapRep.colorAt(x: 0, y: 0)
-//        let r = color!.redComponent * 255
-//        let g = color!.greenComponent * 255
-//        let b = color!.blueComponent * 255
-//        
-//        let colorInt = (Int(r) << 16) | (Int(g) << 8) | Int(b);
-//        FullStackedApp.singleton?.webViews.setColor(projectId: projectId, color: colorInt)
+    func getBackgroundColor() -> Color {
+        return Color(self.underPageBackgroundColor.cgColor)
     }
 }
 
@@ -75,4 +65,28 @@ struct WebViewRepresentable: NSViewRepresentable {
     
     
     func updateNSView(_ uiView: NSView, context: Context) { }
+}
+
+extension Color {
+    /// Converts the NSColor to a hexadecimal string representation (RRGGBB or RRGGBBAA).
+    func hex() -> Int {
+        let nsColor = NSColor(self)
+                
+        // Get the RGBA components
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        nsColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+                
+        // Convert the components to 0-255 range Ints
+        let r = Int(red * 255.0)
+        let g = Int(green * 255.0)
+        let b = Int(blue * 255.0)
+        
+        // Combine into a single UInt64 (RGB format, ignoring alpha for a 6-digit hex)
+        let hexValue = (r << 16) | (g << 8) | b
+        
+        return hexValue
+    }
 }
