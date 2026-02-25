@@ -1,4 +1,5 @@
 import WebKit
+import SwiftUI
 
 let platform = "apple"
 let downloadDirectory = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first! + "/downloads";
@@ -119,6 +120,10 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     
     func downloadDidFinish(_ download: WKDownload) {
         self.openDownloadDirectory()
+    }
+    
+    func getBackgroundColor() -> Color {
+        return Color(self.underPageBackgroundColor.cgColor)
     }
 }
 

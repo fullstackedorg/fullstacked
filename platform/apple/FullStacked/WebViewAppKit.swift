@@ -33,10 +33,6 @@ class WebViewExtended: WKWebView, WKUIDelegate {
             }
         }
     }
-    
-    func getBackgroundColor() -> Color {
-        return Color(self.underPageBackgroundColor.cgColor)
-    }
 }
 
 // suppress "funk" noise

@@ -39,7 +39,7 @@ struct FullStackedApp: App {
     
     @ObservedObject var webViewStore = WebViewStore.getInstance()
     
-    @State var isToolbarHidden:Bool = false
+    @State private var windowSize: CGSize = .zero
     
     @Environment(\.openWindow) private var openWindow
     @Environment(\.supportsMultipleWindows) private var supportsMultipleWindows
@@ -50,47 +50,80 @@ struct FullStackedApp: App {
 
     var body: some Scene {
         WindowGroup(id: "FullStacked", for: WebView.ID.self) { $id in
-            ZStack(alignment: .top) {
-                WebViewRepresentable(self.webViewStore.getOrCreate(id))
-                    .ignoresSafeArea()
-                    .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0))
-                    .toolbar{
-                        Spacer()
-                    }
-                    .navigationTitle(self.webViewStore.webViewsMeta[id]?.0 ?? "FullStacked")
-                    .toolbarBackground(self.webViewStore.webViewsMeta[id]?.1 ?? Color(red: 0, green: 0, blue: 0, opacity: 0))
-                    .background(self.webViewStore.webViewsMeta[id]?.1)
-                    .preferredColorScheme(getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[id]?.1))
-                    .onAppear{
-                        if(self.supportsMultipleWindows) {
-                            self.webViewStore.openWindow = self.openWindow
-                        }
-                    }
-                    .onDisappear{
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                            self.webViewStore.removeWebView(id)
-                       }
-                    }
-                
-                if(self.webViewStore.getOrCreate(id).main) {
-                    ForEach(self.webViewStore.webViewsPublished, id: \.self) { webView in
-                        VStack {
-                            HStack(alignment: .center) {
-                                Button {
-                                    self.webViewStore.removeWebView(webView.id)
-                                } label: {
-                                    Image(systemName: "xmark")
-                                }
-                                .frame(maxWidth: .infinity, alignment: .trailing)
-                                .padding(EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 10))
-                            }
-                            WebViewRepresentable(webView)
+            (self.webViewStore.webViewsMeta[id]?.1 ?? Color(hex: 0))
+                .navigationTitle(self.webViewStore.webViewsMeta[id]?.0 ?? "FullStacked")
+            
+                .onGeometryChange(for: CGSize.self) { proxy in
+                    proxy.size
+                } action: { newSize in
+                    self.windowSize = newSize
+                }
+            
+                .overlay {
+                    NavigationStack {
+                        ZStack {
+                            WebViewRepresentable(self.webViewStore.getOrCreate(id))
                                 .ignoresSafeArea()
+                                .background(self.webViewStore.webViewsMeta[id]?.1)
+                                .navigationTitle(self.webViewStore.webViewsMeta[id]?.0 ?? "FullStacked")
+                            
+                            #if os(macOS)
+                                .preferredColorScheme(getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[id]?.1))
+                                .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0))
+                                .toolbar{
+                                    Spacer()
+                                }
+                                .toolbarBackground(self.webViewStore.webViewsMeta[id]?.1 ?? Color(red: 0, green: 0, blue: 0, opacity: 0))
+                            #else
+                                .preferredColorScheme(isIPadOS
+                                                      ? getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[id]?.1)
+                                                      : nil)
+                                .toolbar(
+                                    isIPadOS && !isFullScreen(size: self.windowSize) ? .visible : .hidden,
+                                    for: .navigationBar)
+                                .navigationBarTitleDisplayMode(.inline)
+                            #endif
+                                
+                                .onAppear{
+                                    if(self.supportsMultipleWindows) {
+                                        self.webViewStore.openWindow = self.openWindow
+                                    }
+                                }
+                                .onDisappear{
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                        self.webViewStore.removeWebView(id)
+                                   }
+                                }
+                            
+                            if(self.webViewStore.getOrCreate(id).main) {
+                                ForEach(self.webViewStore.webViewsPublished, id: \.self) { webView in
+                                    VStack {
+                                        HStack(alignment: .center) {
+                                            Button {
+                                                self.webViewStore.removeWebView(webView.id)
+                                            } label: {
+                                                Image(systemName: "xmark")
+                                                    .tint(getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[webView.id]?.1) == .dark
+                                                          ? .white
+                                                          : .black)
+                                            }
+                                            .frame(maxWidth: .infinity, alignment: .trailing)
+                                            .padding(windowSize.width > windowSize.height
+                                                     ? EdgeInsets(top: 10, leading: 0, bottom: 2, trailing: 10)
+                                                     : EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 10))
+                                                
+                                        }
+                                        WebViewRepresentable(webView)
+                                            .ignoresSafeArea()
+                                            
+                                    }
+                                    .background(self.webViewStore.webViewsMeta[webView.id]?.1 ?? Color(.black))
+                                    .preferredColorScheme(getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[webView.id]?.1))
+                                }
+                            }
                         }
-                            .background(Color(red: 1.0, green: 1.0, blue: 1.0))
                     }
                 }
-            }
         } defaultValue: {
             UUID()
         }
