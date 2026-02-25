@@ -7,7 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		9C5A1EDB2CDB99BB009B4A20 /* ios-arm64.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 9C5A1EDA2CDB99BB009B4A20 /* ios-arm64.a */; };
+		9C2CD0202F4EB1E70019F8E6 /* darwin.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 9C2CD01F2F4EB1E70019F8E6 /* darwin.a */; };
+		9C2CD0232F4EB2510019F8E6 /* ios-arm64.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 9C2CD0222F4EB2510019F8E6 /* ios-arm64.a */; };
 		9C5A1EDD2CDB9AB9009B4A20 /* Instance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5A1EDC2CDB9AB4009B4A20 /* Instance.swift */; };
 		9C5A1EDF2CDB9ADB009B4A20 /* WebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5A1EDE2CDB9AD6009B4A20 /* WebView.swift */; };
 		9C7E8A632BAA038500CE9660 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9C7E8A622BA9BF1600CE9660 /* PrivacyInfo.xcprivacy */; };
@@ -26,12 +27,13 @@
 		9CDBCDB32CF7F9BF0035BF46 /* WebViewUIKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CDBCDB12CF7F9B00035BF46 /* WebViewUIKit.swift */; };
 		9CDBCDB82CF7F9F50035BF46 /* WebViewAppKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CDBCDB52CF7F9F50035BF46 /* WebViewAppKit.swift */; };
 		9CDBCDB92CF7FAB80035BF46 /* Main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CA03E512B5715AA002D2D9F /* Main.swift */; };
-		9CDBCDC82CF819F60035BF46 /* darwin.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 9CDBCDC72CF819F60035BF46 /* darwin.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		9C5A1ED92CDB99BB009B4A20 /* ios-arm64.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "ios-arm64.h"; path = "../../core/bin/ios-arm64.h"; sourceTree = SOURCE_ROOT; };
-		9C5A1EDA2CDB99BB009B4A20 /* ios-arm64.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "ios-arm64.a"; path = "../../core/bin/ios-arm64.a"; sourceTree = SOURCE_ROOT; };
+		9C2CD01E2F4EB1E70019F8E6 /* darwin.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = darwin.h; path = ../../../../core/bin/darwin.h; sourceTree = "<group>"; };
+		9C2CD01F2F4EB1E70019F8E6 /* darwin.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = darwin.a; path = ../../../../core/bin/darwin.a; sourceTree = "<group>"; };
+		9C2CD0212F4EB2510019F8E6 /* ios-arm64.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "ios-arm64.h"; path = "../../../../core/bin/ios-arm64.h"; sourceTree = "<group>"; };
+		9C2CD0222F4EB2510019F8E6 /* ios-arm64.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "ios-arm64.a"; path = "../../../../core/bin/ios-arm64.a"; sourceTree = "<group>"; };
 		9C5A1EDC2CDB9AB4009B4A20 /* Instance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Instance.swift; sourceTree = "<group>"; };
 		9C5A1EDE2CDB9AD6009B4A20 /* WebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebView.swift; sourceTree = "<group>"; };
 		9C7081332BE6CBA100EF0A6B /* FullStacked.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FullStacked.entitlements; sourceTree = "<group>"; };
@@ -46,8 +48,6 @@
 		9CDBCDAF2CF7F8070035BF46 /* FullStacked.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FullStacked.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9CDBCDB12CF7F9B00035BF46 /* WebViewUIKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewUIKit.swift; sourceTree = "<group>"; };
 		9CDBCDB52CF7F9F50035BF46 /* WebViewAppKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewAppKit.swift; sourceTree = "<group>"; };
-		9CDBCDC62CF819F60035BF46 /* darwin.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = darwin.h; path = ../../core/bin/darwin.h; sourceTree = SOURCE_ROOT; };
-		9CDBCDC72CF819F60035BF46 /* darwin.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = darwin.a; path = ../../core/bin/darwin.a; sourceTree = SOURCE_ROOT; };
 		9CE2142E2B5E17AA00B3F646 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -56,7 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9C5A1EDB2CDB99BB009B4A20 /* ios-arm64.a in Frameworks */,
+				9C2CD0232F4EB2510019F8E6 /* ios-arm64.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -64,13 +64,24 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9CDBCDC82CF819F60035BF46 /* darwin.a in Frameworks */,
+				9C2CD0202F4EB1E70019F8E6 /* darwin.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		9C2CD0242F4EB25B0019F8E6 /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9C2CD0212F4EB2510019F8E6 /* ios-arm64.h */,
+				9C2CD0222F4EB2510019F8E6 /* ios-arm64.a */,
+				9C2CD01E2F4EB1E70019F8E6 /* darwin.h */,
+				9C2CD01F2F4EB1E70019F8E6 /* darwin.a */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
 		9C3752D72BE70548001C98D3 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -78,18 +89,6 @@
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
-		};
-		9C5A1ED82CDB998F009B4A20 /* bin */ = {
-			isa = PBXGroup;
-			children = (
-				9CDBCDC62CF819F60035BF46 /* darwin.h */,
-				9CDBCDC72CF819F60035BF46 /* darwin.a */,
-				9C5A1ED92CDB99BB009B4A20 /* ios-arm64.h */,
-				9C5A1EDA2CDB99BB009B4A20 /* ios-arm64.a */,
-			);
-			name = bin;
-			path = ../../core/bin;
-			sourceTree = SOURCE_ROOT;
 		};
 		9CA03E432B5715A9002D2D9F = {
 			isa = PBXGroup;
@@ -112,8 +111,8 @@
 		9CA03E4E2B5715AA002D2D9F /* FullStacked */ = {
 			isa = PBXGroup;
 			children = (
+				9C2CD0242F4EB25B0019F8E6 /* bin */,
 				9C8003182E85B87E003D0FBA /* AppIcon.icon */,
-				9C5A1ED82CDB998F009B4A20 /* bin */,
 				9C7081332BE6CBA100EF0A6B /* FullStacked.entitlements */,
 				9CE2142E2B5E17AA00B3F646 /* Info.plist */,
 				9C8C8A2D2D2CEA1400C4B8AD /* FullStacked.swift */,
@@ -136,6 +135,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 9CA03E5A2B5715AC002D2D9F /* Build configuration list for PBXNativeTarget "FullStacked-iOS" */;
 			buildPhases = (
+				9CBABC1E2F4EA368004203B9 /* ShellScript */,
 				9CA03E482B5715AA002D2D9F /* Sources */,
 				9CA03E492B5715AA002D2D9F /* Frameworks */,
 				9CA03E4A2B5715AA002D2D9F /* Resources */,
@@ -155,6 +155,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 9CDBCDAC2CF7F8070035BF46 /* Build configuration list for PBXNativeTarget "FullStacked-MacOS" */;
 			buildPhases = (
+				9CBABC1F2F4EA3AE004203B9 /* Run Script */,
 				9CDBCDA12CF7F8070035BF46 /* Sources */,
 				9CDBCDA62CF7F8070035BF46 /* Frameworks */,
 				9CDBCDA82CF7F8070035BF46 /* Resources */,
@@ -230,6 +231,50 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		9CBABC1E2F4EA368004203B9 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/../../core/bin/ios-arm64.h",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\ncd \"${SRCROOT}\"/../../core/build\n\nPATH=$(bash -l -c 'echo $PATH')\n\nmake ios-arm64\n\ncd ../../\n\nif [ ! -d \"node_modules\" ]; then\n  npm install\nfi\n\nnpm run build\n";
+			showEnvVarsInLog = 0;
+		};
+		9CBABC1F2F4EA3AE004203B9 /* Run Script */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Run Script";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/../../core/bin/darwin.h",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\ncd \"${SRCROOT}\"/../../core/build\n\nPATH=$(bash -l -c 'echo $PATH')\n\nmake darwin-static\n\ncd ../../\n\nif [ ! -d \"node_modules\" ]; then\n  npm install\nfi\n\nnpm run build\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		9CA03E482B5715AA002D2D9F /* Sources */ = {
