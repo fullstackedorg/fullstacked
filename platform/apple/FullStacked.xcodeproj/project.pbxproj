@@ -135,7 +135,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 9CA03E5A2B5715AC002D2D9F /* Build configuration list for PBXNativeTarget "FullStacked-iOS" */;
 			buildPhases = (
-				9CBABC1E2F4EA368004203B9 /* ShellScript */,
 				9CA03E482B5715AA002D2D9F /* Sources */,
 				9CA03E492B5715AA002D2D9F /* Frameworks */,
 				9CA03E4A2B5715AA002D2D9F /* Resources */,
@@ -155,7 +154,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 9CDBCDAC2CF7F8070035BF46 /* Build configuration list for PBXNativeTarget "FullStacked-MacOS" */;
 			buildPhases = (
-				9CBABC1F2F4EA3AE004203B9 /* Run Script */,
 				9CDBCDA12CF7F8070035BF46 /* Sources */,
 				9CDBCDA62CF7F8070035BF46 /* Frameworks */,
 				9CDBCDA82CF7F8070035BF46 /* Resources */,
@@ -231,50 +229,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
-
-/* Begin PBXShellScriptBuildPhase section */
-		9CBABC1E2F4EA368004203B9 /* ShellScript */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(SRCROOT)/../../core/bin/ios-arm64.h",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\ncd \"${SRCROOT}\"/../../core/build\n\nPATH=$(bash -l -c 'echo $PATH')\n\nmake ios-arm64\n\ncd ../../\n\nif [ ! -d \"node_modules\" ]; then\n  npm install\nfi\n\nnpm run build\n";
-			showEnvVarsInLog = 0;
-		};
-		9CBABC1F2F4EA3AE004203B9 /* Run Script */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Run Script";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(SRCROOT)/../../core/bin/darwin.h",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\ncd \"${SRCROOT}\"/../../core/build\n\nPATH=$(bash -l -c 'echo $PATH')\n\nmake darwin-static\n\ncd ../../\n\nif [ ! -d \"node_modules\" ]; then\n  npm install\nfi\n\nnpm run build\n";
-			showEnvVarsInLog = 0;
-		};
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		9CA03E482B5715AA002D2D9F /* Sources */ = {
