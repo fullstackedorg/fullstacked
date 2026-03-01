@@ -62,8 +62,8 @@ export async function getLibPath(directory: string) {
 
     const extract = tar.extract();
     extract.on("entry", (header, stream, next) => {
-        const filePath = path.resolve(directory, header.name);
-        if (fileName.indexOf('..') == -1) {
+        if(header.name.indexOf('..') == -1) {
+            const filePath = path.resolve(directory, header.name);
             const writeStream = fs.createWriteStream(filePath);
             stream.pipe(writeStream);
             writeStream.on("close", next);

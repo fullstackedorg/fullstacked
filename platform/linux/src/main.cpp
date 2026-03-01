@@ -75,7 +75,10 @@ void registerDesktopApp() {
     replaceAll(localAppsDir, "\\", "\\\\");
     replaceAll(localAppsDir, "'", "\\'");
     
-    std::string command = std::sprintf("update-desktop-database %s", localAppsDir)
+    std::string format = "update-desktop-database ";
+    char command[format.size() + localAppsDir.size()];
+    std::sprintf(command, std::string(format + "%s").c_str(), localAppsDir.c_str());
+
     system(command);
 }
 
