@@ -49,16 +49,20 @@ func UnzipDataToFilesSerialized(data []byte, out string) []byte {
 	fs.Mkdir(out, fileEventOrigin)
 
 	for _, zipFile := range zipReader.File {
-		if zipFile.FileInfo().IsDir() {
-			fs.Mkdir(out+"/"+zipFile.Name, fileEventOrigin)
-		} else {
-			data, err := readZipFile(zipFile)
-			if err != nil {
-				continue
-			}
-			err = fs.WriteFile(out+"/"+zipFile.Name, data, fileEventOrigin)
-			if err != nil {
-				continue
+		filePath := path.Join(out + "/" + zipFile.Name)
+
+		if !strings.Contains(filePath, "..") {
+			if zipFile.FileInfo().IsDir() {
+				fs.Mkdir(filePath, fileEventOrigin)
+			} else {
+				data, err := readZipFile(zipFile)
+				if err != nil {
+					continue
+				}
+				err = fs.WriteFile(filePath, data, fileEventOrigin)
+				if err != nil {
+					continue
+				}
 			}
 		}
 	}

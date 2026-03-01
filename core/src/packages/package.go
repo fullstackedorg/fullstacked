@@ -389,14 +389,20 @@ func (p *Package) installFromRemote(directory string) {
 
 			target := path.Join(directory, filePath)
 
-			if header.Typeflag == tar.TypeDir {
-				fs.Mkdir(target, fileEventOrigin)
-			} else if header.Typeflag == tar.TypeReg {
-				dir, _ := path.Split(target)
-				fs.Mkdir(dir, fileEventOrigin)
-				fileData, _ := io.ReadAll(tarReader)
-				fs.WriteFile(target, fileData, fileEventOrigin)
+			if !strings.Contains(target, "..") {
+
+				switch header.Typeflag {
+				case tar.TypeDir:
+					fs.Mkdir(target, fileEventOrigin)
+				case tar.TypeReg:
+					dir, _ := path.Split(target)
+					fs.Mkdir(dir, fileEventOrigin)
+					fileData, _ := io.ReadAll(tarReader)
+					fs.WriteFile(target, fileData, fileEventOrigin)
+				}
+
 			}
+
 		}
 
 		p.Progress.Loaded += 1

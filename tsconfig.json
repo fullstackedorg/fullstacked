@@ -6,6 +6,7 @@
         "moduleResolution": "bundler",
         "skipLibCheck": true,
         "jsx": "react",
+        "strictNullChecks": false,
         "paths": {
             "*": ["./fullstacked_modules/*"]
         }

@@ -176,6 +176,12 @@ func (p *ProjectBuild) buildStyle(entryPoint string) StyleBuildResult {
 	return styleBuild.Result
 }
 
+func addImportStatement(template string, file string) string {
+	sanetizedFile := strings.ReplaceAll(file, `\`, `\\`)
+	sanetizedFile = strings.ReplaceAll(sanetizedFile, "'", "\\'")
+	return template + fmt.Sprintf("import %q;\n", sanetizedFile)
+}
+
 func (p *ProjectBuild) buildJS(
 	entryPoint *string,
 	styleEntryPoint *string,
@@ -185,15 +191,15 @@ func (p *ProjectBuild) buildJS(
 
 	fullstackedModulesDir := path.Join(setup.Directories.Editor, "fullstacked_modules")
 
-	fileTemplate := "import \"" + path.Join(fullstackedModulesDir, "bridge") + "\";\n"
+	fileTemplate := addImportStatement("", path.Join(fullstackedModulesDir, "bridge"))
 
 	if entryPoint != nil {
 		entryPointJSPath := path.Join(setup.Directories.Root, p.ProjectID, *entryPoint)
-		fileTemplate += "import \"" + entryPointJSPath + "\";\n"
+		fileTemplate += addImportStatement(fileTemplate, entryPointJSPath)
 	}
 
 	if styleEntryPoint != nil {
-		fileTemplate += "import \"" + *styleEntryPoint + "\";\n"
+		fileTemplate += addImportStatement(fileTemplate, *styleEntryPoint)
 	}
 
 	fs.WriteFile(intermediateFilePath, []byte(fileTemplate), fileEventOrigin)
@@ -203,7 +209,7 @@ func (p *ProjectBuild) buildJS(
 	// gather all .s.ts files to build css styles
 	styleFiles := []string{}
 	plugins := []esbuild.Plugin{
-		esbuild.Plugin{
+		{
 			Name: "style",
 			Setup: func(build esbuild.PluginBuild) {
 				build.OnLoad(esbuild.OnLoadOptions{Filter: `.*\.s\.ts`}, func(args esbuild.OnLoadArgs) (esbuild.OnLoadResult, error) {
