@@ -37,6 +37,15 @@ void libCallback(char *projectId, char *type, void *msgData, int msgLength) {
     App::instance->onMessage(projectId, type, msg);
 }
 
+void replaceAll(std::string& str, const std::string& from, const std::string& to) {
+    if(from.empty()) return; // Avoid infinite loop if 'from' is empty
+    size_t start_pos = 0;
+    while((start_pos = str.find(from, start_pos)) != std::string::npos) {
+        str.replace(start_pos, from.length(), to);
+        start_pos += to.length(); // Move past the newly inserted text
+    }
+}
+
 void registerDesktopApp() {
     std::string localIconsDir =
         std::string(getenv("HOME")) + "/.local/share/icons";
@@ -63,7 +72,14 @@ void registerDesktopApp() {
     localAppFile << contents.c_str();
     localAppFile.close();
 
-    system(("update-desktop-database " + localAppsDir).c_str());
+    replaceAll(localAppsDir, "\\", "\\\\");
+    replaceAll(localAppsDir, "'", "\\'");
+    
+    std::string format = "update-desktop-database ";
+    char command[format.size() + localAppsDir.size()];
+    std::sprintf(command, std::string(format + "%s").c_str(), localAppsDir.c_str());
+
+    system(command);
 }
 
 int main(int argc, char *argv[]) {

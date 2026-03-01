@@ -48,8 +48,6 @@
 		9CDBCDAF2CF7F8070035BF46 /* FullStacked.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FullStacked.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9CDBCDB12CF7F9B00035BF46 /* WebViewUIKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewUIKit.swift; sourceTree = "<group>"; };
 		9CDBCDB52CF7F9F50035BF46 /* WebViewAppKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewAppKit.swift; sourceTree = "<group>"; };
-		9CDBCDC62CF819F60035BF46 /* darwin.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = darwin.h; path = ../../core/bin/darwin.h; sourceTree = SOURCE_ROOT; };
-		9CDBCDC72CF819F60035BF46 /* darwin.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = darwin.a; path = ../../core/bin/darwin.a; sourceTree = SOURCE_ROOT; };
 		9CE2142E2B5E17AA00B3F646 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		9CF5A12A2F228EBD0027A18F /* Serialization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Serialization.swift; sourceTree = "<group>"; };
 		9CF5A12D2F2294C70027A18F /* Core.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core.swift; sourceTree = "<group>"; };
@@ -78,6 +76,17 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		9C2CD0242F4EB25B0019F8E6 /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				9C2CD0212F4EB2510019F8E6 /* ios-arm64.h */,
+				9C2CD0222F4EB2510019F8E6 /* ios-arm64.a */,
+				9C2CD01E2F4EB1E70019F8E6 /* darwin.h */,
+				9C2CD01F2F4EB1E70019F8E6 /* darwin.a */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
 		9C3752D72BE70548001C98D3 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -88,18 +97,6 @@
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
-		};
-		9C5A1ED82CDB998F009B4A20 /* bin */ = {
-			isa = PBXGroup;
-			children = (
-				9CDBCDC62CF819F60035BF46 /* darwin.h */,
-				9CDBCDC72CF819F60035BF46 /* darwin.a */,
-				9C5A1ED92CDB99BB009B4A20 /* ios-arm64.h */,
-				9C5A1EDA2CDB99BB009B4A20 /* ios-arm64.a */,
-			);
-			name = bin;
-			path = ../../core/bin;
-			sourceTree = SOURCE_ROOT;
 		};
 		9CA03E432B5715A9002D2D9F = {
 			isa = PBXGroup;
@@ -122,8 +119,8 @@
 		9CA03E4E2B5715AA002D2D9F /* FullStacked */ = {
 			isa = PBXGroup;
 			children = (
+				9C2CD0242F4EB25B0019F8E6 /* bin */,
 				9C8003182E85B87E003D0FBA /* AppIcon.icon */,
-				9C5A1ED82CDB998F009B4A20 /* bin */,
 				9C7081332BE6CBA100EF0A6B /* FullStacked.entitlements */,
 				9CE2142E2B5E17AA00B3F646 /* Info.plist */,
 				9C8C8A2D2D2CEA1400C4B8AD /* FullStacked.swift */,

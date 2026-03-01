@@ -97,10 +97,16 @@ export async function downloadBinaries(directory: string) {
 
     const extract = tar.extract();
     extract.on("entry", (header, stream, next) => {
-        const filePath = path.resolve(directory, header.name);
-        const writeStream = fs.createWriteStream(filePath);
-        stream.pipe(writeStream);
-        writeStream.on("close", next);
+        if(header.name.indexOf('..') == -1) {
+            const filePath = path.resolve(directory, header.name);
+            const writeStream = fs.createWriteStream(filePath);
+            stream.pipe(writeStream);
+            writeStream.on("close", next);
+        }
+        else {
+            console.log('skipping bad path', fileName);
+            next();
+        }
     });
     const readStream = fs.createReadStream(outPath);
     const gunzip = zlib.createGunzip();
