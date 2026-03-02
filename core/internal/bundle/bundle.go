@@ -27,7 +27,7 @@ var libModules = map[string]string{
 	"child_process":       "/lib/unavailable/index.ts",
 	"console":             "/lib/console/index.ts",
 	"constants":           "/lib/constants/index.json",
-	"crypto":              "/lib/crypto/index.js",
+	"crypto":              "/lib/crypto/index.ts",
 	"diagnostics_channel": "/lib/diagnostics_channel/index.js",
 	"dns":                 "/lib/dns/index.js",
 	"events":              "/lib/events/index.js",
@@ -60,7 +60,7 @@ var libModules = map[string]string{
 	"vm":                  "/lib/unavailable/index.ts",
 	"v8":                  "/lib/unavailable/index.ts",
 	"worker_threads":      "/lib/worker_threads/index.ts",
-	"zlib":                "/lib/zlib/index.js",
+	"zlib":                "/lib/zlib/index.ts",
 
 	"test": "/lib/test/index.ts",
 }
@@ -264,8 +264,16 @@ func BundleFnApply(ctx *types.Context, entryPoint string) EsbuildResult {
 				Setup: func(build esbuild.PluginBuild) {
 					// catch lib module entry
 					build.OnResolve(esbuild.OnResolveOptions{Filter: ".*"}, func(args esbuild.OnResolveArgs) (esbuild.OnResolveResult, error) {
+						if strings.HasSuffix(args.Path, ".node") {
+							return esbuild.OnResolveResult{
+								External: true,
+							}, nil
+						}
+
 						// node:fs => fs
 						args.Path = strings.TrimPrefix(args.Path, "node:")
+						// process/ => process
+						args.Path = strings.TrimSuffix(args.Path, "/")
 
 						libModulePath, isLibModule := libModules[args.Path]
 

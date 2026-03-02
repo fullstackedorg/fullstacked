@@ -10,6 +10,8 @@ import {
 import platformBridge from "./platform/index.ts";
 import { createDuplex } from "./duplex.ts";
 
+globalThis.__dirname = "/"
+
 type BridgeOpts = {
     mod: CoreModule;
     fn: number;

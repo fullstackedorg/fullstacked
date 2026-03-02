@@ -7,6 +7,47 @@ import { Connect } from "../@types/net.ts";
 import { Duplex } from "../bridge/duplex.ts";
 import EventEmitter from "events";
 
+function parseOptions(pathOrPortOrOptions: Partial<ConnectOpts> | string | number, connectListenerOrHost?: string | ConnectListener) {
+    const path =
+        typeof pathOrPortOrOptions === "string"
+            ? pathOrPortOrOptions
+            : typeof pathOrPortOrOptions === "object"
+                ? pathOrPortOrOptions?.path
+                : null;
+
+    // connect path
+    if (path) {
+        throw "socket to unix file unavailable";
+    }
+
+    const port =
+        typeof pathOrPortOrOptions === "number"
+            ? pathOrPortOrOptions
+            : typeof pathOrPortOrOptions === "object"
+                ? pathOrPortOrOptions?.port
+                : null;
+
+    if (!port) {
+        throw "undefined port for socket connection";
+    }
+
+    const host =
+        typeof connectListenerOrHost === "string"
+            ? connectListenerOrHost
+            : typeof pathOrPortOrOptions === "object"
+                ? pathOrPortOrOptions?.host
+                : null;
+
+    const options =
+        typeof pathOrPortOrOptions === "object" ? pathOrPortOrOptions : null;
+
+    return {
+        host,
+        port,
+        options
+    }
+}
+
 type SocketOpts = {
     allowHalfOpen: boolean;
     // blockList
@@ -25,24 +66,33 @@ type SocketOpts = {
 
 export class Socket extends EventEmitter {
     private duplex: Duplex = null;
+    writable: boolean = true;
+    readable: boolean = true;
+    _readableState: any = {
+        ended: false,
+    };
 
     constructor(options?: Partial<SocketOpts>) {
         super();
     }
 
-    connect(port: number, host?: string) {
-        const h = host || "localhost";
+    connect(options: Partial<ConnectOpts>): void
+    connect(port: number, host?: string): void
+    connect(optionsOrPort: Partial<ConnectOpts> | number, maybeHost?: string) {
+        const { host, port } = parseOptions(optionsOrPort, maybeHost);
+
         bridge({
             mod: Net,
             fn: Connect,
-            data: [port, h]
+            data: [port, host]
         }).then((d) => {
             this.duplex = d;
-            this.duplex.on("data", (data: Uint8Array) =>
+            this.duplex.on("data", (data: Uint8Array) => {
                 this.emit("data", Buffer.from(data))
-            );
+            });
             this.duplex.on("close", () => this.emit("close"));
             this.emit("connect");
+            this.emit("ready");
         });
     }
 
@@ -110,38 +160,7 @@ export function connect(
     connectListenerOrHost?: string | ConnectListener,
     connectListener?: ConnectListener
 ) {
-    const path =
-        typeof pathOrPortOrOptions === "string"
-            ? pathOrPortOrOptions
-            : typeof pathOrPortOrOptions === "object"
-              ? pathOrPortOrOptions?.path
-              : null;
-
-    // connect path
-    if (path) {
-        throw "socket to unix file unavailable";
-    }
-
-    const port =
-        typeof pathOrPortOrOptions === "number"
-            ? pathOrPortOrOptions
-            : typeof pathOrPortOrOptions === "object"
-              ? pathOrPortOrOptions?.port
-              : null;
-
-    if (!port) {
-        throw "undefined port for socket connection";
-    }
-
-    const host =
-        typeof connectListenerOrHost === "string"
-            ? connectListenerOrHost
-            : typeof pathOrPortOrOptions === "object"
-              ? pathOrPortOrOptions?.host
-              : null;
-
-    const options =
-        typeof pathOrPortOrOptions === "object" ? pathOrPortOrOptions : null;
+    const { host, port, options } = parseOptions(pathOrPortOrOptions, connectListenerOrHost);
 
     const onConnectListener =
         typeof connectListenerOrHost === "function"

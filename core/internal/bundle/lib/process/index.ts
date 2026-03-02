@@ -55,3 +55,5 @@ process.cwd = cwd;
 process.chdir = chdir;
 process.versions = {};
 process.exit = exit;
+
+export default process;
