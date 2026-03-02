@@ -7,13 +7,16 @@ import { Connect } from "../@types/net.ts";
 import { Duplex } from "../bridge/duplex.ts";
 import EventEmitter from "events";
 
-function parseOptions(pathOrPortOrOptions: Partial<ConnectOpts> | string | number, connectListenerOrHost?: string | ConnectListener) {
+function parseOptions(
+    pathOrPortOrOptions: Partial<ConnectOpts> | string | number,
+    connectListenerOrHost?: string | ConnectListener
+) {
     const path =
         typeof pathOrPortOrOptions === "string"
             ? pathOrPortOrOptions
             : typeof pathOrPortOrOptions === "object"
-                ? pathOrPortOrOptions?.path
-                : null;
+              ? pathOrPortOrOptions?.path
+              : null;
 
     // connect path
     if (path) {
@@ -24,8 +27,8 @@ function parseOptions(pathOrPortOrOptions: Partial<ConnectOpts> | string | numbe
         typeof pathOrPortOrOptions === "number"
             ? pathOrPortOrOptions
             : typeof pathOrPortOrOptions === "object"
-                ? pathOrPortOrOptions?.port
-                : null;
+              ? pathOrPortOrOptions?.port
+              : null;
 
     if (!port) {
         throw "undefined port for socket connection";
@@ -35,8 +38,8 @@ function parseOptions(pathOrPortOrOptions: Partial<ConnectOpts> | string | numbe
         typeof connectListenerOrHost === "string"
             ? connectListenerOrHost
             : typeof pathOrPortOrOptions === "object"
-                ? pathOrPortOrOptions?.host
-                : null;
+              ? pathOrPortOrOptions?.host
+              : null;
 
     const options =
         typeof pathOrPortOrOptions === "object" ? pathOrPortOrOptions : null;
@@ -45,7 +48,7 @@ function parseOptions(pathOrPortOrOptions: Partial<ConnectOpts> | string | numbe
         host,
         port,
         options
-    }
+    };
 }
 
 type SocketOpts = {
@@ -69,15 +72,15 @@ export class Socket extends EventEmitter {
     writable: boolean = true;
     readable: boolean = true;
     _readableState: any = {
-        ended: false,
+        ended: false
     };
 
     constructor(options?: Partial<SocketOpts>) {
         super();
     }
 
-    connect(options: Partial<ConnectOpts>): void
-    connect(port: number, host?: string): void
+    connect(options: Partial<ConnectOpts>): void;
+    connect(port: number, host?: string): void;
     connect(optionsOrPort: Partial<ConnectOpts> | number, maybeHost?: string) {
         const { host, port } = parseOptions(optionsOrPort, maybeHost);
 
@@ -88,7 +91,7 @@ export class Socket extends EventEmitter {
         }).then((d) => {
             this.duplex = d;
             this.duplex.on("data", (data: Uint8Array) => {
-                this.emit("data", Buffer.from(data))
+                this.emit("data", Buffer.from(data));
             });
             this.duplex.on("close", () => this.emit("close"));
             this.emit("connect");
@@ -160,7 +163,10 @@ export function connect(
     connectListenerOrHost?: string | ConnectListener,
     connectListener?: ConnectListener
 ) {
-    const { host, port, options } = parseOptions(pathOrPortOrOptions, connectListenerOrHost);
+    const { host, port, options } = parseOptions(
+        pathOrPortOrOptions,
+        connectListenerOrHost
+    );
 
     const onConnectListener =
         typeof connectListenerOrHost === "function"

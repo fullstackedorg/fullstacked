@@ -1,5 +1,5 @@
 import * as c from "./index.js";
-export * from "./index.js"
+export * from "./index.js";
 
 export const crypto: any = c.default;
 export const getCurves = () => [];

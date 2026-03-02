@@ -78,26 +78,26 @@ packagesToBundle.forEach(({ entryPoint, outfile }) =>
     entryPoint.endsWith(".json")
         ? fs.copyFileSync(entryPoint, outfile)
         : esbuild.buildSync({
-            entryPoints: [entryPoint],
-            outfile,
-            bundle: true,
-            // format: "esm",
-            platform: "node",
-            external: ["process/", "create-hash/browser/md5"],
-            alias: {
-                // source: https://soatok.blog/2025/11/19/moving-beyond-the-npm-elliptic-package/
-                // elliptic: "@soatok/elliptic-to-noble",
+              entryPoints: [entryPoint],
+              outfile,
+              bundle: true,
+              // format: "esm",
+              platform: "node",
+              external: ["process/", "create-hash/browser/md5"],
+              alias: {
+                  // source: https://soatok.blog/2025/11/19/moving-beyond-the-npm-elliptic-package/
+                  // elliptic: "@soatok/elliptic-to-noble",
 
-                randombytes: "randombytes/browser",
-                "create-ecdh": "create-ecdh/browser",
-                "create-hash": "create-hash/browser",
-                "create-hmac": "create-hmac/browser",
-                "browserify-cipher": "browserify-cipher/browser",
-                "browserify-sign": "browserify-sign/browser",
-                "browserify-sign/algos": "browserify-sign/algos",
-                // "browserify-aes": "browserify-aes/browser",
-            }
-        })
+                  randombytes: "randombytes/browser",
+                  "create-ecdh": "create-ecdh/browser",
+                  "create-hash": "create-hash/browser",
+                  "create-hmac": "create-hmac/browser",
+                  "browserify-cipher": "browserify-cipher/browser",
+                  "browserify-sign": "browserify-sign/browser",
+                  "browserify-sign/algos": "browserify-sign/algos"
+                  // "browserify-aes": "browserify-aes/browser",
+              }
+          })
 );
 
 // types

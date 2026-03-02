@@ -7,7 +7,6 @@
 //     }
 // );
 
-
 export class Unavailable extends Error {
     constructor() {
         super("unavailable");
