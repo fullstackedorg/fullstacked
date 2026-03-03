@@ -18,7 +18,8 @@ import {
     Mkdir,
     Rm,
     WriteFile,
-    Rename
+    Rename,
+    Copy
 } from "../@types/fs.ts";
 import { bridge } from "../bridge/index.ts";
 import { Fs } from "../@types/index.ts";
@@ -114,6 +115,14 @@ export function rename(path: PathLike, path2: PathLike) {
     });
 }
 
+export function cp(src: PathLike, dst: PathLike) {
+    return bridge({
+        mod: Fs,
+        fn: Copy,
+        data: [resolve(formatPathLike(src)), resolve(formatPathLike(dst))]
+    });
+}
+
 export default {
     stat,
     readFile,
@@ -122,5 +131,6 @@ export default {
     rm,
     unlink,
     writeFile,
-    rename
+    rename,
+    cp
 };

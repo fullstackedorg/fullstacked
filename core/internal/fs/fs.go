@@ -22,6 +22,7 @@ const (
 	Rm        FsFn = 5
 	WriteFile FsFn = 6
 	Rename    FsFn = 7
+	Copy      FsFn = 8
 )
 
 func Switch(
@@ -87,6 +88,9 @@ func Switch(
 	case Rename:
 		response.Type = types.CoreResponseData
 		return RenameFn(path.ResolveWithContext(ctx, data[0].Data.(string)), path.ResolveWithContext(ctx, data[1].Data.(string)))
+	case Copy:
+		response.Type = types.CoreResponseData
+		return CopyFn(path.ResolveWithContext(ctx, data[0].Data.(string)), path.ResolveWithContext(ctx, data[1].Data.(string)))
 	}
 
 	return errors.New("unkown fs function")
@@ -220,4 +224,50 @@ func CreateFn(p string) (*os.File, error) {
 
 func RenameFn(p string, p2 string) error {
 	return os.Rename(p, p2)
+}
+func CopyFn(src string, dst string) error {
+	srcStat, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	if !srcStat.IsDir() {
+		return copyFileFn(src, dst)
+	}
+
+	err = os.MkdirAll(dst, srcStat.Mode())
+	if err != nil {
+		return err
+	}
+
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		err = CopyFn(srcPath, dstPath)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func copyFileFn(src string, dst string) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+
+	srcStat, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(dst, data, srcStat.Mode())
 }

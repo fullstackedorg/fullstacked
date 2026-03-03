@@ -2,6 +2,7 @@
 
 import { bridge } from "../bridge/index.ts";
 import {
+    Copy,
     Exists,
     GoFileInfo,
     Mkdir,
@@ -281,6 +282,28 @@ export function realpathSync(path: PathLike) {
     return resolve(formatPathLike(path));
 }
 
+export function cpSync(src: PathLike, dst: PathLike) {
+    return bridge(
+        {
+            mod: Fs,
+            fn: Copy,
+            data: [resolve(formatPathLike(src)), resolve(formatPathLike(dst))]
+        },
+        true
+    );
+}
+
+export function cp(
+    src: PathLike,
+    dst: PathLike,
+    callback: (err: Error) => void
+) {
+    promises
+        .cp(src, dst)
+        .then(() => callback(null))
+        .catch((e) => callback(e));
+}
+
 export type { Stats, Dirent } from "./common.ts";
 
 export * as promises from "./promises.ts";
@@ -304,6 +327,7 @@ export default {
     renameSync,
     rename,
     realpathSync,
-
+    cpSync,
+    cp,
     promises
 };
