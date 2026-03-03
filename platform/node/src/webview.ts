@@ -48,6 +48,7 @@ export async function createWebView(
     server.listen(port);
 
     if (openBrowser) {
+        console.log(`Opening browser at http://localhost:${port}`);
         open(`http://localhost:${port}`);
     }
 
