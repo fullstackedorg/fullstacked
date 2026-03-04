@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fullstackedorg/fullstacked/internal/serialization"
 	"fullstackedorg/fullstacked/types"
+	"path"
+	"strings"
 	"sync"
 )
 
@@ -14,7 +16,7 @@ var nextCtxId uint8 = 0
 var Contexts = map[uint8]types.Context{}
 var ctxMutex = sync.Mutex{}
 
-func NewContext(directories types.ContextDirectories) uint8 {
+func NewContext(root string, build string) uint8 {
 	ctxMutex.Lock()
 
 	id := nextCtxId
@@ -29,13 +31,22 @@ func NewContext(directories types.ContextDirectories) uint8 {
 
 	ctxMutex.Unlock()
 
-	NewContextWithCtxId(id, directories)
+	NewContextWithCtxId(id, root, build)
 	return id
 }
 
-func NewContextWithCtxId(ctxId uint8, directories types.ContextDirectories) {
+func NewContextWithCtxId(ctxId uint8, root string, build string) {
 	ctxMutex.Lock()
 	defer ctxMutex.Unlock()
+
+	if strings.Compare(root, build) == 0 {
+		build = path.Join(root, "out")
+	}
+
+	directories := types.ContextDirectories{
+		Root:  root,
+		Build: build,
+	}
 
 	Contexts[ctxId] = types.Context{
 		Id:          ctxId,

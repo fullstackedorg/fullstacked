@@ -4,6 +4,7 @@ node_modules
 *.env
 bin
 out
+!test/static-file/sample/out
 .vscode
 ./build.js
 fullstacked_modules/@types
@@ -11,7 +12,6 @@ core/internal/bundle/lib/@types
 core/internal/bundle/lib/**/*.js
 core/internal/bundle/lib/**/*.json
 test/**/_index.ts.js
-!test/static-file/sample/_index.ts.js
 test/**/_index.ts.css
 test/**/_index.ts.tailwind.css
 test/**/output.css

@@ -21,12 +21,12 @@ suite("static-file - e2e", () => {
         const staticFile = coreStaticFile(
             core.instance,
             0,
-            "test/static-file/sample/index.ts"
+            "test/static-file/sample/out/index.ts.js"
         );
         assert.deepEqual(staticFile, {
             found: true,
             mimeType: "text/javascript; charset=utf-8",
-            data: fs.readFileSync("test/static-file/sample/_index.ts.js")
+            data: fs.readFileSync("test/static-file/sample/out/index.ts.js")
         });
     });
 });
