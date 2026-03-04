@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"fullstackedorg/fullstacked/internal/router"
 	"fullstackedorg/fullstacked/internal/store"
-	"fullstackedorg/fullstacked/types"
 	"unsafe"
 )
 
@@ -31,12 +30,7 @@ func start(
 	root *C.char,
 	build *C.char,
 ) C.uint8_t {
-	directories := types.ContextDirectories{
-		Root:  C.GoString(root),
-		Build: C.GoString(build),
-	}
-
-	id := store.NewContext(directories)
+	id := store.NewContext(C.GoString(root), C.GoString(build))
 	return C.uint8_t(id)
 }
 
@@ -46,10 +40,7 @@ func startWithCtx(
 	build *C.char,
 	ctxId C.uint8_t,
 ) {
-	store.NewContextWithCtxId(uint8(ctxId), types.ContextDirectories{
-		Root:  C.GoString(root),
-		Build: C.GoString(build),
-	})
+	store.NewContextWithCtxId(uint8(ctxId), C.GoString(root), C.GoString(build))
 }
 
 //export check

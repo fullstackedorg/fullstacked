@@ -2,9 +2,10 @@ import { bridge } from "../bridge/index.ts";
 import { Bundle } from "../@types/index.ts";
 import {
     EsbuildVersion,
-    Bundle as BundleFn,
     EsbuildResult,
-    BuilderTailwindCSS
+    BuilderTailwindCSS,
+    BundleDir,
+    BundleFile
 } from "../@types/bundle.ts";
 import path from "../path/index.ts";
 import { Duplex } from "../bridge/duplex.ts";
@@ -24,7 +25,7 @@ export function bundle(entryPoint: string): Promise<EsbuildResult> {
         const ee = (
             (await bridge({
                 mod: Bundle,
-                fn: BundleFn,
+                fn: BundleDir,
                 data: [resolved]
             })) as Duplex
         ).eventEmitter() as EventEmitter<{
@@ -32,6 +33,16 @@ export function bundle(entryPoint: string): Promise<EsbuildResult> {
         }>;
 
         ee.on("result", resolve);
+    });
+}
+
+export function bundleFile(entryPoint: string): Promise<EsbuildResult> {
+    const resolved = path.resolve(entryPoint);
+
+    return bridge({
+        mod: Bundle,
+        fn: BundleFile,
+        data: [resolved]
     });
 }
 
@@ -51,5 +62,6 @@ export async function builderTailwindCSS() {
 export default {
     esbuildVersion,
     bundle,
+    bundleFile,
     builderTailwindCSS
 };

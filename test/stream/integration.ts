@@ -1,21 +1,20 @@
-import test, { after, before, suite } from "node:test";
+import test, { after, suite } from "node:test";
 import assert from "node:assert";
 import { Browser, createBrowser } from "../browser.ts";
 import * as bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 
 suite("stream - integration", () => {
-    let browser: Browser;
-
-    before(async () => {
-        browser = await createBrowser("test/stream/sample");
-    });
+    let browsers: Browser[] = [];
 
     test("stream", { timeout: 1000 * 3 }, async () => {
-        const result = await bundle.bundle("test/stream/sample/read/index.ts");
+        const browser = await createBrowser("test/stream/sample/read");
+        browsers.push(browser);
+
+        const result = await bundle.bundle("test/stream/sample/read");
         assert.deepEqual(result.Errors, null);
         assert.deepEqual(result.Warnings, null);
         const page = await browser.createPage(
-            `http://localhost:${browser.webview.port}/read/`
+            `http://localhost:${browser.webview.port}`
         );
 
         const test = async () => {
@@ -31,14 +30,18 @@ suite("stream - integration", () => {
         await page.page.emulateCPUThrottling(4);
         await page.page.reload();
         await test();
+        await browser.end();
     });
 
     test("streamWrite", { timeout: 1000 * 3 }, async () => {
-        const result = await bundle.bundle("test/stream/sample/write/index.ts");
+        const browser = await createBrowser("test/stream/sample/write");
+        browsers.push(browser);
+
+        const result = await bundle.bundle("test/stream/sample/write");
         assert.deepEqual(result.Errors, null);
         assert.deepEqual(result.Warnings, null);
         const page = await browser.createPage(
-            `http://localhost:${browser.webview.port}/write/`
+            `http://localhost:${browser.webview.port}`
         );
 
         const test = async () => {
@@ -54,7 +57,8 @@ suite("stream - integration", () => {
         await page.page.emulateCPUThrottling(4);
         await page.page.reload();
         await test();
+        await browser.end();
     });
 
-    after(() => browser.end());
+    after(() => browsers.forEach((b) => b.end()));
 });

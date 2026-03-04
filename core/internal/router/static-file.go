@@ -1,15 +1,12 @@
 package router
 
 import (
-	"errors"
-	"fullstackedorg/fullstacked/internal/bundle"
 	"fullstackedorg/fullstacked/internal/fs"
 	"fullstackedorg/fullstacked/internal/serialization"
 	"fullstackedorg/fullstacked/types"
 	"mime"
 	"net/url"
 	"path"
-	"slices"
 	"strings"
 )
 
@@ -21,8 +18,11 @@ func staticFile(ctx *types.Context, pathname string) []byte {
 	pathname = strings.TrimLeft(pathname, "/")
 	pathname = strings.TrimRight(pathname, "/")
 
-	pathname = path.Join(ctx.Directories.Root, pathname)
-	pathname, contents, err := resolveFile(ctx, pathname)
+	foundPath, contents, err := resolveFile(path.Join(ctx.Directories.Build, pathname))
+	if err != nil {
+		foundPath, contents, err = resolveFile(path.Join(ctx.Directories.Root, pathname))
+	}
+	pathname = foundPath
 
 	if err != nil {
 		return []byte{}
@@ -57,26 +57,7 @@ func staticFile(ctx *types.Context, pathname string) []byte {
 	return merged
 }
 
-func resolveFile(ctx *types.Context, pathname string) (string, []byte, error) {
-	pathname = resolveBundledHtmlFile(ctx, pathname)
-	pathname = resolveBundledCssFile(ctx, pathname)
-	pathname = resolveBundledJsFile(ctx, pathname)
-
-	exists := fs.ExistsFn(pathname)
-	if !exists {
-		if strings.HasSuffix(pathname, "index.html") {
-			html, err := generateIndexHTML(ctx, path.Dir(pathname))
-
-			if err != nil {
-				return "", nil, err
-			}
-
-			return pathname, html, nil
-		} else {
-			return "", nil, errors.New("not found")
-		}
-	}
-
+func resolveFile(pathname string) (string, []byte, error) {
 	stats, err := fs.StatsFn(pathname)
 
 	if err != nil {
@@ -84,78 +65,10 @@ func resolveFile(ctx *types.Context, pathname string) (string, []byte, error) {
 	}
 
 	if stats.IsDir {
-		return resolveFile(ctx, path.Join(pathname, "index.html"))
+		return resolveFile(path.Join(pathname, "index.html"))
 	}
 
 	return resolvedFileContents(pathname)
-}
-
-func resolveBundledJsFile(ctx *types.Context, pathname string) string {
-	ext := path.Ext(pathname)
-
-	if !slices.Contains(bundle.BundleExtensions, ext) {
-		return pathname
-	}
-
-	name := path.Base(pathname)
-	midDirectories := strings.TrimPrefix(pathname, ctx.Directories.Root)
-	midDirectories = strings.TrimSuffix(midDirectories, name)
-
-	bundleJsPathname := path.Join(
-		ctx.Directories.Build,
-		midDirectories,
-		"_"+name+".js")
-	if fs.ExistsFn(bundleJsPathname) {
-		return bundleJsPathname
-	}
-
-	return pathname
-}
-
-func resolveBundledCssFile(ctx *types.Context, pathname string) string {
-	ext := path.Ext(pathname)
-
-	if ext != ".css" {
-		return pathname
-	}
-
-	name := path.Base(pathname)
-	midDirectories := strings.TrimPrefix(pathname, ctx.Directories.Root)
-	midDirectories = strings.TrimSuffix(midDirectories, name)
-
-	bundleCssPathname := path.Join(
-		ctx.Directories.Build,
-		midDirectories,
-		"_"+name,
-	)
-	if fs.ExistsFn(bundleCssPathname) {
-		return bundleCssPathname
-	}
-
-	return pathname
-}
-
-func resolveBundledHtmlFile(ctx *types.Context, pathname string) string {
-	ext := path.Ext(pathname)
-
-	if ext != ".html" {
-		return pathname
-	}
-
-	name := path.Base(pathname)
-	midDirectories := strings.TrimPrefix(pathname, ctx.Directories.Root)
-	midDirectories = strings.TrimSuffix(midDirectories, name)
-
-	bundleHtmlPathname := path.Join(
-		ctx.Directories.Build,
-		midDirectories,
-		name,
-	)
-	if fs.ExistsFn(bundleHtmlPathname) {
-		return bundleHtmlPathname
-	}
-
-	return pathname
 }
 
 func resolvedFileContents(pathname string) (string, []byte, error) {

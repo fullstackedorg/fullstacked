@@ -23,7 +23,13 @@ func Switch(
 	switch header.Fn {
 	case Connect:
 		response.Type = types.CoreResponseStream
-		stream, err := createSocket(int(data[0].Data.(float64)), data[1].Data.(string))
+
+		host := "localhost"
+		if len(data) > 1 && data[1].Type == types.STRING {
+			host = data[1].Data.(string)
+		}
+
+		stream, err := createSocket(int(data[0].Data.(float64)), host)
 		if err != nil {
 			return err
 		}

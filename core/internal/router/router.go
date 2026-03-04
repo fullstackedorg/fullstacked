@@ -138,10 +138,7 @@ func Switch(
 	case Run:
 		response.Type = types.CoreResponseData
 		root := filepath.Join(ctx.Directories.Root, data[0].Data.(string))
-		id := store.NewContext(types.ContextDirectories{
-			Root:  root,
-			Build: root,
-		})
+		id := store.NewContext(root, root)
 
 		if store.OnStreamData == nil {
 			return errors.New("onStreamData not set")

@@ -16,13 +16,13 @@ builder.on("build", async (entryfile, outfile, ...sources) => {
     builder.writeEvent("build-done");
 });
 
-await bundle.bundle("./tailwind.ts");
+await bundle.bundle("./project");
 
 const link = document.createElement("link");
 link.rel = "stylesheet";
-link.href = "./_tailwind.ts.tailwind.css";
+link.href = "./project/out/index.ts.tailwind.css";
 document.head.appendChild(link);
 
-await import("./tailwind");
+await import("./project/index.ts");
 
 document.body.classList.add("done");

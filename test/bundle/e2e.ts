@@ -20,23 +20,42 @@ suite("bundle - e2e", () => {
         assert.deepEqual(await bundle.esbuildVersion(), esbuildVersionJS);
     });
 
+    test("bundle - file", async () => {
+        const result = await bundle.bundleFile(
+            "test/bundle/samples/file/index.ts"
+        );
+        assert.deepEqual(result.Errors, null);
+        assert.deepEqual(result.Warnings, null);
+        assert.deepEqual(result.OutputFiles, [
+            "test/bundle/samples/file/index.ts.js"
+        ]);
+        assert.ok(fs.existsSync(result.OutputFiles.at(0)));
+    });
+
     test("bundle - ts", async () => {
-        const errorsAndWarnings = await bundle.bundle(
+        const result = await bundle.bundle(
             "test/bundle/samples/basic/index.ts"
         );
-        assert.deepEqual(errorsAndWarnings.Errors, null);
-        assert.deepEqual(errorsAndWarnings.Warnings, null);
-        assert.ok(fs.existsSync("test/bundle/samples/basic/_index.ts.js"));
+        assert.deepEqual(result.Errors, null);
+        assert.deepEqual(result.Warnings, null);
+        assert.deepEqual(result.OutputFiles, [
+            "test/bundle/samples/basic/out/index.ts.js",
+            "test/bundle/samples/basic/out/index.html"
+        ]);
+        assert.ok(fs.existsSync("test/bundle/samples/basic/out/index.ts.js"));
     });
 
     test("bundle - css", async () => {
-        const errorsAndWarnings = await bundle.bundle(
-            "test/bundle/samples/css/index.ts"
-        );
-        assert.deepEqual(errorsAndWarnings.Errors, null);
-        assert.deepEqual(errorsAndWarnings.Warnings, null);
-        assert.ok(fs.existsSync("test/bundle/samples/css/_index.ts.js"));
-        assert.ok(fs.existsSync("test/bundle/samples/css/_index.ts.css"));
+        const result = await bundle.bundle("test/bundle/samples/css/index.ts");
+        assert.deepEqual(result.Errors, null);
+        assert.deepEqual(result.Warnings, null);
+        assert.deepEqual(result.OutputFiles, [
+            "test/bundle/samples/css/out/index.ts.js",
+            "test/bundle/samples/css/out/index.ts.css",
+            "test/bundle/samples/css/out/index.html"
+        ]);
+        assert.ok(fs.existsSync("test/bundle/samples/css/out/index.ts.js"));
+        assert.ok(fs.existsSync("test/bundle/samples/css/out/index.ts.css"));
     });
 
     test("bundle - tailwindcss", async () => {
@@ -47,11 +66,20 @@ suite("bundle - e2e", () => {
 
         const builder = await tailwindcssBuilder();
 
-        await bundle.bundle("test/bundle/samples/tailwindcss/index.ts");
+        const result = await bundle.bundle(
+            "test/bundle/samples/tailwindcss/index.ts"
+        );
+
+        assert.deepEqual(result.OutputFiles, [
+            "test/bundle/samples/tailwindcss/out/index.ts.js",
+            "test/bundle/samples/tailwindcss/out/index.ts.css",
+            "test/bundle/samples/tailwindcss/out/index.ts.tailwind.css",
+            "test/bundle/samples/tailwindcss/out/index.html"
+        ]);
 
         assert.deepEqual(
             fs.readFileSync(
-                "test/bundle/samples/tailwindcss/_index.ts.tailwind.css"
+                "test/bundle/samples/tailwindcss/out/index.ts.tailwind.css"
             ),
             fs.readFileSync("test/bundle/samples/tailwindcss/output.css")
         );

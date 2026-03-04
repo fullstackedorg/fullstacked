@@ -24,7 +24,7 @@ suite("static-file - integration", () => {
         const scriptContent = await new Promise<Uint8Array>(async (resolve) => {
             const page = await browser.createPage(null);
             const resCb = async (res: HTTPResponse) => {
-                if (res.url().endsWith("/index.ts")) {
+                if (res.url().endsWith("index.js")) {
                     resolve(await res.content());
                     page.page.off("response", resCb);
                 }
@@ -36,7 +36,7 @@ suite("static-file - integration", () => {
 
         assert.deepEqual(
             scriptContent,
-            fs.readFileSync("test/static-file/sample/_index.ts.js")
+            fs.readFileSync("test/static-file/sample/script/index.js")
         );
     });
 
