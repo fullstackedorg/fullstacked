@@ -32,7 +32,7 @@ func getBestSuitedColorScheme(color: Color?) -> ColorScheme? {
 }
 
 let root = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first!;
-let build = Bundle.main.path(forResource: "app", ofType: nil)!
+let build = Bundle.main.path(forResource: "out", ofType: nil)!
 
 @main
 struct FullStackedApp: App {

@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9C5516FE2F589B8D006B0B64 /* out in Resources */ = {isa = PBXBuildFile; fileRef = 9C5516FD2F589B8D006B0B64 /* out */; };
+		9C5516FF2F589B9E006B0B64 /* out in Resources */ = {isa = PBXBuildFile; fileRef = 9C5516FD2F589B8D006B0B64 /* out */; };
 		9C5A1EDB2CDB99BB009B4A20 /* ios-arm64.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 9C5A1EDA2CDB99BB009B4A20 /* ios-arm64.a */; };
 		9C5A1EDF2CDB9ADB009B4A20 /* WebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5A1EDE2CDB9AD6009B4A20 /* WebView.swift */; };
 		9C7E8A632BAA038500CE9660 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9C7E8A622BA9BF1600CE9660 /* PrivacyInfo.xcprivacy */; };
@@ -19,8 +21,6 @@
 		9CD1F0D92F55C7A900FD3499 /* darwin.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 9CD1F0D52F55C7A900FD3499 /* darwin.a */; };
 		9CD1F0DA2F55C7A900FD3499 /* ios-arm64.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 9CD1F0D72F55C7A900FD3499 /* ios-arm64.a */; };
 		9CD952B72F3D2D4E009B9EE7 /* libresolv.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 9CD952B62F3D2D40009B9EE7 /* libresolv.tbd */; };
-		9CD952B82F3D2D72009B9EE7 /* app in Resources */ = {isa = PBXBuildFile; fileRef = 9CD952B42F3D2D0F009B9EE7 /* app */; };
-		9CD952B92F3D2D72009B9EE7 /* app in Resources */ = {isa = PBXBuildFile; fileRef = 9CD952B42F3D2D0F009B9EE7 /* app */; };
 		9CDBCDA32CF7F8070035BF46 /* WebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5A1EDE2CDB9AD6009B4A20 /* WebView.swift */; };
 		9CDBCDA92CF7F8070035BF46 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9C7E8A622BA9BF1600CE9660 /* PrivacyInfo.xcprivacy */; };
 		9CDBCDB32CF7F9BF0035BF46 /* WebViewUIKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CDBCDB12CF7F9B00035BF46 /* WebViewUIKit.swift */; };
@@ -34,6 +34,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		9C5516FD2F589B8D006B0B64 /* out */ = {isa = PBXFileReference; lastKnownFileType = folder; name = out; path = ../../../app/out; sourceTree = "<group>"; };
 		9C5A1EDA2CDB99BB009B4A20 /* ios-arm64.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "ios-arm64.a"; path = "../../core/bin/ios-arm64.a"; sourceTree = SOURCE_ROOT; };
 		9C5A1EDE2CDB9AD6009B4A20 /* WebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebView.swift; sourceTree = "<group>"; };
 		9C7081332BE6CBA100EF0A6B /* FullStacked.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FullStacked.entitlements; sourceTree = "<group>"; };
@@ -47,7 +48,6 @@
 		9CD1F0D52F55C7A900FD3499 /* darwin.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = darwin.a; path = /Users/cplepage/fullstackedorg/fullstacked/core/bin/darwin.a; sourceTree = "<absolute>"; };
 		9CD1F0D62F55C7A900FD3499 /* ios-arm64.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "ios-arm64.h"; path = "/Users/cplepage/fullstackedorg/fullstacked/core/bin/ios-arm64.h"; sourceTree = "<absolute>"; };
 		9CD1F0D72F55C7A900FD3499 /* ios-arm64.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "ios-arm64.a"; path = "/Users/cplepage/fullstackedorg/fullstacked/core/bin/ios-arm64.a"; sourceTree = "<absolute>"; };
-		9CD952B42F3D2D0F009B9EE7 /* app */ = {isa = PBXFileReference; lastKnownFileType = folder; name = app; path = ../../app; sourceTree = SOURCE_ROOT; };
 		9CD952B52F3D2D37009B9EE7 /* libresolv.9.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libresolv.9.tbd; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/usr/lib/libresolv.9.tbd; sourceTree = DEVELOPER_DIR; };
 		9CD952B62F3D2D40009B9EE7 /* libresolv.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libresolv.tbd; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/usr/lib/libresolv.tbd; sourceTree = DEVELOPER_DIR; };
 		9CDBCDAF2CF7F8070035BF46 /* FullStacked.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FullStacked.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -127,6 +127,7 @@
 		9CA03E4E2B5715AA002D2D9F /* FullStacked */ = {
 			isa = PBXGroup;
 			children = (
+				9C5516FD2F589B8D006B0B64 /* out */,
 				9C2CD0242F4EB25B0019F8E6 /* bin */,
 				9C8003182E85B87E003D0FBA /* AppIcon.icon */,
 				9C7081332BE6CBA100EF0A6B /* FullStacked.entitlements */,
@@ -134,7 +135,6 @@
 				9C8C8A2D2D2CEA1400C4B8AD /* FullStacked.swift */,
 				9CF5A12A2F228EBD0027A18F /* Serialization.swift */,
 				9CF5A12D2F2294C70027A18F /* Core.swift */,
-				9CD952B42F3D2D0F009B9EE7 /* app */,
 				9C5A1EDE2CDB9AD6009B4A20 /* WebView.swift */,
 				9CDBCDB12CF7F9B00035BF46 /* WebViewUIKit.swift */,
 				9CDBCDB52CF7F9F50035BF46 /* WebViewAppKit.swift */,
@@ -234,7 +234,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9CD952B82F3D2D72009B9EE7 /* app in Resources */,
+				9C5516FF2F589B9E006B0B64 /* out in Resources */,
 				9C7E8A632BAA038500CE9660 /* PrivacyInfo.xcprivacy in Resources */,
 				9C80031A2E85B87E003D0FBA /* AppIcon.icon in Resources */,
 				9C91B3C22E0CFAFD00CF54B7 /* Assets.xcassets in Resources */,
@@ -245,7 +245,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9CD952B92F3D2D72009B9EE7 /* app in Resources */,
+				9C5516FE2F589B8D006B0B64 /* out in Resources */,
 				9CDBCDA92CF7F8070035BF46 /* PrivacyInfo.xcprivacy in Resources */,
 				9C8003192E85B87E003D0FBA /* AppIcon.icon in Resources */,
 				9C91B3C32E0CFAFD00CF54B7 /* Assets.xcassets in Resources */,

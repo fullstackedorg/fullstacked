@@ -16,15 +16,32 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
 
     const ctx = await (await globalThis.originalFetch("/ctx")).json();
 
+    if (isWorker) {
+        globalThis.onmessage = (event) => {
+            const buffer: ArrayBuffer = event.data;
+            const dataView = new DataView(buffer);
+            const id = dataView.getUint8(0);
+            const response = new Uint8Array(buffer.byteLength - 1);
+            response.set(new Uint8Array(buffer, 1));
+            const promise = asyncResponsePromises.get(id);
+            promise?.(response.buffer);
+            asyncResponsePromises.delete(id);
+        }
+    }
+
     return {
         ctx,
         async Async(payload) {
-            const uint8array = new Uint8Array(payload);
-            const base64 = fromByteArray(uint8array);
-            const id = uint8array[1];
+            const dataView = new DataView(payload);
+            const id = dataView.getUint8(1);
             return new Promise<ArrayBuffer>((resolve) => {
                 asyncResponsePromises.set(id, resolve);
-                globalThis.webkit.messageHandlers.bridge.postMessage(base64);
+                if (isWorker) {
+                    globalThis.postMessage(payload);
+                } else {
+                    const base64 = fromByteArray(new Uint8Array(payload));
+                    globalThis.webkit.messageHandlers.bridge.postMessage(base64);
+                }
             });
         },
         Sync(payload) {

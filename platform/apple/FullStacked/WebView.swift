@@ -46,7 +46,7 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         self.navigationDelegate = self
         userContentController.add(self, name: "bridge")
         
-        self.load(URLRequest(url: URL(string: "fs://localhost")!))
+        self.load(URLRequest(url: URL(string: "fs://localhost/?term")!))
     }
     
     func close(){

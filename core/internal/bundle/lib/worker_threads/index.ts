@@ -18,8 +18,14 @@ export class Worker extends events.EventEmitter {
             if (e.data === "exit") {
                 this.emit("exit");
             } else {
-                platformBridge.bridge.Async(e.data).then((res) => {
-                    this.w.postMessage(new Uint8Array(res));
+                const buffer: ArrayBuffer = e.data;
+                const dataView = new DataView(buffer);
+                const id = dataView.getUint8(1);
+                platformBridge.bridge.Async(buffer).then((res) => {
+                    const response = new Uint8Array(res.byteLength + 1);
+                    response[0] = id;
+                    response.set(new Uint8Array(res), 1);
+                    this.w.postMessage(response.buffer);
                 });
             }
         };
