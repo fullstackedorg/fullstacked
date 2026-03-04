@@ -5,7 +5,6 @@ _*.css
 dist
 node_modules
 out
-demo
 
 core/typescript-go
 
