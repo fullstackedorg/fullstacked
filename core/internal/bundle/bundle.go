@@ -310,9 +310,6 @@ func BundleDirFn(ctx *types.Context, entryPoint string) EsbuildResult {
 	htmlAssets := []string{}
 
 	if len(result.Errors) == 0 {
-		if fs.ExistsFn(buildOptions.Outdir) {
-			fs.RmFn(buildOptions.Outdir)
-		}
 		fs.MkdirFn(buildOptions.Outdir)
 
 		entrypointBaseName := path.Base(buildOptions.Stdin.Sourcefile)

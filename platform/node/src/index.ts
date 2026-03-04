@@ -67,6 +67,7 @@ tailwindcssBuilder.on("build", (entryfile, outfile) => {
     tailwindcssBuilder.writeEvent("build-done");
 });
 
+prestart(directory);
 const result = await bundle(".");
 if (result.Warnings?.length) {
     console.warn("Warnings:", result.Warnings);
@@ -74,7 +75,6 @@ if (result.Warnings?.length) {
 if (result.Errors?.length) {
     console.error("Errors:", result.Errors);
 } else if (!process.argv.includes("-b")) {
-    prestart(directory);
     run(".");
 } else {
     end();
