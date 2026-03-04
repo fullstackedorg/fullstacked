@@ -269,5 +269,10 @@ func copyFileFn(src string, dst string) error {
 		return err
 	}
 
+	dir := filepath.Dir(dst)
+	if !ExistsFn(dir) {
+		MkdirFn(dir)
+	}
+
 	return os.WriteFile(dst, data, srcStat.Mode())
 }

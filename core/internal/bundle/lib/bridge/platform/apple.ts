@@ -26,7 +26,7 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
             const promise = asyncResponsePromises.get(id);
             promise?.(response.buffer);
             asyncResponsePromises.delete(id);
-        }
+        };
     }
 
     return {
@@ -40,7 +40,9 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
                     globalThis.postMessage(payload);
                 } else {
                     const base64 = fromByteArray(new Uint8Array(payload));
-                    globalThis.webkit.messageHandlers.bridge.postMessage(base64);
+                    globalThis.webkit.messageHandlers.bridge.postMessage(
+                        base64
+                    );
                 }
             });
         },

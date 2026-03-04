@@ -169,7 +169,7 @@ func TestInstall_FullFlow(t *testing.T) {
 	os.WriteFile(path.Join(tmpDir, "package.json"), pjBytes, 0644)
 
 	// Run Install
-	install(tmpDir, nil, false, 5, false, nil)
+	install(nil, tmpDir, nil, false, 5, false, nil)
 
 	// Verify Check
 	// 1. node_modules/test-pkg/index.js exists
@@ -206,7 +206,7 @@ func TestInstall_NoPackageJson(t *testing.T) {
 	tmpDir := t.TempDir()
 	// Should just return likely, or log error. Function has no return value.
 	// We just ensure it doesn't panic.
-	install(tmpDir, nil, false, 5, false, nil)
+	install(nil, tmpDir, nil, false, 5, false, nil)
 }
 
 func TestInstall_WithLockfile(t *testing.T) {
@@ -231,7 +231,7 @@ func TestInstall_WithLockfile(t *testing.T) {
 	lBytes, _ := json.Marshal(lock)
 	os.WriteFile(path.Join(tmpDir, "package-lock.json"), lBytes, 0644)
 
-	install(tmpDir, nil, false, 5, false, nil)
+	install(nil, tmpDir, nil, false, 5, false, nil)
 
 	// Verify it survives
 	// And verify the new lockfile contains the old entry?
@@ -306,12 +306,12 @@ func TestInstall_CorruptFiles(t *testing.T) {
 
 	// Corrupt package.json
 	os.WriteFile(path.Join(tmpDir, "package.json"), []byte(`{bad json`), 0644)
-	install(tmpDir, nil, false, 5, false, nil)
+	install(nil, tmpDir, nil, false, 5, false, nil)
 	// Should return early
 
 	// Corrupt package-lock.json
 	os.WriteFile(path.Join(tmpDir, "package-lock.json"), []byte(`{bad json`), 0644)
-	install(tmpDir, nil, false, 5, false, nil)
+	install(nil, tmpDir, nil, false, 5, false, nil)
 	// Should ignore bad lockfile and continue
 }
 
@@ -358,7 +358,7 @@ func TestInstall_DevDependencies(t *testing.T) {
 	os.WriteFile(path.Join(tmpDir, "package.json"), pjBytes, 0644)
 
 	// Run with devDependencies=true
-	install(tmpDir, nil, true, 5, false, nil)
+	install(nil, tmpDir, nil, true, 5, false, nil)
 
 	if _, err := os.Stat(path.Join(tmpDir, "node_modules/dev-pkg/dev.js")); os.IsNotExist(err) {
 		t.Error("dev-pkg not installed")
@@ -410,7 +410,7 @@ func TestInstall_ResolutionFailures(t *testing.T) {
 	pjBytes, _ := json.Marshal(pj)
 	os.WriteFile(path.Join(tmpDir, "package.json"), pjBytes, 0644)
 
-	install(tmpDir, nil, false, 5, false, nil)
+	install(nil, tmpDir, nil, false, 5, false, nil)
 
 	// good-pkg should be there
 	if _, err := os.Stat(path.Join(tmpDir, "node_modules/good-pkg/index.js")); os.IsNotExist(err) {
@@ -424,6 +424,13 @@ func TestDownloadExtract_ZipSlip(t *testing.T) {
 		var buf bytes.Buffer
 		gw := gzip.NewWriter(&buf)
 		tw := tar.NewWriter(gw)
+
+		// First add a valid-looking wrapper so rootDir isn't set to "../"
+		tw.WriteHeader(&tar.Header{
+			Name:     "package/",
+			Mode:     0755,
+			Typeflag: tar.TypeDir,
+		})
 
 		hdr := &tar.Header{
 			Name:     "../evil.txt",
@@ -473,9 +480,16 @@ func TestDownloadExtract_WithDir(t *testing.T) {
 		gw := gzip.NewWriter(&buf)
 		tw := tar.NewWriter(gw)
 
+		// Wrapper Directory that will get stripped
+		tw.WriteHeader(&tar.Header{
+			Name:     "wrapper/",
+			Mode:     0755,
+			Typeflag: tar.TypeDir,
+		})
+
 		// Directory
 		hdr := &tar.Header{
-			Name:     "subdir/",
+			Name:     "wrapper/subdir/",
 			Mode:     0755,
 			Typeflag: tar.TypeDir,
 		}
@@ -483,7 +497,7 @@ func TestDownloadExtract_WithDir(t *testing.T) {
 
 		// File in directory
 		hdr = &tar.Header{
-			Name:     "subdir/file.txt",
+			Name:     "wrapper/subdir/file.txt",
 			Mode:     0600,
 			Size:     4,
 			Typeflag: tar.TypeReg,
@@ -620,7 +634,7 @@ func TestUninstall(t *testing.T) {
 	os.MkdirAll(path.Join(tmpDir, "node_modules/dev-pkg"), 0755)
 
 	// Uninstall pkg-a and dev-pkg
-	uninstall(tmpDir, []string{"pkg-a", "dev-pkg"}, nil)
+	uninstall(nil, tmpDir, []string{"pkg-a", "dev-pkg"}, nil)
 
 	// Verify pkg-a removed
 	if _, err := os.Stat(path.Join(tmpDir, "node_modules/pkg-a")); !os.IsNotExist(err) {
@@ -721,20 +735,20 @@ func TestUninstall_EdgeCases(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Case 1: Empty list
-	uninstall(tmpDir, []string{"dummy"}, nil)
+	uninstall(nil, tmpDir, []string{"dummy"}, nil)
 
 	// Case 2: Missing package.json
-	uninstall(tmpDir, []string{"pkg"}, nil)
+	uninstall(nil, tmpDir, []string{"pkg"}, nil)
 
 	// Verify it still tries to remove node_modules even if package.json missing
 	os.MkdirAll(path.Join(tmpDir, "node_modules/pkg"), 0755)
-	uninstall(tmpDir, []string{"pkg"}, nil)
+	uninstall(nil, tmpDir, []string{"pkg"}, nil)
 	if _, err := os.Stat(path.Join(tmpDir, "node_modules/pkg")); !os.IsNotExist(err) {
 		t.Error("Should remove node_modules even if package.json missing")
 	}
 
 	os.WriteFile(path.Join(tmpDir, "package-lock.json"), []byte("{bad"), 0644)
-	uninstall(tmpDir, []string{"pkg"}, nil)
+	uninstall(nil, tmpDir, []string{"pkg"}, nil)
 }
 
 func TestSwitch_EdgeCases(t *testing.T) {
@@ -803,7 +817,7 @@ func TestInstall_SpecificPackage(t *testing.T) {
 	os.WriteFile(path.Join(tmpDir, "package.json"), []byte(`{"name":"test"}`), 0644)
 
 	// Install specific package
-	install(tmpDir, []string{"new-pkg"}, false, 5, false, nil)
+	install(nil, tmpDir, []string{"new-pkg"}, false, 5, false, nil)
 
 	// Verify package.json updated
 	pjBytes, _ := os.ReadFile(path.Join(tmpDir, "package.json"))
@@ -857,7 +871,7 @@ func TestInstall_SaveDev(t *testing.T) {
 	os.WriteFile(path.Join(tmpDir, "package.json"), []byte(`{"name":"test"}`), 0644)
 
 	// Install with saveDev=true
-	install(tmpDir, []string{"dev-tool"}, true, 5, false, nil)
+	install(nil, tmpDir, []string{"dev-tool"}, true, 5, false, nil)
 
 	// Verify package.json updated
 	pjBytes, _ := os.ReadFile(path.Join(tmpDir, "package.json"))
@@ -936,7 +950,7 @@ func TestInstall_FastPath(t *testing.T) {
 	os.WriteFile(path.Join(tmpDir, "package-lock.json"), lockBytes, 0644)
 
 	// Run Install - Should use Fast Path and succeed despite metadata failure
-	install(tmpDir, nil, false, 5, false, nil)
+	install(nil, tmpDir, nil, false, 5, false, nil)
 
 	// Verify installation
 	if _, err := os.Stat(path.Join(tmpDir, "node_modules/fast-pkg/index.js")); os.IsNotExist(err) {
@@ -1085,7 +1099,7 @@ func TestInstall_Flattening(t *testing.T) {
 	pjBytes, _ := json.Marshal(pj)
 	os.WriteFile(path.Join(tmpDir, "package.json"), pjBytes, 0644)
 
-	install(tmpDir, nil, false, 5, false, nil)
+	install(nil, tmpDir, nil, false, 5, false, nil)
 
 	// Check flattening
 	if _, err := os.Stat(path.Join(tmpDir, "node_modules/test-pkg-c")); os.IsNotExist(err) {
@@ -1170,7 +1184,7 @@ func TestInstall_Conflict(t *testing.T) {
 	pjBytes, _ := json.Marshal(pj)
 	os.WriteFile(path.Join(tmpDir, "package.json"), pjBytes, 0644)
 
-	install(tmpDir, nil, false, 5, false, nil)
+	install(nil, tmpDir, nil, false, 5, false, nil)
 
 	// C@2.0 at root
 	// We need to verify version but we didn't write checking logic in extraction mock.
@@ -1316,7 +1330,7 @@ func TestProgressReporting(t *testing.T) {
 		events = append(events, p)
 	}
 
-	install(tmpDir, nil, false, 5, false, cb)
+	install(nil, tmpDir, nil, false, 5, false, cb)
 
 	// Verify events
 	// Expect: Initialization, Resolving, Pruning, Installing, Extracting, Finalizing, Done
@@ -1388,7 +1402,7 @@ func TestInstall_VersionedPackage(t *testing.T) {
 	os.WriteFile(path.Join(tmpDir, "package.json"), []byte(`{"name":"test"}`), 0644)
 
 	// Install specific version
-	install(tmpDir, []string{"v-pkg@1.0.0"}, false, 5, false, nil)
+	install(nil, tmpDir, []string{"v-pkg@1.0.0"}, false, 5, false, nil)
 
 	// Verify package-lock.json has v1.0.0
 	lockBytes, _ := os.ReadFile(path.Join(tmpDir, "package-lock.json"))
@@ -1442,7 +1456,7 @@ func TestInstall_ScopedPackage(t *testing.T) {
 	os.WriteFile(path.Join(tmpDir, "package.json"), []byte(`{"name":"test"}`), 0644)
 
 	// Install scoped version
-	install(tmpDir, []string{"@scope/pkg@1.0.0"}, false, 5, false, nil)
+	install(nil, tmpDir, []string{"@scope/pkg@1.0.0"}, false, 5, false, nil)
 
 	// Verify package-lock.json has v1.0.0
 	lockBytes, _ := os.ReadFile(path.Join(tmpDir, "package-lock.json"))
@@ -1611,7 +1625,7 @@ func TestInstall_Concurrency(t *testing.T) {
 
 	// Test 1: Sequential (MaxConcurrent=1)
 	start := time.Now()
-	install(tmpDir, nil, false, 1, false, nil)
+	install(nil, tmpDir, nil, false, 1, false, nil)
 	durationSeq := time.Since(start)
 
 	// Reset
@@ -1620,7 +1634,7 @@ func TestInstall_Concurrency(t *testing.T) {
 
 	// Test 2: Concurrent (MaxConcurrent=5)
 	start = time.Now()
-	install(tmpDir, nil, false, 5, false, nil)
+	install(nil, tmpDir, nil, false, 5, false, nil)
 	durationConc := time.Since(start)
 
 	t.Logf("Sequential: %v, Concurrent: %v", durationSeq, durationConc)
@@ -1685,7 +1699,7 @@ func TestInstall_TypesReact(t *testing.T) {
 	pjBytes, _ := json.Marshal(pj)
 	os.WriteFile(path.Join(tmpDir, "package.json"), pjBytes, 0644)
 
-	install(tmpDir, nil, false, 5, false, nil)
+	install(nil, tmpDir, nil, false, 5, false, nil)
 
 	// Check where the file landed
 	// Should be node_modules/@types/react/index.d.ts

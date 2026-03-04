@@ -649,6 +649,54 @@ func clone(
 	}, nil
 }
 
+func CloneRepo(ctx *types.Context, urlStr string, directory string, progress io.Writer) error {
+	err := testHost(urlStr)
+
+	if err != nil {
+		return err
+	}
+
+	exists := fs.ExistsFn(directory)
+
+	processErr := func(err error) {
+		if err == nil {
+			return
+		}
+
+		if !exists && err != transport.ErrEmptyRemoteRepository {
+			fs.RmFn(directory)
+		}
+	}
+
+	// run once
+	options := git.CloneOptions{
+		URL:      urlStr,
+		Progress: progress,
+	}
+
+	gitAuth, _ := RequestAuth(ctx, urlStr, false)
+	options.Auth = gitAuthToHttpAuth(gitAuth)
+
+	_, err = git.PlainClone(directory, &options)
+
+	if err != nil {
+		processErr(err)
+
+		if errIsAuthenticationRequired(err) {
+			// retry with new auth
+			gitAuth, err := RequestAuth(ctx, urlStr, true)
+			if err == nil {
+				options.Auth = gitAuthToHttpAuth(gitAuth)
+				_, err = git.PlainClone(directory, &options)
+			}
+		}
+
+		processErr(err)
+	}
+
+	return err
+}
+
 func pull(directory string) (*types.ResponseStream, error) {
 	dir, err := OpenGitDirectory(directory)
 

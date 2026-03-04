@@ -5,7 +5,9 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"fullstackedorg/fullstacked/internal/fs"
+	"fullstackedorg/fullstacked/internal/git"
 	fspath "fullstackedorg/fullstacked/internal/path"
 	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/types"
@@ -76,7 +78,7 @@ func Switch(
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
 			Open: func(ctx *types.Context, streamId uint8) {
-				install(directory, packagesName, saveDev, 10, false, func(p Progress) {
+				install(ctx, directory, packagesName, saveDev, 10, false, func(p Progress) {
 					if ctx != nil {
 						store.StreamEvent(ctx, streamId, "progress", []types.SerializableData{p}, p.Stage == "Done")
 					}
@@ -107,7 +109,7 @@ func Switch(
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
 			Open: func(ctx *types.Context, streamId uint8) {
-				uninstall(directory, packagesName, func(p Progress) {
+				uninstall(ctx, directory, packagesName, func(p Progress) {
 					if ctx != nil {
 						store.StreamEvent(ctx, streamId, "progress", []types.SerializableData{p}, p.Stage == "Done")
 					}
@@ -139,10 +141,12 @@ func Switch(
 }
 
 type PackageJSON struct {
-	Name            string            `json:"name,omitempty"`
-	Version         string            `json:"version,omitempty"`
-	Dependencies    map[string]string `json:"dependencies,omitempty"`
-	DevDependencies map[string]string `json:"devDependencies,omitempty"`
+	Name                 string            `json:"name,omitempty"`
+	Version              string            `json:"version,omitempty"`
+	Dependencies         map[string]string `json:"dependencies,omitempty"`
+	DevDependencies      map[string]string `json:"devDependencies,omitempty"`
+	OptionalDependencies map[string]string `json:"optionalDependencies,omitempty"`
+	PeerDependencies     map[string]string `json:"peerDependencies,omitempty"`
 
 	Main    string          `json:"main,omitempty"`
 	Browser json.RawMessage `json:"browser,omitempty"`
@@ -157,14 +161,32 @@ type PackageMetadata struct {
 }
 
 type PackageVersion struct {
-	Name         string            `json:"name"`
-	Version      string            `json:"version"`
-	Dependencies map[string]string `json:"dependencies"`
+	Name                 string            `json:"name"`
+	Version              string            `json:"version"`
+	Dependencies         map[string]string `json:"dependencies"`
+	OptionalDependencies map[string]string `json:"optionalDependencies,omitempty"`
 	// DevDependencies removed as unused in sub-deps logic
-	Dist             PackageDist       `json:"dist"`
-	License          interface{}       `json:"license,omitempty"`
-	Engines          interface{}       `json:"engines,omitempty"`
-	PeerDependencies map[string]string `json:"peerDependencies,omitempty"`
+	Dist                PackageDist               `json:"dist"`
+	License             interface{}               `json:"license,omitempty"`
+	Engines             interface{}               `json:"engines,omitempty"`
+	PeerDependencies    map[string]string         `json:"peerDependencies,omitempty"`
+	BundleDependencies  BundleDependenciesWrapper `json:"bundleDependencies,omitempty"`
+	BundledDependencies BundleDependenciesWrapper `json:"bundledDependencies,omitempty"`
+}
+
+type BundleDependenciesWrapper []string
+
+func (b *BundleDependenciesWrapper) UnmarshalJSON(data []byte) error {
+	if len(data) > 0 && data[0] == '[' {
+		var s []string
+		if err := json.Unmarshal(data, &s); err != nil {
+			return err
+		}
+		*b = s
+		return nil
+	}
+	*b = nil
+	return nil
 }
 
 type PackageDist struct {
@@ -182,17 +204,20 @@ type PackageLock struct {
 }
 
 type LockDependency struct {
-	Version          string            `json:"version,omitempty"`
-	Resolved         string            `json:"resolved,omitempty"`
-	Integrity        string            `json:"integrity,omitempty"`
-	Dependencies     map[string]string `json:"dependencies,omitempty"`
-	License          string            `json:"license,omitempty"`
-	Engines          map[string]string `json:"engines,omitempty"`
-	PeerDependencies map[string]string `json:"peerDependencies,omitempty"`
-	Peer             bool              `json:"peer,omitempty"`
+	Version              string            `json:"version,omitempty"`
+	Resolved             string            `json:"resolved,omitempty"`
+	Integrity            string            `json:"integrity,omitempty"`
+	Dependencies         map[string]string `json:"dependencies,omitempty"`
+	OptionalDependencies map[string]string `json:"optionalDependencies,omitempty"`
+	License              string            `json:"license,omitempty"`
+	Engines              map[string]string `json:"engines,omitempty"`
+	PeerDependencies     map[string]string `json:"peerDependencies,omitempty"`
+	Peer                 bool              `json:"peer,omitempty"`
+	Optional             bool              `json:"optional,omitempty"`
 }
 
 func install(
+	ctx *types.Context,
 	directory string,
 	packagesName []string,
 	saveDev bool,
@@ -212,8 +237,13 @@ func install(
 
 	// Handle missing package.json by initializing empty struct
 	var pkgJSON PackageJSON
+	var rawPkgJSON map[string]interface{}
 	if err == nil {
 		json.Unmarshal(packageJsonContent, &pkgJSON)
+		json.Unmarshal(packageJsonContent, &rawPkgJSON)
+	}
+	if rawPkgJSON == nil {
+		rawPkgJSON = make(map[string]interface{})
 	}
 	// Verify maps are initialized if empty
 	if pkgJSON.Dependencies == nil {
@@ -222,16 +252,39 @@ func install(
 	if pkgJSON.DevDependencies == nil {
 		pkgJSON.DevDependencies = make(map[string]string)
 	}
+	if pkgJSON.OptionalDependencies == nil {
+		pkgJSON.OptionalDependencies = make(map[string]string)
+	}
 
 	// 1.5 Handle packagesName (Install Specific Packages)
 	if len(packagesName) > 0 {
 		for _, nameWithVersion := range packagesName {
 			name := nameWithVersion
 			rangeStr := "latest"
-			lastAt := strings.LastIndex(nameWithVersion, "@")
-			if lastAt > 0 {
-				name = nameWithVersion[:lastAt]
-				rangeStr = nameWithVersion[lastAt+1:]
+			gitUrl, isGit := isGithubRepo(nameWithVersion)
+			var meta PackageMetadata
+			var err error
+
+			if isGit {
+				meta, err = fetchGithubPackageMetadata(ctx, gitUrl)
+				if err == nil {
+					name = meta.Name
+					if strings.HasPrefix(gitUrl, "https://github.com/") {
+						repoPart := strings.TrimPrefix(gitUrl, "https://github.com/")
+						repoPart = strings.TrimSuffix(repoPart, ".git")
+						rangeStr = "github:" + repoPart
+					} else {
+						rangeStr = gitUrl
+					}
+				} else {
+					fmt.Println("Metadata Fetch Error:", err)
+				}
+			} else {
+				lastAt := strings.LastIndex(nameWithVersion, "@")
+				if lastAt > 0 {
+					name = nameWithVersion[:lastAt]
+					rangeStr = nameWithVersion[lastAt+1:]
+				}
 			}
 
 			onProgress(Progress{
@@ -239,23 +292,44 @@ func install(
 				Stage: "Resolving",
 			})
 
-			meta, err := fetchPackageMetadata(name)
+			if !isGit {
+				meta, err = fetchPackageMetadata(name)
+			}
 			if err != nil {
 				continue
 			}
 
-			// Resolve version based on specifier
-			ver, err := resolveVersion(meta, rangeStr)
-			if err != nil {
-				continue
+			versionCaret := rangeStr
+			if !isGit {
+				// Resolve version based on specifier
+				ver, err := resolveVersion(meta, rangeStr)
+				if err != nil {
+					continue
+				}
+				versionCaret = "^" + ver.Version
 			}
 
-			versionCaret := "^" + ver.Version
 			if saveDev {
 				pkgJSON.DevDependencies[name] = versionCaret
 			} else {
 				pkgJSON.Dependencies[name] = versionCaret
 			}
+		}
+
+		if len(pkgJSON.Dependencies) > 0 {
+			rawPkgJSON["dependencies"] = pkgJSON.Dependencies
+		} else {
+			delete(rawPkgJSON, "dependencies")
+		}
+		if len(pkgJSON.DevDependencies) > 0 {
+			rawPkgJSON["devDependencies"] = pkgJSON.DevDependencies
+		} else {
+			delete(rawPkgJSON, "devDependencies")
+		}
+		if len(pkgJSON.OptionalDependencies) > 0 {
+			rawPkgJSON["optionalDependencies"] = pkgJSON.OptionalDependencies
+		} else {
+			delete(rawPkgJSON, "optionalDependencies")
 		}
 
 		// Save package.json immediately
@@ -264,7 +338,7 @@ func install(
 			enc := json.NewEncoder(f)
 			enc.SetEscapeHTML(false)
 			enc.SetIndent("", "  ")
-			enc.Encode(pkgJSON)
+			enc.Encode(rawPkgJSON)
 		}
 	}
 
@@ -322,14 +396,27 @@ func install(
 
 				fs.MkdirFn(tDir)
 
-				err := downloadAndExtract(p.Resolved, tDir, pkgName, func(prog float64) {
-					threadSafeProgress(Progress{
-						Name:     displayName,
-						Version:  p.Version,
-						Stage:    "Extracting",
-						Progress: prog,
+				var err error
+				gitUrl, isGit := isGithubRepo(p.Resolved)
+				if isGit {
+					err = git.CloneRepo(ctx, gitUrl, tDir, nil)
+					if err == nil {
+						fs.RmFn(filepath.Join(tDir, ".git"))
+						fs.RmFn(filepath.Join(tDir, ".gitignore"))
+						fs.RmFn(filepath.Join(tDir, "package-lock.json"))
+					} else {
+						fmt.Println("Git CloneRepo Error:", err)
+					}
+				} else {
+					err = downloadAndExtract(p.Resolved, tDir, pkgName, func(prog float64) {
+						threadSafeProgress(Progress{
+							Name:     displayName,
+							Version:  p.Version,
+							Stage:    "Extracting",
+							Progress: prog,
+						})
 					})
-				})
+				}
 
 				if err == nil {
 					mu.Lock()
@@ -347,6 +434,18 @@ func install(
 		}
 
 		wg.Wait()
+
+		// Also create node_modules/.package-lock.json in fast path
+		fs.MkdirFn(path.Join(directory, "node_modules"))
+		nodeModulesLockPath := path.Join(directory, "node_modules", ".package-lock.json")
+		if f, err := fs.CreateFn(nodeModulesLockPath); err == nil {
+			defer f.Close()
+			enc := json.NewEncoder(f)
+			enc.SetEscapeHTML(false)
+			enc.SetIndent("", "  ")
+			enc.Encode(oldLock)
+		}
+
 		onProgress(Progress{Stage: "Done", Progress: float64(downloadCount)})
 		return
 	}
@@ -379,14 +478,18 @@ func install(
 	for k, v := range pkgJSON.DevDependencies {
 		rootDeps[k] = v
 	}
+	for k, v := range pkgJSON.OptionalDependencies {
+		rootDeps[k] = v
+	}
 
 	installedPaths := make(map[string]string) // path -> version
 
 	// Queue for BFS
 	type QueueItem struct {
-		ParentPath string
-		Deps       map[string]string
-		PeerDeps   map[string]string
+		ParentPath   string
+		Deps         map[string]string
+		OptionalDeps map[string]string
+		PeerDeps     map[string]string
 	}
 	queue := []QueueItem{{ParentPath: "", Deps: rootDeps}}
 
@@ -446,14 +549,25 @@ func install(
 			fs.RmFn(tDir)
 			fs.MkdirFn(tDir)
 
-			err := downloadAndExtract(ver.Resolved, tDir, pFlat, func(p float64) {
-				threadSafeProgress(Progress{
-					Name:     pDisplay,
-					Version:  ver.Version,
-					Stage:    "Extracting",
-					Progress: p,
+			var err error
+			gitUrl, isGit := isGithubRepo(ver.Resolved)
+			if isGit {
+				err = git.CloneRepo(ctx, gitUrl, tDir, nil)
+				if err == nil {
+					fs.RmFn(filepath.Join(tDir, ".git"))
+					fs.RmFn(filepath.Join(tDir, ".gitignore"))
+					fs.RmFn(filepath.Join(tDir, "package-lock.json"))
+				}
+			} else {
+				err = downloadAndExtract(ver.Resolved, tDir, pFlat, func(p float64) {
+					threadSafeProgress(Progress{
+						Name:     pDisplay,
+						Version:  ver.Version,
+						Stage:    "Extracting",
+						Progress: p,
+					})
 				})
-			})
+			}
 
 			if err == nil {
 				mu.Lock()
@@ -487,6 +601,12 @@ func install(
 			depsToInstall := make(map[string]string)
 			for k, v := range item.Deps {
 				depsToInstall[k] = v
+			}
+
+			optionalDepsToInstall := make(map[string]string)
+			for k, v := range item.OptionalDeps {
+				depsToInstall[k] = v
+				optionalDepsToInstall[k] = v
 			}
 
 			for name, rangeStr := range item.PeerDeps {
@@ -548,7 +668,12 @@ func install(
 			// Process each dependency in the item concurrently
 			for name, rangeStr := range depsToInstall {
 				levelWG.Add(1)
-				go func(pName, pRange, parentPath string) {
+				isOptional := false
+				if _, ok := optionalDepsToInstall[name]; ok {
+					isOptional = true
+				}
+
+				go func(pName, pRange, parentPath string, pOptional bool) {
 					defer levelWG.Done()
 
 					// Acquire semaphore to limit concurrency
@@ -564,11 +689,25 @@ func install(
 					})
 					stateMu.Unlock()
 
-					meta, err := fetchPackageMetadata(pName)
-					if err != nil {
-						return
+					var meta PackageMetadata
+					var err error
+					var ver PackageVersion
+
+					gitUrl, isGit := isGithubRepo(pRange)
+					if isGit {
+						meta, err = fetchGithubPackageMetadata(ctx, gitUrl)
+						if err == nil {
+							ver = meta.Versions[meta.DistTags["latest"]]
+						} else {
+							fmt.Println("Git Metadata Fetch Error (deps):", err)
+						}
+					} else {
+						meta, err = fetchPackageMetadata(pName)
+						if err == nil {
+							ver, err = resolveVersion(meta, pRange)
+						}
 					}
-					ver, err := resolveVersion(meta, pRange)
+
 					if err != nil {
 						return
 					}
@@ -609,11 +748,13 @@ func install(
 					}
 
 					depEntry := LockDependency{
-						Version:          ver.Version,
-						Resolved:         ver.Dist.Tarball,
-						Integrity:        integrity,
-						Dependencies:     ver.Dependencies,
-						PeerDependencies: ver.PeerDependencies,
+						Version:              ver.Version,
+						Resolved:             ver.Dist.Tarball,
+						Integrity:            integrity,
+						Dependencies:         ver.Dependencies,
+						OptionalDependencies: ver.OptionalDependencies,
+						PeerDependencies:     ver.PeerDependencies,
+						Optional:             pOptional,
 					}
 
 					if l, ok := ver.License.(string); ok {
@@ -640,11 +781,31 @@ func install(
 					// Must capture deps before unlocking or just use local var
 					deps := make(map[string]string)
 					for k, v := range ver.Dependencies {
-						deps[k] = v
+						isBundled := false
+						for _, bd := range ver.BundleDependencies {
+							if bd == k {
+								isBundled = true
+								break
+							}
+						}
+						// also check bundledDependencies fallback
+						for _, bd := range ver.BundledDependencies {
+							if bd == k {
+								isBundled = true
+								break
+							}
+						}
+						if !isBundled {
+							deps[k] = v
+						}
 					}
 					peerDeps := make(map[string]string)
 					for k, v := range ver.PeerDependencies {
 						peerDeps[k] = v
+					}
+					optionalDeps := make(map[string]string)
+					for k, v := range ver.OptionalDependencies {
+						optionalDeps[k] = v
 					}
 
 					// Release state lock before triggering install (which might block/spawn)
@@ -653,16 +814,17 @@ func install(
 					// Trigger installation immediately
 					triggerInstall(targetPath, depEntry)
 
-					if len(deps) > 0 || len(peerDeps) > 0 {
+					if len(deps) > 0 || len(peerDeps) > 0 || len(optionalDeps) > 0 {
 						nextQueueMu.Lock()
 						nextLevelQueue = append(nextLevelQueue, QueueItem{
-							ParentPath: targetPath,
-							Deps:       deps,
-							PeerDeps:   peerDeps,
+							ParentPath:   targetPath,
+							Deps:         deps,
+							OptionalDeps: optionalDeps,
+							PeerDeps:     peerDeps,
 						})
 						nextQueueMu.Unlock()
 					}
-				}(name, rangeStr, item.ParentPath)
+				}(name, rangeStr, item.ParentPath, isOptional)
 			}
 		}
 		// Wait for this level to complete before moving to next depth
@@ -719,10 +881,25 @@ func install(
 		enc.Encode(newLock)
 	}
 
+	// 6.5 Save node_modules/.package-lock.json
+	fs.MkdirFn(path.Join(directory, "node_modules"))
+	nodeModulesLockPath := path.Join(directory, "node_modules", ".package-lock.json")
+	if f, err := fs.CreateFn(nodeModulesLockPath); err == nil {
+		defer f.Close()
+		enc := json.NewEncoder(f)
+		enc.SetEscapeHTML(false)
+		enc.SetIndent("", "  ")
+		if encodeErr := enc.Encode(newLock); encodeErr != nil {
+			panic("Encode error: " + encodeErr.Error())
+		}
+	} else {
+		panic("Failed to create node_modules/.package-lock.json: " + err.Error())
+	}
+
 	onProgress(Progress{Stage: "Done", Progress: float64(downloadCount)})
 }
 
-func uninstall(directory string, packagesName []string, onProgress ProgressCallback) {
+func uninstall(ctx *types.Context, directory string, packagesName []string, onProgress ProgressCallback) {
 	if onProgress == nil {
 		onProgress = func(p Progress) {}
 	}
@@ -736,8 +913,13 @@ func uninstall(directory string, packagesName []string, onProgress ProgressCallb
 	// 1. Read package.json
 	packageJsonPath := path.Join(directory, "package.json")
 	var pkgJSON PackageJSON
+	var rawPkgJSON map[string]interface{}
 	if content, err := fs.ReadFileFn(packageJsonPath); err == nil {
 		json.Unmarshal(content, &pkgJSON)
+		json.Unmarshal(content, &rawPkgJSON)
+	}
+	if rawPkgJSON == nil {
+		rawPkgJSON = make(map[string]interface{})
 	}
 
 	// 2. Remove from package.json
@@ -759,17 +941,108 @@ func uninstall(directory string, packagesName []string, onProgress ProgressCallb
 		fs.RmFn(path.Join(directory, "node_modules", name))
 	}
 
+	if len(pkgJSON.Dependencies) > 0 {
+		rawPkgJSON["dependencies"] = pkgJSON.Dependencies
+	} else {
+		delete(rawPkgJSON, "dependencies")
+	}
+	if len(pkgJSON.DevDependencies) > 0 {
+		rawPkgJSON["devDependencies"] = pkgJSON.DevDependencies
+	} else {
+		delete(rawPkgJSON, "devDependencies")
+	}
+
 	// 3. Save package.json
 	if f, err := fs.CreateFn(packageJsonPath); err == nil {
 		defer f.Close()
 		enc := json.NewEncoder(f)
 		enc.SetEscapeHTML(false)
 		enc.SetIndent("", "  ")
-		enc.Encode(pkgJSON)
+		enc.Encode(rawPkgJSON)
 	}
 
 	// 4. Run Install (Reconcile)
-	install(directory, nil, false, 10, true, onProgress)
+	install(ctx, directory, nil, false, 10, true, onProgress)
+}
+
+func isGithubRepo(str string) (string, bool) {
+	if strings.HasSuffix(str, ".tgz") || strings.HasSuffix(str, ".tar.gz") {
+		return "", false
+	}
+
+	hashIndex := strings.Index(str, "#")
+	if hashIndex != -1 {
+		str = str[:hashIndex]
+	}
+
+	if strings.HasPrefix(str, "github:") {
+		return "https://github.com/" + strings.TrimPrefix(str, "github:"), true
+	}
+	if strings.HasPrefix(str, "https://github.com/") {
+		return str, true
+	}
+	if strings.HasPrefix(str, "git+https://github.com/") {
+		return "https://github.com/" + strings.TrimPrefix(str, "git+https://github.com/"), true
+	}
+	if strings.HasPrefix(str, "git+ssh://git@github.com/") {
+		return "https://github.com/" + strings.TrimPrefix(str, "git+ssh://git@github.com/"), true
+	}
+	if strings.HasPrefix(str, "git://github.com/") {
+		return "https://github.com/" + strings.TrimPrefix(str, "git://github.com/"), true
+	}
+	return "", false
+}
+
+func fetchGithubPackageMetadata(ctx *types.Context, url string) (PackageMetadata, error) {
+	tmpDir, err := os.MkdirTemp("", "git-*")
+	if err != nil {
+		return PackageMetadata{}, err
+	}
+	defer fs.RmFn(tmpDir)
+
+	err = git.CloneRepo(ctx, url, tmpDir, nil)
+	if err != nil {
+		return PackageMetadata{}, err
+	}
+
+	pkgJsonBytes, err := fs.ReadFileFn(filepath.Join(tmpDir, "package.json"))
+	if err != nil {
+		return PackageMetadata{}, err
+	}
+
+	var pkgJSON PackageJSON
+	err = json.Unmarshal(pkgJsonBytes, &pkgJSON)
+	if err != nil {
+		return PackageMetadata{}, err
+	}
+
+	deps := pkgJSON.Dependencies
+	if deps == nil {
+		deps = make(map[string]string)
+	}
+
+	peerDeps := pkgJSON.PeerDependencies
+	if peerDeps == nil {
+		peerDeps = make(map[string]string)
+	}
+
+	ver := PackageVersion{
+		Name:             pkgJSON.Name,
+		Version:          pkgJSON.Version,
+		Dependencies:     deps,
+		PeerDependencies: peerDeps,
+		Dist: PackageDist{
+			Tarball: url, // Store git url as tarball to identify later it's a git repo
+		},
+	}
+
+	meta := PackageMetadata{
+		Name:     pkgJSON.Name,
+		DistTags: map[string]string{"latest": pkgJSON.Version},
+		Versions: map[string]PackageVersion{pkgJSON.Version: ver},
+	}
+
+	return meta, nil
 }
 
 var (
@@ -896,7 +1169,6 @@ func downloadAndExtract(url string, dest string, packageName string, onProgress 
 	defer gzipReader.Close()
 
 	tarReader := tar.NewReader(gzipReader)
-
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
@@ -906,20 +1178,20 @@ func downloadAndExtract(url string, dest string, packageName string, onProgress 
 			return err
 		}
 
-		// npm tarballs usually have a root 'package' folder
-		// we strip it
 		name := header.Name
-		if len(name) > 8 && name[0:8] == "package/" {
-			name = name[8:]
-		} else if name == "package" {
+
+		// basic zip slip check
+		if strings.Contains(name, "..") || strings.HasPrefix(name, "/") {
+			return errors.New("zip slip detected")
+		}
+
+		// Strip the first directory component if it exists
+		idx := strings.Index(name, "/")
+		if idx != -1 {
+			name = name[idx+1:]
+		} else {
+			// If it's the root directory itself, skip it
 			continue
-		} else if packageName != "" {
-			prefix := packageName + "/"
-			if strings.HasPrefix(name, prefix) {
-				name = strings.TrimPrefix(name, prefix)
-			} else if name == packageName {
-				continue
-			}
 		}
 
 		if name == "" {
@@ -927,11 +1199,6 @@ func downloadAndExtract(url string, dest string, packageName string, onProgress 
 		}
 
 		targetPath := path.Join(dest, name)
-
-		// basic zip slip check
-		if !strings.HasPrefix(targetPath, path.Clean(dest)+string(os.PathSeparator)) && targetPath != dest {
-			return errors.New("zip slip detected")
-		}
 
 		switch header.Typeflag {
 		case tar.TypeDir:

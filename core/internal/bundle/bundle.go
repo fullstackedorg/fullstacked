@@ -418,7 +418,7 @@ var esbuildPluginsLib = []esbuild.Plugin{
 			})
 
 			// resolve relative import in lib modules
-			build.OnResolve(esbuild.OnResolveOptions{Filter: ".*", Namespace: "lib"}, func(args esbuild.OnResolveArgs) (esbuild.OnResolveResult, error) {
+			build.OnResolve(esbuild.OnResolveOptions{Namespace: "lib", Filter: ".*"}, func(args esbuild.OnResolveArgs) (esbuild.OnResolveResult, error) {
 				Path := path.Join(args.ResolveDir, args.Path)
 				return esbuild.OnResolveResult{
 					Path:      Path,

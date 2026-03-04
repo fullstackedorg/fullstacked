@@ -20,7 +20,14 @@ suite("packages - e2e", () => {
     beforeEach(() => {
         fs.mkdirSync(testDirectoryGo, { recursive: true });
         fs.mkdirSync(testDirectoryNode, { recursive: true });
-        fs.writeFileSync(`${testDirectoryNode}/package.json`, "{}");
+        fs.writeFileSync(
+            `${testDirectoryNode}/package.json`,
+            `{"scripts":{"test":"echo test"}}`
+        );
+        fs.writeFileSync(
+            `${testDirectoryGo}/package.json`,
+            `{"scripts":{"test":"echo test"}}`
+        );
     });
 
     afterEach(clean);
@@ -155,6 +162,136 @@ suite("packages - e2e", () => {
         assert.deepStrictEqual(
             JSON.parse(packageLock),
             JSON.parse(packageLockNode)
+        );
+    });
+
+    test("install - git repository", async () => {
+        await new Promise<void>(async (res) => {
+            const ee = await packages.install(
+                testDirectoryGo,
+                false,
+                "https://github.com/fullstackedorg/builder-tailwindcss.git"
+            );
+            ee.duplex.on("close", res);
+        });
+
+        child_process.execSync(
+            "npm install https://github.com/fullstackedorg/builder-tailwindcss.git",
+            {
+                cwd: testDirectoryNode,
+                stdio: "ignore"
+            }
+        );
+
+        assert.deepEqual(
+            JSON.parse(
+                fs.readFileSync(`${testDirectoryGo}/package.json`, {
+                    encoding: "utf-8"
+                })
+            ),
+            JSON.parse(
+                fs.readFileSync(`${testDirectoryNode}/package.json`, {
+                    encoding: "utf-8"
+                })
+            )
+        );
+
+        assert.deepEqual(
+            fs.readdirSync(`${testDirectoryGo}/node_modules`),
+            fs.readdirSync(`${testDirectoryNode}/node_modules`)
+        );
+
+        assert.deepEqual(
+            fs.readdirSync(
+                `${testDirectoryGo}/node_modules/@fullstacked/builder-tailwindcss`
+            ),
+            fs.readdirSync(
+                `${testDirectoryNode}/node_modules/@fullstacked/builder-tailwindcss`
+            )
+        );
+
+        fs.rmSync(`${testDirectoryGo}/node_modules`, { recursive: true });
+        fs.rmSync(`${testDirectoryNode}/node_modules`, { recursive: true });
+
+        fs.cpSync(
+            `${testDirectoryNode}/package.json`,
+            `${testDirectoryGo}/package.json`
+        );
+        fs.cpSync(
+            `${testDirectoryNode}/package-lock.json`,
+            `${testDirectoryGo}/package-lock.json`
+        );
+
+        await new Promise<void>(async (res) => {
+            const ee = await packages.install(testDirectoryGo, false);
+            ee.duplex.on("close", res);
+        });
+
+        child_process.execSync("npm install", {
+            cwd: testDirectoryNode,
+            stdio: "ignore"
+        });
+
+        assert.deepEqual(
+            JSON.parse(
+                fs.readFileSync(`${testDirectoryGo}/package.json`, {
+                    encoding: "utf-8"
+                })
+            ),
+            JSON.parse(
+                fs.readFileSync(`${testDirectoryNode}/package.json`, {
+                    encoding: "utf-8"
+                })
+            )
+        );
+
+        assert.deepEqual(
+            fs.readdirSync(`${testDirectoryGo}/node_modules`),
+            fs.readdirSync(`${testDirectoryNode}/node_modules`)
+        );
+
+        assert.deepEqual(
+            fs.readdirSync(
+                `${testDirectoryGo}/node_modules/@fullstacked/builder-tailwindcss`
+            ),
+            fs.readdirSync(
+                `${testDirectoryNode}/node_modules/@fullstacked/builder-tailwindcss`
+            )
+        );
+    });
+
+    test("install - ssh2", async () => {
+        await new Promise<void>(async (res) => {
+            const ee = await packages.install(testDirectoryGo, false, "ssh2");
+            ee.duplex.on("close", res);
+        });
+
+        child_process.execSync("npm install ssh2", {
+            cwd: testDirectoryNode,
+            stdio: "ignore"
+        });
+
+        assert.deepEqual(
+            JSON.parse(
+                fs.readFileSync(`${testDirectoryGo}/package.json`, {
+                    encoding: "utf-8"
+                })
+            ),
+            JSON.parse(
+                fs.readFileSync(`${testDirectoryNode}/package.json`, {
+                    encoding: "utf-8"
+                })
+            )
+        );
+
+        assert.deepEqual(
+            fs.readdirSync(`${testDirectoryGo}/node_modules`),
+            fs.readdirSync(`${testDirectoryNode}/node_modules`)
+        );
+
+        assert.deepEqual(
+            fs.readdirSync(`${testDirectoryGo}/node_modules/ssh2`),
+            fs.readdirSync(`${testDirectoryNode}/node_modules/ssh2`)
         );
     });
 });
