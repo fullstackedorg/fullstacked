@@ -8,7 +8,6 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     var id = UUID()
     public let requestHandler: RequestHandler
     public var main = false
-    var markForRemoval = false
     
     required init(from decoder: any Decoder) throws {
         fatalError("init(coder:) has not been implemented")

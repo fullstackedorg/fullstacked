@@ -6,6 +6,7 @@ typedef void (*SetOnStreamData)(void *cb);
 typedef int (*Call)(void *buffer, int length);
 typedef void (*GetCorePayload)(uint8_t ctx, uint8_t coreType, uint8_t id,
                                void *ptr, int size);
+typedef void (*InitSentry)(char *dsn, char *release, char *environment);
 
 struct CoreLib {
         Start start;
@@ -13,4 +14,5 @@ struct CoreLib {
         SetOnStreamData setOnStreamData;
         Call call;
         GetCorePayload getCorePayload;
+        InitSentry initSentry;
 };

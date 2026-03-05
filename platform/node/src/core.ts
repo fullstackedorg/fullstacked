@@ -6,6 +6,7 @@ import { createRequire } from "node:module";
 import cliProgress from "cli-progress";
 import prettyBytes from "pretty-bytes";
 import tar from "tar-stream";
+import packageJson from "../package.json";
 
 globalThis.require = createRequire(import.meta.url);
 
@@ -18,14 +19,16 @@ export interface Core {
         cb: (ctx: number, streamId: number, buffer: ArrayBuffer) => void
     ): void;
     end(): void;
+    initSentry(dsn: string, release: string, environment: string): void;
 }
 
 let core: Core;
 
 const platform = os.platform();
 const arch = os.arch();
-const libBinary = `${platform}-${arch}.${platform === "win32" ? "dll" : "so"}`;
-const binding = `${platform}-${arch}.node`;
+const environment = `${platform}-${arch}`;
+const libBinary = `${environment}.${platform === "win32" ? "dll" : "so"}`;
+const binding = `${environment}.node`;
 
 export async function load(
     libDirectory: string,
@@ -48,16 +51,19 @@ export async function load(
     core = require(bindingPath);
     core.load(libPath);
     core.setOnStreamData(onStreamData);
+    if (process.env.SENTRY_DSN) {
+        core.initSentry(
+            process.env.SENTRY_DSN,
+            packageJson.version,
+            environment + "-node"
+        );
+    }
     return core;
 }
 
 export async function downloadBinaries(directory: string) {
-    const packageJsonFilePath = path.resolve(directory, "package.json");
-    const packageJson = JSON.parse(
-        fs.readFileSync(packageJsonFilePath, { encoding: "utf8" })
-    );
     const [version] = packageJson.version.split("-");
-    const fileName = `${platform}-${arch}-${packageJson.version}.tgz`;
+    const fileName = `${environment}-${packageJson.version}.tgz`;
     const remoteLibUrl = `https://files.fullstacked.org/lib/${platform}/${arch}/${version}/${fileName}`;
 
     const response = await fetch(remoteLibUrl);

@@ -101,6 +101,15 @@ void N_Load(const Napi::CallbackInfo &info) {
     lib = loadLibrary(libPath.Utf8Value());
 }
 
+void N_InitSentry(const Napi::CallbackInfo &info) {
+    Napi::String dsn = info[0].As<Napi::String>().ToString();
+    Napi::String release = info[1].As<Napi::String>().ToString();
+    Napi::String environment = info[2].As<Napi::String>().ToString();
+    lib.initSentry(const_cast<char *>(dsn.Utf8Value().c_str()),
+                   const_cast<char *>(release.Utf8Value().c_str()),
+                   const_cast<char *>(environment.Utf8Value().c_str()));
+}
+
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set(Napi::String::New(env, "load"),
                 Napi::Function::New(env, N_Load));
@@ -116,6 +125,9 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
 
     exports.Set(Napi::String::New(env, "call"),
                 Napi::Function::New(env, N_Call));
+
+    exports.Set(Napi::String::New(env, "initSentry"),
+                Napi::Function::New(env, N_InitSentry));
 
     exports.Set(Napi::String::New(env, "end"), Napi::Function::New(env, N_End));
     return exports;

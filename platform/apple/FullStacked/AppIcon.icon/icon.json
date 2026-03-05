@@ -1,74 +1,90 @@
 {
     "fill": {
         "linear-gradient": [
-            "display-p3:0.01961,0.73333,0.93333,1.00000",
-            "display-p3:0.13333,0.45490,0.73333,1.00000"
-        ]
+            "display-p3:0.28235,0.73725,1.00000,1.00000",
+            "display-p3:0.00000,0.23922,0.58824,1.00000"
+        ],
+        "orientation": {
+            "start": {
+                "x": 0.5,
+                "y": 0
+            },
+            "stop": {
+                "x": 0.5,
+                "y": 0.7
+            }
+        }
     },
     "groups": [
         {
+            "blur-material": 0.05,
             "layers": [
                 {
-                    "image-name": "FullStacked-1.svg",
-                    "name": "FullStacked-1"
+                    "fill": {
+                        "solid": "display-p3:1.00000,1.00000,1.00000,1.00000"
+                    },
+                    "image-name": "fullstacked-1.svg",
+                    "name": "fullstacked-1",
+                    "position": {
+                        "scale": 1.1,
+                        "translation-in-points": [
+                            0,
+                            0
+                        ]
+                    }
                 }
             ],
-            "position": {
-                "scale": 1.05,
-                "translation-in-points": [0, 0]
-            },
+            "lighting": "individual",
             "shadow": {
                 "kind": "neutral",
-                "opacity": 1
+                "opacity": 0.5
             },
+            "specular": false,
             "translucency": {
-                "enabled": false,
-                "value": 0.5
+                "enabled": true,
+                "value": 0.8
             }
         },
         {
+            "blur-material": null,
             "layers": [
                 {
-                    "image-name": "FullStacked-2.svg",
-                    "name": "FullStacked-2"
+                    "fill-specializations": [
+                        {
+                            "appearance": "dark",
+                            "value": {
+                                "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
+                            }
+                        }
+                    ],
+                    "glass": false,
+                    "image-name": "fullstacked-2.svg",
+                    "name": "fullstacked-2",
+                    "opacity-specializations": [
+                        {
+                            "value": 0.5
+                        },
+                        {
+                            "appearance": "dark",
+                            "value": 0.3
+                        }
+                    ]
                 }
             ],
-            "position": {
-                "scale": 1.05,
-                "translation-in-points": [0, 0]
-            },
             "shadow": {
                 "kind": "neutral",
-                "opacity": 1
+                "opacity": 0.5
             },
             "translucency": {
-                "enabled": false,
-                "value": 0.5
-            }
-        },
-        {
-            "layers": [
-                {
-                    "image-name": "FullStacked-3.svg",
-                    "name": "FullStacked-3"
-                }
-            ],
-            "position": {
-                "scale": 1.05,
-                "translation-in-points": [0, 0]
-            },
-            "shadow": {
-                "kind": "neutral",
-                "opacity": 1
-            },
-            "translucency": {
-                "enabled": false,
+                "enabled": true,
                 "value": 0.5
             }
         }
     ],
     "supported-platforms": {
-        "circles": ["watchOS"],
+        "circles": [
+            "watchOS"
+        ],
         "squares": "shared"
     }
 }

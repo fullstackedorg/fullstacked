@@ -1,0 +1,2 @@
+let DSN = ""
+let VERSION = ""

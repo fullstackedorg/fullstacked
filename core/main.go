@@ -21,15 +21,23 @@ import (
 	"fullstackedorg/fullstacked/internal/router"
 	"fullstackedorg/fullstacked/internal/store"
 	"unsafe"
+
+	"github.com/getsentry/sentry-go"
 )
 
 func main() {}
+
+var hasSentry = false
 
 //export start
 func start(
 	root *C.char,
 	build *C.char,
 ) C.uint8_t {
+	if hasSentry {
+		defer sentry.Recover()
+	}
+
 	id := store.NewContext(C.GoString(root), C.GoString(build))
 	return C.uint8_t(id)
 }
@@ -40,6 +48,10 @@ func startWithCtx(
 	build *C.char,
 	ctxId C.uint8_t,
 ) {
+	if hasSentry {
+		defer sentry.Recover()
+	}
+
 	store.NewContextWithCtxId(uint8(ctxId), C.GoString(root), C.GoString(build))
 }
 
@@ -47,6 +59,10 @@ func startWithCtx(
 func check(
 	ctxId C.uint8_t,
 ) C.int {
+	if hasSentry {
+		defer sentry.Recover()
+	}
+
 	_, ok := store.Contexts[uint8(ctxId)]
 	if !ok {
 		return 0
@@ -58,13 +74,19 @@ func check(
 func stop(
 	ctxId C.uint8_t,
 ) {
+	if hasSentry {
+		defer sentry.Recover()
+	}
+
 	delete(store.Contexts, uint8(ctxId))
 }
 
 var cCallback = (unsafe.Pointer)(nil)
 
 //export setOnStreamData
-func setOnStreamData(cb unsafe.Pointer) {
+func setOnStreamData(
+	cb unsafe.Pointer,
+) {
 	// androidPrintToLogCat()
 
 	cCallback = cb
@@ -79,6 +101,20 @@ func setOnStreamData(cb unsafe.Pointer) {
 	}
 }
 
+//export initSentry
+func initSentry(
+	dsn *C.char,
+	release *C.char,
+	environment *C.char,
+) {
+	sentry.Init(sentry.ClientOptions{
+		Dsn:         C.GoString(dsn),
+		Release:     C.GoString(release),
+		Environment: C.GoString(environment),
+	})
+	hasSentry = true
+}
+
 //export getCorePayload
 func getCorePayload(
 	ctx C.uint8_t,
@@ -87,6 +123,10 @@ func getCorePayload(
 	ptr unsafe.Pointer,
 	size C.int,
 ) {
+	if hasSentry {
+		defer sentry.Recover()
+	}
+
 	response, err := store.GetCorePayload(uint8(ctx), uint8(coreType), uint8(id), int(size))
 
 	if err != nil {
@@ -101,6 +141,10 @@ func getCorePayload(
 
 //export call
 func call(buffer unsafe.Pointer, length C.int) C.int {
+	if hasSentry {
+		defer sentry.Recover()
+	}
+
 	size, err := router.Call(C.GoBytes(buffer, length))
 
 	if err != nil {
@@ -113,6 +157,10 @@ func call(buffer unsafe.Pointer, length C.int) C.int {
 
 //export freePtr
 func freePtr(ptr unsafe.Pointer) {
+	if hasSentry {
+		defer sentry.Recover()
+	}
+
 	C.free(ptr)
 }
 
