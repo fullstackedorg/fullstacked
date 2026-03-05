@@ -6,7 +6,6 @@ import { createRequire } from "node:module";
 import cliProgress from "cli-progress";
 import prettyBytes from "pretty-bytes";
 import tar from "tar-stream";
-import packageJson from "../package.json";
 
 globalThis.require = createRequire(import.meta.url);
 
@@ -34,12 +33,13 @@ export async function load(
     libDirectory: string,
     bindingDir: string,
     onStreamData: Parameters<(typeof core)["setOnStreamData"]>[0],
+    packageJson: { version: string },
     downloadLibIfNotExising = false
 ) {
     const libPath = path.resolve(libDirectory, libBinary);
     if (!fs.existsSync(libPath)) {
         if (downloadLibIfNotExising) {
-            await downloadBinaries(libDirectory);
+            await downloadBinaries(libDirectory, packageJson);
         } else {
             throw `Cannot find core library at ${libPath}`;
         }
@@ -61,7 +61,7 @@ export async function load(
     return core;
 }
 
-export async function downloadBinaries(directory: string) {
+export async function downloadBinaries(directory: string, packageJson: { version: string }) {
     const [version] = packageJson.version.split("-");
     const fileName = `${environment}-${packageJson.version}.tgz`;
     const remoteLibUrl = `https://files.fullstacked.org/lib/${platform}/${arch}/${version}/${fileName}`;

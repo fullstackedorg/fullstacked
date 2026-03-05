@@ -11,6 +11,7 @@ import {
     builderTailwindCSS
 } from "../../../core/internal/bundle/lib/bundle/index.ts";
 import { run } from "../../../core/internal/bundle/lib/run/index.ts";
+import packageJson from "../package.json";
 
 const end = () => {
     core.end();
@@ -45,6 +46,7 @@ const core = await load(
             webviews.set(ctx, webview);
         });
     },
+    packageJson,
     true
 );
 
