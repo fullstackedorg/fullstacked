@@ -49,9 +49,10 @@
     },
     "overrides": {
         "glob": "12.0.0",
-        "tar": "7.5.9",
+        "tar": "7.5.10",
         "fast-xml-parser": ">=5.3.6",
         "@isaacs/brace-expansion": ">=5.0.1",
-        "minimatch": ">=10.2.3"
+        "minimatch": ">=10.2.3",
+        "immutable": "^5.1.5"
     }
 }
