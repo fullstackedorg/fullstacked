@@ -15,8 +15,6 @@
 			</array>
 		</dict>
 	</array>
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_fullstacked._tcp</string>

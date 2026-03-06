@@ -4,6 +4,24 @@ import SwiftUI
 let platform = "apple"
 let downloadDirectory = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first! + "/downloads";
 
+func startMain(_ providedCtx: UInt8?) -> UInt8 {
+    let rootPtr = root.ptr()
+    let buildPtr = build.ptr()
+    
+    var ctx: UInt8
+    if(providedCtx == nil) {
+        ctx = start(rootPtr, buildPtr)
+    } else {
+        startWithCtx(rootPtr, buildPtr, providedCtx!)
+        ctx = providedCtx!
+    }
+    
+    rootPtr?.deallocate()
+    buildPtr?.deallocate()
+    
+    return ctx
+}
+
 class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WKDownloadDelegate, Codable, Identifiable {
     var id = UUID()
     public let requestHandler: RequestHandler
@@ -21,11 +39,11 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
             self.main = true
         }
         
-        let ctx = providedCtx ?? start(root.ptr(), build.ptr())
+        let ctx = providedCtx ?? startMain(nil)
         
         if check(ctx) == 0 {
             self.main = true
-            startWithCtx(root.ptr(), build.ptr(), ctx)
+            _ = startMain(ctx)
         }
         
         self.requestHandler = RequestHandler(ctx: ctx)
@@ -257,8 +275,8 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
 }
 
 extension String {
-    func ptr() -> UnsafeMutableRawPointer? {
-        return Data(self.utf8).ptr()
+    func ptr() -> UnsafeMutablePointer<CChar>? {
+        return strdup(self)
     }
 }
 

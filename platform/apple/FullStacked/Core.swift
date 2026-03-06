@@ -40,6 +40,11 @@ func coreInit(){
         } else if(isIPadOS) {
             env = "ipados"
         }
-        initSentry(dsn.ptr(), version.ptr(), env.ptr())
+        
+        let ptrs = [dsn.ptr(), version.ptr(), env.ptr()]
+        
+        initSentry(ptrs[0], ptrs[1], ptrs[2])
+        
+        ptrs.forEach{ptr in ptr?.deallocate()}
     }
 }

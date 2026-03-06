@@ -416,6 +416,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = FullStacked/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = FullStacked;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Use camera for file upload";
@@ -431,7 +432,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 0.12.0;
-				PRODUCT_BUNDLE_IDENTIFIER = editor.FullStacked;
+				PRODUCT_BUNDLE_IDENTIFIER = v1.FullStacked;
 				PRODUCT_NAME = FullStacked;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -459,6 +460,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = FullStacked/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = FullStacked;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Use camera for file upload";
@@ -474,7 +476,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 0.12.0;
-				PRODUCT_BUNDLE_IDENTIFIER = editor.FullStacked;
+				PRODUCT_BUNDLE_IDENTIFIER = v1.FullStacked;
 				PRODUCT_NAME = FullStacked;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -524,7 +526,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.12.0;
-				PRODUCT_BUNDLE_IDENTIFIER = editor.FullStacked;
+				PRODUCT_BUNDLE_IDENTIFIER = v1.FullStacked;
 				PRODUCT_NAME = FullStacked;
 				REGISTER_APP_GROUPS = NO;
 				SDKROOT = macosx;
@@ -576,7 +578,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.12.0;
-				PRODUCT_BUNDLE_IDENTIFIER = editor.FullStacked;
+				PRODUCT_BUNDLE_IDENTIFIER = v1.FullStacked;
 				PRODUCT_NAME = FullStacked;
 				REGISTER_APP_GROUPS = NO;
 				SDKROOT = macosx;

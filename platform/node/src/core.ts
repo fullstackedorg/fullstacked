@@ -61,7 +61,10 @@ export async function load(
     return core;
 }
 
-export async function downloadBinaries(directory: string, packageJson: { version: string }) {
+export async function downloadBinaries(
+    directory: string,
+    packageJson: { version: string }
+) {
     const [version] = packageJson.version.split("-");
     const fileName = `${environment}-${packageJson.version}.tgz`;
     const remoteLibUrl = `https://files.fullstacked.org/lib/${platform}/${arch}/${version}/${fileName}`;
