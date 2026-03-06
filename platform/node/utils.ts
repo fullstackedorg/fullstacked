@@ -2,6 +2,7 @@ import os from "node:os";
 import { getVersion } from "../../version.ts";
 import path from "node:path";
 import url from "node:url";
+import fs from "node:fs";
 
 export const platform = os.platform();
 
@@ -19,6 +20,10 @@ export const bindingBasename = "binding.node";
 
 export const currentDirectory = path.dirname(
     url.fileURLToPath(import.meta.url)
+);
+
+export const packageJson = JSON.parse(
+    fs.readFileSync(path.resolve(currentDirectory, "package.json"), "utf-8")
 );
 
 export const version = getVersion(path.resolve(currentDirectory, "..", ".."));

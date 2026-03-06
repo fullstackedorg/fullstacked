@@ -10,7 +10,6 @@ import {
     builderTailwindCSS
 } from "../../../core/internal/bundle/lib/bundle/index.ts";
 import { run } from "../../../core/internal/bundle/lib/run/index.ts";
-import packageJson from "../package.json";
 
 const end = () => {
     core.end();
@@ -40,8 +39,7 @@ const core = await load(
         createWebView(core, ctx, true, webviews.size === 0).then((webview) => {
             webviews.set(ctx, webview);
         });
-    },
-    packageJson
+    }
 );
 
 const directory = path.resolve(process.argv[2] || ".");

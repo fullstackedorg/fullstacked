@@ -4,10 +4,10 @@ import {
     binBasename,
     bindingBasename,
     binLocation,
-    environment
+    environment,
+    packageJson
 } from "../utils.ts";
 import fs from "node:fs";
-import packageJson from "../package.json";
 import child_process from "node:child_process";
 
 globalThis.require = createRequire(import.meta.url);
@@ -40,8 +40,7 @@ function verifyVersion() {
 }
 
 export async function load(
-    onStreamData: Parameters<(typeof core)["setOnStreamData"]>[0],
-    packageJson: { version: string }
+    onStreamData: Parameters<(typeof core)["setOnStreamData"]>[0]
 ) {
     if (fs.existsSync(binLocation) && verifyVersion()) {
         const libPath = path.resolve(binLocation, binBasename);
@@ -70,5 +69,5 @@ export async function load(
         }
     );
 
-    return load(onStreamData, packageJson);
+    return load(onStreamData);
 }

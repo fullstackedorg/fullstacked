@@ -1,5 +1,4 @@
 import path from "node:path";
-import url from "node:url";
 import fs from "node:fs";
 import { load } from "../platform/node/src/core.ts";
 
@@ -22,22 +21,7 @@ export default {
         return core;
     },
     start: async () => {
-        const currentDirectory = path.dirname(
-            url.fileURLToPath(import.meta.url)
-        );
-        const nodeDirectory = path.resolve(
-            currentDirectory,
-            "..",
-            "platform",
-            "node"
-        );
-        const libDirectory = path.resolve(
-            currentDirectory,
-            "..",
-            "core",
-            "bin"
-        );
-        core = await load(libDirectory, nodeDirectory, (ctx, id, buffer) => {
+        core = await load((ctx, id, buffer) => {
             if (ctx === 0) {
                 // e2e tests
                 globalThis.callback(id, buffer);
