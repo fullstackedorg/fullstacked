@@ -9,7 +9,7 @@ const cache = {
     arch: null,
     endianness: null,
     uname: null as UnameInfo
-}
+};
 
 export function platform(): string {
     if (cache.platform === null) {
@@ -21,7 +21,7 @@ export function platform(): string {
             true
         );
     }
-    return cache.platform
+    return cache.platform;
 }
 
 export function arch(): string {
