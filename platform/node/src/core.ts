@@ -21,7 +21,6 @@ export interface Core {
         cb: (ctx: number, streamId: number, buffer: ArrayBuffer) => void
     ): void;
     end(): void;
-    initSentry(dsn: string, release: string, environment: string): void;
 }
 
 let core: Core;
@@ -48,13 +47,6 @@ export async function load(
         core = require(bindingPath);
         core.load(libPath);
         core.setOnStreamData(onStreamData);
-        if (process.env.SENTRY_DSN) {
-            core.initSentry(
-                process.env.SENTRY_DSN,
-                packageJson.version,
-                environment + "-node"
-            );
-        }
         return core;
     }
 

@@ -4,40 +4,55 @@ import { bridge } from "../bridge/index.ts";
 import { Os } from "../@types/index.ts";
 import { Arch, Endieness, Platform, Uname, UnameInfo } from "../@types/os.ts";
 
+const cache = {
+    platform: null,
+    arch: null,
+    endianness: null,
+    uname: null as UnameInfo
+}
+
 export function platform(): string {
-    return bridge(
-        {
-            mod: Os,
-            fn: Platform
-        },
-        true
-    );
+    if (cache.platform === null) {
+        cache.platform = bridge(
+            {
+                mod: Os,
+                fn: Platform
+            },
+            true
+        );
+    }
+    return cache.platform
 }
 
 export function arch(): string {
-    return bridge(
-        {
-            mod: Os,
-            fn: Arch
-        },
-        true
-    );
+    if (cache.arch === null) {
+        cache.arch = bridge(
+            {
+                mod: Os,
+                fn: Arch
+            },
+            true
+        );
+    }
+    return cache.arch;
 }
 
 export function endianness(): string {
-    return bridge(
-        {
-            mod: Os,
-            fn: Endieness
-        },
-        true
-    );
+    if (cache.endianness === null) {
+        cache.endianness = bridge(
+            {
+                mod: Os,
+                fn: Endieness
+            },
+            true
+        );
+    }
+    return cache.endianness;
 }
 
-let cachedUname: UnameInfo = null;
 function getUname() {
-    if (!cachedUname) {
-        cachedUname = bridge(
+    if (cache.uname === null) {
+        cache.uname = bridge(
             {
                 mod: Os,
                 fn: Uname
@@ -46,7 +61,7 @@ function getUname() {
         );
     }
 
-    return cachedUname;
+    return cache.uname;
 }
 
 export function release(): string {

@@ -12,6 +12,8 @@ import (
 // ctxId, storedStreamId, size
 var OnStreamData = (func(uint8, uint8, int))(nil)
 
+var HasSentry = false
+
 var nextCtxId uint8 = 0
 var Contexts = map[uint8]types.Context{}
 var ctxMutex = sync.Mutex{}

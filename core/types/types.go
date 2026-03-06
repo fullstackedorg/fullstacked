@@ -17,6 +17,7 @@ const (
 	Dns      CoreModule = 9
 	Git      CoreModule = 10
 	Packages CoreModule = 11
+	Sentry   CoreModule = 12
 )
 
 type ModuleSwitch = func(*Context, CoreCallHeader, []DeserializedData, *CoreCallResponse) error

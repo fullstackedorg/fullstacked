@@ -31,20 +31,4 @@ func coreInit(){
                             Int32) -> Void = onStreamDataCallback
     let cbPtr = unsafeBitCast(cb, to: UnsafeMutableRawPointer.self)
     setOnStreamData(cbPtr)
-    if(!DSN.isEmpty) {
-        let dsn = DSN
-        let version = VERSION
-        var env = "ios"
-        if(isMacOS) {
-            env = "macos"
-        } else if(isIPadOS) {
-            env = "ipados"
-        }
-        
-        let ptrs = [dsn.ptr(), version.ptr(), env.ptr()]
-        
-        initSentry(ptrs[0], ptrs[1], ptrs[2])
-        
-        ptrs.forEach{ptr in ptr?.deallocate()}
-    }
 }

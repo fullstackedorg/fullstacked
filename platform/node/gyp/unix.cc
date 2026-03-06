@@ -10,7 +10,6 @@ CoreLib loadLibrary(std::string libPath) {
         (SetOnStreamData)(dlsym(coreLib, "setOnStreamData")),
         (Call)(dlsym(coreLib, "call")),
         (GetCorePayload)(dlsym(coreLib, "getCorePayload")),
-        (InitSentry)(dlsym(coreLib, "initSentry")),
     };
 
     return lib;

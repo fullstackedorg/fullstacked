@@ -11,6 +11,7 @@ import (
 	"fullstackedorg/fullstacked/internal/os"
 	"fullstackedorg/fullstacked/internal/packages"
 	"fullstackedorg/fullstacked/internal/path"
+	"fullstackedorg/fullstacked/internal/sentry"
 	"fullstackedorg/fullstacked/internal/serialization"
 	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/internal/stream"
@@ -104,6 +105,7 @@ var modules = map[types.CoreModule]types.ModuleSwitch{
 	types.Dns:      dns.Switch,
 	types.Git:      git.Switch,
 	types.Packages: packages.Switch,
+	types.Sentry:   sentry.Switch,
 	types.Test:     test.Switch,
 }
 

@@ -1,2 +1,0 @@
-let DSN = ""
-let VERSION = ""

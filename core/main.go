@@ -27,14 +27,12 @@ import (
 
 func main() {}
 
-var hasSentry = false
-
 //export start
 func start(
 	root *C.char,
 	build *C.char,
 ) C.uint8_t {
-	if hasSentry {
+	if  store.HasSentry {
 		defer sentry.Recover()
 	}
 
@@ -48,7 +46,7 @@ func startWithCtx(
 	build *C.char,
 	ctxId C.uint8_t,
 ) {
-	if hasSentry {
+	if  store.HasSentry {
 		defer sentry.Recover()
 	}
 
@@ -59,7 +57,7 @@ func startWithCtx(
 func check(
 	ctxId C.uint8_t,
 ) C.int {
-	if hasSentry {
+	if  store.HasSentry {
 		defer sentry.Recover()
 	}
 
@@ -74,7 +72,7 @@ func check(
 func stop(
 	ctxId C.uint8_t,
 ) {
-	if hasSentry {
+	if  store.HasSentry {
 		defer sentry.Recover()
 	}
 
@@ -101,20 +99,6 @@ func setOnStreamData(
 	}
 }
 
-//export initSentry
-func initSentry(
-	dsn *C.char,
-	release *C.char,
-	environment *C.char,
-) {
-	sentry.Init(sentry.ClientOptions{
-		Dsn:         C.GoString(dsn),
-		Release:     C.GoString(release),
-		Environment: C.GoString(environment),
-	})
-	hasSentry = true
-}
-
 //export getCorePayload
 func getCorePayload(
 	ctx C.uint8_t,
@@ -123,7 +107,7 @@ func getCorePayload(
 	ptr unsafe.Pointer,
 	size C.int,
 ) {
-	if hasSentry {
+	if  store.HasSentry {
 		defer sentry.Recover()
 	}
 
@@ -141,7 +125,7 @@ func getCorePayload(
 
 //export call
 func call(buffer unsafe.Pointer, length C.int) C.int {
-	if hasSentry {
+	if  store.HasSentry {
 		defer sentry.Recover()
 	}
 
@@ -157,7 +141,7 @@ func call(buffer unsafe.Pointer, length C.int) C.int {
 
 //export freePtr
 func freePtr(ptr unsafe.Pointer) {
-	if hasSentry {
+	if  store.HasSentry {
 		defer sentry.Recover()
 	}
 
