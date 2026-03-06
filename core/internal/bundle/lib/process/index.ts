@@ -3,6 +3,7 @@ import { chdir } from "./cwd/chdir.ts";
 import { cwd } from "./cwd/index.ts";
 import process from "./process.js";
 export * from "./process.js";
+import fullstacked from "./version.json";
 
 if (globalThis.process === undefined) {
     globalThis.process = process;
@@ -53,7 +54,7 @@ export function exit() {
 process.hrtime = hrtime;
 process.cwd = cwd;
 process.chdir = chdir;
-process.versions = {};
+process.versions = { fullstacked };
 process.exit = exit;
 
 export default process;

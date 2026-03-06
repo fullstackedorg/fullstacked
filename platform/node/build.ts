@@ -1,23 +1,32 @@
 import path from "node:path";
 import url from "node:url";
 import fs from "node:fs";
-import os from "node:os";
 import child_process from "node:child_process";
 import esbuild from "esbuild";
+import {
+    arch,
+    binBasename,
+    bindingBasename,
+    binExtension,
+    binLocation,
+    environment,
+    fullVersion,
+    platform
+} from "./utils.ts";
 
 const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
 
-const platform = os.platform();
-const archArgIndex = process.argv.indexOf("--arch");
-const arch =
-    archArgIndex === -1 ? os.arch() : process.argv.at(archArgIndex + 1);
+if (fs.existsSync(binLocation)) {
+    fs.rmSync(binLocation, { recursive: true });
+}
+fs.mkdirSync(binLocation, { recursive: true });
 
 const sharedLibLocation = path.resolve(
     currentDirectory,
     "../../",
     "core",
     "bin",
-    `${platform}-${arch}.${platform === "win32" ? "dll" : "so"}`
+    `${environment}.${binExtension}`
 );
 
 if (!fs.existsSync(sharedLibLocation)) {
@@ -25,17 +34,12 @@ if (!fs.existsSync(sharedLibLocation)) {
     process.exit(1);
 }
 
-fs.cpSync(
-    sharedLibLocation,
-    path.resolve(currentDirectory, path.basename(sharedLibLocation))
-);
-
-const target_name = platform + "-" + arch;
+fs.cpSync(sharedLibLocation, path.resolve(binLocation, binBasename));
 
 const binding = {
     targets: [
         {
-            target_name,
+            target_name: bindingBasename.slice(0, -".node".length),
             sources: ["bridge.cc", platform === "win32" ? "win.cc" : "unix.cc"],
             include_dirs: [
                 "<!@(node -p \"require('node-addon-api').include\")"
@@ -56,15 +60,9 @@ child_process.execSync(
     }
 );
 
-fs.cpSync(
-    path.resolve(
-        currentDirectory,
-        "gyp",
-        "build",
-        "Release",
-        target_name + ".node"
-    ),
-    path.resolve(currentDirectory, target_name + ".node")
+fs.renameSync(
+    path.resolve(currentDirectory, "gyp", "build", "Release", bindingBasename),
+    path.resolve(binLocation, bindingBasename)
 );
 
 esbuild.buildSync({
@@ -75,3 +73,23 @@ esbuild.buildSync({
     packages: "external",
     platform: "node"
 });
+
+const packageJsonFile = path.resolve(currentDirectory, "package.json");
+const packageJson = JSON.parse(
+    fs.readFileSync(packageJsonFile, { encoding: "utf-8" })
+);
+packageJson.version = fullVersion;
+fs.writeFileSync(packageJsonFile, JSON.stringify(packageJson, null, 4));
+
+const binPackageJson = {
+    name: `@fullstacked/${environment}`,
+    version: fullVersion,
+    main: "index.js",
+    bin: {
+        fullstacked: "index.js"
+    }
+};
+fs.writeFileSync(
+    path.resolve(binLocation, "package.json"),
+    JSON.stringify(binPackageJson, null, 4)
+);

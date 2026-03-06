@@ -3,6 +3,7 @@ import child_process from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
 import esbuild from "esbuild";
+import version from "./version.ts";
 
 // shims
 
@@ -126,4 +127,9 @@ export const sharedLibLocation = path.resolve(
     "core",
     "bin",
     `${platform}-${arch}.${platform === "win32" ? "dll" : "so"}`
+);
+
+fs.writeFileSync(
+    "core/internal/bundle/lib/process/version.json",
+    JSON.stringify(version)
 );

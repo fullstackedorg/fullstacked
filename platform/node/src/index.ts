@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import "./env.ts";
 import path from "node:path";
-import url from "node:url";
 import fs from "node:fs";
 import child_process from "node:child_process";
 import { load } from "./core.ts";
@@ -20,16 +19,12 @@ const end = () => {
 
 ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => process.on(signal, end));
 
-const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
-
 const webviews: Map<
     number,
     Awaited<ReturnType<typeof createWebView>>
 > = new Map();
 
 const core = await load(
-    currentDirectory,
-    currentDirectory,
     (ctx: number, streamId: number, buffer: ArrayBuffer) => {
         if (ctx === mainCtx) {
             globalThis.callback(streamId, buffer);
@@ -46,8 +41,7 @@ const core = await load(
             webviews.set(ctx, webview);
         });
     },
-    packageJson,
-    true
+    packageJson
 );
 
 const directory = path.resolve(process.argv[2] || ".");

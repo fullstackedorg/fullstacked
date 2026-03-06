@@ -16,3 +16,4 @@ test/**/_index.ts.css
 test/**/_index.ts.tailwind.css
 test/**/output.css
 test/**/test
+platform/@fullstacked
