@@ -7,6 +7,8 @@ const asyncResponsePromises = new Map<
     (response: ArrayBuffer) => void
 >();
 
+const clipboardResponsePromises = new Map<number, (response: string) => void>();
+
 export async function BridgeAppleInit(): Promise<PlatformBridge> {
     globalThis.respond = function (id: number, responseB64: string) {
         const promise = asyncResponsePromises.get(id);
@@ -15,6 +17,29 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
     };
 
     const ctx = await (await globalThis.originalFetch("/ctx")).json();
+
+    if (globalThis.webkit.messageHandlers.clipboard) {
+        const td = new TextDecoder();
+        globalThis.respondClipboard = function (
+            idStr: string,
+            response: string
+        ) {
+            const id = parseInt(idStr);
+            const promise = clipboardResponsePromises.get(id);
+            promise?.(td.decode(toByteArray(response)));
+            clipboardResponsePromises.delete(id);
+        };
+
+        globalThis.paste = function () {
+            const id = Math.floor(Math.random() * 1000000);
+            return new Promise<string>((resolve) => {
+                globalThis.webkit.messageHandlers.clipboard.postMessage(
+                    id.toString()
+                );
+                clipboardResponsePromises.set(id, resolve);
+            });
+        };
+    }
 
     if (isWorker) {
         globalThis.onmessage = (event) => {

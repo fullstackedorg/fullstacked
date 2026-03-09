@@ -58,7 +58,6 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         
         super.init(frame: CGRect(), configuration: wkWebViewConfig)
         
-        
         self.isInspectable = true
         self.navigationDelegate = self
         userContentController.add(self, name: "bridge")
@@ -66,10 +65,11 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         self.load(URLRequest(url: URL(string: "fs://localhost")!))
     }
     
-    func close(){
+    override func close(){
         self.navigationDelegate = nil
         self.configuration.userContentController.removeScriptMessageHandler(forName: "bridge")
         stop(self.requestHandler.ctx)
+        super.close()
     }
     
     required init?(coder: NSCoder) {

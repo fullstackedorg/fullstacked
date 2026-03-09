@@ -3,9 +3,48 @@ import WebKit
 
 // iOS
 
-class WebViewExtended: WKWebView {
+class ClipboardHelper: NSObject, WKScriptMessageHandler {
+    var cb: ((_ requestClipboardID: String, _ clipboardContent: String) -> Void)?
+    
+    func setCallback(_ callback: @escaping (_ requestClipboardID: String, _ clipboardContent: String) -> Void) {
+        self.cb = callback
+    }
+    
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if let callback = self.cb {
+            let requestClipboardID = message.body as! String;
+            let clipboardContent = UIPasteboard.general.string ?? "";
+            callback(requestClipboardID, clipboardContent)
+        }
+    }
+}
+
+class WebViewExtended: WKWebView  {
+    let clipboardHelper: ClipboardHelper;
+    
     override var safeAreaInsets: UIEdgeInsets {
         return UIEdgeInsets(top: super.safeAreaInsets.top, left: 0, bottom: 0, right: 0)
+    }
+    
+    override init(frame: CGRect, configuration: WKWebViewConfiguration) {
+        self.clipboardHelper = ClipboardHelper()
+        
+        super.init(frame: frame, configuration: configuration)
+        
+        configuration.userContentController.add(self.clipboardHelper, name: "clipboard")
+        
+        self.clipboardHelper.setCallback { (requestClipboardID, clipboardContent) in
+            let b64 = Data(clipboardContent.utf8).base64EncodedString()
+            self.evaluateJavaScript("window.respondClipboard(\"\(requestClipboardID)\", \"\(b64)\")")
+        }
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    func close(){
+        self.configuration.userContentController.removeScriptMessageHandler(forName: "clipboard")
     }
     
     func openBrowserURL(_ url: URL){
