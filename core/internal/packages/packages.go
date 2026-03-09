@@ -16,6 +16,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -152,6 +153,8 @@ type PackageJSON struct {
 	Browser json.RawMessage `json:"browser,omitempty"`
 	Module  string          `json:"module,omitempty"`
 	Exports json.RawMessage `json:"exports,omitempty"`
+	OS      []string        `json:"os,omitempty"`
+	CPU     []string        `json:"cpu,omitempty"`
 }
 
 type PackageMetadata struct {
@@ -172,6 +175,8 @@ type PackageVersion struct {
 	PeerDependencies    map[string]string         `json:"peerDependencies,omitempty"`
 	BundleDependencies  BundleDependenciesWrapper `json:"bundleDependencies,omitempty"`
 	BundledDependencies BundleDependenciesWrapper `json:"bundledDependencies,omitempty"`
+	OS                  []string                  `json:"os,omitempty"`
+	CPU                 []string                  `json:"cpu,omitempty"`
 }
 
 type BundleDependenciesWrapper []string
@@ -214,6 +219,51 @@ type LockDependency struct {
 	PeerDependencies     map[string]string `json:"peerDependencies,omitempty"`
 	Peer                 bool              `json:"peer,omitempty"`
 	Optional             bool              `json:"optional,omitempty"`
+	OS                   []string          `json:"os,omitempty"`
+	CPU                  []string          `json:"cpu,omitempty"`
+}
+
+func isPlatformSupported(oss, cpus []string) bool {
+	currentOS := runtime.GOOS
+	currentCPU := runtime.GOARCH
+
+	if len(oss) > 0 {
+		supported := false
+		hasNegative := false
+		for _, os := range oss {
+			if strings.HasPrefix(os, "!") {
+				hasNegative = true
+				if os[1:] == currentOS {
+					return false
+				}
+			} else if os == currentOS {
+				supported = true
+			}
+		}
+		if !supported && !hasNegative {
+			return false
+		}
+	}
+
+	if len(cpus) > 0 {
+		supported := false
+		hasNegative := false
+		for _, cpu := range cpus {
+			if strings.HasPrefix(cpu, "!") {
+				hasNegative = true
+				if cpu[1:] == currentCPU {
+					return false
+				}
+			} else if cpu == currentCPU {
+				supported = true
+			}
+		}
+		if !supported && !hasNegative {
+			return false
+		}
+	}
+
+	return true
 }
 
 func install(
@@ -260,10 +310,14 @@ func install(
 	if len(packagesName) > 0 {
 		for _, nameWithVersion := range packagesName {
 			name := nameWithVersion
+			if strings.HasPrefix(name, "fullstacked") && (len(name) == 11 || name[11] == '@') {
+				continue
+			}
 			rangeStr := "latest"
 			gitUrl, isGit := isGithubRepo(nameWithVersion)
 			var meta PackageMetadata
 			var err error
+			var ver PackageVersion
 
 			if isGit {
 				meta, err = fetchGithubPackageMetadata(ctx, gitUrl)
@@ -302,11 +356,20 @@ func install(
 			versionCaret := rangeStr
 			if !isGit {
 				// Resolve version based on specifier
-				ver, err := resolveVersion(meta, rangeStr)
+				ver, err = resolveVersion(meta, rangeStr)
 				if err != nil {
 					continue
 				}
+				if !isPlatformSupported(ver.OS, ver.CPU) {
+					continue
+				}
 				versionCaret = "^" + ver.Version
+			} else {
+				// For git repos, we already have the meta (and ver) from fetchGithubPackageMetadata
+				ver = meta.Versions[meta.DistTags["latest"]]
+				if !isPlatformSupported(ver.OS, ver.CPU) {
+					continue
+				}
 			}
 
 			if saveDev {
@@ -372,6 +435,12 @@ func install(
 			if pathKey == "" {
 				continue
 			}
+
+			pkgName := path.Base(pathKey)
+			if pkgName == "fullstacked" || !isPlatformSupported(pkg.OS, pkg.CPU) {
+				continue
+			}
+
 			if pkg.Resolved == "" {
 				continue
 			}
@@ -667,6 +736,9 @@ func install(
 
 			// Process each dependency in the item concurrently
 			for name, rangeStr := range depsToInstall {
+				if name == "fullstacked" {
+					continue
+				}
 				levelWG.Add(1)
 				isOptional := false
 				if _, ok := optionalDepsToInstall[name]; ok {
@@ -709,6 +781,10 @@ func install(
 					}
 
 					if err != nil {
+						return
+					}
+
+					if !isPlatformSupported(ver.OS, ver.CPU) {
 						return
 					}
 
@@ -1031,6 +1107,8 @@ func fetchGithubPackageMetadata(ctx *types.Context, url string) (PackageMetadata
 		Version:          pkgJSON.Version,
 		Dependencies:     deps,
 		PeerDependencies: peerDeps,
+		OS:               pkgJSON.OS,
+		CPU:              pkgJSON.CPU,
 		Dist: PackageDist{
 			Tarball: url, // Store git url as tarball to identify later it's a git repo
 		},

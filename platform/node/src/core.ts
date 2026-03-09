@@ -55,7 +55,7 @@ export async function load(
     }
 
     child_process.execSync(
-        `npm i @fullstacked/${environment}@${packageJson.version}`,
+        `npm i --no-save @fullstacked/${environment}@${packageJson.version}`,
         {
             stdio: "inherit"
         }

@@ -84,10 +84,8 @@ fs.writeFileSync(packageJsonFile, JSON.stringify(packageJson, null, 4));
 const binPackageJson = {
     name: `@fullstacked/${environment}`,
     version: fullVersion,
-    main: "index.js",
-    bin: {
-        fullstacked: "index.js"
-    }
+    os: [platform],
+    cpu: [arch]
 };
 fs.writeFileSync(
     path.resolve(binLocation, "package.json"),

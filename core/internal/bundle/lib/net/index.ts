@@ -135,6 +135,14 @@ export class Socket extends EventEmitter {
     pipe() {
         return this;
     }
+
+    ref() {
+        return this;
+    }
+
+    unref() {
+        return this;
+    }
 }
 
 type ConnectOpts = SocketOpts & {

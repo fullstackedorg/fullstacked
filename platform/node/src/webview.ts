@@ -52,7 +52,9 @@ export async function createWebView(
         if (first) {
             console.log(`Opening browser at http://localhost:${port}`);
         }
-        open(`http://localhost:${port}`);
+        if (!first || process.argv.includes("--open")) {
+            open(`http://localhost:${port}`);
+        }
     }
 
     return {

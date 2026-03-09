@@ -403,13 +403,13 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = FullStacked/FullStacked.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1175;
+				CURRENT_PROJECT_VERSION = 1583;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = QD7Y9DQ5V4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = FullStacked/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = FullStacked;
+				INFOPLIST_KEY_CFBundleDisplayName = "FullStacked v1";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
@@ -425,7 +425,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.12.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = v1.FullStacked;
 				PRODUCT_NAME = FullStacked;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -447,13 +447,13 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = FullStacked/FullStacked.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1175;
+				CURRENT_PROJECT_VERSION = 1583;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = QD7Y9DQ5V4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = FullStacked/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = FullStacked;
+				INFOPLIST_KEY_CFBundleDisplayName = "FullStacked v1";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
@@ -469,7 +469,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.12.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = v1.FullStacked;
 				PRODUCT_NAME = FullStacked;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -492,14 +492,14 @@
 				CODE_SIGN_ENTITLEMENTS = FullStacked/FullStacked.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1175;
+				CURRENT_PROJECT_VERSION = 1583;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = QD7Y9DQ5V4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = FullStacked/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = FullStacked;
+				INFOPLIST_KEY_CFBundleDisplayName = "FullStacked v1";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Use camera for file upload";
@@ -519,7 +519,7 @@
 					"$(PROJECT_DIR)/FullStacked/bin",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.12.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = v1.FullStacked;
 				PRODUCT_NAME = FullStacked;
 				REGISTER_APP_GROUPS = NO;
@@ -544,14 +544,14 @@
 				CODE_SIGN_ENTITLEMENTS = FullStacked/FullStacked.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1175;
+				CURRENT_PROJECT_VERSION = 1583;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = QD7Y9DQ5V4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = FullStacked/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = FullStacked;
+				INFOPLIST_KEY_CFBundleDisplayName = "FullStacked v1";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Use camera for file upload";
@@ -571,7 +571,7 @@
 					"$(PROJECT_DIR)/FullStacked/bin",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.12.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = v1.FullStacked;
 				PRODUCT_NAME = FullStacked;
 				REGISTER_APP_GROUPS = NO;

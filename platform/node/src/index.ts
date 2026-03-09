@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import path from "node:path";
-import fs from "node:fs";
 import child_process from "node:child_process";
 import { load } from "./core.ts";
 import { createWebView } from "./webview.ts";
@@ -61,7 +60,6 @@ tailwindcssBuilder.on("build", (entryfile, outfile) => {
     tailwindcssBuilder.writeEvent("build-done");
 });
 
-prestart(directory);
 const result = await bundle(".");
 if (result.Warnings?.length) {
     console.warn("Warnings:", result.Warnings);
@@ -72,16 +70,4 @@ if (result.Errors?.length) {
     run(".");
 } else {
     end();
-}
-
-function prestart(directory: string) {
-    const packageJson = JSON.parse(
-        fs.readFileSync(path.join(directory, "package.json"), "utf8")
-    );
-    if (packageJson.scripts?.prestart) {
-        child_process.execSync(packageJson.scripts.prestart, {
-            cwd: directory,
-            stdio: "inherit"
-        });
-    }
 }
