@@ -36,11 +36,9 @@ const core = await load(
 
         createWebView(core, ctx, {
             openBrowser: openBrowser || webviews.size >= 1
-        }).then(
-            (webview) => {
-                webviews.set(ctx, webview);
-            }
-        );
+        }).then((webview) => {
+            webviews.set(ctx, webview);
+        });
     }
 );
 

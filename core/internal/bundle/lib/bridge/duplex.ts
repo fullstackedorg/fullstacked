@@ -37,7 +37,7 @@ globalThis.callback = async function (
             mod: Stream,
             fn: Close,
             data: [id]
-        })
+        });
         throw new Error("No duplex found for id " + id);
     }
 
