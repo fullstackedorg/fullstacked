@@ -2,7 +2,7 @@ import { toByteArray } from "./base64.ts";
 import { SerializableData, Stream } from "../@types/index.ts";
 import { Close, Open, Write, WriteEvent } from "../@types/stream.ts";
 import { mergeUint8Arrays } from "./serialization.ts";
-import type { bridge } from "./index.ts";
+import { bridge } from "./index.ts";
 import { createEventEmitter } from "./eventEmitter.ts";
 
 type DuplexItem = {
@@ -31,6 +31,15 @@ globalThis.callback = async function (
             : new Uint8Array(payload);
 
     const duplex = activeDuplexes.get(id);
+
+    if (!duplex) {
+        bridge({
+            mod: Stream,
+            fn: Close,
+            data: [id]
+        })
+        throw new Error("No duplex found for id " + id);
+    }
 
     if (duplex.opening) {
         await duplex.opening;
