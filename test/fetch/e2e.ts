@@ -104,6 +104,35 @@ suite("fetch - e2e", () => {
         assert.deepEqual(responseGoBytes, await responseNode.bytes());
     });
 
+    test("timeout", { timeout: 1000 }, async () => {
+        assert.rejects(
+            fetch("http://localhost:9090/wait", {
+                headers: {
+                    "x-wait": "2000"
+                },
+                signal: AbortSignal.timeout(500)
+            })
+        );
+    });
+
+    test("cancel", { timeout: 3000 }, async () => {
+        const controller = new AbortController();
+        const response = await fetch("http://localhost:9090/stream", {
+            headers: {
+                "x-wait": "2000"
+            },
+            signal: controller.signal
+        });
+
+        setTimeout(() => controller.abort(), 500);
+        assert.rejects(
+            (async () => {
+                for await (const _ of response.body) {
+                }
+            })()
+        );
+    });
+
     after(() => {
         worker.terminate();
     });

@@ -7,23 +7,20 @@ import {
 
 export type EventEmitter<K extends Record<string, any[]>> = {
     duplex: Duplex;
-    on(event: keyof K, callback: (...args: K[keyof K]) => void): void;
-    off(event: keyof K, callback: (...args: K[keyof K]) => void): void;
-    writeEvent(event: keyof K, ...args: K[keyof K]): void;
+    on<E extends keyof K>(event: E, callback: (...args: K[E]) => void): void;
+    off<E extends keyof K>(event: E, callback: (...args: K[E]) => void): void;
+    writeEvent<E extends keyof K>(event: E, ...args: K[E]): void;
 };
 
 export function createEventEmitter<K extends Record<string, any[]>>(
     duplex: Duplex
 ): EventEmitter<K> {
-    const eventListeners = new Map<
-        keyof K,
-        Set<(...args: K[keyof K]) => void>
-    >();
+    const eventListeners = new Map<keyof K, Set<(...args: any[]) => void>>();
 
     const processEvent = (buffer: Uint8Array<ArrayBuffer>) => {
         const [name, ...data] = deserializeAll(buffer.buffer);
         const listeners = eventListeners.get(name);
-        listeners?.forEach((cb) => cb(...(data as K[keyof K])));
+        listeners?.forEach((cb) => cb(...(data as any[])));
     };
 
     let sizeNeeded = -1;
@@ -63,19 +60,19 @@ export function createEventEmitter<K extends Record<string, any[]>>(
 
     return {
         duplex,
-        on(event: keyof K, callback: (...args: K[keyof K]) => void) {
+        on<E extends keyof K>(event: E, callback: (...args: K[E]) => void) {
             let listeners = eventListeners.get(event);
             if (!listeners) {
                 listeners = new Set();
                 eventListeners.set(event, listeners);
             }
-            listeners.add(callback);
+            listeners.add(callback as (...args: any[]) => void);
         },
-        off(event: keyof K, callback: (...args: K[keyof K]) => void) {
+        off<E extends keyof K>(event: E, callback: (...args: K[E]) => void) {
             let listeners = eventListeners.get(event);
-            listeners?.delete(callback);
+            listeners?.delete(callback as (...args: any[]) => void);
         },
-        writeEvent(event: keyof K, ...args: K[keyof K]) {
+        writeEvent<E extends keyof K>(event: E, ...args: K[E]) {
             duplex.writeEvent(event as string, ...args);
         }
     };

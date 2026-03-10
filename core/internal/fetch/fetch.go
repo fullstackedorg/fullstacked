@@ -17,6 +17,7 @@ type FetchFn = uint8
 const (
 	Fetch        FetchFn = 0
 	ResponseBody FetchFn = 1
+	Cancel       FetchFn = 2
 )
 
 func Switch(
@@ -35,12 +36,33 @@ func Switch(
 			requestBody = data[1].Data.([]byte)
 		}
 
-		res, err := FetchFnApply(requestHead, requestBody)
-		if err != nil {
-			return err
+		fetchRequestsMutex.Lock()
+		id := fetchId
+		fetchId += 1
+		fetchRequestsMutex.Unlock()
+
+		response.Type = types.CoreResponseStream
+		response.Stream = &types.ResponseStream{
+			Open: func(ctx *types.Context, streamId uint8) {
+				res, err := FetchFnApply(id, requestHead, requestBody)
+
+				fetchRequestsMutex.Lock()
+				_, ok := fetchRequests[id]
+				fetchRequestsMutex.Unlock()
+
+				if ok {
+					if err != nil {
+						store.StreamEvent(ctx, streamId, "error", []types.SerializableData{err.Error()}, true)
+					} else {
+						store.StreamEvent(ctx, streamId, "response", []types.SerializableData{res}, true)
+					}
+				}
+			},
+			Close: func(ctx *types.Context, streamId uint8) {
+				closeFetchRequest(id)
+				closeFetchResponse(id)
+			},
 		}
-		response.Type = types.CoreResponseData
-		response.Data = res
 		return nil
 	case ResponseBody:
 		id := int(data[0].Data.(float64))
@@ -51,9 +73,28 @@ func Switch(
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
 			Open: func(ctx *types.Context, streamId uint8) {
+				fetchResponsesMutex.Lock()
+				_, ok := fetchResponses[id]
+				fetchResponsesMutex.Unlock()
+
+				if !ok {
+					return
+				}
+
 				StreamResponse(ctx, streamId, id)
 			},
+			Close: func(ctx *types.Context, streamId uint8) {
+				closeFetchResponse(id)
+			},
 		}
+		return nil
+	case Cancel:
+		id := int(data[0].Data.(float64))
+
+		closeFetchRequest(id)
+		closeFetchResponse(id)
+
+		response.Type = types.CoreResponseData
 		return nil
 	}
 
@@ -66,6 +107,15 @@ type RequestHead struct {
 	Headers map[string]string
 }
 
+type Request struct {
+	Cancel context.CancelFunc
+}
+
+var fetchId = 0
+
+var fetchRequests = map[int]*Request{}
+var fetchRequestsMutex = sync.Mutex{}
+
 type ResponseHead struct {
 	Id         int
 	Status     int
@@ -73,13 +123,17 @@ type ResponseHead struct {
 	Headers    map[string][]string
 }
 
-var fetchResponses = map[int]*http.Response{}
+type ResponseStream struct {
+	Response *http.Response
+	Canceled bool
+}
+
+var fetchResponses = map[int]*ResponseStream{}
 var fetchResponsesMutex = sync.Mutex{}
-var fetchId = 0
 
 var client = &http.Client{}
 
-func FetchFnApply(requestHead RequestHead, body []byte) (ResponseHead, error) {
+func FetchFnApply(id int, requestHead RequestHead, body []byte) (ResponseHead, error) {
 	reqBody := (io.Reader)(http.NoBody)
 	if len(body) > 0 {
 		reqBody = bytes.NewReader(body)
@@ -87,6 +141,12 @@ func FetchFnApply(requestHead RequestHead, body []byte) (ResponseHead, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	fetchRequestsMutex.Lock()
+	fetchRequests[id] = &Request{
+		Cancel: cancel,
+	}
+	fetchRequestsMutex.Unlock()
 
 	request, err := http.NewRequestWithContext(ctx, requestHead.Method, requestHead.Url, reqBody)
 
@@ -110,9 +170,11 @@ func FetchFnApply(requestHead RequestHead, body []byte) (ResponseHead, error) {
 	}
 
 	fetchResponsesMutex.Lock()
-	id := fetchId
-	fetchResponses[id] = response
-	fetchId += 1
+	responseStream := ResponseStream{
+		Response: response,
+		Canceled: false,
+	}
+	fetchResponses[id] = &responseStream
 	fetchResponsesMutex.Unlock()
 
 	responseHead := ResponseHead{
@@ -138,14 +200,24 @@ func StreamResponse(
 		return
 	}
 
-	defer response.Body.Close()
+	defer response.Response.Body.Close()
 
 	for {
+		if response.Canceled {
+			break
+		}
+
 		buffer := make([]byte, 2048)
-		n, err := response.Body.Read(buffer)
+		n, err := response.Response.Body.Read(buffer)
 		buffer = buffer[:n]
 		end := err == io.EOF
+
+		if response.Canceled {
+			break
+		}
+
 		store.StreamChunk(ctx, streamId, buffer, end)
+
 		if end {
 			break
 		}
@@ -153,5 +225,26 @@ func StreamResponse(
 
 	fetchResponsesMutex.Lock()
 	delete(fetchResponses, responseId)
+	fetchResponsesMutex.Unlock()
+}
+
+func closeFetchRequest(id int) {
+	fetchRequestsMutex.Lock()
+	request, ok := fetchRequests[id]
+	if ok {
+		request.Cancel()
+	}
+	delete(fetchRequests, id)
+	fetchRequestsMutex.Unlock()
+}
+
+func closeFetchResponse(id int) {
+	fetchResponsesMutex.Lock()
+	response, ok := fetchResponses[id]
+	if ok {
+		response.Canceled = true
+		response.Response.Body.Close()
+	}
+	delete(fetchResponses, id)
 	fetchResponsesMutex.Unlock()
 }

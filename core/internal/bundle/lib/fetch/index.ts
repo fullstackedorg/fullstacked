@@ -1,5 +1,6 @@
 import { Fetch } from "../@types/index.ts";
 import {
+    Cancel,
     Fetch as FetchFn,
     RequestHead,
     ResponseBody,
@@ -7,6 +8,8 @@ import {
 } from "../@types/fetch.ts";
 import { bridge } from "../bridge/index.ts";
 import { mergeUint8Arrays } from "../bridge/serialization.ts";
+import { Duplex } from "../bridge/duplex.ts";
+import { EventEmitter } from "../bridge/eventEmitter.ts";
 
 function headersToObj(headers: HeadersInit) {
     if (headers === null) return {};
@@ -39,6 +42,11 @@ async function fetchCore(
     request: string | URL | Request,
     init?: RequestInit
 ): Promise<Response> {
+    const signal = init?.signal;
+    if (signal?.aborted) {
+        throw new DOMException("The operation was aborted.", "AbortError");
+    }
+
     const url = (
         request instanceof URL || typeof request === "string"
             ? urlOrStringToUrl(request)
@@ -62,24 +70,104 @@ async function fetchCore(
             ? await request.arrayBuffer()
             : await bodyInitToBuffer(init?.body);
 
-    const responseHead: ResponseHead = await bridge({
-        mod: Fetch,
-        fn: FetchFn,
-        data: [requestHead, new Uint8Array(requestBody)]
-    });
+    let responseHeadEE: EventEmitter<{
+            response: [ResponseHead];
+            error: [string];
+        }>,
+        responseHead: ResponseHead,
+        responseBodyStream: Duplex;
 
-    const responseBodyStream = await bridge({
-        mod: Fetch,
-        fn: ResponseBody,
-        data: [responseHead.Id]
-    });
+    let rejectHead: (reason?: any) => void;
+
+    const onAbort = () => {
+        const error = new DOMException(
+            "The operation was aborted.",
+            "AbortError"
+        );
+
+        rejectHead?.(error);
+
+        responseHeadEE?.duplex.end();
+
+        responseBodyStream?.end();
+
+        if (responseHead) {
+            bridge({
+                mod: Fetch,
+                fn: Cancel,
+                data: [responseHead.Id]
+            });
+        }
+    };
+
+    if (signal) {
+        signal.addEventListener("abort", onAbort, { once: true });
+    }
+
+    try {
+        responseHead = await new Promise(async (resolve, reject) => {
+            rejectHead = reject;
+            responseHeadEE = (
+                (await bridge({
+                    mod: Fetch,
+                    fn: FetchFn,
+                    data: [requestHead, new Uint8Array(requestBody)]
+                })) as Duplex
+            ).eventEmitter();
+
+            responseHeadEE.on("response", (responseHead) => {
+                resolve(responseHead);
+            });
+
+            responseHeadEE.on("error", (error) => {
+                reject(error);
+            });
+
+            responseHeadEE.duplex.on("close", () => {
+                responseHeadEE = null;
+            });
+        });
+
+        if (signal?.aborted) {
+            throw new DOMException("The operation was aborted.", "AbortError");
+        }
+
+        responseBodyStream = await bridge({
+            mod: Fetch,
+            fn: ResponseBody,
+            data: [responseHead.Id]
+        });
+
+        responseBodyStream.on("close", () => {
+            if (signal) {
+                signal.removeEventListener("abort", onAbort);
+            }
+        });
+    } catch (e) {
+        if (signal) {
+            signal.removeEventListener("abort", onAbort);
+        }
+        throw e;
+    }
 
     const readBody = async () => {
-        let buffer = new Uint8Array();
-        for await (const chunk of responseBodyStream) {
-            buffer = mergeUint8Arrays(buffer, chunk);
+        try {
+            let buffer = new Uint8Array();
+            for await (const chunk of responseBodyStream) {
+                if (signal?.aborted) {
+                    throw new DOMException(
+                        "The operation was aborted.",
+                        "AbortError"
+                    );
+                }
+                buffer = mergeUint8Arrays(buffer, chunk);
+            }
+            return buffer;
+        } finally {
+            if (signal) {
+                signal.removeEventListener("abort", onAbort);
+            }
         }
-        return buffer;
     };
 
     const response: Response = {

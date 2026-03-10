@@ -8,7 +8,9 @@ export type Browser = Awaited<ReturnType<typeof createBrowser>>;
 export async function createBrowser(directory: string) {
     directory = path.resolve(directory);
     const ctx = core.instance.start(directory, directory);
-    const webview = await createWebView(core.instance, ctx);
+    const webview = await createWebView(core.instance, ctx, {
+        quiet: true
+    });
     core.callbackListeners.add(webview.callback);
 
     const browser = await puppeteer.launch({

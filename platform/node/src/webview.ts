@@ -27,8 +27,10 @@ const te = new TextEncoder();
 export async function createWebView(
     core: Core,
     ctx: number,
-    openBrowser = false,
-    first = false
+    opts: {
+        openBrowser?: boolean;
+        quiet?: boolean;
+    }
 ) {
     const port = await getNextAvailablePort(mainPort);
     const server = http.createServer(createHandler(core, ctx));
@@ -48,13 +50,12 @@ export async function createWebView(
 
     server.listen(port);
 
-    if (openBrowser) {
-        if (first) {
-            console.log(`Opening browser at http://localhost:${port}`);
-        }
-        if (!first || process.argv.includes("--open")) {
-            open(`http://localhost:${port}`);
-        }
+    if (!opts.quiet) {
+        console.log(`Listening at http://localhost:${port}`);
+    }
+
+    if (opts.openBrowser) {
+        open(`http://localhost:${port}`);
     }
 
     return {

@@ -34,13 +34,37 @@ const core = await load(
             return;
         }
 
-        createWebView(core, ctx, true, webviews.size === 0).then((webview) => {
-            webviews.set(ctx, webview);
-        });
+        createWebView(core, ctx, {
+            openBrowser: openBrowser || webviews.size >= 1
+        }).then(
+            (webview) => {
+                webviews.set(ctx, webview);
+            }
+        );
     }
 );
 
-const directory = path.resolve(process.argv[2] || ".");
+const args = process.argv.slice(2);
+const help = args.includes("-h") || args.includes("--help");
+const openBrowser = args.includes("-o") || args.includes("--open");
+const buildOnly = args.includes("-b") || args.includes("--build");
+const positionalArgs = args.filter((arg) => !arg.startsWith("-"));
+const directory = path.resolve(positionalArgs.at(-1) || ".");
+
+if (help) {
+    console.log(`
+Usage: fullstacked [options] [directory]
+
+Options:
+  -o, --open    Directly open the browser
+  -b, --build   Only bundle, don't run afterward
+  -h, --help    Display this help message
+
+Directory:
+  The directory to bundle (defaults to ".")
+    `);
+    process.exit(0);
+}
 
 const mainCtx = core.start(directory, directory);
 
@@ -60,14 +84,15 @@ tailwindcssBuilder.on("build", (entryfile, outfile) => {
     tailwindcssBuilder.writeEvent("build-done");
 });
 
-const result = await bundle(".");
+const result = await bundle();
 if (result.Warnings?.length) {
     console.warn("Warnings:", result.Warnings);
 }
 if (result.Errors?.length) {
     console.error("Errors:", result.Errors);
-} else if (!process.argv.includes("-b")) {
-    run(".");
+} else if (!buildOnly) {
+    run();
 } else {
+    console.log("Build complete.");
     end();
 }

@@ -18,8 +18,8 @@ export function esbuildVersion(): Promise<string> {
     });
 }
 
-export function bundle(entryPoint: string): Promise<EsbuildResult> {
-    const resolved = path.resolve(entryPoint);
+export function bundle(entryPoint?: string): Promise<EsbuildResult> {
+    const resolved = path.resolve(entryPoint ?? ".");
 
     return new Promise(async (resolve) => {
         const ee = (
@@ -55,7 +55,7 @@ export async function builderTailwindCSS() {
     ).eventEmitter() as EventEmitter<{
         // [entryfile, outfile, ...sources]
         build: string[];
-        "build-done": undefined;
+        "build-done": [];
     }>;
 }
 

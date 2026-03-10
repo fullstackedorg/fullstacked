@@ -58,7 +58,7 @@ type StreamData = string | Buffer | Uint8Array | DataView;
 
 type EndCallback = () => void;
 
-export interface Duplex extends ReadableStream<Uint8Array> {
+export interface Duplex extends ReadableStream<Uint8Array<ArrayBuffer>> {
     on(
         event: "data",
         callback: (chunk: StreamData, encoding?: string) => void
