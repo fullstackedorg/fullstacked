@@ -10,9 +10,9 @@ import {
     binExtension,
     binLocation,
     environment,
-    fullVersion,
     platform
 } from "./utils.ts";
+import { getVersion } from "../../version.ts";
 
 const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
 
@@ -78,7 +78,12 @@ const packageJsonFile = path.resolve(currentDirectory, "package.json");
 const packageJson = JSON.parse(
     fs.readFileSync(packageJsonFile, { encoding: "utf-8" })
 );
+
+const version = getVersion(path.resolve(currentDirectory, "..", ".."));
+const fullVersion = `${version.major}.${version.minor}.${version.patch}-${version.build}`;
+
 packageJson.version = fullVersion;
+
 fs.writeFileSync(packageJsonFile, JSON.stringify(packageJson, null, 4));
 
 const binPackageJson = {

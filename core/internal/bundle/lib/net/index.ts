@@ -5,7 +5,7 @@ import { bridge } from "../bridge/index.ts";
 import { Net } from "../@types/index.ts";
 import { Connect } from "../@types/net.ts";
 import { Duplex } from "../bridge/duplex.ts";
-import EventEmitter from "events";
+import { Duplex as RealDuplex } from "stream";
 
 function parseOptions(
     pathOrPortOrOptions: Partial<ConnectOpts> | string | number,
@@ -67,7 +67,7 @@ type SocketOpts = {
     // writable
 };
 
-export class Socket extends EventEmitter {
+export class Socket extends RealDuplex {
     private duplex: Duplex = null;
     writable: boolean = true;
     readable: boolean = true;
@@ -99,14 +99,18 @@ export class Socket extends EventEmitter {
         });
     }
 
+    // @ts-ignore
     end(data: Uint8Array) {
         this.duplex.end(data);
+        return this;
     }
 
-    destroy() {
+    destroy(error?: Error) {
         this.duplex.end();
+        return this;
     }
 
+    // @ts-ignore
     write(data: Uint8Array) {
         this.duplex.write(data);
         return this;
@@ -132,8 +136,8 @@ export class Socket extends EventEmitter {
         return this;
     }
 
-    pipe() {
-        return this;
+    pipe(destination: any, options?: { end?: boolean }) {
+        return this as any;
     }
 
     ref() {
@@ -194,6 +198,33 @@ export function connect(
 
 export const createConnection: typeof connect = (...args: any) =>
     connect(...(args as [any]));
+
+const maxIPv4Length = 15;
+const maxIPv6Length = 45;
+
+export function isIP(addr: string) {
+    return isIPv6(addr) ? 6 : isIPv4(addr) ? 4 : 0;
+}
+
+export function isIPv4(addr: string) {
+    if (addr.length > maxIPv4Length) {
+        return false;
+    }
+
+    const ipv4Regex =
+        /^(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)){3}$/;
+    return ipv4Regex.test(addr);
+}
+
+export function isIPv6(addr: string) {
+    if (addr.length > maxIPv6Length) {
+        return false;
+    }
+
+    const ipv6Regex =
+        /^(?:(?:[a-fA-F\d]{1,4}:){7}(?:[a-fA-F\d]{1,4}|:)|(?:[a-fA-F\d]{1,4}:){6}(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)){3}|:[a-fA-F\d]{1,4}|:)|(?:[a-fA-F\d]{1,4}:){5}(?::(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)){3}|(?::[a-fA-F\d]{1,4}){1,2}|:)|(?:[a-fA-F\d]{1,4}:){4}(?:(?::[a-fA-F\d]{1,4}){0,1}:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)){3}|(?::[a-fA-F\d]{1,4}){1,3}|:)|(?:[a-fA-F\d]{1,4}:){3}(?:(?::[a-fA-F\d]{1,4}){0,2}:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)){3}|(?::[a-fA-F\d]{1,4}){1,4}|:)|(?:[a-fA-F\d]{1,4}:){2}(?:(?::[a-fA-F\d]{1,4}){0,3}:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)){3}|(?::[a-fA-F\d]{1,4}){1,5}|:)|(?:[a-fA-F\d]{1,4}:){1}(?:(?::[a-fA-F\d]{1,4}){0,4}:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)){3}|(?::[a-fA-F\d]{1,4}){1,6}|:)|(?::(?:(?::[a-fA-F\d]{1,4}){0,5}:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)){3}|(?::[a-fA-F\d]{1,4}){1,7}|:)))(?:%[0-9a-zA-Z]{1,})?$/;
+    return ipv6Regex.test(addr);
+}
 
 export default {
     Socket,

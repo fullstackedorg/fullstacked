@@ -157,6 +157,7 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
     };
 
     const stream: any = {
+        duplex: true,
         [Symbol.asyncIterator]() {
             return {
                 next

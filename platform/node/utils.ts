@@ -26,10 +26,6 @@ export const packageJson = JSON.parse(
     fs.readFileSync(path.resolve(currentDirectory, "package.json"), "utf-8")
 );
 
-export const version = getVersion(path.resolve(currentDirectory, "..", ".."));
-
-export const fullVersion = `${version.major}.${version.minor}.${version.patch}-${version.build}`;
-
 export const binLocation = path.resolve(
     currentDirectory,
     "..",
