@@ -1,6 +1,6 @@
 {
     "name": "fullstacked",
-    "version": "1.0.0-alpha-1590",
+    "version": "1.0.0-alpha-1591",
     "bin": {
         "fullstacked": "index.js"
     },

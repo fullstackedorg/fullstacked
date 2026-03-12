@@ -84,6 +84,7 @@ func Switch(
 				StreamResponse(ctx, streamId, id)
 			},
 			Close: func(ctx *types.Context, streamId uint8) {
+				closeFetchRequest(id)
 				closeFetchResponse(id)
 			},
 		}
@@ -194,18 +195,18 @@ func StreamResponse(
 		return
 	}
 
-	defer response.Body.Close()
+	defer closeFetchResponse(responseId)
 
 	for {
 		response := safelyGetResponse(responseId)
 		if response == nil {
-			return
+			break
 		}
 
 		buffer := make([]byte, 2048)
 		n, err := response.Body.Read(buffer)
 		buffer = buffer[:n]
-		end := err == io.EOF
+		end := err != nil
 
 		store.StreamChunk(ctx, streamId, buffer, end)
 
@@ -213,8 +214,6 @@ func StreamResponse(
 			break
 		}
 	}
-
-	closeFetchResponse(responseId)
 }
 
 func closeFetchRequest(id int) {
