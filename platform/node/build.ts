@@ -107,11 +107,11 @@ fs.writeFileSync(
     JSON.stringify(binPackageJson, null, 4)
 );
 
-fs.rmSync(path.resolve(currentDirectory, "types"), { recursive: true, force: true });
-child_process.execSync(
-    `npx tsc -p ./tsconfig.lib.json`,
-    {
-        cwd: path.resolve(currentDirectory, "..", ".."),
-        stdio: "inherit"
-    }
-);
+fs.rmSync(path.resolve(currentDirectory, "types"), {
+    recursive: true,
+    force: true
+});
+child_process.execSync(`npx tsc -p ./tsconfig.lib.json`, {
+    cwd: path.resolve(currentDirectory, "..", ".."),
+    stdio: "inherit"
+});

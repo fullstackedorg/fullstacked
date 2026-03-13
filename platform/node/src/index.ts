@@ -52,7 +52,9 @@ const positionalArgs = args.filter((arg) => !arg.startsWith("-"));
 const directory = path.resolve(positionalArgs.at(-1) || ".");
 
 if (showVersion) {
-    console.log(`FullStacked v${version.major}.${version.minor}.${version.patch} (build ${version.build}), branch ${version.branch}, hash ${version.hash.slice(0, 8)}`);
+    console.log(
+        `FullStacked v${version.major}.${version.minor}.${version.patch} (build ${version.build}), branch ${version.branch}, hash ${version.hash.slice(0, 8)}`
+    );
     process.exit(0);
 }
 

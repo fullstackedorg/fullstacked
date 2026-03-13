@@ -13,6 +13,6 @@ export function init(dsn: string, release: string) {
 
 const sentry = {
     init
-}
+};
 
 export default sentry;
