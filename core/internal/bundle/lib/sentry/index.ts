@@ -11,6 +11,8 @@ export function init(dsn: string, release: string) {
     });
 }
 
-export default {
+const sentry = {
     init
-};
+}
+
+export default sentry;

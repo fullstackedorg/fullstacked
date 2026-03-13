@@ -1,6 +1,6 @@
 {
     "name": "fullstacked",
-    "version": "1.0.0-alpha-1593",
+    "version": "1.0.0-alpha-1594",
     "bin": {
         "fullstacked": "index.js"
     },
@@ -49,6 +49,9 @@
         },
         "./run": {
             "types": "./types/run/index.d.ts"
+        },
+        "./sentry": {
+            "types": "./types/sentry/index.d.ts"
         }
     }
 }
