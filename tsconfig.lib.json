@@ -1,0 +1,19 @@
+{
+    "compilerOptions": {
+        "esModuleInterop": true,
+        "module": "esnext",
+        "target": "esnext",
+        "moduleResolution": "bundler",
+        "allowImportingTsExtensions": true,
+        "emitDeclarationOnly": true,
+        "declaration": true,
+        "declarationDir": "platform/node/types",
+        "skipLibCheck": true
+    },
+    "include": [
+        "core/internal/bundle/lib/bundle/index.ts",
+        "core/internal/bundle/lib/git/index.ts",
+        "core/internal/bundle/lib/packages/index.ts",
+        "core/internal/bundle/lib/run/index.ts"
+    ]
+}

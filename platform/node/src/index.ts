@@ -8,6 +8,7 @@ import {
     builderTailwindCSS
 } from "../../../core/internal/bundle/lib/bundle/index.ts";
 import { run } from "../../../core/internal/bundle/lib/run/index.ts";
+import version from "../../../core/internal/bundle/lib/process/version.json";
 
 const end = () => {
     core.end();
@@ -44,16 +45,24 @@ const core = await load(
 
 const args = process.argv.slice(2);
 const help = args.includes("-h") || args.includes("--help");
+const showVersion = args.includes("-v") || args.includes("--version");
 const openBrowser = args.includes("-o") || args.includes("--open");
 const buildOnly = args.includes("-b") || args.includes("--build");
 const positionalArgs = args.filter((arg) => !arg.startsWith("-"));
 const directory = path.resolve(positionalArgs.at(-1) || ".");
+
+if (showVersion) {
+    console.log(`FullStacked v${version.major}.${version.minor}.${version.patch} (build ${version.build}), branch ${version.branch}, hash ${version.hash.slice(0, 8)}`);
+    process.exit(0);
+}
 
 if (help) {
     console.log(`
 Usage: fullstacked [options] [directory]
 
 Options:
+  -v, --version Display the current version
+  -p, --port    Define the main starting port (defaults to 9000)
   -o, --open    Directly open the browser
   -b, --build   Only bundle, don't run afterward
   -h, --help    Display this help message

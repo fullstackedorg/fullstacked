@@ -16,6 +16,12 @@ import { getVersion } from "../../version.ts";
 
 const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
 
+fs.readdirSync(currentDirectory).forEach((file) => {
+    if (file.endsWith(".tgz")) {
+        fs.rmSync(path.resolve(currentDirectory, file));
+    }
+});
+
 if (fs.existsSync(binLocation)) {
     fs.rmSync(binLocation, { recursive: true });
 }
@@ -95,4 +101,13 @@ const binPackageJson = {
 fs.writeFileSync(
     path.resolve(binLocation, "package.json"),
     JSON.stringify(binPackageJson, null, 4)
+);
+
+fs.rmSync(path.resolve(currentDirectory, "types"), { recursive: true, force: true });
+child_process.execSync(
+    `npx tsc -p ./tsconfig.lib.json`,
+    {
+        cwd: path.resolve(currentDirectory, "..", ".."),
+        stdio: "inherit"
+    }
 );

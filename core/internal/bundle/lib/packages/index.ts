@@ -40,8 +40,10 @@ export function audit(directory: string) {
     });
 }
 
-export default {
+const packages = {
     install,
     uninstall,
     audit
 };
+
+export default packages;

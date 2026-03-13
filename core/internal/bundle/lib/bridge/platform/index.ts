@@ -43,11 +43,12 @@ if (globalThis.process) {
                 });
             }
 
+            // globals process, fetch and buffer
             await import("process");
             process.chdir(cwd);
-
             // @ts-ignore
             await import("fetch");
+            await import("buffer");
 
             const platform = await (
                 await globalThis.originalFetch("/platform")

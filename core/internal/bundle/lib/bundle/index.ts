@@ -59,9 +59,11 @@ export async function builderTailwindCSS() {
     }>;
 }
 
-export default {
+const bundler = {
     esbuildVersion,
     bundle,
     bundleFile,
     builderTailwindCSS
 };
+
+export default bundler;

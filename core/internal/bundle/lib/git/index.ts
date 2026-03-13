@@ -163,7 +163,7 @@ export function restore(directory: string, ...files: string[]) {
     });
 }
 
-export default {
+const git = {
     createGitAuthManager,
     init,
     status,
@@ -180,3 +180,5 @@ export default {
     merge,
     restore
 };
+
+export default git;

@@ -16,11 +16,15 @@ import {
 import { StaticFile } from "../../../core/internal/bundle/lib/@types/router.ts";
 import { fromByteArray } from "../../../core/internal/bundle/lib/bridge/base64.ts";
 
-// export let mainPort = parseInt(getEnvVar("port"));
-// if (!mainPort || isNaN(mainPort)) {
-//     mainPort = 9000;
-// }
-const mainPort = 9000;
+const args = process.argv;
+const portIndex = args.findIndex((arg) => arg === "-p" || arg === "--port");
+let mainPort = 9000;
+if (portIndex !== -1 && args[portIndex + 1]) {
+    mainPort = parseInt(args[portIndex + 1]);
+    if (isNaN(mainPort)) {
+        mainPort = 9000;
+    }
+}
 
 const te = new TextEncoder();
 

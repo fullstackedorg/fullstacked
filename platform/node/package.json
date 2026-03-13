@@ -1,6 +1,6 @@
 {
     "name": "fullstacked",
-    "version": "1.0.0-alpha-1592",
+    "version": "1.0.0-alpha-1593",
     "bin": {
         "fullstacked": "index.js"
     },
@@ -21,12 +21,34 @@
         "esbuild": "^0.27.3",
         "node-addon-api": "^8.6.0"
     },
+    "optionalDependencies": {
+        "@fullstacked/darwin-arm64": "*",
+        "@fullstacked/darwin-x64": "*",
+        "@fullstacked/linux-arm64": "*",
+        "@fullstacked/linux-x64": "*",
+        "@fullstacked/win32-arm64": "*",
+        "@fullstacked/win32-x64": "*"
+    },
     "author": "FullStacked",
     "license": "MIT",
-    "description": "Create, run and share projects built with web technologies in a fully cross-platform, local-first environment.",
+    "description": "The Portable JavaScript Runtime",
     "homepage": "https://fullstacked.org",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/fullstackedorg/fullstacked.git"
+    },
+    "exports": {
+        "./bundle": {
+            "types": "./types/bundle/index.d.ts"
+        },
+        "./git": {
+            "types": "./types/git/index.d.ts"
+        },
+        "./packages": {
+            "types": "./types/packages/index.d.ts"
+        },
+        "./run": {
+            "types": "./types/run/index.d.ts"
+        }
     }
 }
