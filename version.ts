@@ -26,9 +26,9 @@ export function getVersion(cwd = process.cwd()) {
     const [major, minor, patch] = packageJson.version.split(".");
 
     const version: Partial<{
-        major: number;
-        minor: number;
-        patch: number;
+        major: string;
+        minor: string;
+        patch: string;
         build: string;
         branch: string;
         hash: string;

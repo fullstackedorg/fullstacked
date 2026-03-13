@@ -86,7 +86,7 @@ const packageJson = JSON.parse(
 );
 
 const version = getVersion(path.resolve(currentDirectory, "..", ".."));
-const fullVersion = `${version.major}.${version.minor}.${version.patch}-${version.build}`;
+const fullVersion = `${version.major}.${version.minor}.${version.patch}${version.patch.includes("-") ? "." : "-"}${version.build}`;
 
 packageJson.version = fullVersion;
 

@@ -1,5 +1,4 @@
 import os from "node:os";
-import { getVersion } from "../../version.ts";
 import path from "node:path";
 import url from "node:url";
 import fs from "node:fs";
