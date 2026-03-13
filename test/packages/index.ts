@@ -29,7 +29,6 @@ suite("packages - e2e", () => {
             `{"scripts":{"test":"echo test"}}`
         );
     });
-
     afterEach(clean);
 
     test("go", () => {

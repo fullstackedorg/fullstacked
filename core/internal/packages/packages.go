@@ -912,38 +912,78 @@ func install(
 	wg.Wait()
 
 	// 5.5 Mark peers
-	peersToMark := make(map[string]bool)
-	for pkgPath, pkg := range newLock.Packages {
-		for peerName := range pkg.PeerDependencies {
-			curr := pkgPath
-			// Simple node resolution up the tree
-			for {
-				tryPath := path.Join(curr, "node_modules", peerName)
-				if _, ok := newLock.Packages[tryPath]; ok {
-					peersToMark[tryPath] = true
-					break
-				}
-				if curr == "" || curr == "." {
-					break
-				}
+	// First, find all packages reachable via regular/optional dependencies from the root
+	regularReach := make(map[string]bool)
+	queueReq := []string{""}
+	regularReach[""] = true
 
-				// Move up: strip node_modules/PKG
-				dir := path.Dir(curr)
-				if path.Base(dir) == "node_modules" {
-					curr = path.Dir(dir)
-				} else if dir == "node_modules" {
-					curr = ""
-				} else {
-					curr = ""
-				}
+	resolvePath := func(currPath, depName string) string {
+		curr := currPath
+		for {
+			tryPath := path.Join(curr, "node_modules", depName)
+			if _, ok := newLock.Packages[tryPath]; ok {
+				return tryPath
+			}
+			if curr == "" || curr == "." {
+				break
+			}
+
+			dir := path.Dir(curr)
+			if path.Base(dir) == "node_modules" {
+				curr = path.Dir(dir)
+			} else if dir == "node_modules" {
+				curr = ""
+			} else {
+				curr = ""
+			}
+		}
+		return ""
+	}
+
+	for len(queueReq) > 0 {
+		currPath := queueReq[0]
+		queueReq = queueReq[1:]
+
+		pkg := newLock.Packages[currPath]
+
+		deps := make(map[string]string)
+		if currPath == "" {
+			for k, v := range pkgJSON.Dependencies {
+				deps[k] = v
+			}
+			for k, v := range pkgJSON.DevDependencies {
+				deps[k] = v
+			}
+			for k, v := range pkgJSON.OptionalDependencies {
+				deps[k] = v
+			}
+		} else {
+			for k, v := range pkg.Dependencies {
+				deps[k] = v
+			}
+			for k, v := range pkg.OptionalDependencies {
+				deps[k] = v
+			}
+		}
+
+		for depName := range deps {
+			resolvedPath := resolvePath(currPath, depName)
+			if resolvedPath != "" && !regularReach[resolvedPath] {
+				regularReach[resolvedPath] = true
+				queueReq = append(queueReq, resolvedPath)
 			}
 		}
 	}
 
-	for p := range peersToMark {
-		if val, ok := newLock.Packages[p]; ok {
-			val.Peer = true
-			newLock.Packages[p] = val
+	for pkgPath := range newLock.Packages {
+		if pkgPath == "" {
+			continue
+		}
+		if !regularReach[pkgPath] {
+			if val, ok := newLock.Packages[pkgPath]; ok {
+				val.Peer = true
+				newLock.Packages[pkgPath] = val
+			}
 		}
 	}
 

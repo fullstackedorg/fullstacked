@@ -1,3 +1,6 @@
-[submodule "app"]
-	path = app
-	url = https://github.com/fullstackedorg/app.git
+[submodule "app/shell"]
+	path = app/shell
+	url = https://github.com/fullstackedorg/shell.git
+[submodule "app/demo"]
+	path = app/demo
+	url = https://github.com/fullstackedorg/demo.git

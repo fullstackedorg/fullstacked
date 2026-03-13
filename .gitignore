@@ -17,3 +17,4 @@ test/**/_index.ts.tailwind.css
 test/**/output.css
 test/**/test
 platform/@fullstacked
+app/user_data

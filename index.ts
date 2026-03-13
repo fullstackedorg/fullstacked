@@ -1,16 +1,23 @@
 import "./build.ts";
 import "./platform/node/build.ts";
+import fs from "fs";
 
-import path from "node:path";
-import fs from "node:fs";
-import child_process from "node:child_process";
-
-const directory = path.resolve(process.argv[2] || ".");
-// if (fs.existsSync(path.join(directory, "package.json"))) {
-//     child_process.execSync("npm run prestart", {
-//         cwd: directory,
-//         stdio: "inherit"
-//     });
-// }
+await Promise.all([
+    fs.promises.cp(
+        "app/shell/node_modules/oxide-wasm/pkg/oxide_wasm_bg.wasm",
+        "app/out/oxide_wasm_bg.wasm"
+    ),
+    fs.promises.cp(
+        "app/shell/node_modules/lightningcss-wasm/lightningcss_node.wasm",
+        "app/out/lightningcss_node.wasm"
+    ),
+    fs.promises.cp(
+        "app/shell/node_modules/tailwindcss",
+        "app/out/tailwindcss",
+        {
+            recursive: true
+        }
+    )
+]);
 
 await import("./platform/node/index.js");
