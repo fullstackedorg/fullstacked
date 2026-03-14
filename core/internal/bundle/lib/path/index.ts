@@ -11,6 +11,9 @@ import {
     Resolve
 } from "../@types/path.ts";
 import { cwd } from "../process/cwd/index.ts";
+import os from "../os/index.ts";
+
+export const sep = os.platform() === "win32" ? "\\" : "/";
 
 export function resolve(...paths: string[]): string {
     if (paths[0].startsWith("build:")) {
@@ -93,6 +96,7 @@ export function relative(from: string, to: string) {
 }
 
 const mod = {
+    sep,
     resolve,
     join,
     normalize,

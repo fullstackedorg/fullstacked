@@ -6,9 +6,10 @@ CoreLib loadLibrary(std::string libPath) {
 
     CoreLib lib = {
         (Start)GetProcAddress(coreLib, "start"),
-        (Callback)GetProcAddress(coreLib, "callback"),
+        (Stop)GetProcAddress(coreLib, "stop"),
+        (SetOnStreamData)GetProcAddress(coreLib, "setOnStreamData"),
         (Call)GetProcAddress(coreLib, "call"),
-        (GetResponse)GetProcAddress(coreLib, "getResponse"),
+        (GetCorePayload)GetProcAddress(coreLib, "getCorePayload"),
     };
 
     return lib;

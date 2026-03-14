@@ -7,6 +7,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
+	"slices"
+	"strings"
 
 	"github.com/djherbis/times"
 )
@@ -137,6 +140,11 @@ func StatsFn(p string) (GoFileInfo, error) {
 		birthTime = t.BirthTime()
 	}
 
+	perm := fileInfo.Mode().Perm()
+	if runtime.GOOS == "windows" {
+		perm = perm & 0666
+	}
+
 	return GoFileInfo{
 		Name:      fileInfo.Name(),
 		Size:      fileInfo.Size(),
@@ -145,7 +153,7 @@ func StatsFn(p string) (GoFileInfo, error) {
 		CTime:     cTime.UnixNano(),
 		BirthTime: birthTime.UnixNano(),
 		IsDir:     fileInfo.IsDir(),
-		Mode:      fileInfo.Mode().Perm(),
+		Mode:      perm,
 	}, nil
 }
 
@@ -182,6 +190,10 @@ func ReadDirFn(p string) ([]GoFileInfo, error) {
 		})
 	}
 
+	slices.SortFunc(items, func(a GoFileInfo, b GoFileInfo) int {
+		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+	})
+
 	return items, nil
 }
 
@@ -205,6 +217,10 @@ func ReadDirFnRecursive(p string) ([]GoFileInfo, error) {
 		})
 
 		return nil
+	})
+
+	slices.SortFunc(items, func(a GoFileInfo, b GoFileInfo) int {
+		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
 	})
 
 	return items, err

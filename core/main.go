@@ -4,6 +4,7 @@ package main
 // #include <android/log.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 typedef void (*Callback)(uint8_t ctx, uint8_t id, int size);
 static inline void CallMyFunction(void *callback, uint8_t ctx, uint8_t id, int size) {

@@ -1,5 +1,6 @@
 import core from "./core.ts";
 import { after, before } from "node:test";
+import { URL } from "node:url";
 
 before(core.start);
 
@@ -23,7 +24,8 @@ if (process.argv.length > 2) {
 }
 
 for (const test of tests) {
-    await import(test);
+    const url = new URL(test, import.meta.url);
+    await import(url.toString());
 }
 
 // hangs if C++ callback not released

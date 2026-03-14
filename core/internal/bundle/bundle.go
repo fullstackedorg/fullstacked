@@ -8,6 +8,7 @@ import (
 	"fullstackedorg/fullstacked/internal/serialization"
 	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/types"
+	"os"
 	"path"
 	"path/filepath"
 	"runtime/debug"
@@ -321,8 +322,8 @@ func BundleDirFn(ctx *types.Context, entryPoint string) EsbuildResult {
 		entrypointBaseName := path.Base(buildOptions.Stdin.Sourcefile)
 
 		for _, file := range result.OutputFiles {
-			if strings.HasPrefix(path.Base(file.Path), "stdin") {
-				file.Path = path.Join(path.Dir(file.Path), entrypointBaseName+path.Ext(file.Path))
+			if strings.HasPrefix(filepath.Base(file.Path), "stdin") {
+				file.Path = filepath.Join(filepath.Dir(file.Path), entrypointBaseName+path.Ext(file.Path))
 			}
 			fs.WriteFileFn(file.Path, file.Contents)
 
@@ -335,7 +336,7 @@ func BundleDirFn(ctx *types.Context, entryPoint string) EsbuildResult {
 		}
 
 		if tailwindcssEntry != "" {
-			tailwindOutput := path.Join(buildOptions.Outdir, entrypointBaseName+".tailwind.css")
+			tailwindOutput := filepath.Join(buildOptions.Outdir, entrypointBaseName+".tailwind.css")
 			err := tailwindCSSBuild(ctx, tailwindcssEntry, tailwindOutput, sources)
 			if err == nil {
 				// relative to build dir
@@ -349,7 +350,7 @@ func BundleDirFn(ctx *types.Context, entryPoint string) EsbuildResult {
 
 		// files must be relative to out directory
 		html, _ := generateIndexHTML(htmlAssets)
-		fs.WriteFileFn(path.Join(buildOptions.Outdir, "index.html"), html)
+		fs.WriteFileFn(filepath.Join(buildOptions.Outdir, "index.html"), html)
 		indexHTMLPathRel := fspath.RelativeToRoot(ctx, path.Join(buildOptions.Outdir, "index.html"))
 		esbuildResult.OutputFiles = append(esbuildResult.OutputFiles, indexHTMLPathRel)
 	}
@@ -423,8 +424,15 @@ var esbuildPluginsLib = []esbuild.Plugin{
 				}, nil
 			})
 
+			pwd, _ := os.Getwd()
+
 			// resolve relative import in lib modules
 			build.OnResolve(esbuild.OnResolveOptions{Namespace: "lib", Filter: ".*"}, func(args esbuild.OnResolveArgs) (esbuild.OnResolveResult, error) {
+				if !strings.HasPrefix(args.ResolveDir, "/") {
+					dir, _ := filepath.Rel(pwd, args.ResolveDir)
+					args.ResolveDir = "/" + filepath.ToSlash(dir)
+				}
+
 				Path := path.Join(args.ResolveDir, args.Path)
 				return esbuild.OnResolveResult{
 					Path:      Path,

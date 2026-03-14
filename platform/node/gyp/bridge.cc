@@ -80,7 +80,9 @@ void N_Callback(const Napi::CallbackInfo &info) {
 }
 
 void N_End(const Napi::CallbackInfo &info) {
+    std::cout << "ended" << std::endl;
     tsfn.Release();
+    std::cout << "ended" << std::endl;
 }
 
 Napi::ArrayBuffer N_Call(const Napi::CallbackInfo &info) {

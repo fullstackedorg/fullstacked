@@ -314,7 +314,7 @@ suite("fs - e2e", () => {
         const nodeStats = nodeFs.statSync(path);
         assert.deepEqual(stats.mode, nodeStats.mode);
 
-        nodeFs.rmdirSync(path);
+        nodeFs.rmSync(path, { recursive: true, force: true });
     });
 
     test("mkdir", (_, done) => {
@@ -331,7 +331,7 @@ suite("fs - e2e", () => {
                 const stats = fs.statSync(path);
                 const nodeStats = nodeFs.statSync(path);
                 assert.deepEqual(stats.mode, nodeStats.mode);
-                nodeFs.rmdirSync(path);
+                nodeFs.rmSync(path, { recursive: true, force: true });
                 done();
             } catch (e) {
                 done(e);
@@ -352,7 +352,7 @@ suite("fs - e2e", () => {
         const nodeStats = await nodeFs.promises.stat(path);
         assert.deepEqual(stats.mode, nodeStats.mode);
 
-        nodeFs.rmdirSync(path);
+        nodeFs.rmSync(path, { recursive: true, force: true });
     });
 
     test("rmSync", () => {

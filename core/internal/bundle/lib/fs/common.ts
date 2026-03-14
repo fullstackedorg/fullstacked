@@ -1,3 +1,4 @@
+import path from "../path/index.ts";
 import { GoFileInfo } from "../@types/fs";
 import { fromByteArray } from "../bridge/base64.ts";
 
@@ -60,12 +61,13 @@ export interface Stats {
     // isSymbolicLink(): boolean
 }
 
-export function fileInfoToStat(fileInfo: GoFileInfo): Stats {
-    const typeFlag = fileInfo.IsDir
-        ? 16384 // fs.constants.S_IFDIR
-        : 32768; // fs.constants.S_IFREG
+const S_IFREG = 0o100000;
+const S_IFDIR = 0o040000;
 
-    const mode = typeFlag | fileInfo.Mode;
+export function fileInfoToStat(fileInfo: GoFileInfo): Stats {
+    const permissions = fileInfo.Mode & 0o777;
+    const fileTypeMask = fileInfo.IsDir ? S_IFDIR : S_IFREG;
+    const mode = fileTypeMask | permissions;
 
     return {
         mode,
@@ -106,9 +108,9 @@ export function convertGoFileInfo(
 ): Dirent[] | string[] {
     if (withFileTypes) {
         return items.map((item) => {
-            const itemNameComponents = item.Name.split("/");
+            const itemNameComponents = item.Name.split(path.sep);
             const name = itemNameComponents.pop();
-            const parentPath = [baseDir, ...itemNameComponents].join("/");
+            const parentPath = [baseDir, ...itemNameComponents].join(path.sep);
             return {
                 name,
                 parentPath,

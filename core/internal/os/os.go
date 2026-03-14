@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fullstackedorg/fullstacked/types"
 	"runtime"
-
-	"golang.org/x/sys/unix"
 )
 
 type OsFn = uint8
@@ -27,7 +25,11 @@ func Switch(
 	switch header.Fn {
 	case Platform:
 		response.Type = types.CoreResponseData
-		response.Data = runtime.GOOS
+		goos := runtime.GOOS
+		if goos == "windows" {
+			goos = "win32"
+		}
+		response.Data = goos
 		return nil
 	case Arch:
 		response.Type = types.CoreResponseData
@@ -76,21 +78,4 @@ type UnameInfo struct {
 	Release  string `json:"release"`
 	Version  string `json:"version"`
 	Machine  string `json:"machine"`
-}
-
-func uname() (UnameInfo, error) {
-	uname := unix.Utsname{}
-	err := unix.Uname(&uname)
-
-	if err != nil {
-		return UnameInfo{}, err
-	}
-
-	return UnameInfo{
-		Sysname:  int8ToStr(uname.Sysname[:]),
-		Nodename: int8ToStr(uname.Nodename[:]),
-		Release:  int8ToStr(uname.Release[:]),
-		Version:  int8ToStr(uname.Version[:]),
-		Machine:  int8ToStr(uname.Machine[:]),
-	}, nil
 }
