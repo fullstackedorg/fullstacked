@@ -190,9 +190,11 @@ func ReadDirFn(p string) ([]GoFileInfo, error) {
 		})
 	}
 
-	slices.SortFunc(items, func(a GoFileInfo, b GoFileInfo) int {
-		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
-	})
+	if runtime.GOOS == "windows" {
+		slices.SortFunc(items, func(a GoFileInfo, b GoFileInfo) int {
+			return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+		})
+	}
 
 	return items, nil
 }
@@ -217,10 +219,6 @@ func ReadDirFnRecursive(p string) ([]GoFileInfo, error) {
 		})
 
 		return nil
-	})
-
-	slices.SortFunc(items, func(a GoFileInfo, b GoFileInfo) int {
-		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
 	})
 
 	return items, err
