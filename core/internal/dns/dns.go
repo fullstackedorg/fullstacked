@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"context"
 	"errors"
 	"fullstackedorg/fullstacked/types"
 	"net"
@@ -18,6 +19,25 @@ const (
 	ResolveSRV   DnsFn = 5
 	ResolveTXT   DnsFn = 6
 )
+
+var customResolver *net.Resolver
+
+func getResolver() *net.Resolver {
+	if customResolver == nil {
+		// Google DNS server
+		dnsServer := "8.8.8.8:53"
+
+		customResolver = &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+				d := net.Dialer{}
+				return d.DialContext(ctx, "udp", dnsServer)
+			},
+		}
+	}
+
+	return customResolver
+}
 
 func Switch(
 	ctx *types.Context,
@@ -38,7 +58,7 @@ func Switch(
 			response.Data = ipv6
 		}
 	case ResolveCNAME:
-		cname, err := net.LookupCNAME(data[0].Data.(string))
+		cname, err := getResolver().LookupCNAME(context.Background(), data[0].Data.(string))
 		if err == nil {
 			response.Data = []string{strings.TrimSuffix(cname, ".")}
 		}
@@ -48,7 +68,7 @@ func Switch(
 			response.Data = mx
 		}
 	case ResolveNS:
-		ns, err := net.LookupNS(data[0].Data.(string))
+		ns, err := getResolver().LookupNS(context.Background(), data[0].Data.(string))
 		if err == nil {
 			nss := []string{}
 			for _, r := range ns {
@@ -62,7 +82,7 @@ func Switch(
 			response.Data = srv
 		}
 	case ResolveTXT:
-		txt, err := net.LookupTXT(data[0].Data.(string))
+		txt, err := getResolver().LookupTXT(context.Background(), data[0].Data.(string))
 		if err == nil {
 			response.Data = [][]string{txt}
 		}
@@ -79,7 +99,7 @@ func Switch(
 }
 
 func resolve4(host string) ([]string, error) {
-	ips, err := net.LookupIP(host)
+	ips, err := getResolver().LookupIP(context.Background(), "ip", host)
 
 	if err != nil {
 		return nil, err
@@ -97,7 +117,7 @@ func resolve4(host string) ([]string, error) {
 }
 
 func resolve6(host string) ([]string, error) {
-	ips, err := net.LookupIP(host)
+	ips, err := getResolver().LookupIP(context.Background(), "ip", host)
 
 	if err != nil {
 		return nil, err
@@ -121,7 +141,7 @@ type MX struct {
 }
 
 func resolveMx(host string) ([]MX, error) {
-	mx, err := net.LookupMX(host)
+	mx, err := getResolver().LookupMX(context.Background(), host)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +168,7 @@ type SRV struct {
 }
 
 func resolveSrv(host string) ([]SRV, error) {
-	_, srv, err := net.LookupSRV("", "", host)
+	_, srv, err := getResolver().LookupSRV(context.Background(), "", "", host)
 	if err != nil {
 		return nil, err
 	}
