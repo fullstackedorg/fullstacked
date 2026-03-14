@@ -99,7 +99,11 @@ suite("fs - e2e", () => {
                         nodeStats.isDirectory(),
                         "isDirectory"
                     );
-                    assert.deepEqual(stats.isFile(), nodeStats.isFile(), "isFile");
+                    assert.deepEqual(
+                        stats.isFile(),
+                        nodeStats.isFile(),
+                        "isFile"
+                    );
                     done();
                 } catch (e) {
                     done(e);

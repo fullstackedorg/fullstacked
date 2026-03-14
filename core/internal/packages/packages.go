@@ -456,11 +456,11 @@ func install(
 				sem <- struct{}{}
 				defer func() { <-sem }()
 
-		pkgName := filepath.Base(pathKey)
-		displayName := pkgName
-		if strings.HasPrefix(path.Base(path.Dir(pathKey)), "@") {
-			displayName = path.Join(path.Base(path.Dir(pathKey)), pkgName)
-		}
+				pkgName := filepath.Base(pathKey)
+				displayName := pkgName
+				if strings.HasPrefix(path.Base(path.Dir(pathKey)), "@") {
+					displayName = path.Join(path.Base(path.Dir(pathKey)), pkgName)
+				}
 
 				fs.MkdirFn(tDir)
 

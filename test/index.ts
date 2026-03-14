@@ -20,7 +20,9 @@ let tests = [
     "./packages/index.ts"
 ];
 
-const definedTests = process.argv.slice(2).filter(arg => !arg.startsWith("--"))
+const definedTests = process.argv
+    .slice(2)
+    .filter((arg) => !arg.startsWith("--"));
 if (definedTests.length > 0) {
     tests = definedTests.map((test) => "." + test.replace("test", ""));
 }
