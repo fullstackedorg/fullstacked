@@ -13,8 +13,6 @@ import {
 import { cwd } from "../process/cwd/index.ts";
 import os from "../os/index.ts";
 
-export const sep = os.platform() === "win32" ? "\\" : "/";
-
 export function resolve(...paths: string[]): string {
     if (paths[0].startsWith("build:")) {
         return paths.join("/");
@@ -95,8 +93,15 @@ export function relative(from: string, to: string) {
     );
 }
 
+export let sep = "/";
+
 const mod = {
-    sep,
+    get sep() {
+        if (sep === "/") {
+            sep = os.platform() === "win32" ? "\\" : "/";
+        }
+        return sep;
+    },
     resolve,
     join,
     normalize,
