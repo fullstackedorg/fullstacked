@@ -3,7 +3,6 @@ package path
 import (
 	"errors"
 	"fullstackedorg/fullstacked/types"
-	goPath "path"
 	"path/filepath"
 	"strings"
 )
@@ -35,7 +34,7 @@ func Switch(
 	switch header.Fn {
 	case Join:
 		response.Type = types.CoreResponseData
-		response.Data = goPath.Join(DataToStringSlice(data...)...)
+		response.Data = filepath.Join(DataToStringSlice(data...)...)
 		return nil
 	case Resolve:
 		response.Type = types.CoreResponseData
@@ -43,11 +42,11 @@ func Switch(
 			"/",
 		}
 		strSlice = append(strSlice, DataToStringSlice(data...)...)
-		response.Data = goPath.Clean(goPath.Join(strSlice...))
+		response.Data = filepath.Clean(filepath.Join(strSlice...))
 		return nil
 	case Normalize:
 		response.Type = types.CoreResponseData
-		response.Data = goPath.Clean(data[0].Data.(string))
+		response.Data = filepath.Clean(data[0].Data.(string))
 		return nil
 	case Relative:
 		str, err := filepath.Rel(data[0].Data.(string), data[1].Data.(string))
@@ -88,7 +87,7 @@ func ResolveWithContext(ctx *types.Context, paths ...string) string {
 		baseDir,
 	}
 	strSlice = append(strSlice, paths...)
-	return goPath.Join(strSlice...)
+	return filepath.Join(strSlice...)
 }
 
 func DataToStringSlice(data ...types.DeserializedData) []string {
@@ -106,14 +105,14 @@ func ParsePath(path string) ParsedPath {
 		Root: "",
 		Dir:  "",
 	}
-	parsed.Base = goPath.Base(path)
+	parsed.Base = filepath.Base(path)
 	if len(path) > len(parsed.Base) {
 		parsed.Dir = path[:len(path)-len(parsed.Base)-1]
 	}
-	parsed.Ext = goPath.Ext(path)
+	parsed.Ext = filepath.Ext(path)
 	parsed.Name = strings.TrimSuffix(parsed.Base, parsed.Ext)
 
-	if goPath.IsAbs(path) {
+	if filepath.IsAbs(path) || strings.HasPrefix(path, "/") {
 		parsed.Root = "/"
 	}
 	return parsed

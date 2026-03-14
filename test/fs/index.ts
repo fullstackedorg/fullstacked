@@ -49,48 +49,57 @@ suite("fs - e2e", () => {
     });
 
     test("stat", (_, done) => {
-        fs.stat("package.json", (_, stats) => {
-            nodeFs.stat("package.json", (_, nodeStats) => {
+        fs.stat("package-lock.json", (_, stats) => {
+            nodeFs.stat("package-lock.json", (_, nodeStats) => {
                 try {
-                    assert.deepEqual(stats.mode, nodeStats.mode);
-                    assert.deepEqual(stats.size, nodeStats.size);
+                    assert.deepEqual(stats.mode, nodeStats.mode, "mode");
+                    assert.deepEqual(stats.size, nodeStats.size, "size");
                     assert.deepEqual(
                         Math.floor(stats.atimeMs),
-                        Math.floor(nodeStats.atimeMs)
+                        Math.floor(nodeStats.atimeMs),
+                        "atimeMs"
                     );
                     assert.deepEqual(
                         Math.floor(stats.mtimeMs),
-                        Math.floor(nodeStats.mtimeMs)
+                        Math.floor(nodeStats.mtimeMs),
+                        "mtimeMs"
                     );
                     assert.deepEqual(
                         Math.floor(stats.ctimeMs),
-                        Math.floor(nodeStats.ctimeMs)
+                        Math.floor(nodeStats.ctimeMs),
+                        "ctimeMs"
                     );
                     assert.deepEqual(
                         Math.floor(stats.birthtimeMs),
-                        Math.floor(nodeStats.birthtimeMs)
+                        Math.floor(nodeStats.birthtimeMs),
+                        "birthtimeMs"
                     );
                     assert.deepEqual(
                         stats.atime.toString(),
-                        nodeStats.atime.toString()
+                        nodeStats.atime.toString(),
+                        "atime"
                     );
                     assert.deepEqual(
                         stats.mtime.toString(),
-                        nodeStats.mtime.toString()
+                        nodeStats.mtime.toString(),
+                        "mtime"
                     );
                     assert.deepEqual(
                         stats.ctime.toString(),
-                        nodeStats.ctime.toString()
+                        nodeStats.ctime.toString(),
+                        "ctime"
                     );
                     assert.deepEqual(
                         stats.birthtime.toString(),
-                        nodeStats.birthtime.toString()
+                        nodeStats.birthtime.toString(),
+                        "birthtime"
                     );
                     assert.deepEqual(
                         stats.isDirectory(),
-                        nodeStats.isDirectory()
+                        nodeStats.isDirectory(),
+                        "isDirectory"
                     );
-                    assert.deepEqual(stats.isFile(), nodeStats.isFile());
+                    assert.deepEqual(stats.isFile(), nodeStats.isFile(), "isFile");
                     done();
                 } catch (e) {
                     done(e);

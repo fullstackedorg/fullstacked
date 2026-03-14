@@ -19,8 +19,10 @@ let tests = [
     "./git/index.ts",
     "./packages/index.ts"
 ];
-if (process.argv.length > 2) {
-    tests = process.argv.slice(2).map((test) => "." + test.replace("test", ""));
+
+const definedTests = process.argv.slice(2).filter(arg => !arg.startsWith("--"))
+if (definedTests.length > 0) {
+    tests = definedTests.map((test) => "." + test.replace("test", ""));
 }
 
 for (const test of tests) {

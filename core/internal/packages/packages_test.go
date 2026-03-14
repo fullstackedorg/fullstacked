@@ -11,6 +11,8 @@ import (
 	"net/http/httptest"
 	"os"
 	"path"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -173,12 +175,12 @@ func TestInstall_FullFlow(t *testing.T) {
 
 	// Verify Check
 	// 1. node_modules/test-pkg/index.js exists
-	if _, err := os.Stat(path.Join(tmpDir, "node_modules/test-pkg/index.js")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(tmpDir, "node_modules", "test-pkg", "index.js")); os.IsNotExist(err) {
 		t.Error("node_modules/test-pkg/index.js not found")
 	}
 
 	// 2. package-lock.json exists and contains correct info
-	lockPath := path.Join(tmpDir, "package-lock.json")
+	lockPath := filepath.Join(tmpDir, "package-lock.json")
 	lockBytes, err := os.ReadFile(lockPath)
 	if err != nil {
 		t.Fatalf("package-lock.json not found: %v", err)
@@ -218,7 +220,7 @@ func TestInstall_WithLockfile(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// package.json
-	os.WriteFile(path.Join(tmpDir, "package.json"), []byte(`{"name":"test"}`), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "package.json"), []byte(`{"name":"test"}`), 0644)
 
 	// package-lock.json
 	lock := PackageLock{
@@ -229,7 +231,7 @@ func TestInstall_WithLockfile(t *testing.T) {
 		},
 	}
 	lBytes, _ := json.Marshal(lock)
-	os.WriteFile(path.Join(tmpDir, "package-lock.json"), lBytes, 0644)
+	os.WriteFile(filepath.Join(tmpDir, "package-lock.json"), lBytes, 0644)
 
 	install(nil, tmpDir, nil, false, 5, false, nil)
 
@@ -245,7 +247,7 @@ func TestInstall_WithLockfile(t *testing.T) {
 	// With reconciliation, if "existing" is not in package.json, it should be PRUNED.
 	// So we expect it to be GONE.
 
-	newLockBytes, _ := os.ReadFile(path.Join(tmpDir, "package-lock.json"))
+	newLockBytes, _ := os.ReadFile(filepath.Join(tmpDir, "package-lock.json"))
 	var newLock PackageLock
 	json.Unmarshal(newLockBytes, &newLock)
 
@@ -305,12 +307,12 @@ func TestInstall_CorruptFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Corrupt package.json
-	os.WriteFile(path.Join(tmpDir, "package.json"), []byte(`{bad json`), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "package.json"), []byte(`{bad json`), 0644)
 	install(nil, tmpDir, nil, false, 5, false, nil)
 	// Should return early
 
 	// Corrupt package-lock.json
-	os.WriteFile(path.Join(tmpDir, "package-lock.json"), []byte(`{bad json`), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "package-lock.json"), []byte(`{bad json`), 0644)
 	install(nil, tmpDir, nil, false, 5, false, nil)
 	// Should ignore bad lockfile and continue
 }
@@ -360,7 +362,7 @@ func TestInstall_DevDependencies(t *testing.T) {
 	// Run with devDependencies=true
 	install(nil, tmpDir, nil, true, 5, false, nil)
 
-	if _, err := os.Stat(path.Join(tmpDir, "node_modules/dev-pkg/dev.js")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(tmpDir, "node_modules", "dev-pkg", "dev.js")); os.IsNotExist(err) {
 		t.Error("dev-pkg not installed")
 	}
 }
@@ -413,7 +415,7 @@ func TestInstall_ResolutionFailures(t *testing.T) {
 	install(nil, tmpDir, nil, false, 5, false, nil)
 
 	// good-pkg should be there
-	if _, err := os.Stat(path.Join(tmpDir, "node_modules/good-pkg/index.js")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(tmpDir, "node_modules", "good-pkg", "index.js")); os.IsNotExist(err) {
 		t.Error("good-pkg not installed despite errors in other deps")
 	}
 }
@@ -520,10 +522,10 @@ func TestDownloadExtract_WithDir(t *testing.T) {
 		t.Fatalf("Extraction failed: %v", err)
 	}
 
-	if info, err := os.Stat(path.Join(tmpDir, "subdir")); os.IsNotExist(err) || !info.IsDir() {
+	if info, err := os.Stat(filepath.Join(tmpDir, "subdir")); os.IsNotExist(err) || !info.IsDir() {
 		t.Error("subdir not created properly")
 	}
-	if _, err := os.Stat(path.Join(tmpDir, "subdir/file.txt")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(tmpDir, "subdir", "file.txt")); os.IsNotExist(err) {
 		t.Error("file inside subdir not created")
 	}
 }
@@ -629,24 +631,24 @@ func TestUninstall(t *testing.T) {
 	os.WriteFile(path.Join(tmpDir, "package-lock.json"), plBytes, 0644)
 
 	// Create directories
-	os.MkdirAll(path.Join(tmpDir, "node_modules/pkg-a"), 0755)
-	os.MkdirAll(path.Join(tmpDir, "node_modules/pkg-b"), 0755)
-	os.MkdirAll(path.Join(tmpDir, "node_modules/dev-pkg"), 0755)
+	os.MkdirAll(filepath.Join(tmpDir, "node_modules", "pkg-a"), 0755)
+	os.MkdirAll(filepath.Join(tmpDir, "node_modules", "pkg-b"), 0755)
+	os.MkdirAll(filepath.Join(tmpDir, "node_modules", "dev-pkg"), 0755)
 
 	// Uninstall pkg-a and dev-pkg
 	uninstall(nil, tmpDir, []string{"pkg-a", "dev-pkg"}, nil)
 
 	// Verify pkg-a removed
-	if _, err := os.Stat(path.Join(tmpDir, "node_modules/pkg-a")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(tmpDir, "node_modules", "pkg-a")); !os.IsNotExist(err) {
 		t.Error("pkg-a should be removed from node_modules")
 	}
 	// Verify pkg-b remains
-	if _, err := os.Stat(path.Join(tmpDir, "node_modules/pkg-b")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(tmpDir, "node_modules", "pkg-b")); os.IsNotExist(err) {
 		t.Error("pkg-b should NOT be removed from node_modules")
 	}
 
 	// Verify package.json
-	pjBytes, _ = os.ReadFile(path.Join(tmpDir, "package.json"))
+	pjBytes, _ = os.ReadFile(filepath.Join(tmpDir, "package.json"))
 	var pjCheck PackageJSON
 	json.Unmarshal(pjBytes, &pjCheck)
 	if _, ok := pjCheck.Dependencies["pkg-a"]; ok {
@@ -660,7 +662,7 @@ func TestUninstall(t *testing.T) {
 	}
 
 	// Verify package-lock.json
-	plBytes, _ = os.ReadFile(path.Join(tmpDir, "package-lock.json"))
+	plBytes, _ = os.ReadFile(filepath.Join(tmpDir, "package-lock.json"))
 	var plCheck PackageLock
 	json.Unmarshal(plBytes, &plCheck)
 	if _, ok := plCheck.Packages["node_modules/pkg-a"]; ok {
@@ -675,8 +677,8 @@ func TestSwitch_Uninstall(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Minimal setup
-	os.WriteFile(path.Join(tmpDir, "package.json"), []byte("{}"), 0644)
-	os.MkdirAll(path.Join(tmpDir, "node_modules/target"), 0755)
+	os.WriteFile(filepath.Join(tmpDir, "package.json"), []byte("{}"), 0644)
+	os.MkdirAll(filepath.Join(tmpDir, "node_modules", "target"), 0755)
 
 	resp := &types.CoreCallResponse{}
 	// Call Switch with Uninstall
@@ -701,12 +703,12 @@ func TestSwitch_Uninstall(t *testing.T) {
 	}
 
 	// Verify removal
-	if _, err := os.Stat(path.Join(tmpDir, "node_modules/target")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(tmpDir, "node_modules", "target")); !os.IsNotExist(err) {
 		t.Error("target should be removed via Switch")
 	}
 
 	// Test deserialization variant (interface{})
-	os.MkdirAll(path.Join(tmpDir, "node_modules/target2"), 0755)
+	os.MkdirAll(filepath.Join(tmpDir, "node_modules", "target2"), 0755)
 	err = Switch(
 		nil,
 		types.CoreCallHeader{Fn: Uninstall},
@@ -726,7 +728,7 @@ func TestSwitch_Uninstall(t *testing.T) {
 		t.Error("Expected ResponseStream in resp.Stream")
 	}
 
-	if _, err := os.Stat(path.Join(tmpDir, "node_modules/target2")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(tmpDir, "node_modules", "target2")); !os.IsNotExist(err) {
 		t.Error("target2 should be removed via Switch (interface{})")
 	}
 }
@@ -741,13 +743,13 @@ func TestUninstall_EdgeCases(t *testing.T) {
 	uninstall(nil, tmpDir, []string{"pkg"}, nil)
 
 	// Verify it still tries to remove node_modules even if package.json missing
-	os.MkdirAll(path.Join(tmpDir, "node_modules/pkg"), 0755)
+	os.MkdirAll(filepath.Join(tmpDir, "node_modules", "pkg"), 0755)
 	uninstall(nil, tmpDir, []string{"pkg"}, nil)
-	if _, err := os.Stat(path.Join(tmpDir, "node_modules/pkg")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(tmpDir, "node_modules", "pkg")); !os.IsNotExist(err) {
 		t.Error("Should remove node_modules even if package.json missing")
 	}
 
-	os.WriteFile(path.Join(tmpDir, "package-lock.json"), []byte("{bad"), 0644)
+	os.WriteFile(filepath.Join(tmpDir, "package-lock.json"), []byte("{bad"), 0644)
 	uninstall(nil, tmpDir, []string{"pkg"}, nil)
 }
 
@@ -1535,6 +1537,10 @@ func TestSwitch_InputErrors(t *testing.T) {
 }
 
 func TestDownloadExtract_Permissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping permission test on Windows")
+	}
+
 	// Setup a tarball server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tb, _ := createMockTarball(map[string]string{"package/file.txt": "ok"})
@@ -1548,21 +1554,12 @@ func TestDownloadExtract_Permissions(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
-	// Create a file where we want a directory to be, to force MkdirAll to fail (or Create to fail)
-	// downloadAndExtract will try to create "dest/file.txt"
-	// if we make "dest" read-only, we might trigger error
-
 	// Better: make dest read-only
 	os.Chmod(tmpDir, 0500) // Read/Execute only, no Write
 	defer os.Chmod(tmpDir, 0755)
 
 	err := downloadAndExtract(ts.URL, tmpDir, "", nil)
 	if err == nil {
-		// Note: Root user (in docker?) might bypass this.
-		// If running as normal user, this should fail.
-		// If it doesn't fail, we might print a log.
-		// But in typical CI environments this works.
-		// Use t.Log check for skipping if running as root?
 		if os.Getuid() != 0 {
 			t.Error("Expected error when writing to read-only directory")
 		}

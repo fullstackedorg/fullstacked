@@ -1,6 +1,7 @@
 import test, { suite, afterEach, before } from "node:test";
 import assert from "node:assert";
 import fs from "node:fs";
+import path from "node:path"
 import child_process from "node:child_process";
 import * as bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 import { tailwindcssBuilder, cleanup } from "./common.ts";
@@ -27,7 +28,7 @@ suite("bundle - e2e", () => {
         assert.deepEqual(result.Errors, null);
         assert.deepEqual(result.Warnings, null);
         assert.deepEqual(result.OutputFiles, [
-            "test/bundle/samples/file/index.ts.js"
+            path.join("test", "bundle", "samples", "file", "index.ts.js")
         ]);
         assert.ok(fs.existsSync(result.OutputFiles.at(0)));
     });
@@ -39,8 +40,8 @@ suite("bundle - e2e", () => {
         assert.deepEqual(result.Errors, null);
         assert.deepEqual(result.Warnings, null);
         assert.deepEqual(result.OutputFiles, [
-            "test/bundle/samples/basic/out/index.ts.js",
-            "test/bundle/samples/basic/out/index.html"
+            path.join("test", "bundle", "samples", "basic", "out", "index.ts.js"),
+            path.join("test", "bundle", "samples", "basic", "out", "index.html")
         ]);
         assert.ok(fs.existsSync("test/bundle/samples/basic/out/index.ts.js"));
     });
@@ -50,9 +51,9 @@ suite("bundle - e2e", () => {
         assert.deepEqual(result.Errors, null);
         assert.deepEqual(result.Warnings, null);
         assert.deepEqual(result.OutputFiles, [
-            "test/bundle/samples/css/out/index.ts.js",
-            "test/bundle/samples/css/out/index.ts.css",
-            "test/bundle/samples/css/out/index.html"
+            path.join("test", "bundle", "samples", "css", "out", "index.ts.js"),
+            path.join("test", "bundle", "samples", "css", "out", "index.ts.css"),
+            path.join("test", "bundle", "samples", "css", "out", "index.html")
         ]);
         assert.ok(fs.existsSync("test/bundle/samples/css/out/index.ts.js"));
         assert.ok(fs.existsSync("test/bundle/samples/css/out/index.ts.css"));
@@ -71,10 +72,10 @@ suite("bundle - e2e", () => {
         );
 
         assert.deepEqual(result.OutputFiles, [
-            "test/bundle/samples/tailwindcss/out/index.ts.js",
-            "test/bundle/samples/tailwindcss/out/index.ts.css",
-            "test/bundle/samples/tailwindcss/out/index.ts.tailwind.css",
-            "test/bundle/samples/tailwindcss/out/index.html"
+            path.join("test", "bundle", "samples", "tailwindcss", "out", "index.ts.js"),
+            path.join("test", "bundle", "samples", "tailwindcss", "out", "index.ts.css"),
+            path.join("test", "bundle", "samples", "tailwindcss", "out", "index.ts.tailwind.css"),
+            path.join("test", "bundle", "samples", "tailwindcss", "out", "index.html")
         ]);
 
         assert.deepEqual(

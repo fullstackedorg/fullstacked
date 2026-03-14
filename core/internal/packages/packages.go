@@ -409,7 +409,7 @@ func install(
 
 	// 2. Load Existing Lockfile (for Pruning/Comparison)
 	var oldLock *PackageLock
-	packageLockPath := path.Join(directory, "package-lock.json")
+	packageLockPath := filepath.Join(directory, "package-lock.json")
 	if packageLockContent, err := fs.ReadFileFn(packageLockPath); err == nil {
 		oldLock = &PackageLock{}
 		if err := json.Unmarshal(packageLockContent, oldLock); err != nil {
@@ -436,7 +436,7 @@ func install(
 				continue
 			}
 
-			pkgName := path.Base(pathKey)
+			pkgName := filepath.Base(pathKey)
 			if pkgName == "fullstacked" || !isPlatformSupported(pkg.OS, pkg.CPU) {
 				continue
 			}
@@ -445,7 +445,7 @@ func install(
 				continue
 			}
 
-			targetDir := path.Join(directory, pathKey)
+			targetDir := filepath.Join(directory, pathKey)
 			if fs.ExistsFn(targetDir) {
 				continue
 			}
@@ -456,12 +456,11 @@ func install(
 				sem <- struct{}{}
 				defer func() { <-sem }()
 
-				pkgName := path.Base(pKey)
-				// Handle scoped packages in display name
-				displayName := pkgName
-				if strings.HasPrefix(path.Base(path.Dir(pKey)), "@") {
-					displayName = path.Join(path.Base(path.Dir(pKey)), pkgName)
-				}
+		pkgName := filepath.Base(pathKey)
+		displayName := pkgName
+		if strings.HasPrefix(path.Base(path.Dir(pathKey)), "@") {
+			displayName = path.Join(path.Base(path.Dir(pathKey)), pkgName)
+		}
 
 				fs.MkdirFn(tDir)
 
@@ -505,8 +504,8 @@ func install(
 		wg.Wait()
 
 		// Also create node_modules/.package-lock.json in fast path
-		fs.MkdirFn(path.Join(directory, "node_modules"))
-		nodeModulesLockPath := path.Join(directory, "node_modules", ".package-lock.json")
+		fs.MkdirFn(filepath.Join(directory, "node_modules"))
+		nodeModulesLockPath := filepath.Join(directory, "node_modules", ".package-lock.json")
 		if f, err := fs.CreateFn(nodeModulesLockPath); err == nil {
 			defer f.Close()
 			enc := json.NewEncoder(f)
@@ -523,7 +522,7 @@ func install(
 
 	name := pkgJSON.Name
 	if name == "" {
-		name = path.Base(directory)
+		name = filepath.Base(directory)
 	}
 
 	// 3. Resolution (BFS / Desired State)
@@ -580,7 +579,7 @@ func install(
 			return
 		}
 
-		targetDir := path.Join(directory, pathKey)
+		targetDir := filepath.Join(directory, pathKey)
 
 		needsInstall := true
 		if fs.ExistsFn(targetDir) {
@@ -695,12 +694,6 @@ func install(
 						}
 					}
 
-					// Move up: find the nearest parent directory that contains "node_modules"
-					// We are at `curr`. We want to go to the folder containing the node_modules that contains `curr`.
-					// E.g. node_modules/a -> .
-					// node_modules/@s/a -> .
-					// node_modules/a/node_modules/b -> node_modules/a
-
 					// Check if we are at root
 					if curr == "" || curr == "." {
 						break
@@ -718,14 +711,7 @@ func install(
 						// node_modules/a/node_modules/b
 						// index is 15
 						// we want node_modules/a
-						// curr[:15] is node_modules/a/
-						target := curr[:index]
-						// Clean trailing slash if any (though path.Join usually clean)
-						target = strings.TrimSuffix(target, string(os.PathSeparator))
-						if target == "" {
-							target = "."
-						}
-						curr = target
+						curr = path.Dir(path.Dir(curr))
 					}
 				}
 
@@ -928,14 +914,7 @@ func install(
 				break
 			}
 
-			dir := path.Dir(curr)
-			if path.Base(dir) == "node_modules" {
-				curr = path.Dir(dir)
-			} else if dir == "node_modules" {
-				curr = ""
-			} else {
-				curr = ""
-			}
+			curr = path.Dir(path.Dir(curr))
 		}
 		return ""
 	}
@@ -998,8 +977,8 @@ func install(
 	}
 
 	// 6.5 Save node_modules/.package-lock.json
-	fs.MkdirFn(path.Join(directory, "node_modules"))
-	nodeModulesLockPath := path.Join(directory, "node_modules", ".package-lock.json")
+	fs.MkdirFn(filepath.Join(directory, "node_modules"))
+	nodeModulesLockPath := filepath.Join(directory, "node_modules", ".package-lock.json")
 	if f, err := fs.CreateFn(nodeModulesLockPath); err == nil {
 		defer f.Close()
 		enc := json.NewEncoder(f)
@@ -1027,7 +1006,7 @@ func uninstall(ctx *types.Context, directory string, packagesName []string, onPr
 	}
 
 	// 1. Read package.json
-	packageJsonPath := path.Join(directory, "package.json")
+	packageJsonPath := filepath.Join(directory, "package.json")
 	var pkgJSON PackageJSON
 	var rawPkgJSON map[string]interface{}
 	if content, err := fs.ReadFileFn(packageJsonPath); err == nil {
@@ -1054,7 +1033,7 @@ func uninstall(ctx *types.Context, directory string, packagesName []string, onPr
 		}
 
 		// Explicitly remove the package from disk
-		fs.RmFn(path.Join(directory, "node_modules", name))
+		fs.RmFn(filepath.Join(directory, "node_modules", name))
 	}
 
 	if len(pkgJSON.Dependencies) > 0 {
@@ -1316,7 +1295,7 @@ func downloadAndExtract(url string, dest string, packageName string, onProgress 
 			continue
 		}
 
-		targetPath := path.Join(dest, name)
+		targetPath := filepath.Join(dest, name)
 
 		switch header.Typeflag {
 		case tar.TypeDir:
@@ -1324,7 +1303,7 @@ func downloadAndExtract(url string, dest string, packageName string, onProgress 
 				return err
 			}
 		case tar.TypeReg:
-			dir := path.Dir(targetPath)
+			dir := filepath.Dir(targetPath)
 			if err := fs.MkdirFn(dir); err != nil {
 				return err
 			}

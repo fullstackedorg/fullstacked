@@ -6,7 +6,7 @@ import * as bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 suite("stream - integration", () => {
     let browsers: Browser[] = [];
 
-    test("stream", { timeout: 1000 * 3 }, async () => {
+    test("stream", async () => {
         const browser = await createBrowser("test/stream/sample/read");
         browsers.push(browser);
 
@@ -33,7 +33,7 @@ suite("stream - integration", () => {
         await browser.end();
     });
 
-    test("streamWrite", { timeout: 1000 * 3 }, async () => {
+    test("streamWrite", async () => {
         const browser = await createBrowser("test/stream/sample/write");
         browsers.push(browser);
 

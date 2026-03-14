@@ -242,7 +242,7 @@ func prepareBundleStdin(entryPoint string) (esbuild.StdinOptions, error) {
 
 	stdin.Contents = string(contents)
 	stdin.Sourcefile = entryPoint
-	stdin.ResolveDir = path.Dir(entryPoint)
+	stdin.ResolveDir = filepath.Dir(entryPoint)
 	stdin.Loader = loader
 
 	return stdin, nil
@@ -298,7 +298,7 @@ func BundleDirFn(ctx *types.Context, entryPoint string) EsbuildResult {
 	}
 
 	// setup outdir
-	buildOptions.Outdir = path.Join(path.Dir(buildOptions.Stdin.Sourcefile), "out")
+	buildOptions.Outdir = filepath.Join(filepath.Dir(buildOptions.Stdin.Sourcefile), "out")
 
 	// prepare tailwind
 	tailwindcssEntry := ""
@@ -319,11 +319,11 @@ func BundleDirFn(ctx *types.Context, entryPoint string) EsbuildResult {
 	if len(result.Errors) == 0 {
 		fs.MkdirFn(buildOptions.Outdir)
 
-		entrypointBaseName := path.Base(buildOptions.Stdin.Sourcefile)
+		entrypointBaseName := filepath.Base(buildOptions.Stdin.Sourcefile)
 
 		for _, file := range result.OutputFiles {
 			if strings.HasPrefix(filepath.Base(file.Path), "stdin") {
-				file.Path = filepath.Join(filepath.Dir(file.Path), entrypointBaseName+path.Ext(file.Path))
+				file.Path = filepath.Join(filepath.Dir(file.Path), entrypointBaseName+filepath.Ext(file.Path))
 			}
 			fs.WriteFileFn(file.Path, file.Contents)
 

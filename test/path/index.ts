@@ -12,7 +12,7 @@ suite("path - e2e", () => {
     });
 
     test("resolve", () => {
-        assert.deepEqual(path.resolve("."), "/");
+        assert.deepEqual(path.resolve("."), nodePath.sep);
     });
 
     test("normalize", () => {

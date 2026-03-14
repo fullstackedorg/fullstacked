@@ -6,8 +6,8 @@ import fs from "node:fs";
 import { cleanup, tailwindcssBuilder } from "./common.ts";
 
 suite("bundle - integration", () => {
-    // before(cleanup);
-    // afterEach(cleanup);
+    before(cleanup);
+    afterEach(cleanup);
 
     let browsers: Browser[] = [];
 

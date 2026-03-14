@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 )
 
@@ -97,14 +97,14 @@ func TestInstall_PeerDependencyDeduplication(t *testing.T) {
 		},
 	}
 	pjBytes, _ := json.Marshal(pkgJson)
-	os.WriteFile(path.Join(tmpDir, "package.json"), pjBytes, 0644)
+	os.WriteFile(filepath.Join(tmpDir, "package.json"), pjBytes, 0644)
 
 	// Run Install
 	install(nil, tmpDir, nil, false, 5, false, nil)
 
 	// Verify Structure
 	// 1. Root peer should be 1.0.0
-	peerPath := path.Join(tmpDir, "node_modules", "peer")
+	peerPath := filepath.Join(tmpDir, "node_modules", "peer")
 	if !fs.ExistsFn(peerPath) {
 		t.Fatal("root peer not installed")
 	}
@@ -112,7 +112,7 @@ func TestInstall_PeerDependencyDeduplication(t *testing.T) {
 
 	// 2. IMPORTANT: Nested peer should NOT exist
 	// node_modules/lib/node_modules/peer
-	nestedPeerPath := path.Join(tmpDir, "node_modules", "lib", "node_modules", "peer")
+	nestedPeerPath := filepath.Join(tmpDir, "node_modules", "lib", "node_modules", "peer")
 	if fs.ExistsFn(nestedPeerPath) {
 		t.Errorf("Nested peer dependency installed at %s, but should have been deduplicated against root", nestedPeerPath)
 	}

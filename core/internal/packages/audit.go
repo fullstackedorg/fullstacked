@@ -7,7 +7,7 @@ import (
 	"fullstackedorg/fullstacked/internal/fs"
 	"io"
 	"net/http"
-	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -17,7 +17,7 @@ type AuditPayload map[string][]string
 
 func audit(directory string) (map[string]interface{}, error) {
 	// 1. Read package-lock.json
-	packageLockPath := path.Join(directory, "package-lock.json")
+	packageLockPath := filepath.Join(directory, "package-lock.json")
 	lockContent, err := fs.ReadFileFn(packageLockPath)
 	if err != nil {
 		return nil, errors.New("failed to read package-lock.json: " + err.Error())
@@ -36,8 +36,7 @@ func audit(directory string) (map[string]interface{}, error) {
 	// "node_modules/@scope/pkg" -> "@scope/pkg"
 	getNameFromPath := func(p string) string {
 		parts := strings.Split(p, "node_modules/")
-		ifSC := len(parts)
-		if ifSC == 0 {
+		if len(parts) < 2 {
 			return ""
 		}
 		// The last part is the package name relative to the nearest node_modules
