@@ -6,21 +6,21 @@ import (
 	"fullstackedorg/fullstacked/types"
 	"mime"
 	"net/url"
-	"path"
+	"path/filepath"
 	"strings"
 )
 
-// ONLY function in core returning a serialized response
-// because adapters needs to read both mime type string and file content buffer
+// this is the ONLY function in the core that returns a serialized value
+// adapters needs to receive both mime type and file content
 // buffer of size 0 means not found
 func staticFile(ctx *types.Context, pathname string) []byte {
 	pathname, _ = url.PathUnescape(pathname)
 	pathname = strings.TrimLeft(pathname, "/")
 	pathname = strings.TrimRight(pathname, "/")
 
-	foundPath, contents, err := resolveFile(path.Join(ctx.Directories.Build, pathname))
+	foundPath, contents, err := resolveFile(filepath.Join(ctx.Directories.Build, pathname))
 	if err != nil {
-		foundPath, contents, err = resolveFile(path.Join(ctx.Directories.Root, pathname))
+		foundPath, contents, err = resolveFile(filepath.Join(ctx.Directories.Root, pathname))
 	}
 	pathname = foundPath
 
@@ -28,7 +28,7 @@ func staticFile(ctx *types.Context, pathname string) []byte {
 		return []byte{}
 	}
 
-	ext := path.Ext(pathname)
+	ext := filepath.Ext(pathname)
 
 	mimeType := mime.TypeByExtension(ext)
 
@@ -65,7 +65,7 @@ func resolveFile(pathname string) (string, []byte, error) {
 	}
 
 	if stats.IsDir {
-		return resolveFile(path.Join(pathname, "index.html"))
+		return resolveFile(filepath.Join(pathname, "index.html"))
 	}
 
 	return resolvedFileContents(pathname)
