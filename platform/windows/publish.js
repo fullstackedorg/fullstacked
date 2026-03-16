@@ -28,7 +28,7 @@ const filePath = path.resolve(
     "Microsoft.Windows.SDK.BuildTools.MSIX.Packaging.targets"
 );
 let contents = fs.readFileSync(filePath, { encoding: "utf-8" });
-contents.replace(/WinAppSdkSignAppxPackageBundle/g, "WinAppSdkSignAppxPackage");
+contents = contents.replace(/WinAppSdkSignAppxPackageBundle/g, "WinAppSdkSignAppxPackage");
 fs.writeFileSync(filePath, contents);
 // end fix
 

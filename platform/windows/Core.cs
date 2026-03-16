@@ -1,10 +1,6 @@
-﻿using Microsoft.UI.Xaml.Shapes;
-using System;
-using System.Diagnostics;
-using System.IO;
+﻿using System;
 using System.Runtime.InteropServices;
 using System.Text;
-using Path = System.IO.Path;
 
 namespace FullStacked
 {
@@ -42,7 +38,7 @@ namespace FullStacked
                     throw new Exception("Unsupported arch");
             }
 
-            this.lib.setOnStreamDataCore(this.onStreamDataCore);
+            this.lib.setOnStreamDataCore(onStreamDataCore);
         }
 
         private byte[] strToBufferUTF8(string str) {
@@ -67,16 +63,17 @@ namespace FullStacked
         {
             this.lib.stopCore(ctxId);
         }
-        private void onStreamDataCore(byte ctx, byte streamId, int size)
+
+        private static void onStreamDataCore(byte ctx, byte streamId, int size)
         {
             byte[] data = new byte[size];
 
             fixed (byte* ptr = data)
             {
-                this.lib.getCorePayloadCore(ctx, 2, streamId, ptr, size);
+                App.core.lib.getCorePayloadCore(ctx, 2, streamId, ptr, size);
             }
 
-            this.onStreamData(ctx, streamId, data);
+            App.core.onStreamData(ctx, streamId, data);
         }
         public byte[] call(byte[] payload)
         {

@@ -1,17 +1,7 @@
-﻿using Microsoft.UI;
-using Microsoft.UI.Windowing;
-using Microsoft.UI.Xaml;
-using Microsoft.Win32;
+﻿using Microsoft.UI.Xaml;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Reflection;
-using System.Runtime.InteropServices;
-using System.Security.Principal;
-using System.Text;
-using Windows.UI;
 
 namespace FullStacked
 {
@@ -35,7 +25,10 @@ namespace FullStacked
             // AppData
             string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string appDataFolder = Path.Combine(localAppData, "fullstacked");
-            Directory.CreateDirectory(appDataFolder);
+            if (!Directory.Exists(appDataFolder))
+            {
+                Directory.CreateDirectory(appDataFolder);
+            }
 
             string buildFolder = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledPath, "out");
 
