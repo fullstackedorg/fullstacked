@@ -13,10 +13,24 @@ import {
 import { cwd } from "../process/cwd/index.ts";
 import os from "../os/index.ts";
 
+
+export let sep = "/";
+let checkRealSep = false;
+
+const constants = {
+    get sep() {
+        if (!checkRealSep) {
+            sep = os.platform() === "win32" ? "\\" : "/";
+            checkRealSep = true;
+        }
+        return sep;
+    }
+}
+
 export function resolve(...paths: string[]): string {
     if (paths[0].startsWith("build:")) {
-        return paths.join("/");
-    } else if (!paths[0].startsWith("/")) {
+        return paths.join(constants.sep);
+    } else if (!paths[0].startsWith(constants.sep)) {
         paths.unshift(cwd());
     }
     return bridge(
@@ -93,14 +107,9 @@ export function relative(from: string, to: string) {
     );
 }
 
-export let sep = "/";
-
 const mod = {
     get sep() {
-        if (sep === "/") {
-            sep = os.platform() === "win32" ? "\\" : "/";
-        }
-        return sep;
+        return constants.sep;
     },
     resolve,
     join,
