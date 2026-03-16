@@ -24,14 +24,14 @@ IF "%arg1%" == "x64" (
     xcopy ..\bin\win32-x64.dll ..\..\platform\windows /y /q
 )
 
-@REM SET SOURCE_DIR="..\..\out\build"
-@REM SET TARGET_DIR="..\..\platform\windows\build"
+SET SOURCE_DIR="..\..\app\out"
+SET TARGET_DIR="..\..\platform\windows\out"
 
-@REM IF "%arg1%" == "copy" (    
-@REM     IF EXIST "%TARGET_DIR%" (
-@REM         RD /S /Q "%TARGET_DIR%"
-@REM     )
-@REM     IF EXIST "%SOURCE_DIR%" (
-@REM         xcopy "%SOURCE_DIR%" "%TARGET_DIR%"\ /y /s /e /q
-@REM     )
-@REM )
+IF "%arg1%" == "copy" (    
+    IF EXIST "%TARGET_DIR%" (
+        RD /S /Q "%TARGET_DIR%"
+    )
+    IF EXIST "%SOURCE_DIR%" (
+        xcopy "%SOURCE_DIR%" "%TARGET_DIR%"\ /y /s /e /q
+    )
+)

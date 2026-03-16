@@ -95,7 +95,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="build\**">
+    <None Update="out\**">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
@@ -127,7 +127,7 @@
     <GenerateTemporaryStoreCertificate>True</GenerateTemporaryStoreCertificate>
     <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
-    <PackageCertificateThumbprint>734F092F0523EE1065405C073E3E682186A2A0D7</PackageCertificateThumbprint>
+    <PackageCertificateThumbprint>C78BDB8C6ADF2B177ED6B9AC337BDA3F265B9BD9</PackageCertificateThumbprint>
   </PropertyGroup>
 
   <!--
