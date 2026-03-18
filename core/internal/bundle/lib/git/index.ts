@@ -11,8 +11,11 @@ import {
     GitAuthor,
     GitBranch,
     GitCommit,
+    GitHead,
     GitStatus,
     GitTag,
+    HasGit,
+    Head,
     Init,
     Log,
     Merge,
@@ -39,11 +42,27 @@ export async function createGitAuthManager() {
     }>;
 }
 
+export function hasGit(directory: string): Promise<boolean> {
+    return bridge({
+        mod: Git,
+        fn: HasGit,
+        data: [directory]
+    });
+}
+
 export function init(directory: string, url: string) {
     return bridge({
         mod: Git,
         fn: Init,
         data: [directory, url]
+    });
+}
+
+export function head(directory: string): Promise<GitHead> {
+    return bridge({
+        mod: Git,
+        fn: Head,
+        data: [directory]
     });
 }
 
@@ -165,7 +184,9 @@ export function restore(directory: string, ...files: string[]) {
 
 const git = {
     createGitAuthManager,
+    hasGit,
     init,
+    head,
     status,
     add,
     log,

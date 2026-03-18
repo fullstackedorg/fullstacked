@@ -29,20 +29,22 @@ type GitFn = uint8
 
 const (
 	AuthManager GitFn = 0
-	Init        GitFn = 1
-	Status      GitFn = 2
-	Add         GitFn = 3
-	Log         GitFn = 4
-	Commit      GitFn = 5
-	Clone       GitFn = 6
-	Pull        GitFn = 7
-	Push        GitFn = 8
-	Reset       GitFn = 9
-	Branch      GitFn = 10
-	Tags        GitFn = 11
-	Checkout    GitFn = 12
-	Merge       GitFn = 13
-	Restore     GitFn = 14
+	HasGit      GitFn = 1
+	Init        GitFn = 2
+	Head        GitFn = 3
+	Status      GitFn = 4
+	Add         GitFn = 5
+	Log         GitFn = 6
+	Commit      GitFn = 7
+	Clone       GitFn = 8
+	Pull        GitFn = 9
+	Push        GitFn = 10
+	Reset       GitFn = 11
+	Branch      GitFn = 12
+	Tags        GitFn = 13
+	Checkout    GitFn = 14
+	Merge       GitFn = 15
+	Restore     GitFn = 16
 )
 
 type gitAuthManager struct {
@@ -168,9 +170,21 @@ func Switch(
 		response.Stream = &stream
 
 		return nil
+	case HasGit:
+		response.Type = types.CoreResponseData
+		response.Data = HasGitFn(path.ResolveWithContext(ctx, data[0].Data.(string)))
+		return nil
 	case Init:
 		response.Type = types.CoreResponseData
 		return initFn(path.ResolveWithContext(ctx, data[0].Data.(string)), data[1].Data.(string))
+	case Head:
+		response.Type = types.CoreResponseData
+		head, err := HeadFn(path.ResolveWithContext(ctx, data[0].Data.(string)))
+		if err != nil {
+			return err
+		}
+		response.Data = head
+		return nil
 	case Status:
 		response.Type = types.CoreResponseData
 
@@ -315,6 +329,11 @@ func Switch(
 	return errors.New("unknown git function")
 }
 
+func HasGitFn(directory string) bool {
+	_, err := OpenGitDirectory(directory)
+	return err == nil
+}
+
 func initFn(directory string, url string) error {
 	repository, err := git.PlainInit(directory, false, git.WithDefaultBranch(plumbing.Main))
 
@@ -341,6 +360,29 @@ type GitStatus struct {
 	Staged    map[string][]string `json:"staged"`
 	Unstaged  map[string][]string `json:"unstaged"`
 	Untracked []string            `json:"untracked"`
+}
+
+func HeadFn(directory string) (GitHead, error) {
+	dir, err := OpenGitDirectory(directory)
+	if err != nil {
+		return GitHead{}, err
+	}
+
+	repository, err := dir.Repository()
+	if err != nil {
+		return GitHead{}, err
+	}
+
+	head, err := repository.Head()
+	if err != nil {
+		return GitHead{}, err
+	}
+
+	return GitHead{
+		Branch: head.Name().Short(),
+		Hash:   head.Hash().String(),
+		Type:   head.Type().String(),
+	}, nil
 }
 
 func statusCodeToString(statusCode git.StatusCode) string {

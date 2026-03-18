@@ -13,7 +13,6 @@ import {
 import { cwd } from "../process/cwd/index.ts";
 import os from "../os/index.ts";
 
-
 export let sep = "/";
 let checkRealSep = false;
 
@@ -25,7 +24,7 @@ const constants = {
         }
         return sep;
     }
-}
+};
 
 export function resolve(...paths: string[]): string {
     if (paths[0].startsWith("build:")) {

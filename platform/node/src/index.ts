@@ -85,13 +85,10 @@ globalThis.bridges = {
 
 const tailwindcssBuilder = await builderTailwindCSS();
 tailwindcssBuilder.on("build", (entryfile, outfile) => {
-    child_process.execSync(
-        `tailwindcss -i ${entryfile} -o ${outfile}`,
-        {
-            cwd: directory,
-            stdio: "inherit"
-        }
-    );
+    child_process.execSync(`tailwindcss -i ${entryfile} -o ${outfile}`, {
+        cwd: directory,
+        stdio: "inherit"
+    });
 
     tailwindcssBuilder.writeEvent("build-done");
 });
