@@ -47,6 +47,7 @@
         "util": "^0.12.5"
     },
     "overrides": {
-        "yauzl": "3.2.1"
+        "yauzl": "3.2.1",
+        "fast-xml-parser": ">=5.5.6"
     }
 }
