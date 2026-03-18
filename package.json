@@ -21,10 +21,10 @@
         "trailingComma": "none"
     },
     "dependencies": {
-        "@aws-sdk/client-s3": "^3.1002.0",
+        "@aws-sdk/client-s3": "^3.1011.0",
         "@fullstacked/builder-tailwindcss": "github:fullstackedorg/builder-tailwindcss",
         "@nitrogql/esbuild-register": "^1.7.2",
-        "@types/node": "^25.3.3",
+        "@types/node": "^25.5.0",
         "assert": "^2.1.0",
         "browserify-zlib": "^0.2.0",
         "buffer": "^6.0.3",
@@ -34,7 +34,7 @@
         "dc-polyfill": "^0.1.10",
         "dotenv": "^17.3.1",
         "elliptic": "^6.6.1",
-        "esbuild": "^0.27.3",
+        "esbuild": "^0.27.4",
         "events": "^3.3.0",
         "fast-querystring": "^1.1.2",
         "node-gyp": "^12.2.0",
