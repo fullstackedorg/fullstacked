@@ -2,7 +2,7 @@
 
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities" xmlns:iot="http://schemas.microsoft.com/appx/manifest/iot/windows10" IgnorableNamespaces="uap rescap iot build" xmlns:build="http://schemas.microsoft.com/developer/appx/2015/build">
 
-  <Identity Name="Charles-PhilippeLepage.FullStackedv1" Publisher="CN=3F94CE5F-7E00-4DE1-941D-8256CB924D0F" Version="1.0.1185.0" />
+  <Identity Name="Charles-PhilippeLepage.FullStackedv1" Publisher="CN=3F94CE5F-7E00-4DE1-941D-8256CB924D0F" Version="1.0.1612.0" />
 
   <Properties>
     <DisplayName>FullStacked v1</DisplayName>

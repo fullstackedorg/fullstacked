@@ -5,7 +5,7 @@ namespace FullStacked
     unsafe internal class CoreX64 : CoreImplementation
     {
 
-        const string dllName = "win32-arm64.dll";
+        const string dllName = "win32-x64.dll";
 
         [DllImport(dllName)]
         public static extern byte start(char* root, char* build);
