@@ -25,4 +25,3 @@ document.head.appendChild(link);
 
 await import("./project/index.ts");
 
-document.body.classList.add("done");

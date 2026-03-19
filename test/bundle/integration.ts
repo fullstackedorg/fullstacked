@@ -55,6 +55,10 @@ suite("bundle - integration", () => {
         await bundle.bundle("test/bundle/samples/tailwindcss/index.ts");
         const page = await browser.createPage();
 
+        await page.page.waitForFunction(
+            'document.body.classList.contains("done")'
+        );
+
         assert.deepEqual(
             await page.getPixelColorRGB({
                 x: 0,
