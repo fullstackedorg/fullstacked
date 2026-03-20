@@ -123,8 +123,8 @@ suite("fetch - e2e", () => {
             },
             signal: controller.signal
         });
-        controller.abort()
-        assert.rejects(response.text())
+        controller.abort();
+        assert.rejects(response.text());
     });
 
     after(() => {

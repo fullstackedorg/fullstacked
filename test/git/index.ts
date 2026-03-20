@@ -9,7 +9,12 @@ const testDirectory = "test/git/test";
 
 async function resetRepositories() {
     if (fs.existsSync(testDirectory)) {
-        await fs.promises.rm(testDirectory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+        await fs.promises.rm(testDirectory, {
+            recursive: true,
+            force: true,
+            maxRetries: 10,
+            retryDelay: 100
+        });
     }
     child_process.execSync(
         "docker compose exec git-server /bin/bash /home/setup.sh",
@@ -63,10 +68,7 @@ suite("git - e2e", () => {
 
     test("clone", async () => {
         await cloneRepository("test");
-        assert.deepEqual(
-            [".git", "test.txt"],
-            fs.readdirSync(testDirectory)
-        );
+        assert.deepEqual([".git", "test.txt"], fs.readdirSync(testDirectory));
         assert.deepEqual(
             "test file\n",
             fs.readFileSync(`${testDirectory}/test.txt`, { encoding: "utf-8" })
@@ -205,7 +207,12 @@ suite("git - e2e", () => {
             email: "test@testing.com"
         });
         await (await git.push(testDirectory)).promise();
-        await fs.promises.rm(testDirectory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+        await fs.promises.rm(testDirectory, {
+            recursive: true,
+            force: true,
+            maxRetries: 10,
+            retryDelay: 100
+        });
         await cloneRepository("test");
         assert.deepEqual((await git.log(testDirectory)).length, 2);
     });
@@ -327,7 +334,12 @@ suite("git - e2e", () => {
             email: "test@testing.com"
         });
         await (await git.push(testDirectory)).promise();
-        await fs.promises.rm(testDirectory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+        await fs.promises.rm(testDirectory, {
+            recursive: true,
+            force: true,
+            maxRetries: 10,
+            retryDelay: 100
+        });
         await cloneRepository("empty");
         assert.deepEqual(1, (await git.log(testDirectory)).length);
     });

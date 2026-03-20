@@ -24,4 +24,3 @@ link.href = "./project/out/index.ts.tailwind.css";
 document.head.appendChild(link);
 
 await import("./project/index.ts");
-

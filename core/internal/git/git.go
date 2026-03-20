@@ -662,8 +662,8 @@ func clone(
 			// run once
 			options := git.CloneOptions{
 				AllowEmptyRepo: true,
-				URL:  urlStr,
-				Auth: gitAuthToHttpAuth(gitAuth),
+				URL:            urlStr,
+				Auth:           gitAuthToHttpAuth(gitAuth),
 				Progress: &GitStream{
 					ctx:      ctx,
 					streamId: streamId,
