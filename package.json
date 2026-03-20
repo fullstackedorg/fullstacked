@@ -48,6 +48,6 @@
     },
     "overrides": {
         "yauzl": "3.2.1",
-        "fast-xml-parser": ">=5.5.6"
+        "fast-xml-parser": ">=5.5.7"
     }
 }
