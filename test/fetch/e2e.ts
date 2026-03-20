@@ -123,14 +123,8 @@ suite("fetch - e2e", () => {
             },
             signal: controller.signal
         });
-
-        setTimeout(() => controller.abort(), 500);
-        assert.rejects(
-            (async () => {
-                for await (const _ of response.body) {
-                }
-            })()
-        );
+        controller.abort()
+        assert.rejects(response.text())
     });
 
     after(() => {

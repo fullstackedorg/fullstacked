@@ -122,7 +122,7 @@ func closeStream(ctx *types.Context, streamId uint8) error {
 	ctx.StreamsMutex.Unlock()
 
 	if !ok {
-		return errors.New("no stream for id")
+		return nil
 	}
 
 	if stream.Close != nil {

@@ -33,9 +33,9 @@ function urlOrStringToUrl(url: URL | string) {
     return url instanceof URL
         ? url
         : new URL(
-              url,
-              url.startsWith("/") ? globalThis?.location?.host : undefined
-          );
+            url,
+            url.startsWith("/") ? globalThis?.location?.host : undefined
+        );
 }
 
 async function fetchCore(
@@ -71,9 +71,9 @@ async function fetchCore(
             : await bodyInitToBuffer(init?.body);
 
     let responseHeadEE: EventEmitter<{
-            response: [ResponseHead];
-            error: [string];
-        }>,
+        response: [ResponseHead];
+        error: [string];
+    }>,
         responseHead: ResponseHead,
         responseBodyStream: Duplex;
 
@@ -151,6 +151,12 @@ async function fetchCore(
     }
 
     const readBody = async () => {
+        if (signal?.aborted) {
+            throw new DOMException(
+                "The operation was aborted.",
+                "AbortError"
+            );
+        }
         try {
             let buffer = new Uint8Array();
             for await (const chunk of responseBodyStream) {
