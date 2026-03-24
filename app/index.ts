@@ -5,7 +5,7 @@ const saveSkipWelcomeUntil = (dontShowAgain: boolean) => {
         ? Number.MAX_SAFE_INTEGER
         : Date.now() + 1000 * 60 * 60 * 24; // 24h
 
-    setConfig("skipWelcomeUntil", until);
+    setConfig("skipWelcomeUntil", until.toString());
 };
 
 const openTerminal = async () => {

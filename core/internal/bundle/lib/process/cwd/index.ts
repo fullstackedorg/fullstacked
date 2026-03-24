@@ -1,6 +1,6 @@
 import path from "../../path/index.ts";
 
-let currentDir = null;
+let currentDir: string = null;
 
 export function cwd() {
     if (currentDir === null) {
