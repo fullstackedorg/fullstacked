@@ -7,20 +7,20 @@ replace github.com/microsoft/typescript-go v0.0.0 => ./typescript-go
 require (
 	github.com/Masterminds/semver/v3 v3.4.0 // direct
 	github.com/djherbis/times v1.6.0 // direct
-	github.com/evanw/esbuild v0.27.3 // direct
-	github.com/go-git/go-git/v5 v5.16.5 // direct
+	github.com/evanw/esbuild v0.28.0 // direct
+	github.com/go-git/go-git/v5 v5.17.2 // direct
 )
 
 require (
-	github.com/go-git/go-billy/v5 v5.7.0
+	github.com/go-git/go-billy/v5 v5.8.0
 	github.com/microsoft/typescript-go v0.0.0
-	golang.org/x/net v0.50.0
+	golang.org/x/net v0.52.0
 )
 
 require (
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/ProtonMail/go-crypto v1.3.0 // indirect
+	github.com/ProtonMail/go-crypto v1.4.1 // indirect
 	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
@@ -36,9 +36,9 @@ require (
 	github.com/skeema/knownhosts v1.3.2 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
-	golang.org/x/crypto v0.48.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
-	golang.org/x/text v0.34.0 // indirect
+	golang.org/x/crypto v0.49.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/text v0.35.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 )
