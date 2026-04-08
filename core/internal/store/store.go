@@ -2,10 +2,10 @@ package store
 
 import (
 	"errors"
-	"fmt"
 	"fullstackedorg/fullstacked/internal/serialization"
 	"fullstackedorg/fullstacked/types"
 	"path"
+	"runtime/debug"
 	"strings"
 	"sync"
 )
@@ -131,6 +131,7 @@ func storeResponseStream(
 	defer ctx.StreamsMutex.Unlock()
 
 	if response.Stream == nil {
+		debug.PrintStack()
 		return 0, errors.New("cannot store response stream with stream nil")
 	}
 
@@ -186,7 +187,6 @@ func GetCorePayload(
 	ctxMutex.Unlock()
 
 	if !ok {
-		fmt.Println(coreType)
 		return nil, errors.New("unkown context")
 	}
 

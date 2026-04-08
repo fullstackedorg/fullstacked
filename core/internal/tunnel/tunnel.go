@@ -27,7 +27,7 @@ func Switch(
 ) error {
 	switch header.Fn {
 	case Register:
-		response.Type = types.CoreResponseStream
+		response.Type = types.CoreResponseData
 
 		tunnel := Tunnel{}
 		err := json.Unmarshal(data[0].Data.(types.DeserializedRawObject).Data, &tunnel)
