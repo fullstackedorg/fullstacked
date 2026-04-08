@@ -12,12 +12,13 @@ const (
 	Path     CoreModule = 4
 	Os       CoreModule = 5
 	Net      CoreModule = 6
-	Fetch    CoreModule = 7
-	Bundle   CoreModule = 8
-	Dns      CoreModule = 9
-	Git      CoreModule = 10
-	Packages CoreModule = 11
-	Sentry   CoreModule = 12
+	Tunnel   CoreModule = 7
+	Fetch    CoreModule = 8
+	Bundle   CoreModule = 9
+	Dns      CoreModule = 10
+	Git      CoreModule = 11
+	Packages CoreModule = 12
+	Sentry   CoreModule = 13
 )
 
 type ModuleSwitch = func(*Context, CoreCallHeader, []DeserializedData, *CoreCallResponse) error

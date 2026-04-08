@@ -15,6 +15,7 @@
         "core/internal/bundle/lib/git/index.ts",
         "core/internal/bundle/lib/packages/index.ts",
         "core/internal/bundle/lib/run/index.ts",
-        "core/internal/bundle/lib/sentry/index.ts"
+        "core/internal/bundle/lib/sentry/index.ts",
+        "core/internal/bundle/lib/tunnel/index.ts"
     ]
 }

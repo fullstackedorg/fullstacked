@@ -1,7 +1,9 @@
-package net
+package tunnel
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/types"
 	"net/http"
@@ -10,6 +12,37 @@ import (
 
 	"github.com/coder/websocket"
 )
+
+type TunnelFn = uint8
+
+const (
+	Register TunnelFn = 0
+)
+
+func Switch(
+	ctx *types.Context,
+	header types.CoreCallHeader,
+	data []types.DeserializedData,
+	response *types.CoreCallResponse,
+) error {
+	switch header.Fn {
+	case Register:
+		response.Type = types.CoreResponseStream
+
+		tunnel := Tunnel{}
+		err := json.Unmarshal(data[0].Data.(types.DeserializedRawObject).Data, &tunnel)
+
+		if err != nil {
+			return err
+		}
+
+		RegisterTunnelFn(tunnel)
+
+		return nil
+	}
+
+	return errors.New("unknown net function")
+}
 
 type Tunnel struct {
 	Name          string `json:"name"`
@@ -23,7 +56,7 @@ type Tunnel struct {
 var tunnels = []Tunnel{}
 
 func RegisterTunnelFn(tunnel Tunnel) {
-	existing := findTunnel(tunnel.Name)
+	existing := FindTunnel(tunnel.Name)
 
 	if existing != nil {
 		existing.Host = tunnel.Host
@@ -36,7 +69,7 @@ func RegisterTunnelFn(tunnel Tunnel) {
 	}
 }
 
-func findTunnel(name string) *Tunnel {
+func FindTunnel(name string) *Tunnel {
 	for i, t := range tunnels {
 		if t.Name == name {
 			return &tunnels[i]

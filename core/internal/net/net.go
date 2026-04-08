@@ -1,9 +1,9 @@
 package net
 
 import (
-	"encoding/json"
 	"errors"
 	"fullstackedorg/fullstacked/internal/store"
+	"fullstackedorg/fullstacked/internal/tunnel"
 	"fullstackedorg/fullstacked/types"
 	"net"
 	"strconv"
@@ -12,8 +12,7 @@ import (
 type NetFn = uint8
 
 const (
-	Connect        NetFn = 0
-	RegisterTunnel NetFn = 1
+	Connect NetFn = 0
 )
 
 func Switch(
@@ -37,19 +36,6 @@ func Switch(
 		}
 		response.Stream = stream
 		return nil
-	case RegisterTunnel:
-		response.Type = types.CoreResponseData
-
-		tunnel := Tunnel{}
-		err := json.Unmarshal(data[0].Data.(types.DeserializedRawObject).Data, &tunnel)
-
-		if err != nil {
-			return err
-		}
-
-		RegisterTunnelFn(tunnel)
-
-		return nil
 	}
 
 	return errors.New("unknown net function")
@@ -59,7 +45,7 @@ func createSocket(
 	port int,
 	hostname string,
 ) (*types.ResponseStream, error) {
-	tunnel := findTunnel(hostname)
+	tunnel := tunnel.FindTunnel(hostname)
 	if tunnel != nil {
 		return tunnel.Connect()
 	}

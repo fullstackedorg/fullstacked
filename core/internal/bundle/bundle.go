@@ -62,6 +62,7 @@ var libModules = map[string]string{
 	"timers":               "/lib/timers/index.ts",
 	"timers/promises":      "/lib/timers/promises.ts",
 	"tls":                  "/lib/unavailable/index.ts",
+	"tunnel":               "/lib/tunnel/index.ts",
 	"tty":                  "/lib/tty/index.ts",
 	"url":                  "/lib/url/index.ts",
 	"util":                 "/lib/util/index.js",

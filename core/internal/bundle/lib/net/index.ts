@@ -3,7 +3,7 @@
 import "buffer";
 import { bridge } from "../bridge/index.ts";
 import { Net } from "../@types/index.ts";
-import { Connect, RegisterTunnel, Tunnel } from "../@types/net.ts";
+import { Connect } from "../@types/net.ts";
 import { Duplex } from "../bridge/duplex.ts";
 import { Duplex as RealDuplex } from "stream";
 
@@ -226,17 +226,8 @@ export function isIPv6(addr: string) {
     return ipv6Regex.test(addr);
 }
 
-export function registerTunnel(tunnel: Tunnel) {
-    return bridge({
-        mod: Net,
-        fn: RegisterTunnel,
-        data: [tunnel]
-    })
-}
-
 export default {
     Socket,
     connect,
-    createConnection,
-    registerTunnel
+    createConnection
 };

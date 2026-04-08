@@ -16,6 +16,7 @@ import (
 	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/internal/stream"
 	"fullstackedorg/fullstacked/internal/test"
+	"fullstackedorg/fullstacked/internal/tunnel"
 	"fullstackedorg/fullstacked/types"
 	"path/filepath"
 	"strconv"
@@ -102,6 +103,7 @@ var modules = map[types.CoreModule]types.ModuleSwitch{
 	types.Fetch:    fetch.Switch,
 	types.Bundle:   bundle.Switch,
 	types.Net:      net.Switch,
+	types.Tunnel:   tunnel.Switch,
 	types.Dns:      dns.Switch,
 	types.Git:      git.Switch,
 	types.Packages: packages.Switch,
