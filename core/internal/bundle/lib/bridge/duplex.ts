@@ -84,6 +84,8 @@ export interface Duplex extends ReadableStream<Uint8Array<ArrayBuffer>> {
     eventEmitter(): ReturnType<typeof createEventEmitter>;
 }
 
+const te = new TextEncoder();
+
 export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
     const duplex: DuplexItem = {
         opening: null,
@@ -180,12 +182,14 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
         }
     };
 
-    stream.write = (data: Uint8Array) =>
+    stream.write = (data: Uint8Array | string) => {
+        data = typeof data === "string" ? te.encode(data) : data;
         bridgeFn({
             mod: Stream,
             fn: Write,
             data: [id, data]
         });
+    }
 
     stream.writeEvent = (event: string, ...args: SerializableData[]) =>
         bridgeFn({

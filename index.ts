@@ -3,7 +3,7 @@ import "./platform/node/build.ts";
 import fs from "fs";
 import { getVersion } from "./version.ts";
 
-if (fs.existsSync("app/shell")) {
+if (fs.existsSync("app/shell/package.json")) {
     // this is a duplicate of the shell/prestart.ts
     // at some point, there won't be any default app in this repository
     // for now we keep the shell and demo as submodule to accelerate the development

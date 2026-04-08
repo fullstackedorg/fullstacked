@@ -2,6 +2,7 @@ package store
 
 import (
 	"errors"
+	"fmt"
 	"fullstackedorg/fullstacked/internal/serialization"
 	"fullstackedorg/fullstacked/types"
 	"path"
@@ -60,6 +61,22 @@ func NewContextWithCtxId(ctxId uint8, root string, build string) {
 		Streams:      map[uint8]*types.StoredStream{},
 		StreamsMutex: &sync.Mutex{},
 	}
+}
+
+func EndContext(ctxId uint8) {
+	ctxMutex.Lock()
+
+	ctx, ok := Contexts[ctxId]
+
+	if ok {
+		for i := range ctx.Streams {
+			ctx.Streams[i].Close(&ctx, i)
+		}
+	}
+
+	delete(Contexts, ctxId)
+
+	ctxMutex.Unlock()
 }
 
 func StoreResponse(
@@ -169,6 +186,7 @@ func GetCorePayload(
 	ctxMutex.Unlock()
 
 	if !ok {
+		fmt.Println(coreType)
 		return nil, errors.New("unkown context")
 	}
 
@@ -227,6 +245,14 @@ func StreamChunk(
 	buffer []byte,
 	end bool,
 ) {
+	ctxMutex.Lock()
+	_, ok := Contexts[ctx.Id]
+	ctxMutex.Unlock()
+
+	if !ok {
+		return
+	}
+
 	ctx.StreamsMutex.Lock()
 
 	stream, ok := ctx.Streams[storedStreamId]

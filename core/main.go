@@ -76,8 +76,8 @@ func stop(
 	if store.HasSentry {
 		defer sentry.Recover()
 	}
-
-	delete(store.Contexts, uint8(ctxId))
+	
+	store.EndContext(uint8(ctxId))
 }
 
 var cCallback = (unsafe.Pointer)(nil)

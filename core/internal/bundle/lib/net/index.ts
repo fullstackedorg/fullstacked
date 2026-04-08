@@ -3,7 +3,7 @@
 import "buffer";
 import { bridge } from "../bridge/index.ts";
 import { Net } from "../@types/index.ts";
-import { Connect } from "../@types/net.ts";
+import { Connect, RegisterTunnel, Tunnel } from "../@types/net.ts";
 import { Duplex } from "../bridge/duplex.ts";
 import { Duplex as RealDuplex } from "stream";
 
@@ -15,8 +15,8 @@ function parseOptions(
         typeof pathOrPortOrOptions === "string"
             ? pathOrPortOrOptions
             : typeof pathOrPortOrOptions === "object"
-              ? pathOrPortOrOptions?.path
-              : null;
+                ? pathOrPortOrOptions?.path
+                : null;
 
     // connect path
     if (path) {
@@ -27,8 +27,8 @@ function parseOptions(
         typeof pathOrPortOrOptions === "number"
             ? pathOrPortOrOptions
             : typeof pathOrPortOrOptions === "object"
-              ? pathOrPortOrOptions?.port
-              : null;
+                ? pathOrPortOrOptions?.port
+                : null;
 
     if (!port) {
         throw "undefined port for socket connection";
@@ -38,8 +38,8 @@ function parseOptions(
         typeof connectListenerOrHost === "string"
             ? connectListenerOrHost
             : typeof pathOrPortOrOptions === "object"
-              ? pathOrPortOrOptions?.host
-              : null;
+                ? pathOrPortOrOptions?.host
+                : null;
 
     const options =
         typeof pathOrPortOrOptions === "object" ? pathOrPortOrOptions : null;
@@ -226,8 +226,17 @@ export function isIPv6(addr: string) {
     return ipv6Regex.test(addr);
 }
 
+export function registerTunnel(tunnel: Tunnel) {
+    return bridge({
+        mod: Net,
+        fn: RegisterTunnel,
+        data: [tunnel]
+    })
+}
+
 export default {
     Socket,
     connect,
-    createConnection
+    createConnection,
+    registerTunnel
 };

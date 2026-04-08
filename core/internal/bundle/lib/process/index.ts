@@ -54,7 +54,7 @@ export function exit() {
 process.hrtime = hrtime;
 process.cwd = cwd;
 process.chdir = chdir;
-process.versions = { fullstacked };
+process.versions = { node: "", fullstacked };
 process.exit = exit;
 
 export default process;
