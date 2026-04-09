@@ -8,7 +8,13 @@
         "emitDeclarationOnly": true,
         "declaration": true,
         "declarationDir": "platform/node/types",
-        "skipLibCheck": true
+        "rootDir": "core/internal/bundle/lib",
+        "skipLibCheck": true,
+        "strictNullChecks": false,
+        "noImplicitAny": false,
+        "types": [
+            "node"
+        ]
     },
     "include": [
         "core/internal/bundle/lib/bundle/index.ts",

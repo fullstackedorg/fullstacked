@@ -1,6 +1,6 @@
 {
     "name": "fullstacked",
-    "version": "1.0.0-alpha.1638",
+    "version": "1.0.0-alpha.1639",
     "bin": {
         "fullstacked": "index.js"
     },
@@ -10,24 +10,24 @@
         "prepack": "npm run build"
     },
     "dependencies": {
-        "@tailwindcss/cli": "^4.2.1",
+        "@tailwindcss/cli": "^4.2.2",
         "open": "^11.0.0",
-        "tailwindcss": "^4.2.1",
-        "ws": "^8.19.0"
+        "tailwindcss": "^4.2.2",
+        "ws": "^8.20.0"
     },
     "devDependencies": {
         "@nitrogql/esbuild-register": "^1.7.2",
         "@types/ws": "^8.18.1",
-        "esbuild": "^0.27.3",
-        "node-addon-api": "^8.6.0"
+        "esbuild": "^0.28.0",
+        "node-addon-api": "^8.7.0"
     },
     "optionalDependencies": {
-        "@fullstacked/darwin-arm64": "1.0.0-alpha.1638",
-        "@fullstacked/darwin-x64": "1.0.0-alpha.1638",
-        "@fullstacked/linux-arm64": "1.0.0-alpha.1638",
-        "@fullstacked/linux-x64": "1.0.0-alpha.1638",
-        "@fullstacked/win32-arm64": "1.0.0-alpha.1638",
-        "@fullstacked/win32-x64": "1.0.0-alpha.1638"
+        "@fullstacked/darwin-arm64": "1.0.0-alpha.1639",
+        "@fullstacked/darwin-x64": "1.0.0-alpha.1639",
+        "@fullstacked/linux-arm64": "1.0.0-alpha.1639",
+        "@fullstacked/linux-x64": "1.0.0-alpha.1639",
+        "@fullstacked/win32-arm64": "1.0.0-alpha.1639",
+        "@fullstacked/win32-x64": "1.0.0-alpha.1639"
     },
     "author": "FullStacked",
     "license": "MIT",
