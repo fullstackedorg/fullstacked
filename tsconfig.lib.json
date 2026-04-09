@@ -12,9 +12,7 @@
         "skipLibCheck": true,
         "strictNullChecks": false,
         "noImplicitAny": false,
-        "types": [
-            "node"
-        ]
+        "types": ["node"]
     },
     "include": [
         "core/internal/bundle/lib/bundle/index.ts",

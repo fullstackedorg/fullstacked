@@ -48,7 +48,7 @@ if (globalThis.process) {
                 // @ts-ignore
                 import("fetch"),
                 import("timers")
-            ])
+            ]);
 
             const platform = await (
                 await globalThis.originalFetch("/platform")

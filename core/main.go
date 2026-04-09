@@ -76,7 +76,7 @@ func stop(
 	if store.HasSentry {
 		defer sentry.Recover()
 	}
-	
+
 	store.EndContext(uint8(ctxId))
 }
 

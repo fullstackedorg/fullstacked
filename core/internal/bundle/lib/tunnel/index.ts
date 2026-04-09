@@ -7,11 +7,11 @@ export function register(tunnel: Tunnel) {
         mod: TunnelMod,
         fn: Register,
         data: [tunnel]
-    })
+    });
 }
 
 const tunnel = {
     register
-}
+};
 
-export default tunnel
+export default tunnel;

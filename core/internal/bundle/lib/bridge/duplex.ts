@@ -189,7 +189,7 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
             fn: Write,
             data: [id, data]
         });
-    }
+    };
 
     stream.writeEvent = (event: string, ...args: SerializableData[]) =>
         bridgeFn({
