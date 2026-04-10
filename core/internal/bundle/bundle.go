@@ -43,6 +43,7 @@ var libModules = map[string]string{
 	"fullstacked/packages": "/lib/packages/index.ts",
 	"fullstacked/run":      "/lib/run/index.ts",
 	"fullstacked/sentry":   "/lib/sentry/index.ts",
+	"fullstacked/tunnel":   "/lib/tunnel/index.ts",
 	"git":                  "/lib/git/index.ts",
 	"http":                 "/lib/http/index.ts",
 	"https":                "/lib/https/index.ts",
