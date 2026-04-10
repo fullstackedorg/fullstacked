@@ -244,8 +244,29 @@ func (r *GitDirectory) FetchBranch(branchName string, progress *GitStream) error
 	}
 	refSpecs := []config.RefSpec{config.RefSpec("refs/heads/" + branchName + ":" + "refs/heads/" + branchName)}
 
-	return remote.Fetch(&git.FetchOptions{
+	urlStr, err := r.GetUrl()
+
+	if err != nil {
+		return err
+	}
+
+	options := git.FetchOptions{
 		RefSpecs: refSpecs,
 		Progress: progress,
-	})
+	}
+
+	auth, _ := RequestAuth(progress.ctx, urlStr, false)
+	options.Auth = gitAuthToHttpAuth(auth)
+
+	err = remote.Fetch(&options)
+
+	if errIsAuthenticationRequired(err) {
+		auth, err = RequestAuth(progress.ctx, urlStr, true)
+		if err == nil {
+			options.Auth = gitAuthToHttpAuth(auth)
+			err = remote.Fetch(&options)
+		}
+	}
+
+	return err
 }
