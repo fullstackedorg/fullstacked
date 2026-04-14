@@ -31,6 +31,7 @@ var libModules = map[string]string{
 	"constants":            "/lib/constants/index.json",
 	"crypto":               "/lib/crypto/index.ts",
 	"diagnostics_channel":  "/lib/diagnostics_channel/index.js",
+	"dgram":                "/lib/dgram/index.ts",
 	"dns":                  "/lib/dns/index.ts",
 	"dns/promises":         "/lib/dns/promises.ts",
 	"events":               "/lib/events/index.js",

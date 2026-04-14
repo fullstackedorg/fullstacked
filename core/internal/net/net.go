@@ -50,7 +50,7 @@ func createSocket(
 		return tunnel.Connect()
 	}
 
-	socket, err := net.Dial("tcp", hostname+":"+strconv.Itoa(port))
+	socket, err := net.Dial("tcp", net.JoinHostPort(hostname, strconv.Itoa(port)))
 	if err != nil {
 		return nil, err
 	}

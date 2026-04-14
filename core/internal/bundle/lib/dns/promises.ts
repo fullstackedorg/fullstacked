@@ -7,7 +7,8 @@ import {
     ResolveMX,
     ResolveNS,
     ResolveSRV,
-    ResolveTXT
+    ResolveTXT,
+    Lookup
 } from "../@types/dns.ts";
 
 export async function resolve(hostname: string, rrtype: string) {}
@@ -68,6 +69,36 @@ export function resolveTxt(hostname: string) {
     });
 }
 
+export async function lookup(hostname: string, options?: any) {
+    let family = 0;
+    let all = false;
+
+    if (typeof options === "number") {
+        family = options;
+    } else if (typeof options === "object" && options !== null) {
+        family = options.family || 0;
+        all = options.all || false;
+    }
+
+    const results: any[] = await bridge({
+        mod: Dns,
+        fn: Lookup,
+        data: [hostname]
+    });
+
+    const filtered = results.filter((r) => family === 0 || r.family === family);
+
+    if (filtered.length === 0) {
+        throw new Error(`ENOTFOUND ${hostname}`);
+    }
+
+    if (all) {
+        return filtered;
+    }
+
+    return filtered[0];
+}
+
 export default {
     resolve4,
     resolve6,
@@ -75,5 +106,6 @@ export default {
     resolveMx,
     resolveNs,
     resolveSrv,
-    resolveTxt
+    resolveTxt,
+    lookup
 };

@@ -13,16 +13,41 @@ type DuplexItem = {
         data: Set<(chunk: Uint8Array) => void>;
         close: Set<() => void>;
     };
+    pendingData: Uint8Array[];
     asyncRead: {
         promise?: { resolve: () => void; reject: (reason: string) => void };
         data: Uint8Array;
     };
+    queuedPackets: (ArrayBuffer | string)[];
 };
 
-const activeDuplexes = new Map<number, DuplexItem>();
+const activeDuplexes = new Map<number, DuplexItem[]>();
 
-globalThis.callback = async function (
+globalThis.callback = function (id: number, payload: ArrayBuffer | string) {
+    const duplexes = activeDuplexes.get(id);
+
+    if (!duplexes || duplexes.length === 0) {
+        bridge({
+            mod: Stream,
+            fn: Close,
+            data: [id]
+        });
+        return;
+    }
+
+    const duplex = duplexes[0];
+
+    if (duplex.opening) {
+        duplex.queuedPackets.push(payload);
+        return;
+    }
+
+    processPayload(id, duplex, payload);
+};
+
+function processPayload(
     id: number,
+    duplex: DuplexItem,
     payload: ArrayBuffer | string
 ) {
     const chunk =
@@ -30,38 +55,39 @@ globalThis.callback = async function (
             ? toByteArray(payload)
             : new Uint8Array(payload);
 
-    const duplex = activeDuplexes.get(id);
-
-    if (!duplex) {
-        bridge({
-            mod: Stream,
-            fn: Close,
-            data: [id]
-        });
-        throw new Error("No duplex found for id " + id);
-    }
-
-    if (duplex.opening) {
-        await duplex.opening;
-    }
-
     duplex.done = chunk[0] === 1;
     const data = chunk.slice(1);
 
-    duplex?.listeners.data.forEach((cb) => cb(data));
-    if (duplex.done) duplex?.listeners.close.forEach((cb) => cb());
-
-    if (duplex?.asyncRead === null) {
-        return;
+    if (duplex.listeners.data.size === 0 && !duplex.done) {
+        duplex.pendingData.push(data);
+    } else {
+        duplex.listeners.data.forEach((cb) => cb(data));
     }
 
-    duplex.asyncRead.data =
-        duplex.asyncRead.data === null
-            ? data
-            : mergeUint8Arrays(duplex.asyncRead.data, data);
+    if (duplex.done) {
+        duplex.listeners.close.forEach((cb) => cb());
+        // Remove from the queue once done
+        const duplexes = activeDuplexes.get(id);
+        if (duplexes) {
+            const index = duplexes.indexOf(duplex);
+            if (index !== -1) {
+                duplexes.splice(index, 1);
+                if (duplexes.length === 0) {
+                    activeDuplexes.delete(id);
+                }
+            }
+        }
+    }
 
-    duplex?.asyncRead?.promise?.resolve?.();
-};
+    if (duplex.asyncRead !== null) {
+        duplex.asyncRead.data =
+            duplex.asyncRead.data === null
+                ? data
+                : mergeUint8Arrays(duplex.asyncRead.data, data);
+
+        duplex.asyncRead.promise?.resolve?.();
+    }
+}
 
 type StreamData = string | Buffer | Uint8Array | DataView;
 
@@ -73,8 +99,8 @@ export interface Duplex extends ReadableStream<Uint8Array<ArrayBuffer>> {
         callback: (chunk: StreamData, encoding?: string) => void
     ): void;
     on(event: "close", callback: EndCallback): void;
-    write(data: StreamData): void;
-    writeEvent(event: string, ...args: SerializableData[]): void;
+    write(data: StreamData): Promise<any>;
+    writeEvent(event: string, ...args: SerializableData[]): Promise<any>;
     end(
         chunk?: StreamData,
         encoding?: string | EndCallback,
@@ -95,10 +121,15 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
             data: new Set<(chunk: Uint8Array) => void>(),
             close: new Set<() => void>()
         },
-        asyncRead: null
+        pendingData: [],
+        asyncRead: null,
+        queuedPackets: []
     };
 
-    activeDuplexes.set(id, duplex);
+    if (!activeDuplexes.has(id)) {
+        activeDuplexes.set(id, []);
+    }
+    activeDuplexes.get(id).push(duplex);
 
     const open = () => {
         if (duplex.open) {
@@ -117,8 +148,13 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
             });
 
             duplex.open = true;
-            resolveOpening();
             duplex.opening = null;
+
+            const packets = duplex.queuedPackets;
+            duplex.queuedPackets = [];
+            packets.forEach((p) => processPayload(id, duplex, p));
+
+            resolveOpening();
         });
 
         return duplex.opening;
@@ -171,6 +207,10 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
         switch (event) {
             case "data":
                 duplex.listeners.data.add(cb);
+                if (duplex.pendingData.length > 0) {
+                    duplex.pendingData.forEach(cb);
+                    duplex.pendingData = [];
+                }
                 break;
             case "close":
                 duplex.listeners.close.add(cb);
@@ -184,7 +224,7 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
 
     stream.write = (data: Uint8Array | string) => {
         data = typeof data === "string" ? te.encode(data) : data;
-        bridgeFn({
+        return bridgeFn({
             mod: Stream,
             fn: Write,
             data: [id, data]

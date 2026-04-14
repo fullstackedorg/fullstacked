@@ -2,13 +2,21 @@
 
 import { bridge } from "../bridge/index.ts";
 import { Os } from "../@types/index.ts";
-import { Arch, Endieness, Platform, Uname, UnameInfo } from "../@types/os.ts";
+import {
+    Arch,
+    Endieness,
+    Hostname,
+    Platform,
+    Uname,
+    UnameInfo
+} from "../@types/os.ts";
 
 const cache = {
     platform: null,
     arch: null,
     endianness: null,
-    uname: null as UnameInfo
+    uname: null as UnameInfo,
+    hostname: null
 };
 
 export function platform(): string {
@@ -72,9 +80,24 @@ export function type(): string {
     return getUname().sysname;
 }
 
+export function hostname(): string {
+    if (cache.hostname === null) {
+        cache.hostname = bridge(
+            {
+                mod: Os,
+                fn: Hostname
+            },
+            true
+        );
+    }
+    return cache.hostname;
+}
+
 export default {
     platform,
     arch,
     endianness,
-    release
+    release,
+    type,
+    hostname
 };

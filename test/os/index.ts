@@ -16,4 +16,8 @@ suite("os - e2e", () => {
         assert.deepEqual(os.release(), nodeOs.release());
         assert.deepEqual(os.type(), nodeOs.type());
     });
+
+    test("hostname", () => {
+        assert.deepEqual(os.hostname(), nodeOs.hostname());
+    });
 });

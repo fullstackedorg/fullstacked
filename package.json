@@ -1,6 +1,7 @@
 {
     "version": "1.0.0-alpha",
     "scripts": {
+        "generate-types": "node -r @nitrogql/esbuild-register generate-types",
         "build": "node -r @nitrogql/esbuild-register build",
         "start": "node -r @nitrogql/esbuild-register index",
         "fmt": "sh ./fmt.sh",

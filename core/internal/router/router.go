@@ -3,6 +3,7 @@ package router
 import (
 	"errors"
 	"fullstackedorg/fullstacked/internal/bundle"
+	"fullstackedorg/fullstacked/internal/dgram"
 	"fullstackedorg/fullstacked/internal/dns"
 	"fullstackedorg/fullstacked/internal/fetch"
 	"fullstackedorg/fullstacked/internal/fs"
@@ -108,6 +109,7 @@ var modules = map[types.CoreModule]types.ModuleSwitch{
 	types.Git:      git.Switch,
 	types.Packages: packages.Switch,
 	types.Sentry:   sentry.Switch,
+	types.Dgram:    dgram.Switch,
 	types.Test:     test.Switch,
 }
 

@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fullstackedorg/fullstacked/types"
+	"os"
 	"runtime"
 )
 
@@ -14,6 +15,7 @@ const (
 	Arch      OsFn = 1
 	Endieness OsFn = 2
 	Uname     OsFn = 3
+	Hostname  OsFn = 4
 )
 
 func Switch(
@@ -46,6 +48,14 @@ func Switch(
 		}
 		response.Type = types.CoreResponseData
 		response.Data = unameInfo
+		return nil
+	case Hostname:
+		hostname, err := os.Hostname()
+		if err != nil {
+			return err
+		}
+		response.Type = types.CoreResponseData
+		response.Data = hostname
 		return nil
 	}
 

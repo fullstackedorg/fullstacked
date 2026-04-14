@@ -46,4 +46,38 @@ suite("dns - e2e", () => {
         const txt = await dns.promises.resolveTxt(host);
         assert.deepEqual(nodeTxt, txt);
     });
+    test("lookup callback (all)", async () => {
+        const host = "testa.fullstacked.org";
+        const nodeLookup = await new Promise((res, rej) =>
+            nodeDns.lookup(host, { all: true }, (err, addresses) =>
+                err ? rej(err) : res(addresses)
+            )
+        );
+        const lookup = await new Promise((res, rej) =>
+            dns.lookup(host, { all: true }, (err: any, addresses: any) =>
+                err ? rej(err) : res(addresses)
+            )
+        );
+        assert.deepEqual(nodeLookup, lookup);
+    });
+    test("lookup callback (single)", async () => {
+        const host = "testa.fullstacked.org";
+        const nodeLookup = await new Promise((res, rej) =>
+            nodeDns.lookup(host, (err, address, family) =>
+                err ? rej(err) : res({ address, family })
+            )
+        );
+        const lookup = await new Promise((res, rej) =>
+            dns.lookup(host, (err: any, address: any, family: any) =>
+                err ? rej(err) : res({ address, family })
+            )
+        );
+        assert.deepEqual(nodeLookup, lookup);
+    });
+    test("promises.lookup (single)", async () => {
+        const host = "testa.fullstacked.org";
+        const nodeLookup = await nodeDns.promises.lookup(host);
+        const lookup = await dns.promises.lookup(host);
+        assert.deepEqual(nodeLookup, lookup);
+    });
 });

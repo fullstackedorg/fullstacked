@@ -19,6 +19,7 @@ const (
 	Git      CoreModule = 11
 	Packages CoreModule = 12
 	Sentry   CoreModule = 13
+	Dgram    CoreModule = 14
 )
 
 type ModuleSwitch = func(*Context, CoreCallHeader, []DeserializedData, *CoreCallResponse) error

@@ -51,34 +51,38 @@ function parseOptions(
     };
 }
 
+/**
+ * Configuration options for the Socket class.
+ */
 type SocketOpts = {
+    /** Whether to allow half-open TCP connections. */
     allowHalfOpen: boolean;
-    // blockList
-    // fd
+    /** Whether to enable keep-alive functionality. */
     keepAlive: boolean;
+    /** The initial delay before the first keepalive probe is sent. */
     keepAliveInitialDelay: number;
+    /** Whether to enable TCP_NODELAY. */
     noDelay: boolean;
+    /** Callback and buffer for low-level reading. */
     onread: {
         buffer: Buffer | Uint8Array | Function;
         callback: (chunk: Buffer) => void;
     };
-    // readable
-    // signal
-    // writable
 };
 
+/**
+ * Node.js net.Socket shim bridging to FullStacked core.
+ */
 export class Socket extends RealDuplex {
     private duplex: Duplex = null;
-    writable: boolean = true;
-    readable: boolean = true;
-    _readableState: any = {
-        ended: false
-    };
 
     constructor(options?: Partial<SocketOpts>) {
-        super();
+        super(options);
     }
 
+    /**
+     * Connect the socket to a remote host and port.
+     */
     connect(options: Partial<ConnectOpts>): void;
     connect(port: number, host?: string): void;
     connect(optionsOrPort: Partial<ConnectOpts> | number, maybeHost?: string) {
@@ -91,53 +95,77 @@ export class Socket extends RealDuplex {
         }).then((d) => {
             this.duplex = d;
             this.duplex.on("data", (data: Uint8Array) => {
-                this.emit("data", Buffer.from(data));
+                if (this.destroyed) return;
+                this.push(Buffer.from(data));
             });
-            this.duplex.on("close", () => this.emit("close"));
+            this.duplex.on("close", () => {
+                if (!this.destroyed) {
+                    this.push(null);
+                }
+                this.emit("close");
+            });
             this.emit("connect");
             this.emit("ready");
         });
     }
 
-    // @ts-ignore
-    end(data: Uint8Array) {
-        this.duplex.end(data);
+    _read(size: number) {
+        // Data is pushed asynchronously from the duplex bridge
+    }
+
+    _write(
+        chunk: any,
+        encoding: string,
+        callback: (error?: Error | null) => void
+    ) {
+        if (!this.duplex) {
+            this.once("connect", () => this._write(chunk, encoding, callback));
+            return;
+        }
+
+        this.duplex
+            .write(chunk)
+            .then(() => callback())
+            .catch(callback);
+    }
+
+    _final(callback: (error?: Error | null) => void) {
+        if (this.duplex) {
+            this.duplex.end();
+        }
+        callback();
+    }
+
+    _destroy(error: Error | null, callback: (error: Error | null) => void) {
+        if (this.duplex) {
+            this.duplex.end();
+        }
+        callback(error);
+    }
+
+    setNoDelay(noDelay: boolean = true) {
         return this;
     }
 
-    destroy(error?: Error) {
-        this.duplex.end();
+    setKeepAlive(enable: boolean = false, initialDelay: number = 0) {
         return this;
     }
 
-    // @ts-ignore
-    write(data: Uint8Array) {
-        this.duplex.write(data);
-        return this;
-    }
-
-    setNoDelay(noDelay: boolean) {
-        return this;
-    }
-
-    setKeepAlive(enable: boolean, initialDelay: number) {
-        return this;
-    }
-
+    private _timeoutId?: any;
+    /**
+     * Set the timeout for the socket.
+     * @param timeout Timeout in milliseconds. 0 disables the timeout.
+     * @param callback Callback executed when the 'timeout' event fires.
+     */
     setTimeout(timeout: number, callback?: () => void) {
+        if (this._timeoutId) clearTimeout(this._timeoutId);
+        if (timeout > 0) {
+            this._timeoutId = setTimeout(() => {
+                if (callback) callback();
+                this.emit("timeout");
+            }, timeout);
+        }
         return this;
-    }
-
-    pause() {
-        return this;
-    }
-
-    resume() {
-        return this;
-    }
-
-    pipe(destination: any, options?: { end?: boolean }) {
-        return this as any;
     }
 
     ref() {
@@ -145,6 +173,7 @@ export class Socket extends RealDuplex {
     }
 
     unref() {
+        if (this._timeoutId) clearTimeout(this._timeoutId);
         return this;
     }
 }
@@ -157,6 +186,9 @@ type ConnectOpts = SocketOpts & {
 
 type ConnectListener = () => void;
 
+/**
+ * Creates a new Socket and connects it to the specified host and port.
+ */
 export function connect(
     options: Partial<ConnectOpts>,
     connectListener?: ConnectListener
@@ -202,10 +234,17 @@ export const createConnection: typeof connect = (...args: any) =>
 const maxIPv4Length = 15;
 const maxIPv6Length = 45;
 
+/**
+ * Identifies the version of the IP address in a string.
+ * @returns 4 if IPv4, 6 if IPv6, 0 otherwise.
+ */
 export function isIP(addr: string) {
     return isIPv6(addr) ? 6 : isIPv4(addr) ? 4 : 0;
 }
 
+/**
+ * Checks if the address is a valid IPv4 address.
+ */
 export function isIPv4(addr: string) {
     if (addr.length > maxIPv4Length) {
         return false;
@@ -216,6 +255,9 @@ export function isIPv4(addr: string) {
     return ipv4Regex.test(addr);
 }
 
+/**
+ * Checks if the address is a valid IPv6 address.
+ */
 export function isIPv6(addr: string) {
     if (addr.length > maxIPv6Length) {
         return false;
@@ -226,8 +268,13 @@ export function isIPv6(addr: string) {
     return ipv6Regex.test(addr);
 }
 
-export default {
+const net = {
     Socket,
     connect,
-    createConnection
+    createConnection,
+    isIP,
+    isIPv4,
+    isIPv6
 };
+
+export default net;

@@ -18,6 +18,7 @@ const (
 	ResolveNS    DnsFn = 4
 	ResolveSRV   DnsFn = 5
 	ResolveTXT   DnsFn = 6
+	Lookup       DnsFn = 7
 )
 
 var customResolver *net.Resolver
@@ -85,6 +86,11 @@ func Switch(
 		txt, err := getResolver().LookupTXT(context.Background(), data[0].Data.(string))
 		if err == nil {
 			response.Data = [][]string{txt}
+		}
+	case Lookup:
+		res, err := lookup(data[0].Data.(string))
+		if err == nil {
+			response.Data = res
 		}
 	default:
 		err = errors.New("unknown dns function")
@@ -185,4 +191,30 @@ func resolveSrv(host string) ([]SRV, error) {
 	}
 
 	return srvs, nil
+}
+
+type LookupResult struct {
+	Address string `json:"address"`
+	Family  int    `json:"family"`
+}
+
+func lookup(host string) ([]LookupResult, error) {
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return nil, err
+	}
+
+	results := []LookupResult{}
+	for _, ip := range ips {
+		family := 4
+		if ip.To4() == nil {
+			family = 6
+		}
+		results = append(results, LookupResult{
+			Address: ip.String(),
+			Family:  family,
+		})
+	}
+
+	return results, nil
 }
