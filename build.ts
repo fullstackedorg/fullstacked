@@ -73,10 +73,6 @@ const packagesToBundle = [
     {
         entryPoint: "node_modules/constants-browserify/constants.json",
         outfile: "core/internal/bundle/lib/constants/index.json"
-    },
-    {
-        entryPoint: "node_modules/just-performance/dist/esm/browser.js",
-        outfile: "core/internal/bundle/lib/perf_hooks/index.js"
     }
 ];
 

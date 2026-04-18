@@ -37,7 +37,6 @@
         "esbuild": "^0.28.0",
         "events": "^3.3.0",
         "fast-querystring": "^1.1.2",
-        "just-performance": "^4.4.0",
         "node-gyp": "^12.2.0",
         "prettier": "^3.8.1",
         "process": "^0.11.10",
