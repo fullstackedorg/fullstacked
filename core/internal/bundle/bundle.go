@@ -53,7 +53,7 @@ var libModules = map[string]string{
 	"os":                   "/lib/os/index.ts",
 	"packages":             "/lib/packages/index.ts",
 	"path":                 "/lib/path/index.ts",
-	"perf_hooks":           "/lib/unavailable/index.ts",
+	"perf_hooks":           "/lib/perf_hooks/index.ts",
 	"process":              "/lib/process/index.ts",
 	"querystring":          "/lib/querystring/index.ts",
 	"run":                  "/lib/run/index.ts",

@@ -7,7 +7,11 @@ globalThis.setImmediate = ((
     callback: (...args: any[]) => void,
     ...args: any[]
 ) => {
-    setTimeout(() => callback(...args), 0);
+    return setTimeout(() => callback(...args), 0);
+}) as any;
+
+globalThis.clearImmediate = ((id: any) => {
+    clearTimeout(id);
 }) as any;
 
 export * from "./promises.ts";

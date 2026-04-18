@@ -19,6 +19,7 @@ import version from "./version.ts";
 // querystring : https://www.npmjs.com/package/fast-querystring
 // diagnostics_channel : https://www.npmjs.com/package/dc-polyfill
 // constants : https://www.npmjs.com/package/constants-browserify
+// perf_hooks: https://www.npmjs.com/package/just-performance
 
 const packagesToBundle = [
     {
@@ -72,6 +73,10 @@ const packagesToBundle = [
     {
         entryPoint: "node_modules/constants-browserify/constants.json",
         outfile: "core/internal/bundle/lib/constants/index.json"
+    },
+    {
+        entryPoint: "node_modules/just-performance/dist/esm/browser.js",
+        outfile: "core/internal/bundle/lib/perf_hooks/index.js"
     }
 ];
 
@@ -79,26 +84,26 @@ packagesToBundle.forEach(({ entryPoint, outfile }) =>
     entryPoint.endsWith(".json")
         ? fs.cpSync(entryPoint, outfile, { recursive: true })
         : esbuild.buildSync({
-              entryPoints: [entryPoint],
-              outfile,
-              bundle: true,
-              // format: "esm",
-              platform: "node",
-              external: ["process/", "create-hash/browser/md5"],
-              alias: {
-                  // source: https://soatok.blog/2025/11/19/moving-beyond-the-npm-elliptic-package/
-                  // elliptic: "@soatok/elliptic-to-noble",
+            entryPoints: [entryPoint],
+            outfile,
+            bundle: true,
+            // format: "esm",
+            platform: "node",
+            external: ["process/", "create-hash/browser/md5"],
+            alias: {
+                // source: https://soatok.blog/2025/11/19/moving-beyond-the-npm-elliptic-package/
+                // elliptic: "@soatok/elliptic-to-noble",
 
-                  randombytes: "randombytes/browser",
-                  "create-ecdh": "create-ecdh/browser",
-                  "create-hash": "create-hash/browser",
-                  "create-hmac": "create-hmac/browser",
-                  "browserify-cipher": "browserify-cipher/browser",
-                  "browserify-sign": "browserify-sign/browser",
-                  "browserify-sign/algos": "browserify-sign/algos"
-                  // "browserify-aes": "browserify-aes/browser",
-              }
-          })
+                randombytes: "randombytes/browser",
+                "create-ecdh": "create-ecdh/browser",
+                "create-hash": "create-hash/browser",
+                "create-hmac": "create-hmac/browser",
+                "browserify-cipher": "browserify-cipher/browser",
+                "browserify-sign": "browserify-sign/browser",
+                "browserify-sign/algos": "browserify-sign/algos"
+                // "browserify-aes": "browserify-aes/browser",
+            }
+        })
 );
 
 // types
@@ -138,8 +143,8 @@ export const sharedLibLocation = path.resolve(
 
 console.log(
     `\nBuilt FullStacked v${version.major}.${version.minor}.${version.patch}\n` +
-        `\tbuild: ${version.build}\n` +
-        `\tbranch: ${version.branch}\n` +
-        `\thash: ${version.hash.slice(0, 8)}\n` +
-        `\tplatform: ${platform}-${arch}\n`
+    `\tbuild: ${version.build}\n` +
+    `\tbranch: ${version.branch}\n` +
+    `\thash: ${version.hash.slice(0, 8)}\n` +
+    `\tplatform: ${platform}-${arch}\n`
 );
