@@ -2,6 +2,7 @@ package tunnel
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fullstackedorg/fullstacked/internal/store"
@@ -36,7 +37,12 @@ func Switch(
 			return err
 		}
 
-		RegisterTunnelFn(tunnel)
+		name, err := RegisterTunnelFn(tunnel)
+		if err != nil {
+			return err
+		}
+
+		response.Data = name
 
 		return nil
 	}
@@ -45,17 +51,33 @@ func Switch(
 }
 
 type Tunnel struct {
-	Name          string `json:"name"`
+	Name          string `json:"name,omitempty"`
 	Host          string `json:"host"`
-	Port          int    `json:"port"`
+	Port          int    `json:"port,omitempty"`
 	Path          string `json:"path,omitempty"`
-	Unsecure      bool   `json:"unsecure"`
-	Authorization string `json:"authorization"`
+	Unsecure      bool   `json:"unsecure,omitempty"`
+	Authorization string `json:"authorization,omitempty"`
 }
 
 var tunnels = []Tunnel{}
 
-func RegisterTunnelFn(tunnel Tunnel) {
+func RegisterTunnelFn(tunnel Tunnel) (string, error) {
+	if tunnel.Host == "" {
+		return "", errors.New("host is required")
+	}
+
+	if tunnel.Name == "" {
+		tunnel.Name = rand.Text()
+	}
+
+	if tunnel.Port == 0 {
+		if tunnel.Unsecure {
+			tunnel.Port = 80
+		} else {
+			tunnel.Port = 443
+		}
+	}
+
 	existing := FindTunnel(tunnel.Name)
 
 	if existing != nil {
@@ -67,6 +89,8 @@ func RegisterTunnelFn(tunnel Tunnel) {
 	} else {
 		tunnels = append(tunnels, tunnel)
 	}
+
+	return tunnel.Name, nil
 }
 
 func FindTunnel(name string) *Tunnel {
