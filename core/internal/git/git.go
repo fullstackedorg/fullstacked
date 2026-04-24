@@ -19,10 +19,10 @@ import (
 	git "github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/config"
 	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/go-git/go-git/v6/plumbing/client"
 	"github.com/go-git/go-git/v6/plumbing/object"
 	"github.com/go-git/go-git/v6/plumbing/storer"
 	"github.com/go-git/go-git/v6/plumbing/transport"
-	"github.com/go-git/go-git/v6/plumbing/transport/http"
 )
 
 type GitFn = uint8
@@ -112,15 +112,16 @@ func RequestAuth(ctx *types.Context, urlStr string, requestUser bool) (*GitAuth,
 	return RequestAuth(ctx, urlStr, false)
 }
 
-func gitAuthToHttpAuth(gitAuth *GitAuth) *http.BasicAuth {
-	if gitAuth == nil {
-		return nil
+type HTTPBasicAuth struct {
+	GitAuth *GitAuth
+}
+
+func (a *HTTPBasicAuth) Authorizer(r *nethttp.Request) error {
+	if a.GitAuth != nil {
+		r.SetBasicAuth(a.GitAuth.Username, a.GitAuth.Password)
 	}
 
-	return &http.BasicAuth{
-		Username: gitAuth.Username,
-		Password: gitAuth.Password,
-	}
+	return nil
 }
 
 func Switch(
@@ -663,7 +664,11 @@ func clone(
 			options := git.CloneOptions{
 				AllowEmptyRepo: true,
 				URL:            urlStr,
-				Auth:           gitAuthToHttpAuth(gitAuth),
+				ClientOptions: []client.Option{
+					client.WithHTTPAuth(&HTTPBasicAuth{
+						GitAuth: gitAuth,
+					}),
+				},
 				Progress: &GitStream{
 					ctx:      ctx,
 					streamId: streamId,
@@ -679,7 +684,11 @@ func clone(
 					// retry with new auth
 					gitAuth, err = RequestAuth(ctx, urlStr, true)
 					if err == nil {
-						options.Auth = gitAuthToHttpAuth(gitAuth)
+						options.ClientOptions = []client.Option{
+							client.WithHTTPAuth(&HTTPBasicAuth{
+								GitAuth: gitAuth,
+							}),
+						}
 						_, err = git.PlainClone(directory, &options)
 					}
 				}
@@ -718,7 +727,11 @@ func CloneRepo(ctx *types.Context, urlStr string, directory string, progress io.
 	}
 
 	gitAuth, _ := RequestAuth(ctx, urlStr, false)
-	options.Auth = gitAuthToHttpAuth(gitAuth)
+	options.ClientOptions = []client.Option{
+		client.WithHTTPAuth(&HTTPBasicAuth{
+			GitAuth: gitAuth,
+		}),
+	}
 
 	_, err = git.PlainClone(directory, &options)
 
@@ -729,7 +742,11 @@ func CloneRepo(ctx *types.Context, urlStr string, directory string, progress io.
 			// retry with new auth
 			gitAuth, err := RequestAuth(ctx, urlStr, true)
 			if err == nil {
-				options.Auth = gitAuthToHttpAuth(gitAuth)
+				options.ClientOptions = []client.Option{
+					client.WithHTTPAuth(&HTTPBasicAuth{
+						GitAuth: gitAuth,
+					}),
+				}
 				_, err = git.PlainClone(directory, &options)
 			}
 		}
@@ -789,14 +806,22 @@ func pull(directory string) (*types.ResponseStream, error) {
 			}
 
 			auth, _ := RequestAuth(ctx, urlStr, false)
-			options.Auth = gitAuthToHttpAuth(auth)
+			options.ClientOptions = []client.Option{
+				client.WithHTTPAuth(&HTTPBasicAuth{
+					GitAuth: auth,
+				}),
+			}
 
 			err = worktree.Pull(&options)
 
 			if errIsAuthenticationRequired(err) {
 				auth, err = RequestAuth(ctx, urlStr, true)
 				if err == nil {
-					options.Auth = gitAuthToHttpAuth(auth)
+					options.ClientOptions = []client.Option{
+						client.WithHTTPAuth(&HTTPBasicAuth{
+							GitAuth: auth,
+						}),
+					}
 					err = worktree.Pull(&options)
 				}
 			}
@@ -845,14 +870,22 @@ func push(directory string) (*types.ResponseStream, error) {
 			}
 
 			auth, _ := RequestAuth(ctx, urlStr, false)
-			options.Auth = gitAuthToHttpAuth(auth)
+			options.ClientOptions = []client.Option{
+				client.WithHTTPAuth(&HTTPBasicAuth{
+					GitAuth: auth,
+				}),
+			}
 
 			err := repository.Push(&options)
 
 			if errIsAuthenticationRequired(err) {
 				auth, err = RequestAuth(ctx, urlStr, true)
 				if err == nil {
-					options.Auth = gitAuthToHttpAuth(auth)
+					options.ClientOptions = []client.Option{
+						client.WithHTTPAuth(&HTTPBasicAuth{
+							GitAuth: auth,
+						}),
+					}
 					err = repository.Push(&options)
 				}
 			}
@@ -1154,7 +1187,7 @@ func errIsAuthenticationRequired(err error) bool {
 	if err == nil {
 		return false
 	}
-	return strings.HasPrefix(err.Error(), transport.ErrAuthenticationRequired.Error())
+	return strings.Contains(err.Error(), transport.ErrAuthenticationRequired.Error())
 }
 
 func testHost(urlStr string) error {

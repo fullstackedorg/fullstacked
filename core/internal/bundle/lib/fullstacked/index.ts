@@ -1,2 +1,6 @@
 import platformBridge from "../bridge/platform/index.ts";
-await platformBridge.ready;
+try {
+    await platformBridge.ready;
+} catch (e) {
+    console.log(e);
+}

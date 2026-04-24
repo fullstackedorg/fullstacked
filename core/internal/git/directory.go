@@ -7,6 +7,7 @@ import (
 	git "github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/config"
 	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/go-git/go-git/v6/plumbing/client"
 )
 
 type GitDirectory struct {
@@ -91,7 +92,11 @@ func (r *GitDirectory) LsRemote(ctx *types.Context, remoteName string) ([]*plumb
 
 	auth, _ := RequestAuth(ctx, urlStr, false)
 
-	options.Auth = gitAuthToHttpAuth(auth)
+	options.ClientOptions = []client.Option{
+		client.WithHTTPAuth(&HTTPBasicAuth{
+			GitAuth: auth,
+		}),
+	}
 
 	refs, err := remote.List(&options)
 
@@ -99,7 +104,11 @@ func (r *GitDirectory) LsRemote(ctx *types.Context, remoteName string) ([]*plumb
 		auth, err = RequestAuth(ctx, urlStr, true)
 
 		if err == nil {
-			options.Auth = gitAuthToHttpAuth(auth)
+			options.ClientOptions = []client.Option{
+				client.WithHTTPAuth(&HTTPBasicAuth{
+					GitAuth: auth,
+				}),
+			}
 			refs, err = remote.List(&options)
 		}
 	}
@@ -256,14 +265,22 @@ func (r *GitDirectory) FetchBranch(branchName string, progress *GitStream) error
 	}
 
 	auth, _ := RequestAuth(progress.ctx, urlStr, false)
-	options.Auth = gitAuthToHttpAuth(auth)
+	options.ClientOptions = []client.Option{
+		client.WithHTTPAuth(&HTTPBasicAuth{
+			GitAuth: auth,
+		}),
+	}
 
 	err = remote.Fetch(&options)
 
 	if errIsAuthenticationRequired(err) {
 		auth, err = RequestAuth(progress.ctx, urlStr, true)
 		if err == nil {
-			options.Auth = gitAuthToHttpAuth(auth)
+			options.ClientOptions = []client.Option{
+				client.WithHTTPAuth(&HTTPBasicAuth{
+					GitAuth: auth,
+				}),
+			}
 			err = remote.Fetch(&options)
 		}
 	}

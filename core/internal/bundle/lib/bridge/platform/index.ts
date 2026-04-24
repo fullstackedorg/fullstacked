@@ -31,18 +31,33 @@ if (globalThis.process) {
 } else {
     globalThis.global = globalThis;
     platformBridge = {
-        ready: new Promise<void>(async (res) => {
+        ready: new Promise<void>(async (resolve, reject) => {
             let cwd = "/";
             if (isWorker) {
-                await new Promise<void>((res) => {
+                await new Promise<void>((workerReady) => {
                     self.onmessage = (message: MessageEvent) => {
                         if (message.data.cwd) {
                             cwd = message.data.cwd;
-                            res();
+                            workerReady();
                         }
                     };
                 });
             }
+
+            let platform: string;
+            const failedPlatformRequest = () => {
+                reject(new Error("Unable to resolve platform"));
+            }
+            try {
+                const platformRequest = await fetch("/platform");
+                if (!platformRequest.ok || platformRequest.status > 299) {
+                    return failedPlatformRequest()
+                }
+                platform = await platformRequest.text();
+            } catch {
+                return failedPlatformRequest();
+            }
+
 
             await Promise.all([
                 // @ts-ignore
@@ -50,9 +65,6 @@ if (globalThis.process) {
                 import("timers")
             ]);
 
-            const platform = await (
-                await globalThis.originalFetch("/platform")
-            ).text();
             switch (platform) {
                 case "node":
                     platformBridge.bridge = await BridgeNodeInit();
@@ -70,7 +82,7 @@ if (globalThis.process) {
             process.chdir(cwd);
             await import("buffer");
 
-            res();
+            resolve();
         })
     };
 }
