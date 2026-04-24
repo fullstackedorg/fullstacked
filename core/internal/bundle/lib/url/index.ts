@@ -1,4 +1,7 @@
 import { Buffer } from "buffer";
+import os from "../os/index.ts";
+
+const isWindows = os.platform() === "win32";
 
 export const URL = globalThis.URL;
 export const URLSearchParams = globalThis.URLSearchParams;
@@ -28,11 +31,19 @@ export function fileURLToPath(url: string | URL, options?: any): string {
         throw new TypeError("Must be a file URL");
     }
 
+    if (isWindows && parsed.hostname !== "") {
+        // UNC path
+        return `\\\\${parsed.hostname}${decodeURIComponent(parsed.pathname).replace(/\//g, "\\")}`;
+    }
+
     let path = decodeURIComponent(parsed.pathname);
 
-    // Simple heuristic for Windows (e.g. /C:/)
-    if (/^\/[a-zA-Z]:\/?/.test(path)) {
-        path = path.slice(1).replace(/\//g, "\\");
+    if (isWindows) {
+        if (/^\/[a-zA-Z]:\/?/.test(path)) {
+            path = path.slice(1).replace(/\//g, "\\");
+        } else {
+            throw new TypeError("File URL path must be absolute");
+        }
     }
 
     return path;
@@ -74,14 +85,28 @@ export function format(urlObject: string | URL, options?: any): string {
 export function pathToFileURL(path: string, options?: any): URL {
     let resolved = path;
 
-    // Windows absolute path
-    if (/^[a-zA-Z]:\\/.test(path)) {
-        resolved = `file:///${path.replace(/\\/g, "/")}`;
-    } else if (path.startsWith("/")) {
-        resolved = `file://${path}`;
+    if (isWindows) {
+        // Windows absolute path
+        if (/^[a-zA-Z]:\\/.test(path)) {
+            resolved = `file:///${path.replace(/\\/g, "/")}`;
+        } else if (path.startsWith("/")) {
+            // Prepend drive letter if on Windows and starts with /
+            let driveLetter = "C";
+            if (typeof process !== "undefined" && process.cwd) {
+                const match = process.cwd().match(/^([a-zA-Z]):/);
+                if (match) driveLetter = match[1];
+            }
+            resolved = `file:///${driveLetter}:${path.replace(/\\/g, "/")}`;
+        } else {
+            // Assume absolute path mapping, typical for shims without full cwd context
+            resolved = `file:///${path.replace(/\\/g, "/")}`;
+        }
     } else {
-        // Assume absolute path mapping, typical for shims without full cwd context
-        resolved = `file://${path.replace(/\\/g, "/")}`;
+        if (path.startsWith("/")) {
+            resolved = `file://${path}`;
+        } else {
+            resolved = `file://${path}`;
+        }
     }
 
     return new URL(resolved);
@@ -133,3 +158,4 @@ const url = {
 };
 
 export default url;
+

@@ -1,7 +1,10 @@
 import test, { suite } from "node:test";
 import assert from "node:assert";
 import nodeUrl from "node:url";
+import os from "node:os";
 import shimUrl from "../../core/internal/bundle/lib/url/index.ts";
+
+const isWindows = os.platform() === "win32";
 
 suite("url - e2e", () => {
     test("domainToASCII", () => {
@@ -22,7 +25,9 @@ suite("url - e2e", () => {
     });
 
     test("fileURLToPath", () => {
-        const urls = ["file:///path/to/file", "file:///path/with%20space"];
+        const urls = isWindows
+            ? ["file:///C:/path/to/file", "file:///C:/path/with%20space"]
+            : ["file:///path/to/file", "file:///path/with%20space"];
         // For POSIX paths, our shim mimics node precisely
         for (const u of urls) {
             assert.equal(shimUrl.fileURLToPath(u), nodeUrl.fileURLToPath(u));
@@ -30,7 +35,9 @@ suite("url - e2e", () => {
     });
 
     test("fileURLToPathBuffer", () => {
-        const urlObj = new URL("file:///path/to/file");
+        const urlObj = isWindows
+            ? new URL("file:///C:/path/to/file")
+            : new URL("file:///path/to/file");
         // Using assert.deepEqual for Buffer comparison
         // Note: url.fileURLToPathBuffer doesn't exist in all node versions. We test if it is exported.
         if (typeof nodeUrl.fileURLToPathBuffer === "function") {
@@ -88,3 +95,4 @@ suite("url - e2e", () => {
         );
     });
 });
+
