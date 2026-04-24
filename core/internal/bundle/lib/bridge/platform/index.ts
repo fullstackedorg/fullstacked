@@ -47,17 +47,16 @@ if (globalThis.process) {
             let platform: string;
             const failedPlatformRequest = () => {
                 reject(new Error("Unable to resolve platform"));
-            }
+            };
             try {
                 const platformRequest = await fetch("/platform");
                 if (!platformRequest.ok || platformRequest.status > 299) {
-                    return failedPlatformRequest()
+                    return failedPlatformRequest();
                 }
                 platform = await platformRequest.text();
             } catch {
                 return failedPlatformRequest();
             }
-
 
             await Promise.all([
                 // @ts-ignore
