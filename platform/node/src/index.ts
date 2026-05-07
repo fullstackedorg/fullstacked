@@ -91,10 +91,10 @@ tailwindcssBuilder.on("build", async (entryfile, outfile) => {
     const from = path.resolve(directory, entryfile);
     const to = path.resolve(directory, outfile);
     const css = await fs.promises.readFile(from, "utf-8");
-    const result = await postcss([
-        tailwindcss(),
-        autoprefixer(),
-    ]).process(css, { from, to });
+    const result = await postcss([tailwindcss(), autoprefixer()]).process(css, {
+        from,
+        to
+    });
     await fs.promises.writeFile(to, result.css);
     tailwindcssBuilder.writeEvent("build-done");
 });

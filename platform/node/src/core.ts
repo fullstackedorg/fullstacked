@@ -63,6 +63,6 @@ export async function load(
     core = require(bindingPath);
     core.load(libPath);
     core.setOnStreamData(onStreamData);
-    
+
     return core;
 }
