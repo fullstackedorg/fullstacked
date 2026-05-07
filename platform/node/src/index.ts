@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import path from "node:path";
-import child_process from "node:child_process";
 import { load } from "./core.ts";
 import { createWebView } from "./webview.ts";
 import {
@@ -9,6 +8,10 @@ import {
 } from "../../../core/internal/bundle/lib/bundle/index.ts";
 import { run } from "../../../core/internal/bundle/lib/run/index.ts";
 import version from "../../../core/internal/bundle/lib/process/version.json";
+import postcss from "postcss";
+import tailwindcss from "@tailwindcss/postcss";
+import autoprefixer from "autoprefixer";
+import fs from "node:fs";
 
 const end = () => {
     core.end();
@@ -84,12 +87,15 @@ globalThis.bridges = {
 };
 
 const tailwindcssBuilder = await builderTailwindCSS();
-tailwindcssBuilder.on("build", (entryfile, outfile) => {
-    child_process.execSync(`tailwindcss -i ${entryfile} -o ${outfile}`, {
-        cwd: directory,
-        stdio: "inherit"
-    });
-
+tailwindcssBuilder.on("build", async (entryfile, outfile) => {
+    const from = path.resolve(directory, entryfile);
+    const to = path.resolve(directory, outfile);
+    const css = await fs.promises.readFile(from, "utf-8");
+    const result = await postcss([
+        tailwindcss(),
+        autoprefixer(),
+    ]).process(css, { from, to });
+    await fs.promises.writeFile(to, result.css);
     tailwindcssBuilder.writeEvent("build-done");
 });
 

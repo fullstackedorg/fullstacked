@@ -1,6 +1,6 @@
 {
     "name": "fullstacked",
-    "version": "1.0.0-alpha.1652",
+    "version": "1.0.0-alpha.1654",
     "bin": {
         "fullstacked": "index.js"
     },
@@ -10,8 +10,10 @@
         "prepack": "npm run build"
     },
     "dependencies": {
-        "@tailwindcss/cli": "^4.2.4",
+        "@tailwindcss/postcss": "^4.2.4",
+        "autoprefixer": "^10.5.0",
         "open": "^11.0.0",
+        "postcss": "^8.5.14",
         "tailwindcss": "^4.2.4",
         "ws": "^8.20.0"
     },
@@ -22,12 +24,12 @@
         "node-addon-api": "^8.7.0"
     },
     "optionalDependencies": {
-        "@fullstacked/darwin-arm64": "1.0.0-alpha.1652",
-        "@fullstacked/darwin-x64": "1.0.0-alpha.1652",
-        "@fullstacked/linux-arm64": "1.0.0-alpha.1652",
-        "@fullstacked/linux-x64": "1.0.0-alpha.1652",
-        "@fullstacked/win32-arm64": "1.0.0-alpha.1652",
-        "@fullstacked/win32-x64": "1.0.0-alpha.1652"
+        "@fullstacked/darwin-arm64": "1.0.0-alpha.1654",
+        "@fullstacked/darwin-x64": "1.0.0-alpha.1654",
+        "@fullstacked/linux-arm64": "1.0.0-alpha.1654",
+        "@fullstacked/linux-x64": "1.0.0-alpha.1654",
+        "@fullstacked/win32-arm64": "1.0.0-alpha.1654",
+        "@fullstacked/win32-x64": "1.0.0-alpha.1654"
     },
     "author": "FullStacked",
     "license": "MIT",

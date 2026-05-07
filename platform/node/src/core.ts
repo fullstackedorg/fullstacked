@@ -3,12 +3,10 @@ import { createRequire } from "node:module";
 import {
     binBasename,
     bindingBasename,
-    binLocation,
-    environment,
+    binLocations,
     packageJson
 } from "../utils.ts";
 import fs from "node:fs";
-import child_process from "node:child_process";
 
 globalThis.require = createRequire(import.meta.url);
 
@@ -25,7 +23,16 @@ export interface Core {
 
 let core: Core;
 
-function verifyVersion() {
+function findBinLocation() {
+    for (const binLocation of binLocations) {
+        if (fs.existsSync(binLocation)) {
+            return binLocation;
+        }
+    }
+    return undefined;
+}
+
+function verifyVersion(binLocation: string) {
     const packageJsonFileBin = path.resolve(binLocation, "package.json");
 
     try {
@@ -41,25 +48,21 @@ function verifyVersion() {
 export async function load(
     onStreamData: Parameters<(typeof core)["setOnStreamData"]>[0]
 ) {
-    if (fs.existsSync(binLocation) && verifyVersion()) {
-        const libPath = path.resolve(binLocation, binBasename);
-        const bindingPath = path.resolve(binLocation, bindingBasename);
-        core = require(bindingPath);
-        core.load(libPath);
-        core.setOnStreamData(onStreamData);
-        return core;
+    const binLocation = findBinLocation();
+    if (!binLocation) {
+        throw `Cannot find core library. Tried:\n${binLocations.join("\n")}`;
     }
 
-    if (process.env.FULLSTACKED_DEBUG) {
-        throw `Cannot find core library at ${binLocation}`;
+    if (!verifyVersion(binLocation)) {
+        throw `Core library version mismatch. Retry installing fullstacked.`;
     }
 
-    child_process.execSync(
-        `npm i --no-save @fullstacked/${environment}@${packageJson.version}`,
-        {
-            stdio: "inherit"
-        }
-    );
+    const libPath = path.resolve(binLocation, binBasename);
+    const bindingPath = path.resolve(binLocation, bindingBasename);
 
-    return load(onStreamData);
+    core = require(bindingPath);
+    core.load(libPath);
+    core.setOnStreamData(onStreamData);
+    
+    return core;
 }

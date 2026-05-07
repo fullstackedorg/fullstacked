@@ -8,7 +8,7 @@ import {
     binBasename,
     bindingBasename,
     binExtension,
-    binLocation,
+    binLocations,
     environment,
     platform
 } from "./utils.ts";
@@ -21,6 +21,8 @@ fs.readdirSync(currentDirectory).forEach((file) => {
         fs.rmSync(path.resolve(currentDirectory, file));
     }
 });
+
+const binLocation = binLocations[0];
 
 if (fs.existsSync(binLocation)) {
     fs.rmSync(binLocation, { recursive: true });

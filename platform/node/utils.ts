@@ -25,9 +25,19 @@ export const packageJson = JSON.parse(
     fs.readFileSync(path.resolve(currentDirectory, "package.json"), "utf-8")
 );
 
-export const binLocation = path.resolve(
-    currentDirectory,
-    "..",
-    "@fullstacked",
-    environment
-);
+export const binLocations = [
+    // flattened dependencies when installed in project
+    path.resolve(
+        currentDirectory,
+        "..",
+        "@fullstacked",
+        environment
+    ),
+    // when installed globally
+    path.resolve(
+        currentDirectory,
+        "node_modules",
+        "@fullstacked",
+        environment
+    )
+]
