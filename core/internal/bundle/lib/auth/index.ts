@@ -1,4 +1,8 @@
 export default function authenticate(url: string): Promise<string> {
+    const urlObj = new URL(url);
+    urlObj.searchParams.append("auth", "1");
+    url = urlObj.toString();
+
     if (globalThis.authenticate) {
         return globalThis.authenticate(url);
     }

@@ -164,8 +164,13 @@ namespace FullStacked
 
             this.webview.CoreWebView2.NewWindowRequested += delegate (CoreWebView2 sender, CoreWebView2NewWindowRequestedEventArgs e)
             {
+                Uri url = new(e.Uri);
+                if (url.Query.Contains("auth")) {
+                    return;
+                }
+
                 e.Handled = true;
-                _ = Windows.System.Launcher.LaunchUriAsync(new Uri(e.Uri));
+                _ = Windows.System.Launcher.LaunchUriAsync(url);
             };
 
             this.webview.Source = new Uri("http://localhost");
