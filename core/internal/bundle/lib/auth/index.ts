@@ -7,16 +7,18 @@ export default function authenticate(url: string): Promise<string> {
     const height = 600;
     const left = window.screenX + (window.innerWidth - width) / 2;
     const top = window.screenY + (window.innerHeight - height) / 2;
-    const authWin = window.open(url, 'Authenticate', `width=${width},height=${height},left=${left},top=${top}`);
+    const authWin = window.open(url, undefined, `width=${width},height=${height},left=${left},top=${top}`);
 
     return new Promise<string>((resolve, reject) => {
-        authWin.onmessage = (event) => {
-            const response = event.data;
+        window.addEventListener("message", (event) => {
             authWin.close();
-            resolve(response);
-        }
-        authWin.onclose = () => {
-            reject(new Error('Authentication cancelled'));
-        }
+            resolve(event.data);
+        });
+        const timer = setInterval(() => {
+            if (authWin.closed) {
+                clearInterval(timer);
+                reject(new Error('Authentication cancelled'));
+            }
+        }, 500);
     });
 }
