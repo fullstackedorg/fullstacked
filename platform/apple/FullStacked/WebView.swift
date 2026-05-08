@@ -1,5 +1,6 @@
 import WebKit
 import SwiftUI
+import AuthenticationServices
 
 let platform = "apple"
 let downloadDirectory = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first! + "/downloads";
@@ -26,6 +27,7 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     var id = UUID()
     public let requestHandler: RequestHandler
     public var main = false
+    private let authHelper = AuthenticationSession()
     
     required init(from decoder: any Decoder) throws {
         fatalError("init(coder:) has not been implemented")
@@ -58,9 +60,12 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         
         super.init(frame: CGRect(), configuration: wkWebViewConfig)
         
+        self.authHelper.webview = self
+        
         self.isInspectable = true
         self.navigationDelegate = self
         userContentController.add(self, name: "bridge")
+        userContentController.add(self.authHelper, name: "auth")
         
         self.load(URLRequest(url: URL(string: "fs://localhost")!))
     }
@@ -68,6 +73,7 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     override func close(){
         self.navigationDelegate = nil
         self.configuration.userContentController.removeScriptMessageHandler(forName: "bridge")
+        self.configuration.userContentController.removeScriptMessageHandler(forName: "auth")
         stop(self.requestHandler.ctx)
         super.close()
     }
@@ -272,6 +278,27 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
     }
     
     func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) { }
+}
+
+class AuthenticationSession: NSObject, WKScriptMessageHandler, ASWebAuthenticationPresentationContextProviding {
+    
+    var webview: WebView?
+    
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        return self.webview!.window!
+    }
+    
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard let authURL = URL(string: message.body as! String) else { return }
+
+        // Initialize the session.
+        let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "fullstacked")
+        { callbackURL, error in
+            
+        }
+        session.presentationContextProvider = self
+        session.start()
+    }
 }
 
 extension String {

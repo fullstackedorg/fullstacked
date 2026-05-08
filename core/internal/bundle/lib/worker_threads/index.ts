@@ -15,9 +15,7 @@ export class Worker extends events.EventEmitter {
         this.postMessage({ cwd: cwd() });
 
         this.w.onmessage = (e) => {
-            if (e.data === "exit") {
-                this.emit("exit");
-            } else {
+            if (e.data instanceof ArrayBuffer) {
                 const buffer: ArrayBuffer = e.data;
                 const dataView = new DataView(buffer);
                 const id = dataView.getUint8(1);
@@ -27,6 +25,10 @@ export class Worker extends events.EventEmitter {
                     response.set(new Uint8Array(res), 1);
                     this.w.postMessage(response.buffer);
                 });
+            } else if (typeof e.data === "string" && e.data === "exit") {
+                this.emit("exit");
+            } else {
+                this.emit("message", e);
             }
         };
     }

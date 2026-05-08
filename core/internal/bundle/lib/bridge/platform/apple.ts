@@ -41,6 +41,12 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
         };
     }
 
+    if (globalThis.webkit.messageHandlers.auth) {
+        globalThis.authenticate = function (url: string) {
+            globalThis.webkit.messageHandlers.auth.postMessage(url);
+        }
+    }
+
     if (isWorker) {
         globalThis.onmessage = (event) => {
             const buffer: ArrayBuffer = event.data;
@@ -62,7 +68,9 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
             return new Promise<ArrayBuffer>((resolve) => {
                 asyncResponsePromises.set(id, resolve);
                 if (isWorker) {
-                    globalThis.postMessage(payload);
+                    globalThis.postMessage(payload, {
+                        targetOrigin: "bridge"
+                    });
                 } else {
                     const base64 = fromByteArray(new Uint8Array(payload));
                     globalThis.webkit.messageHandlers.bridge.postMessage(
@@ -75,7 +83,9 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
             const uint8array = new Uint8Array(payload);
             const id = uint8array[1];
             if (isWorker) {
-                globalThis.postMessage(payload);
+                globalThis.postMessage(payload, {
+                    targetOrigin: "bridge"
+                });
             } else {
                 const base64 = fromByteArray(uint8array);
                 globalThis.webkit.messageHandlers.bridge.postMessage(base64);

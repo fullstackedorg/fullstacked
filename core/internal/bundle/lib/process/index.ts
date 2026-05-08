@@ -46,7 +46,9 @@ export function hrtime(previousTimestamp) {
 
 export function exit() {
     if (isWorker) {
-        self.postMessage("exit");
+        self.postMessage("exit", {
+            targetOrigin: "process"
+        });
         self.close();
     }
 }
