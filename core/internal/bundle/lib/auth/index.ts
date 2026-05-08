@@ -10,15 +10,21 @@ export default function authenticate(url: string): Promise<string> {
     const authWin = window.open(url, undefined, `width=${width},height=${height},left=${left},top=${top}`);
 
     return new Promise<string>((resolve, reject) => {
-        window.addEventListener("message", (event) => {
-            authWin.close();
-            resolve(event.data);
-        });
         const timer = setInterval(() => {
             if (authWin.closed) {
                 clearInterval(timer);
                 reject(new Error('Authentication cancelled'));
+                window.removeEventListener("message", onmessage);
             }
         }, 500);
+
+        const onmessage = (event: MessageEvent) => {
+            clearInterval(timer);
+            authWin.close();
+            resolve(event.data);
+            window.removeEventListener("message", onmessage);
+        };
+
+        window.addEventListener("message", onmessage);
     });
 }

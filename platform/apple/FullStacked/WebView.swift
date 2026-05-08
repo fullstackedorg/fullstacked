@@ -294,7 +294,15 @@ class AuthenticationSession: NSObject, WKScriptMessageHandler, ASWebAuthenticati
         // Initialize the session.
         let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "fullstacked")
         { callbackURL, error in
-            
+            DispatchQueue.main.async {
+                if(error != nil) {
+                    self.webview?.evaluateJavaScript("window.respondAuth(false, \"Authentication Canceled\")")
+                } else {
+                    self.webview?.evaluateJavaScript("window.respondAuth(true, `\(callbackURL?.query() ?? "")`)")
+
+                }
+            }
+           
         }
         session.presentationContextProvider = self
         session.start()
