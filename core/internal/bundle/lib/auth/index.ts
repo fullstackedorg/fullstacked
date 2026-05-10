@@ -7,13 +7,17 @@ export default function authenticate(url: string): Promise<string> {
     const height = 600;
     const left = window.screenX + (window.innerWidth - width) / 2;
     const top = window.screenY + (window.innerHeight - height) / 2;
-    const authWin = window.open(url, undefined, `width=${width},height=${height},left=${left},top=${top}`);
+    const authWin = window.open(
+        url,
+        undefined,
+        `width=${width},height=${height},left=${left},top=${top}`
+    );
 
     return new Promise<string>((resolve, reject) => {
         const timer = setInterval(() => {
             if (authWin?.closed) {
                 clearInterval(timer);
-                reject(new Error('Authentication cancelled'));
+                reject(new Error("Authentication cancelled"));
                 window.removeEventListener("message", onmessage);
             }
         }, 500);
@@ -27,7 +31,7 @@ export default function authenticate(url: string): Promise<string> {
             } else {
                 resolve(event.data);
             }
-            
+
             window.removeEventListener("message", onmessage);
         };
 
