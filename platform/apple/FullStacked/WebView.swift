@@ -53,6 +53,7 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         // inspector / debug console
         let wkWebViewConfig = WKWebViewConfiguration()
         wkWebViewConfig.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        wkWebViewConfig.preferences.javaScriptCanOpenWindowsAutomatically = true
         
         let userContentController = WKUserContentController()
         wkWebViewConfig.userContentController = userContentController
@@ -107,7 +108,6 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
                             self.evaluateJavaScript("window.postMessage(Object.fromEntries(new URLSearchParams(`\(callbackURL?.query() ?? "")`)), \"*\")")
                         }
                     }
-                   
                 }
                 session.presentationContextProvider = self
                 session.start()

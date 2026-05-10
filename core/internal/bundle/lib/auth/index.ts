@@ -1,16 +1,22 @@
-export default function authenticate(url: string): Promise<string> {
-    const urlObj = new URL(url);
-    urlObj.searchParams.append("auth", "1");
-    url = urlObj.toString();
-
+const defaultWindowFeatures = () => {
     const width = 500;
     const height = 600;
     const left = window.screenX + (window.innerWidth - width) / 2;
     const top = window.screenY + (window.innerHeight - height) / 2;
+    return `width=${width},height=${height},left=${left},top=${top}`;
+}
+
+export default function authenticate(url: string, opts?: {
+    windowFeatures?: string;
+}): Promise<string> {
+    const urlObj = new URL(url);
+    urlObj.searchParams.append("auth", "1");
+    url = urlObj.toString();
+
     const authWin = window.open(
         url,
         undefined,
-        `width=${width},height=${height},left=${left},top=${top}`
+        opts?.windowFeatures ?? defaultWindowFeatures()
     );
 
     return new Promise<string>((resolve, reject) => {
@@ -24,7 +30,6 @@ export default function authenticate(url: string): Promise<string> {
 
         const onmessage = (event: MessageEvent) => {
             clearInterval(timer);
-            authWin?.close();
 
             if (event.data instanceof Error) {
                 reject(event.data);

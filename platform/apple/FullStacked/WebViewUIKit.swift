@@ -19,7 +19,7 @@ class ClipboardHelper: NSObject, WKScriptMessageHandler {
     }
 }
 
-class WebViewExtended: WKWebView  {
+class WebViewExtended: WKWebView, WKUIDelegate  {
     let clipboardHelper: ClipboardHelper;
     
     override var safeAreaInsets: UIEdgeInsets {
@@ -37,6 +37,8 @@ class WebViewExtended: WKWebView  {
             let b64 = Data(clipboardContent.utf8).base64EncodedString()
             self.evaluateJavaScript("window.respondClipboard(\"\(requestClipboardID)\", \"\(b64)\")")
         }
+        
+        self.uiDelegate = self
     }
     
     required init?(coder: NSCoder) {
