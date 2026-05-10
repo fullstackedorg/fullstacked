@@ -41,31 +41,6 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
         };
     }
 
-    globalThis.authenticate = function (url: string) {
-        if (globalThis.respondAuth) {
-            throw new Error("Already authenticating");
-        }
-
-        const urlObj = new URL(url);
-        urlObj.searchParams.set("apple", "1");
-        return new Promise((resolve, reject) => {
-            globalThis.webkit.messageHandlers.auth.postMessage(urlObj.toString());
-            globalThis.respondAuth = (success: boolean, data: string) => {
-                delete globalThis.respondAuth;
-                if (success) {
-                    const searchParams = new URLSearchParams(data);
-                    const authResponse: Record<string, any> = {};
-                    searchParams.entries().forEach(([key, value]) => {
-                        authResponse[key] = value;
-                    });
-                    resolve(authResponse);
-                } else {
-                    reject(new Error(data));
-                }
-            }
-        })
-    }
-
     if (isWorker) {
         globalThis.onmessage = (event) => {
             const buffer: ArrayBuffer = event.data;

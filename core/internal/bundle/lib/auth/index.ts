@@ -3,10 +3,6 @@ export default function authenticate(url: string): Promise<string> {
     urlObj.searchParams.append("auth", "1");
     url = urlObj.toString();
 
-    if (globalThis.authenticate) {
-        return globalThis.authenticate(url);
-    }
-
     const width = 500;
     const height = 600;
     const left = window.screenX + (window.innerWidth - width) / 2;
@@ -15,7 +11,7 @@ export default function authenticate(url: string): Promise<string> {
 
     return new Promise<string>((resolve, reject) => {
         const timer = setInterval(() => {
-            if (authWin.closed) {
+            if (authWin?.closed) {
                 clearInterval(timer);
                 reject(new Error('Authentication cancelled'));
                 window.removeEventListener("message", onmessage);
@@ -24,8 +20,14 @@ export default function authenticate(url: string): Promise<string> {
 
         const onmessage = (event: MessageEvent) => {
             clearInterval(timer);
-            authWin.close();
-            resolve(event.data);
+            authWin?.close();
+
+            if (event.data instanceof Error) {
+                reject(event.data);
+            } else {
+                resolve(event.data);
+            }
+            
             window.removeEventListener("message", onmessage);
         };
 

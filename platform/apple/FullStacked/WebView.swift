@@ -23,11 +23,11 @@ func startMain(_ providedCtx: UInt8?) -> UInt8 {
     return ctx
 }
 
-class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WKDownloadDelegate, Codable, Identifiable {
+class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WKDownloadDelegate, Codable, Identifiable, ASWebAuthenticationPresentationContextProviding {
+    
     var id = UUID()
     public let requestHandler: RequestHandler
     public var main = false
-    private let authHelper = AuthenticationSession()
     
     required init(from decoder: any Decoder) throws {
         fatalError("init(coder:) has not been implemented")
@@ -60,12 +60,9 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         
         super.init(frame: CGRect(), configuration: wkWebViewConfig)
         
-        self.authHelper.webview = self
-        
         self.isInspectable = true
         self.navigationDelegate = self
         userContentController.add(self, name: "bridge")
-        userContentController.add(self.authHelper, name: "auth")
         
         self.load(URLRequest(url: URL(string: "fs://localhost")!))
     }
@@ -86,6 +83,38 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         DispatchQueue.main.async {
             self.evaluateJavaScript("window.callback(\(streamId),`\(buffer.base64EncodedString())`)")
         }
+    }
+    
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        return self.window ?? ASPresentationAnchor()
+    }
+    
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+                
+        if let url = navigationAction.request.url {
+            var urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            if (urlComponents?.queryItems?.first(where: { $0.name == "auth" })?.value) != nil {
+                urlComponents?.queryItems?.append(URLQueryItem(name: "apple", value: "1"))
+
+                let appleUrl = urlComponents?.url!
+                // Initialize the session.
+                let session = ASWebAuthenticationSession(url: appleUrl!, callbackURLScheme: "fullstacked")
+                { callbackURL, error in
+                    DispatchQueue.main.async {
+                        if(error != nil) {
+                            self.evaluateJavaScript("window.postMessage(new Error(`Authentication Canceled`), \"*\")")
+                        } else {
+                            self.evaluateJavaScript("window.postMessage(Object.fromEntries(new URLSearchParams(`\(callbackURL?.query() ?? "")`)), \"*\")")
+                        }
+                    }
+                   
+                }
+                session.presentationContextProvider = self
+                session.start()
+            }
+        }
+        
+        return nil
     }
     
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
@@ -278,35 +307,6 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
     }
     
     func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) { }
-}
-
-class AuthenticationSession: NSObject, WKScriptMessageHandler, ASWebAuthenticationPresentationContextProviding {
-    
-    var webview: WebView?
-    
-    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        return self.webview!.window!
-    }
-    
-    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard let authURL = URL(string: message.body as! String) else { return }
-
-        // Initialize the session.
-        let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "fullstacked")
-        { callbackURL, error in
-            DispatchQueue.main.async {
-                if(error != nil) {
-                    self.webview?.evaluateJavaScript("window.respondAuth(false, \"Authentication Canceled\")")
-                } else {
-                    self.webview?.evaluateJavaScript("window.respondAuth(true, `\(callbackURL?.query() ?? "")`)")
-
-                }
-            }
-           
-        }
-        session.presentationContextProvider = self
-        session.start()
-    }
 }
 
 extension String {
