@@ -13,19 +13,19 @@
     "type": "module",
     "dependencies": {
         "cli-progress": "^3.12.0",
-        "jsdom": "^29.0.0",
+        "jsdom": "^29.1.1",
         "open": "^11.0.0",
         "pretty-bytes": "^7.1.0",
-        "sass": "^1.98.0",
-        "tar-stream": "^3.1.8",
-        "ws": "^8.19.0"
+        "sass": "^1.99.0",
+        "tar-stream": "^3.2.0",
+        "ws": "^8.20.1"
     },
     "devDependencies": {
         "@types/cli-progress": "^3.11.6",
-        "@types/jsdom": "^28.0.0",
+        "@types/jsdom": "^28.0.3",
         "@types/tar-stream": "^3.1.4",
         "@types/ws": "^8.18.1",
-        "node-addon-api": "^8.6.0"
+        "node-addon-api": "^8.7.0"
     },
     "overrides": {
         "cli-progress": {
