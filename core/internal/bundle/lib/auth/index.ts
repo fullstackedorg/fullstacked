@@ -6,9 +6,9 @@ const defaultWindowFeatures = () => {
     return `width=${width},height=${height},left=${left},top=${top}`;
 }
 
-export default function authenticate(url: string, opts?: {
+export function authenticate(url: string, opts?: {
     windowFeatures?: string;
-}): Promise<string> {
+}): Promise<any> {
     const urlObj = new URL(url);
     urlObj.searchParams.append("auth", "1");
     url = urlObj.toString();
@@ -43,3 +43,9 @@ export default function authenticate(url: string, opts?: {
         window.addEventListener("message", onmessage);
     });
 }
+
+const auth = {
+    authenticate
+}
+
+export default auth;
