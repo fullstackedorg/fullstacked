@@ -63,6 +63,19 @@ fs.writeFileSync(bindingFilePath, JSON.stringify(binding, null, 4));
 child_process.execSync(
     `npx node-gyp --directory=${path.resolve(currentDirectory, "gyp")} --arch=${arch} clean configure build`,
     {
+        env: {
+            ...process.env,
+            CC: platform === "linux" 
+                ? arch === "arm64"
+                    ? "aarch64-linux-gnu-gcc"
+                    : "x86_64-linux-gnu-gcc"
+                : undefined,
+            CXX: platform === "linux" 
+                ? arch === "arm64"
+                    ? "aarch64-linux-gnu-g++"
+                    : "x86_64-linux-gnu-g++"
+                : undefined
+        },
         cwd: currentDirectory,
         stdio: "inherit"
     }
