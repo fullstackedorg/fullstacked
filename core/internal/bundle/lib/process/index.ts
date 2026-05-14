@@ -58,5 +58,11 @@ process.cwd = cwd;
 process.chdir = chdir;
 process.versions = { node: "", fullstacked };
 process.exit = exit;
+process.stdout = {
+    isTTY: false
+}
+process.stderr = {
+    isTTY: false
+}
 
 export default process;

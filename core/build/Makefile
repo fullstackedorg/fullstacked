@@ -94,12 +94,14 @@ linux-x64-shared:
 	CGO_ENABLED=1 \
 	GOOS=linux \
 	GOARCH=amd64 \
+	CC=$(CURDIR)/linux-gcc.sh \
 	go build -buildmode=c-shared -o $(OUT)/linux-x64.so -v ..
 
 linux-arm64-shared:
 	CGO_ENABLED=1 \
 	GOOS=linux \
 	GOARCH=arm64 \
+	CC=$(CURDIR)/linux-gcc.sh \
 	go build -buildmode=c-shared -o $(OUT)/linux-arm64.so -v ..
 
 linux-x64-static:
