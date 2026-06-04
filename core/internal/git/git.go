@@ -1,14 +1,17 @@
 package git
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"fullstackedorg/fullstacked/internal/fs"
 	"fullstackedorg/fullstacked/internal/path"
 	"fullstackedorg/fullstacked/internal/store"
+	"fullstackedorg/fullstacked/internal/tunnel"
 	"fullstackedorg/fullstacked/types"
 	"io"
+	"net"
 	nethttp "net/http"
 	"net/url"
 	"path/filepath"
@@ -19,7 +22,6 @@ import (
 	git "github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/config"
 	"github.com/go-git/go-git/v6/plumbing"
-	"github.com/go-git/go-git/v6/plumbing/client"
 	"github.com/go-git/go-git/v6/plumbing/object"
 	"github.com/go-git/go-git/v6/plumbing/storer"
 	"github.com/go-git/go-git/v6/plumbing/transport"
@@ -224,9 +226,14 @@ func Switch(
 		return nil
 	case Clone:
 		response.Type = types.CoreResponseStream
+		proxy := ""
+		if len(data) > 2 && data[2].Type == types.STRING {
+			proxy = data[2].Data.(string)
+		}
 		stream, err := clone(
 			data[0].Data.(string),
 			path.ResolveWithContext(ctx, data[1].Data.(string)),
+			proxy,
 		)
 		if err != nil {
 			return err
@@ -235,8 +242,11 @@ func Switch(
 		return nil
 	case Pull:
 		response.Type = types.CoreResponseStream
-
-		stream, err := pull(path.ResolveWithContext(ctx, data[0].Data.(string)))
+		proxy := ""
+		if len(data) > 1 && data[1].Type == types.STRING {
+			proxy = data[1].Data.(string)
+		}
+		stream, err := pull(path.ResolveWithContext(ctx, data[0].Data.(string)), proxy)
 		if err != nil {
 			return err
 		}
@@ -244,8 +254,11 @@ func Switch(
 		return nil
 	case Push:
 		response.Type = types.CoreResponseStream
-
-		stream, err := push(path.ResolveWithContext(ctx, data[0].Data.(string)))
+		proxy := ""
+		if len(data) > 1 && data[1].Type == types.STRING {
+			proxy = data[1].Data.(string)
+		}
+		stream, err := push(path.ResolveWithContext(ctx, data[0].Data.(string)), proxy)
 		if err != nil {
 			return err
 		}
@@ -302,11 +315,16 @@ func Switch(
 		if len(data) > 2 && data[2].Type == types.BOOLEAN {
 			create = data[2].Data.(bool)
 		}
+		proxy := ""
+		if len(data) > 3 && data[3].Type == types.STRING {
+			proxy = data[3].Data.(string)
+		}
 		stream, err := checkout(
 			ctx,
 			path.ResolveWithContext(ctx, data[0].Data.(string)),
 			data[1].Data.(string),
 			create,
+			proxy,
 		)
 		if err != nil {
 			return err
@@ -622,12 +640,15 @@ type GitAuth struct {
 func clone(
 	urlStr string,
 	directory string,
+	proxy string,
 ) (*types.ResponseStream, error) {
-	err := testHost(urlStr)
+	err := testHost(urlStr, proxy)
 
 	if err != nil {
 		return nil, err
 	}
+
+	tempDir := &GitDirectory{Proxy: proxy}
 
 	url, err := url.Parse(urlStr)
 
@@ -659,36 +680,29 @@ func clone(
 	return &types.ResponseStream{
 		Open: func(ctx *types.Context, streamId uint8) {
 
-			gitAuth, _ := RequestAuth(ctx, urlStr, false)
-			// run once
 			options := git.CloneOptions{
 				AllowEmptyRepo: true,
 				URL:            urlStr,
-				ClientOptions: []client.Option{
-					client.WithHTTPAuth(&HTTPBasicAuth{
-						GitAuth: gitAuth,
-					}),
-				},
 				Progress: &GitStream{
 					ctx:      ctx,
 					streamId: streamId,
 				},
 			}
 
-			_, err := git.PlainClone(directory, &options)
+			clientOpts, err := tempDir.getClientOptions(ctx, urlStr, false)
+			if err == nil {
+				options.ClientOptions = clientOpts
+			}
+
+			_, err = git.PlainClone(directory, &options)
 
 			if err != nil {
 				processErr(ctx, streamId, err, false)
 
 				if errIsAuthenticationRequired(err) {
-					// retry with new auth
-					gitAuth, err = RequestAuth(ctx, urlStr, true)
+					clientOpts, err = tempDir.getClientOptions(ctx, urlStr, true)
 					if err == nil {
-						options.ClientOptions = []client.Option{
-							client.WithHTTPAuth(&HTTPBasicAuth{
-								GitAuth: gitAuth,
-							}),
-						}
+						options.ClientOptions = clientOpts
 						_, err = git.PlainClone(directory, &options)
 					}
 				}
@@ -702,7 +716,7 @@ func clone(
 }
 
 func CloneRepo(ctx *types.Context, urlStr string, directory string, progress io.Writer) error {
-	err := testHost(urlStr)
+	err := testHost(urlStr, "")
 
 	if err != nil {
 		return err
@@ -726,11 +740,10 @@ func CloneRepo(ctx *types.Context, urlStr string, directory string, progress io.
 		Progress: progress,
 	}
 
-	gitAuth, _ := RequestAuth(ctx, urlStr, false)
-	options.ClientOptions = []client.Option{
-		client.WithHTTPAuth(&HTTPBasicAuth{
-			GitAuth: gitAuth,
-		}),
+	tempDir := &GitDirectory{}
+	clientOpts, err := tempDir.getClientOptions(ctx, urlStr, false)
+	if err == nil {
+		options.ClientOptions = clientOpts
 	}
 
 	_, err = git.PlainClone(directory, &options)
@@ -739,14 +752,9 @@ func CloneRepo(ctx *types.Context, urlStr string, directory string, progress io.
 		processErr(err)
 
 		if errIsAuthenticationRequired(err) {
-			// retry with new auth
-			gitAuth, err := RequestAuth(ctx, urlStr, true)
+			clientOpts, err = tempDir.getClientOptions(ctx, urlStr, true)
 			if err == nil {
-				options.ClientOptions = []client.Option{
-					client.WithHTTPAuth(&HTTPBasicAuth{
-						GitAuth: gitAuth,
-					}),
-				}
+				options.ClientOptions = clientOpts
 				_, err = git.PlainClone(directory, &options)
 			}
 		}
@@ -757,8 +765,11 @@ func CloneRepo(ctx *types.Context, urlStr string, directory string, progress io.
 	return err
 }
 
-func pull(directory string) (*types.ResponseStream, error) {
+func pull(directory string, proxy string) (*types.ResponseStream, error) {
 	dir, err := OpenGitDirectory(directory)
+	if err == nil {
+		dir.Proxy = proxy
+	}
 
 	if err != nil {
 		return nil, err
@@ -770,7 +781,7 @@ func pull(directory string) (*types.ResponseStream, error) {
 		return nil, err
 	}
 
-	err = testHost(urlStr)
+	err = testHost(urlStr, proxy)
 
 	if err != nil {
 		return nil, err
@@ -805,23 +816,17 @@ func pull(directory string) (*types.ResponseStream, error) {
 				ReferenceName: head.Name(),
 			}
 
-			auth, _ := RequestAuth(ctx, urlStr, false)
-			options.ClientOptions = []client.Option{
-				client.WithHTTPAuth(&HTTPBasicAuth{
-					GitAuth: auth,
-				}),
+			clientOpts, err := dir.getClientOptions(ctx, urlStr, false)
+			if err == nil {
+				options.ClientOptions = clientOpts
 			}
 
 			err = worktree.Pull(&options)
 
 			if errIsAuthenticationRequired(err) {
-				auth, err = RequestAuth(ctx, urlStr, true)
+				clientOpts, err = dir.getClientOptions(ctx, urlStr, true)
 				if err == nil {
-					options.ClientOptions = []client.Option{
-						client.WithHTTPAuth(&HTTPBasicAuth{
-							GitAuth: auth,
-						}),
-					}
+					options.ClientOptions = clientOpts
 					err = worktree.Pull(&options)
 				}
 			}
@@ -835,8 +840,11 @@ func pull(directory string) (*types.ResponseStream, error) {
 	}, nil
 }
 
-func push(directory string) (*types.ResponseStream, error) {
+func push(directory string, proxy string) (*types.ResponseStream, error) {
 	dir, err := OpenGitDirectory(directory)
+	if err == nil {
+		dir.Proxy = proxy
+	}
 
 	if err != nil {
 		return nil, err
@@ -848,7 +856,7 @@ func push(directory string) (*types.ResponseStream, error) {
 		return nil, err
 	}
 
-	err = testHost(urlStr)
+	err = testHost(urlStr, proxy)
 
 	if err != nil {
 		return nil, err
@@ -869,23 +877,17 @@ func push(directory string) (*types.ResponseStream, error) {
 				},
 			}
 
-			auth, _ := RequestAuth(ctx, urlStr, false)
-			options.ClientOptions = []client.Option{
-				client.WithHTTPAuth(&HTTPBasicAuth{
-					GitAuth: auth,
-				}),
+			clientOpts, err := dir.getClientOptions(ctx, urlStr, false)
+			if err == nil {
+				options.ClientOptions = clientOpts
 			}
 
-			err := repository.Push(&options)
+			err = repository.Push(&options)
 
 			if errIsAuthenticationRequired(err) {
-				auth, err = RequestAuth(ctx, urlStr, true)
+				clientOpts, err = dir.getClientOptions(ctx, urlStr, true)
 				if err == nil {
-					options.ClientOptions = []client.Option{
-						client.WithHTTPAuth(&HTTPBasicAuth{
-							GitAuth: auth,
-						}),
-					}
+					options.ClientOptions = clientOpts
 					err = repository.Push(&options)
 				}
 			}
@@ -1077,8 +1079,11 @@ func tags(ctx *types.Context, directory string) ([]GitTag, error) {
 	return tags, nil
 }
 
-func checkout(ctx *types.Context, directory string, ref string, create bool) (*types.ResponseStream, error) {
+func checkout(ctx *types.Context, directory string, ref string, create bool, proxy string) (*types.ResponseStream, error) {
 	dir, err := OpenGitDirectory(directory)
+	if err == nil {
+		dir.Proxy = proxy
+	}
 
 	if err != nil {
 		return nil, err
@@ -1190,7 +1195,7 @@ func errIsAuthenticationRequired(err error) bool {
 	return strings.Contains(err.Error(), transport.ErrAuthenticationRequired.Error())
 }
 
-func testHost(urlStr string) error {
+func testHost(urlStr string, proxy string) error {
 	u, err := url.Parse(urlStr)
 	if err != nil {
 		return err
@@ -1198,6 +1203,18 @@ func testHost(urlStr string) error {
 
 	client := nethttp.Client{
 		Timeout: 5 * time.Second,
+	}
+
+	if proxy != "" {
+		t := tunnel.FindTunnel(proxy)
+		if t == nil {
+			return errors.New("tunnel not found")
+		}
+		client.Transport = &nethttp.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return t.Dial(ctx)
+			},
+		}
 	}
 
 	resp, err := client.Head(fmt.Sprintf("%s://%s", u.Scheme, u.Host))

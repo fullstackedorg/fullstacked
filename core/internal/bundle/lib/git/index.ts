@@ -90,11 +90,15 @@ export function log(directory: string): Promise<GitCommit[]> {
     });
 }
 
-export function clone(url: string, directory: string): Promise<Duplex> {
+export function clone(
+    url: string,
+    directory: string,
+    proxy?: string
+): Promise<Duplex> {
     return bridge({
         mod: Git,
         fn: Clone,
-        data: [url, directory]
+        data: [url, directory, proxy]
     });
 }
 
@@ -110,19 +114,19 @@ export function commit(
     });
 }
 
-export function pull(directory: string): Promise<Duplex> {
+export function pull(directory: string, proxy?: string): Promise<Duplex> {
     return bridge({
         mod: Git,
         fn: Pull,
-        data: [directory]
+        data: [directory, proxy]
     });
 }
 
-export function push(directory: string): Promise<Duplex> {
+export function push(directory: string, proxy?: string): Promise<Duplex> {
     return bridge({
         mod: Git,
         fn: Push,
-        data: [directory]
+        data: [directory, proxy]
     });
 }
 
@@ -157,12 +161,13 @@ export async function tags(directory: string): Promise<GitTag[]> {
 export function checkout(
     directory: string,
     ref: string,
-    create?: boolean
+    create?: boolean,
+    proxy?: string
 ): Promise<Duplex> {
     return bridge({
         mod: Git,
         fn: Checkout,
-        data: [directory, ref, !!create]
+        data: [directory, ref, !!create, proxy || ""]
     });
 }
 

@@ -4,14 +4,19 @@ import (
 	"errors"
 	"fullstackedorg/fullstacked/types"
 
+	"context"
+	"fullstackedorg/fullstacked/internal/tunnel"
 	git "github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/config"
 	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/go-git/go-git/v6/plumbing/client"
+	"net"
+	nethttp "net/http"
 )
 
 type GitDirectory struct {
 	Directory  string
+	Proxy      string
 	repository *git.Repository
 	worktree   *git.Worktree
 }
@@ -63,6 +68,38 @@ func (r *GitDirectory) Worktree() (*git.Worktree, error) {
 	return r.worktree, nil
 }
 
+func (r *GitDirectory) getClientOptions(ctx *types.Context, urlStr string, forcePrompt bool) ([]client.Option, error) {
+	clientOptions := []client.Option{}
+
+	if r.Proxy != "" {
+		t := tunnel.FindTunnel(r.Proxy)
+		if t == nil {
+			return nil, errors.New("tunnel not found")
+		}
+		customClient := &nethttp.Client{
+			Transport: &nethttp.Transport{
+				DialContext: func(netCtx context.Context, network, addr string) (net.Conn, error) {
+					return t.Dial(netCtx)
+				},
+			},
+		}
+		clientOptions = append(clientOptions, client.WithHTTPClient(customClient))
+	}
+
+	auth, err := RequestAuth(ctx, urlStr, forcePrompt)
+	if err != nil {
+		if forcePrompt {
+			return nil, err
+		}
+	} else {
+		clientOptions = append(clientOptions, client.WithHTTPAuth(&HTTPBasicAuth{
+			GitAuth: auth,
+		}))
+	}
+
+	return clientOptions, nil
+}
+
 func (r *GitDirectory) LsRemote(ctx *types.Context, remoteName string) ([]*plumbing.Reference, error) {
 	urlStr, err := r.GetUrl()
 
@@ -70,7 +107,7 @@ func (r *GitDirectory) LsRemote(ctx *types.Context, remoteName string) ([]*plumb
 		return nil, err
 	}
 
-	err = testHost(urlStr)
+	err = testHost(urlStr, r.Proxy)
 
 	if err != nil {
 		return nil, err
@@ -90,25 +127,18 @@ func (r *GitDirectory) LsRemote(ctx *types.Context, remoteName string) ([]*plumb
 
 	options := git.ListOptions{}
 
-	auth, _ := RequestAuth(ctx, urlStr, false)
-
-	options.ClientOptions = []client.Option{
-		client.WithHTTPAuth(&HTTPBasicAuth{
-			GitAuth: auth,
-		}),
+	clientOpts, err := r.getClientOptions(ctx, urlStr, false)
+	if err != nil {
+		return nil, err
 	}
+	options.ClientOptions = clientOpts
 
 	refs, err := remote.List(&options)
 
 	if errIsAuthenticationRequired(err) {
-		auth, err = RequestAuth(ctx, urlStr, true)
-
+		clientOpts, err = r.getClientOptions(ctx, urlStr, true)
 		if err == nil {
-			options.ClientOptions = []client.Option{
-				client.WithHTTPAuth(&HTTPBasicAuth{
-					GitAuth: auth,
-				}),
-			}
+			options.ClientOptions = clientOpts
 			refs, err = remote.List(&options)
 		}
 	}
@@ -264,23 +294,18 @@ func (r *GitDirectory) FetchBranch(branchName string, progress *GitStream) error
 		Progress: progress,
 	}
 
-	auth, _ := RequestAuth(progress.ctx, urlStr, false)
-	options.ClientOptions = []client.Option{
-		client.WithHTTPAuth(&HTTPBasicAuth{
-			GitAuth: auth,
-		}),
+	clientOpts, err := r.getClientOptions(progress.ctx, urlStr, false)
+	if err != nil {
+		return err
 	}
+	options.ClientOptions = clientOpts
 
 	err = remote.Fetch(&options)
 
 	if errIsAuthenticationRequired(err) {
-		auth, err = RequestAuth(progress.ctx, urlStr, true)
+		clientOpts, err = r.getClientOptions(progress.ctx, urlStr, true)
 		if err == nil {
-			options.ClientOptions = []client.Option{
-				client.WithHTTPAuth(&HTTPBasicAuth{
-					GitAuth: auth,
-				}),
-			}
+			options.ClientOptions = clientOpts
 			err = remote.Fetch(&options)
 		}
 	}
