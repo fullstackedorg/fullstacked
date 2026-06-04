@@ -94,7 +94,7 @@ export class Socket extends RealDuplex {
         });
     }
 
-    _read(size: number) { }
+    _read(size: number) {}
 
     _write(
         chunk: any,

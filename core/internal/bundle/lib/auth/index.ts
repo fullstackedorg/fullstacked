@@ -4,11 +4,14 @@ const defaultWindowFeatures = () => {
     const left = window.screenX + (window.innerWidth - width) / 2;
     const top = window.screenY + (window.innerHeight - height) / 2;
     return `width=${width},height=${height},left=${left},top=${top}`;
-}
+};
 
-export function authenticate(url: string, opts?: {
-    windowFeatures?: string;
-}): Promise<any> {
+export function authenticate(
+    url: string,
+    opts?: {
+        windowFeatures?: string;
+    }
+): Promise<any> {
     const urlObj = new URL(url);
     urlObj.searchParams.append("auth", "1");
     url = urlObj.toString();
@@ -46,6 +49,6 @@ export function authenticate(url: string, opts?: {
 
 const auth = {
     authenticate
-}
+};
 
 export default auth;
