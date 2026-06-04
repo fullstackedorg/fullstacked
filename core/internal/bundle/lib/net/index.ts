@@ -18,7 +18,6 @@ function parseOptions(
               ? pathOrPortOrOptions?.path
               : null;
 
-    // connect path
     if (path) {
         throw "socket to unix file unavailable";
     }
@@ -51,28 +50,17 @@ function parseOptions(
     };
 }
 
-/**
- * Configuration options for the Socket class.
- */
 type SocketOpts = {
-    /** Whether to allow half-open TCP connections. */
     allowHalfOpen: boolean;
-    /** Whether to enable keep-alive functionality. */
     keepAlive: boolean;
-    /** The initial delay before the first keepalive probe is sent. */
     keepAliveInitialDelay: number;
-    /** Whether to enable TCP_NODELAY. */
     noDelay: boolean;
-    /** Callback and buffer for low-level reading. */
     onread: {
         buffer: Buffer | Uint8Array | Function;
         callback: (chunk: Buffer) => void;
     };
 };
 
-/**
- * Node.js net.Socket shim bridging to FullStacked core.
- */
 export class Socket extends RealDuplex {
     private duplex: Duplex = null;
 
@@ -80,9 +68,6 @@ export class Socket extends RealDuplex {
         super(options);
     }
 
-    /**
-     * Connect the socket to a remote host and port.
-     */
     connect(options: Partial<ConnectOpts>): void;
     connect(port: number, host?: string): void;
     connect(optionsOrPort: Partial<ConnectOpts> | number, maybeHost?: string) {
@@ -109,9 +94,7 @@ export class Socket extends RealDuplex {
         });
     }
 
-    _read(size: number) {
-        // Data is pushed asynchronously from the duplex bridge
-    }
+    _read(size: number) { }
 
     _write(
         chunk: any,
@@ -152,11 +135,6 @@ export class Socket extends RealDuplex {
     }
 
     private _timeoutId?: any;
-    /**
-     * Set the timeout for the socket.
-     * @param timeout Timeout in milliseconds. 0 disables the timeout.
-     * @param callback Callback executed when the 'timeout' event fires.
-     */
     setTimeout(timeout: number, callback?: () => void) {
         if (this._timeoutId) clearTimeout(this._timeoutId);
         if (timeout > 0) {
@@ -186,9 +164,6 @@ type ConnectOpts = SocketOpts & {
 
 type ConnectListener = () => void;
 
-/**
- * Creates a new Socket and connects it to the specified host and port.
- */
 export function connect(
     options: Partial<ConnectOpts>,
     connectListener?: ConnectListener
@@ -234,17 +209,10 @@ export const createConnection: typeof connect = (...args: any) =>
 const maxIPv4Length = 15;
 const maxIPv6Length = 45;
 
-/**
- * Identifies the version of the IP address in a string.
- * @returns 4 if IPv4, 6 if IPv6, 0 otherwise.
- */
 export function isIP(addr: string) {
     return isIPv6(addr) ? 6 : isIPv4(addr) ? 4 : 0;
 }
 
-/**
- * Checks if the address is a valid IPv4 address.
- */
 export function isIPv4(addr: string) {
     if (addr.length > maxIPv4Length) {
         return false;
@@ -255,9 +223,6 @@ export function isIPv4(addr: string) {
     return ipv4Regex.test(addr);
 }
 
-/**
- * Checks if the address is a valid IPv6 address.
- */
 export function isIPv6(addr: string) {
     if (addr.length > maxIPv6Length) {
         return false;

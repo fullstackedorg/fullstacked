@@ -185,7 +185,20 @@ async function fetchCore(
             ""
         ).trim(),
         bodyUsed: false,
-        body: responseBodyStream,
+        body: new ReadableStream({
+            async pull(controller) {
+                const iterator = responseBodyStream[Symbol.asyncIterator]();
+                const { value, done } = await iterator.next();
+                if (done) {
+                    controller.close();
+                } else {
+                    controller.enqueue(value);
+                }
+            },
+            cancel() {
+                responseBodyStream.end();
+            }
+        }) as any,
         json: async () => {
             return JSON.parse(new TextDecoder().decode(await readBody()));
         },

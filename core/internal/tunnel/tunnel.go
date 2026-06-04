@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/types"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -159,4 +160,21 @@ func (tunnel *Tunnel) Connect() (*types.ResponseStream, error) {
 	}
 
 	return &stream, nil
+}
+
+func (tunnel *Tunnel) Dial(ctx context.Context) (net.Conn, error) {
+	HTTPHeaders := http.Header{}
+	if tunnel.Authorization != "" {
+		HTTPHeaders["Authorization"] = []string{tunnel.Authorization}
+	}
+
+	c, _, err := websocket.Dial(ctx, tunnel.url(), &websocket.DialOptions{
+		HTTPHeader: HTTPHeaders,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return websocket.NetConn(ctx, c, websocket.MessageBinary), nil
 }

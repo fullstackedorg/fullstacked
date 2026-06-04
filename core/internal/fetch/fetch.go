@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fullstackedorg/fullstacked/internal/store"
+	"fullstackedorg/fullstacked/internal/tunnel"
 	"fullstackedorg/fullstacked/types"
 	"io"
+	"net"
 	"net/http"
 	"sync"
 )
@@ -125,7 +127,24 @@ type ResponseHead struct {
 var fetchResponses = map[int]*http.Response{}
 var fetchResponsesMutex = sync.Mutex{}
 
-var client = &http.Client{}
+var client = &http.Client{
+	Transport: &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, _, err := net.SplitHostPort(addr)
+			if err != nil {
+				host = addr
+			}
+
+			t := tunnel.FindTunnel(host)
+			if t != nil {
+				return t.Dial(ctx)
+			}
+
+			var dialer net.Dialer
+			return dialer.DialContext(ctx, network, addr)
+		},
+	},
+}
 
 func FetchFnApply(id int, requestHead RequestHead, body []byte) (ResponseHead, error) {
 	reqBody := (io.Reader)(http.NoBody)
