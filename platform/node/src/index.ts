@@ -9,6 +9,7 @@ import {
 import { run } from "../../../core/internal/bundle/lib/run/index.ts";
 import version from "../../../core/internal/bundle/lib/process/version.json";
 import postcss from "postcss";
+import atImport from "postcss-import";
 import tailwindcss from "@tailwindcss/postcss";
 import autoprefixer from "autoprefixer";
 import fs from "node:fs";
@@ -91,7 +92,15 @@ tailwindcssBuilder.on("build", async (entryfile, outfile) => {
     const from = path.resolve(directory, entryfile);
     const to = path.resolve(directory, outfile);
     const css = await fs.promises.readFile(from, "utf-8");
-    const result = await postcss([tailwindcss(), autoprefixer()]).process(css, {
+    const result = await postcss([
+        atImport({
+            addModulesDirectories: [
+                path.resolve(import.meta.dirname, "node_modules")
+            ]
+        }),
+        tailwindcss(),
+        autoprefixer()
+    ]).process(css, {
         from,
         to
     });
