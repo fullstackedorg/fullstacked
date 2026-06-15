@@ -1,3 +1,6 @@
+import { Core } from "../@types/index.ts";
+import { GetEnv } from "../@types/router.ts";
+import { bridge } from "../bridge/index.ts";
 import { isWorker } from "../bridge/isWorker.ts";
 import { chdir } from "./cwd/chdir.ts";
 import { cwd } from "./cwd/index.ts";
@@ -63,6 +66,17 @@ process.stdout = {
 };
 process.stderr = {
     isTTY: false
+};
+const envData = bridge(
+    {
+        mod: Core,
+        fn: GetEnv
+    },
+    true
+);
+process.env = {
+    ...process.env,
+    ...(envData || {})
 };
 
 export default process;

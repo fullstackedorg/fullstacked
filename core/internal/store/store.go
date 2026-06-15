@@ -79,6 +79,19 @@ func EndContext(ctxId uint8) {
 	ctxMutex.Unlock()
 }
 
+func SetEnvironmentData(ctxId uint8, data map[string]string) {
+	ctxMutex.Lock()
+	defer ctxMutex.Unlock()
+
+	ctx, ok := Contexts[ctxId]
+	if !ok {
+		return
+	}
+
+	ctx.Env = data
+	Contexts[ctxId] = ctx
+}
+
 func StoreResponse(
 	ctx *types.Context,
 	header types.CoreCallHeader,

@@ -1,6 +1,7 @@
 package router
 
 import (
+	"encoding/json"
 	"errors"
 	"fullstackedorg/fullstacked/internal/bundle"
 	"fullstackedorg/fullstacked/internal/dgram"
@@ -28,6 +29,7 @@ type CoreFn = uint8
 const (
 	StaticFile CoreFn = 0
 	Run        CoreFn = 1
+	GetEnv     CoreFn = 2
 )
 
 /*
@@ -144,13 +146,27 @@ func Switch(
 	case Run:
 		response.Type = types.CoreResponseData
 		root := filepath.Join(ctx.Directories.Root, data[0].Data.(string))
+
 		id := store.NewContext(root, root)
 
 		if store.OnStreamData == nil {
 			return errors.New("onStreamData not set")
 		}
 
+		if len(data) > 1 && data[1].Type == types.OBJECT {
+			env := (map[string]string)(nil)
+			err := json.Unmarshal(data[1].Data.(types.DeserializedRawObject).Data, &env)
+
+			if err == nil {
+				store.SetEnvironmentData(id, env)
+			}
+		}
+
 		store.OnStreamData(id, 0, 0)
+		return nil
+	case GetEnv:
+		response.Type = types.CoreResponseData
+		response.Data = ctx.Env
 		return nil
 	}
 
