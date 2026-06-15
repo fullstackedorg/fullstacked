@@ -4,9 +4,9 @@ go 1.26
 
 require (
 	github.com/Masterminds/semver/v3 v3.5.0 // direct
-	github.com/coder/websocket v1.8.14 // direct
+	github.com/coder/websocket v1.8.15 // direct
 	github.com/djherbis/times v1.6.0 // direct
-	github.com/evanw/esbuild v0.28.0 // direct
+	github.com/evanw/esbuild v0.28.1 // direct
 	github.com/getsentry/sentry-go v0.46.2 // direct
 	github.com/go-git/go-git/v6 v6.0.0-alpha.4 // direct
 	golang.org/x/net v0.56.0 // direct
