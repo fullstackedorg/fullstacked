@@ -22,11 +22,12 @@
         "trailingComma": "none"
     },
     "dependencies": {
-        "@aws-sdk/client-s3": "^3.1066.0",
+        "@aws-sdk/client-s3": "^3.1068.0",
         "@fullstacked/builder-tailwindcss": "github:fullstackedorg/builder-tailwindcss",
         "@nitrogql/esbuild-register": "^1.7.2",
-        "@tailwindcss/cli": "^4.3.0",
+        "@tailwindcss/cli": "^4.3.1",
         "assert": "^2.1.0",
+        "audit": "^0.0.6",
         "browserify-zlib": "^0.2.0",
         "buffer": "^6.0.3",
         "constants-browserify": "^1.0.0",
@@ -35,10 +36,11 @@
         "dc-polyfill": "^0.1.11",
         "dotenv": "^17.4.2",
         "elliptic": "^6.6.1",
-        "esbuild": "^0.28.0",
+        "esbuild": "^0.28.1",
         "events": "^3.3.0",
         "fast-querystring": "^1.1.2",
-        "node-gyp": "^12.4.0",
+        "node-gyp": "^13.0.0",
+        "npm": "^11.17.0",
         "prettier": "^3.8.4",
         "process": "^0.11.10",
         "puppeteer": "^25.1.0",
@@ -48,9 +50,7 @@
         "util": "^0.12.5"
     },
     "overrides": {
-        "yauzl": "3.2.1",
-        "fast-xml-parser": ">=5.5.7",
-        "basic-ftp": ">=5.2.1"
+        "tar": "^7.5.16"
     },
     "devDependencies": {
         "@types/node": "^25.9.3"

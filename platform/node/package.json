@@ -10,18 +10,18 @@
         "prepack": "npm run build"
     },
     "dependencies": {
-        "@tailwindcss/postcss": "^4.3.0",
+        "@tailwindcss/postcss": "^4.3.1",
         "autoprefixer": "^10.5.0",
         "open": "^11.0.0",
         "postcss": "^8.5.15",
         "postcss-import": "^16.1.1",
-        "tailwindcss": "^4.3.0",
+        "tailwindcss": "^4.3.1",
         "ws": "^8.21.0"
     },
     "devDependencies": {
         "@nitrogql/esbuild-register": "^1.7.2",
         "@types/ws": "^8.18.1",
-        "esbuild": "^0.28.0",
+        "esbuild": "^0.28.1",
         "node-addon-api": "^8.8.0"
     },
     "optionalDependencies": {
