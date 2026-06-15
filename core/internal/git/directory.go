@@ -22,7 +22,13 @@ type GitDirectory struct {
 }
 
 func OpenGitDirectory(directory string) (*GitDirectory, error) {
-	repository, err := git.PlainOpen(directory)
+	var repository *git.Repository
+	var err error
+	if USE_CUSTOM_FS {
+		repository, err = CustomOpen(directory)
+	} else {
+		repository, err = git.PlainOpen(directory)
+	}
 
 	if err != nil {
 		return nil, err
@@ -41,7 +47,13 @@ func (r *GitDirectory) Repository() (*git.Repository, error) {
 		return r.repository, nil
 	}
 
-	repository, err := git.PlainOpen(r.Directory)
+	var repository *git.Repository
+	var err error
+	if USE_CUSTOM_FS {
+		repository, err = CustomOpen(r.Directory)
+	} else {
+		repository, err = git.PlainOpen(r.Directory)
+	}
 
 	if err != nil {
 		return nil, err

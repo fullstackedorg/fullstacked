@@ -66,6 +66,14 @@ var gitAuthManagers = make(map[uint8]gitAuthManager)
 
 var ErrNoGitAuthManager = errors.New("no git auth manager found for context")
 
+// 2026-06-15
+// USE_CUSTOM_FS toggles the use of our custom filesystem wrapper (fs.go).
+// When true, we avoid using go-git's Plain* methods which utilize os.Root
+// under the hood (via go-billy's osfs). On macOS sandboxed environments,
+// os.Root operations like fs.root.Stat can return permission denied
+// instead of ErrNotExist, causing failures during git operations.
+var USE_CUSTOM_FS = true
+
 func getGitAuthManager(ctx *types.Context) (*gitAuthManager, error) {
 	gitAuthManager, ok := gitAuthManagers[ctx.Id]
 	if !ok {
@@ -354,7 +362,13 @@ func HasGitFn(directory string) bool {
 }
 
 func initFn(directory string, url string) error {
-	repository, err := git.PlainInit(directory, false, git.WithDefaultBranch(plumbing.Main))
+	var repository *git.Repository
+	var err error
+	if USE_CUSTOM_FS {
+		repository, err = CustomInit(directory, false, git.WithDefaultBranch(plumbing.Main))
+	} else {
+		repository, err = git.PlainInit(directory, false, git.WithDefaultBranch(plumbing.Main))
+	}
 
 	if err != nil {
 		return err
@@ -694,20 +708,29 @@ func clone(
 				options.ClientOptions = clientOpts
 			}
 
-			_, err = git.PlainClone(directory, &options)
+			var cloneErr error
+			if USE_CUSTOM_FS {
+				_, cloneErr = CustomCloneContext(context.Background(), directory, &options)
+			} else {
+				_, cloneErr = git.PlainClone(directory, &options)
+			}
 
-			if err != nil {
-				processErr(ctx, streamId, err, false)
+			if cloneErr != nil {
+				processErr(ctx, streamId, cloneErr, false)
 
-				if errIsAuthenticationRequired(err) {
+				if errIsAuthenticationRequired(cloneErr) {
 					clientOpts, err = tempDir.getClientOptions(ctx, urlStr, true)
 					if err == nil {
 						options.ClientOptions = clientOpts
-						_, err = git.PlainClone(directory, &options)
+						if USE_CUSTOM_FS {
+							_, cloneErr = CustomCloneContext(context.Background(), directory, &options)
+						} else {
+							_, cloneErr = git.PlainClone(directory, &options)
+						}
 					}
 				}
 
-				processErr(ctx, streamId, err, true)
+				processErr(ctx, streamId, cloneErr, true)
 			}
 
 			store.StreamChunk(ctx, streamId, nil, true)
@@ -746,20 +769,29 @@ func CloneRepo(ctx *types.Context, urlStr string, directory string, progress io.
 		options.ClientOptions = clientOpts
 	}
 
-	_, err = git.PlainClone(directory, &options)
+	var cloneErr error
+	if USE_CUSTOM_FS {
+		_, cloneErr = CustomCloneContext(context.Background(), directory, &options)
+	} else {
+		_, cloneErr = git.PlainClone(directory, &options)
+	}
 
-	if err != nil {
-		processErr(err)
+	if cloneErr != nil {
+		processErr(cloneErr)
 
-		if errIsAuthenticationRequired(err) {
+		if errIsAuthenticationRequired(cloneErr) {
 			clientOpts, err = tempDir.getClientOptions(ctx, urlStr, true)
 			if err == nil {
 				options.ClientOptions = clientOpts
-				_, err = git.PlainClone(directory, &options)
+				if USE_CUSTOM_FS {
+					_, cloneErr = CustomCloneContext(context.Background(), directory, &options)
+				} else {
+					_, cloneErr = git.PlainClone(directory, &options)
+				}
 			}
 		}
 
-		processErr(err)
+		processErr(cloneErr)
 	}
 
 	return err
