@@ -167,14 +167,19 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
     };
 
     const next = async () => {
-        if (duplex.done) {
-            return { done: true };
+        if (duplex.asyncRead === null) {
+            let initialData: Uint8Array | null = null;
+            if (duplex.pendingData.length > 0) {
+                initialData = mergeUint8Arrays(...duplex.pendingData);
+                duplex.pendingData = [];
+            }
+            duplex.asyncRead = {
+                data: initialData
+            };
         }
 
-        if (duplex.asyncRead === null) {
-            duplex.asyncRead = {
-                data: null
-            };
+        if (duplex.done && !duplex.asyncRead.data) {
+            return { done: true };
         }
 
         if (!duplex.open && !duplex.opening) {

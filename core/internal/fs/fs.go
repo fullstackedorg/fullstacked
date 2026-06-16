@@ -3,6 +3,7 @@ package fs
 import (
 	"errors"
 	"fullstackedorg/fullstacked/internal/path"
+	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/types"
 	"io/fs"
 	"os"
@@ -17,15 +18,16 @@ import (
 type FsFn = uint8
 
 const (
-	Exists    FsFn = 0
-	Stats     FsFn = 1
-	ReadFile  FsFn = 2
-	ReadDir   FsFn = 3
-	Mkdir     FsFn = 4
-	Rm        FsFn = 5
-	WriteFile FsFn = 6
-	Rename    FsFn = 7
-	Copy      FsFn = 8
+	Exists            FsFn = 0
+	Stats             FsFn = 1
+	ReadFile          FsFn = 2
+	ReadDir           FsFn = 3
+	Mkdir             FsFn = 4
+	Rm                FsFn = 5
+	WriteFile         FsFn = 6
+	Rename            FsFn = 7
+	Copy              FsFn = 8
+	CreateWriteStream FsFn = 9
 )
 
 func Switch(
@@ -94,6 +96,49 @@ func Switch(
 	case Copy:
 		response.Type = types.CoreResponseData
 		return CopyFn(path.ResolveWithContext(ctx, data[0].Data.(string)), path.ResolveWithContext(ctx, data[1].Data.(string)))
+	case CreateWriteStream:
+		filePath := path.ResolveWithContext(ctx, data[0].Data.(string))
+
+		var file *os.File
+		var openErr error
+		openedChan := make(chan struct{})
+
+		response.Type = types.CoreResponseStream
+		response.Stream = &types.ResponseStream{
+			Open: func(ctx *types.Context, streamId uint8) {
+				defer close(openedChan)
+				dir := filepath.Dir(filePath)
+				if !ExistsFn(dir) {
+					MkdirFn(dir)
+				}
+
+				file, openErr = os.Create(filePath)
+				if openErr != nil {
+					store.StreamEvent(ctx, streamId, "error", []types.SerializableData{openErr.Error()}, true)
+				}
+			},
+			Write: func(ctx *types.Context, streamId uint8, data []byte) {
+				<-openedChan
+				if openErr != nil {
+					return
+				}
+				if file == nil {
+					return
+				}
+				_, err := file.Write(data)
+				if err != nil {
+					store.StreamEvent(ctx, streamId, "error", []types.SerializableData{err.Error()}, true)
+				}
+			},
+			Close: func(ctx *types.Context, streamId uint8) {
+				<-openedChan
+				if file != nil {
+					file.Close()
+					file = nil
+				}
+			},
+		}
+		return nil
 	}
 
 	return errors.New("unkown fs function")

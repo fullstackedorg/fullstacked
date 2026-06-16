@@ -153,7 +153,6 @@ func FetchFnApply(id int, requestHead RequestHead, body []byte) (ResponseHead, e
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	fetchRequestsMutex.Lock()
 	fetchRequests[id] = &Request{
@@ -164,6 +163,7 @@ func FetchFnApply(id int, requestHead RequestHead, body []byte) (ResponseHead, e
 	request, err := http.NewRequestWithContext(ctx, requestHead.Method, requestHead.Url, reqBody)
 
 	if err != nil {
+		closeFetchRequest(id)
 		return ResponseHead{}, err
 	}
 
@@ -179,6 +179,7 @@ func FetchFnApply(id int, requestHead RequestHead, body []byte) (ResponseHead, e
 	response, err := client.Do(request)
 
 	if err != nil {
+		closeFetchRequest(id)
 		return ResponseHead{}, err
 	}
 

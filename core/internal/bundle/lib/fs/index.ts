@@ -3,6 +3,7 @@
 import { bridge } from "../bridge/index.ts";
 import {
     Copy,
+    CreateWriteStream,
     Exists,
     GoFileInfo,
     Mkdir,
@@ -14,6 +15,8 @@ import {
     WriteFile
 } from "../@types/fs.ts";
 import { Fs } from "../@types/index.ts";
+import { Writable } from "stream";
+import { Duplex } from "../bridge/duplex.ts";
 import {
     convertGoFileInfo,
     decodeStringData,
@@ -304,6 +307,81 @@ export function cp(
         .catch((e) => callback(e));
 }
 
+export class WriteStream extends Writable {
+    private duplex: Duplex | null = null;
+    private eventEmitter: any = null;
+
+    constructor(path: string, options?: any) {
+        super(options);
+
+        const resolved = resolve(formatPathLike(path));
+        bridge({
+            mod: Fs,
+            fn: CreateWriteStream,
+            data: [resolved]
+        })
+            .then((d) => {
+                this.duplex = d;
+                this.eventEmitter = d.eventEmitter();
+                this.eventEmitter.on("error", (err: string) => {
+                    this.emit("error", new Error(err));
+                });
+                this.duplex.on("close", () => {
+                    if (!this.destroyed && !this.closed) {
+                        this.destroy();
+                    }
+                });
+                this.emit("open");
+                this.emit("ready");
+            })
+            .catch((err) => {
+                this.emit("error", err);
+            });
+    }
+
+    _write(
+        chunk: any,
+        encoding: string,
+        callback: (error?: Error | null) => void
+    ) {
+        if (!this.duplex) {
+            this.once("open", () => this._write(chunk, encoding, callback));
+            return;
+        }
+
+        this.duplex
+            .write(chunk)
+            .then(() => callback())
+            .catch(callback);
+    }
+
+    _final(callback: (error?: Error | null) => void) {
+        if (this.duplex) {
+            this.duplex
+                .end()
+                .then(() => callback())
+                .catch(callback);
+        } else {
+            callback();
+        }
+    }
+
+    _destroy(error: Error | null, callback: (error?: Error | null) => void) {
+        if (this.duplex) {
+            this.duplex
+                .end()
+                .then(() => callback(error))
+                .catch((err) => callback(err || error));
+        } else {
+            callback(error);
+        }
+    }
+}
+
+export function createWriteStream(path: PathLike, options?: any): WriteStream {
+    return new WriteStream(formatPathLike(path), options);
+}
+
 export type { Stats, Dirent } from "./common.ts";
 
 export * as promises from "./promises.ts";
@@ -329,5 +407,6 @@ export default {
     realpathSync,
     cpSync,
     cp,
+    createWriteStream,
     promises
 };

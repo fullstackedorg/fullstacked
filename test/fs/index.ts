@@ -488,4 +488,34 @@ suite("fs - e2e", () => {
 
         nodeFs.rmSync(newPath);
     });
+
+    test("createWriteStream", (_, done) => {
+        const path = "test-create-write-stream";
+        if (nodeFs.existsSync(path)) {
+            nodeFs.rmSync(path);
+        }
+
+        const stream = fs.createWriteStream(path);
+
+        stream.on("open", () => {
+            stream.write("hello ");
+            stream.write("world");
+            stream.end();
+        });
+
+        stream.once("close", () => {
+            try {
+                assert.ok(nodeFs.existsSync(path));
+                assert.equal(nodeFs.readFileSync(path, "utf-8"), "hello world");
+                nodeFs.rmSync(path);
+                done();
+            } catch (e) {
+                done(e);
+            }
+        });
+
+        stream.once("error", (err) => {
+            done(err);
+        });
+    });
 });

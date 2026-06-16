@@ -9,6 +9,7 @@ require (
 	github.com/evanw/esbuild v0.28.1 // direct
 	github.com/getsentry/sentry-go v0.46.2 // direct
 	github.com/go-git/go-git/v6 v6.0.0-alpha.4 // direct
+	github.com/go-git/go-billy/v6 v6.0.0-alpha.1 // direct
 	golang.org/x/net v0.56.0 // direct
 	golang.org/x/sys v0.46.0 // direct
 )
@@ -19,7 +20,6 @@ require (
 	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/go-git/gcfg/v2 v2.0.2 // indirect
-	github.com/go-git/go-billy/v6 v6.0.0-alpha.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/kevinburke/ssh_config v1.6.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect

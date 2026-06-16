@@ -3,9 +3,7 @@ import assert from "node:assert";
 import * as dns from "../../core/internal/bundle/lib/dns/index.ts";
 import * as nodeDns from "node:dns";
 
-nodeDns.setServers([
-    "8.8.8.8:53"
-]);
+nodeDns.setServers(["8.8.8.8:53"]);
 
 suite("dns - e2e", () => {
     test("resolve4", async () => {
