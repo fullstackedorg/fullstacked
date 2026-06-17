@@ -95,7 +95,12 @@ if (typeof globalThis.resize === "function") {
             });
             if (savedData) {
                 const savedSize = savedData.trim();
-                if (savedSize && savedSize.includes(":")) {
+                if (
+                    savedSize &&
+                    (savedSize.includes(":") ||
+                        savedSize === "fullscreen" ||
+                        savedSize === "kiosk")
+                ) {
                     return savedSize;
                 }
             }
@@ -114,7 +119,12 @@ if (typeof globalThis.resize === "function") {
         saveTimeout = setTimeout(async () => {
             try {
                 const sizeStr = await (globalThis as any).resize("get");
-                if (sizeStr && sizeStr.includes(":")) {
+                if (
+                    sizeStr &&
+                    (sizeStr.includes(":") ||
+                        sizeStr === "fullscreen" ||
+                        sizeStr === "kiosk")
+                ) {
                     try {
                         await mkdir("/.git");
                     } catch (e) {
@@ -136,8 +146,11 @@ if (typeof globalThis.resize === "function") {
     };
 
     (async () => {
-        const savedSize = await loadSavedSize();
+        let savedSize = await loadSavedSize();
         if (savedSize) {
+            if (savedSize === "kiosk") {
+                savedSize = "fullscreen";
+            }
             defaultSize = savedSize;
         }
 

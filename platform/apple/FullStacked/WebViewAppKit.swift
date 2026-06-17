@@ -8,21 +8,47 @@ class ResizeHelper: NSObject, WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         let body = message.body as! String
         
-        if body == "get" {
-            if let activeWindow = self.webView?.window {
-                let frame = activeWindow.frame
-                let responseStr = "\(frame.size.width):\(frame.size.height):\(frame.origin.x):\(frame.origin.y)"
-                self.webView?.evaluateJavaScript("window.respondResize(\"\(responseStr)\")")
-            }
-            return
-        }
-        
-        let components = body.split(separator: ":")
-        if components.count == 2 {
-            let width = Double(components[0])!
-            let height = Double(components[1])!
+        if let activeWindow = self.webView?.window {
+            let screenFrame = activeWindow.screen?.frame ?? NSScreen.main?.frame ?? NSRect.zero
             
-            if let activeWindow = self.webView?.window {
+            if body == "get" {
+                var responseStr = ""
+                let frame = activeWindow.frame
+                if activeWindow.styleMask.contains(.fullScreen) {
+                    responseStr = "kiosk"
+                } else if frame.size.width == screenFrame.size.width &&
+                            frame.size.height == screenFrame.size.height &&
+                            frame.origin.x == 0 &&
+                            frame.origin.y == 0 {
+                    responseStr = "fullscreen"
+                } else {
+                    responseStr = "\(frame.size.width):\(frame.size.height):\(frame.origin.x):\(frame.origin.y)"
+                }
+                self.webView?.evaluateJavaScript("window.respondResize(\"\(responseStr)\")")
+                return
+            }
+            
+            if body == "kiosk" {
+                if !activeWindow.styleMask.contains(.fullScreen) {
+                    activeWindow.toggleFullScreen(nil)
+                }
+                return
+            }
+            
+            if activeWindow.styleMask.contains(.fullScreen) {
+                activeWindow.toggleFullScreen(nil)
+            }
+            
+            if body == "fullscreen" {
+                let frame = NSRect(x: 0, y: 0, width: screenFrame.size.width, height: screenFrame.size.height)
+                activeWindow.setFrame(frame, display: true)
+                return
+            }
+            
+            let components = body.split(separator: ":")
+            if components.count == 2 {
+                let width = Double(components[0])!
+                let height = Double(components[1])!
                 let currentFrame = activeWindow.frame
                 let newWidth = CGFloat(width)
                 let newHeight = CGFloat(height)
@@ -32,14 +58,12 @@ class ResizeHelper: NSObject, WKScriptMessageHandler {
                 
                 let frame = NSRect(x: newX, y: newY, width: newWidth, height: newHeight)
                 activeWindow.setFrame(frame, display: true)
-            }
-        } else if components.count == 4 {
-            let width = Double(components[0])!
-            let height = Double(components[1])!
-            let x = Double(components[2])!
-            let y = Double(components[3])!
-            
-            if let activeWindow = self.webView?.window {
+            } else if components.count == 4 {
+                let width = Double(components[0])!
+                let height = Double(components[1])!
+                let x = Double(components[2])!
+                let y = Double(components[3])!
+                
                 let frame = NSRect(x: CGFloat(x), y: CGFloat(y), width: CGFloat(width), height: CGFloat(height))
                 activeWindow.setFrame(frame, display: true)
             }

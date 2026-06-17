@@ -19,6 +19,14 @@ export async function BridgeWindowsInit(): Promise<PlatformBridge> {
     globalThis.resize = function (sizeOrGet: string) {
         if (sizeOrGet === "get") {
             return globalThis.originalFetch("/resize").then((r) => r.text());
+        } else if (sizeOrGet === "fullscreen") {
+            return globalThis
+                .originalFetch("/resize?fullscreen=true")
+                .then(() => {});
+        } else if (sizeOrGet === "kiosk") {
+            return globalThis
+                .originalFetch("/resize?kiosk=true")
+                .then(() => {});
         } else {
             const components = sizeOrGet.split(":");
             let url = "/resize";

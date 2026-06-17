@@ -142,11 +142,38 @@ namespace FullStacked
                         }
                     }
 
-                    if (queryParams.TryGetValue("width", out string wStr) &&
-                        queryParams.TryGetValue("height", out string hStr))
+                    if (queryParams.TryGetValue("kiosk", out string kioskVal) && kioskVal == "true")
+                    {
+                        this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen);
+                        (stream, headers) = this.bufferToResponseStream([]);
+                        args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
+                    }
+                    else if (queryParams.TryGetValue("fullscreen", out string fsVal) && fsVal == "true")
+                    {
+                        this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Default);
+                        var overlappedPresenter = this.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
+                        if (overlappedPresenter != null)
+                        {
+                            overlappedPresenter.Maximize();
+                        }
+                        (stream, headers) = this.bufferToResponseStream([]);
+                        args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
+                    }
+                    else if (queryParams.TryGetValue("width", out string wStr) &&
+                             queryParams.TryGetValue("height", out string hStr))
                     {
                         int w = int.Parse(wStr);
                         int h = int.Parse(hStr);
+
+                        if (this.AppWindow.Presenter.Kind == Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen)
+                        {
+                            this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Default);
+                        }
+                        var overlappedPresenter = this.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
+                        if (overlappedPresenter != null && overlappedPresenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Maximized)
+                        {
+                            overlappedPresenter.Restore();
+                        }
 
                         if (queryParams.TryGetValue("x", out string xStr) &&
                             queryParams.TryGetValue("y", out string yStr))
@@ -173,11 +200,24 @@ namespace FullStacked
                     }
                     else
                     {
-                        int width = this.AppWindow.Size.Width;
-                        int height = this.AppWindow.Size.Height;
-                        int x = this.AppWindow.Position.X;
-                        int y = this.AppWindow.Position.Y;
-                        string responseStr = $"{width}:{height}:{x}:{y}";
+                        string responseStr = "";
+                        var overlappedPresenter = this.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
+                        if (this.AppWindow.Presenter.Kind == Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen)
+                        {
+                            responseStr = "kiosk";
+                        }
+                        else if (overlappedPresenter != null && overlappedPresenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Maximized)
+                        {
+                            responseStr = "fullscreen";
+                        }
+                        else
+                        {
+                            int width = this.AppWindow.Size.Width;
+                            int height = this.AppWindow.Size.Height;
+                            int x = this.AppWindow.Position.X;
+                            int y = this.AppWindow.Position.Y;
+                            responseStr = $"{width}:{height}:{x}:{y}";
+                        }
 
                         byte[] responseBuffer = Encoding.UTF8.GetBytes(responseStr);
                         (stream, headers) = this.bufferToResponseStream(responseBuffer);
