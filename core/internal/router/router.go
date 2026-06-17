@@ -30,6 +30,7 @@ const (
 	StaticFile CoreFn = 0
 	Run        CoreFn = 1
 	GetEnv     CoreFn = 2
+	Exit       CoreFn = 3
 )
 
 /*
@@ -167,6 +168,10 @@ func Switch(
 	case GetEnv:
 		response.Type = types.CoreResponseData
 		response.Data = ctx.Env
+		return nil
+	case Exit:
+		response.Type = types.CoreResponseData
+		store.ExitContext(ctx.Id)
 		return nil
 	}
 

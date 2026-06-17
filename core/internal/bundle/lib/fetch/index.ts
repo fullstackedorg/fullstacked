@@ -42,6 +42,27 @@ async function fetchCore(
     request: string | URL | Request,
     init?: RequestInit
 ): Promise<Response> {
+    const requestUrl =
+        request instanceof Request
+            ? request.url
+            : request instanceof URL
+              ? request.href
+              : request;
+    if (typeof requestUrl === "string" && requestUrl.startsWith("data:")) {
+        try {
+            const parts = requestUrl.split(",");
+            const base64 = parts[1];
+            const raw = globalThis.atob(base64);
+            const uint8 = new Uint8Array(raw.length);
+            for (let i = 0; i < raw.length; i++) {
+                uint8[i] = raw.charCodeAt(i);
+            }
+            return new Response(uint8.buffer);
+        } catch (e) {
+            // fallback
+        }
+    }
+
     const signal = init?.signal;
     if (signal?.aborted) {
         throw new DOMException("The operation was aborted.", "AbortError");

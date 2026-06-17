@@ -224,6 +224,8 @@ namespace FullStacked
                         args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
                     }
                     return;
+                } else if (pathname.StartsWith("/exit")) {
+                    this.DispatcherQueue.TryEnqueue(() => this.Close());
                 }
 
                 // static file serving

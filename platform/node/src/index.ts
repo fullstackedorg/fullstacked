@@ -40,7 +40,10 @@ const core = await load(
         }
 
         createWebView(core, ctx, {
-            openBrowser: openBrowser || webviews.size >= 1
+            openBrowser: openBrowser || webviews.size >= 1,
+            didClose: () => {
+                webviews.delete(ctx);
+            }
         }).then((webview) => {
             webviews.set(ctx, webview);
         });

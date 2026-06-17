@@ -83,6 +83,8 @@ type Context struct {
 
 	Streams      map[uint8]*StoredStream
 	StreamsMutex *sync.Mutex
+
+	Exit bool
 }
 
 type SerializableData = any

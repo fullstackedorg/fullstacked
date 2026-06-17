@@ -2,12 +2,14 @@ package store
 
 import (
 	"errors"
+	"fmt"
 	"fullstackedorg/fullstacked/internal/serialization"
 	"fullstackedorg/fullstacked/types"
 	"path"
 	"runtime/debug"
 	"strings"
 	"sync"
+	"time"
 )
 
 // ctxId, storedStreamId, size
@@ -63,7 +65,25 @@ func NewContextWithCtxId(ctxId uint8, root string, build string) {
 	}
 }
 
+func ExitContext(ctxId uint8) {
+	ctxMutex.Lock()
+	ctx, ok := Contexts[ctxId]
+
+	if ok {
+		ctx.Exit = true
+		Contexts[ctxId] = ctx
+	}
+
+	ctxMutex.Unlock()
+
+	go func() {
+		time.Sleep(1 * time.Second)
+		EndContext(ctxId)
+	}()
+}
+
 func EndContext(ctxId uint8) {
+	fmt.Println("Closing", ctxId)
 	ctxMutex.Lock()
 
 	ctx, ok := Contexts[ctxId]

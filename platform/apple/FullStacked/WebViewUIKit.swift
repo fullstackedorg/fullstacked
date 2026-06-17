@@ -31,9 +31,11 @@ class WebViewExtended: WKWebView, WKUIDelegate  {
         
         super.init(frame: frame, configuration: configuration)
         
-        configuration.userContentController.add(self.clipboardHelper, name: "clipboard")
+        // WeakMessageHandler proxy prevents WKUserContentController from strongly retaining clipboardHelper.
+        configuration.userContentController.add(WeakMessageHandler(self.clipboardHelper), name: "clipboard")
         
-        self.clipboardHelper.setCallback { (requestClipboardID, clipboardContent) in
+        self.clipboardHelper.setCallback { [weak self] (requestClipboardID, clipboardContent) in
+            guard let self = self else { return }
             let b64 = Data(clipboardContent.utf8).base64EncodedString()
             self.evaluateJavaScript("window.respondClipboard(\"\(requestClipboardID)\", \"\(b64)\")")
         }

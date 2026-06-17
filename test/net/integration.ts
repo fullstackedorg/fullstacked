@@ -37,32 +37,33 @@ suite("net - integration", () => {
         await test();
     });
 
-    test("ssh", async () => {
+    test("ssh", { timeout: 15000 }, async () => {
         containerName = `openssh-server-test-${Date.now()}`;
-        console.log(`[TEST LOG] Starting Docker container: ${containerName}`);
 
         // Start openssh-server container with password authentication enabled
         execSync(
             `docker run -d --name ${containerName} ` +
-            `-e PASSWORD_ACCESS=true ` +
-            `-e USER_NAME=testuser ` +
-            `-e USER_PASSWORD=testpass ` +
-            `-p 127.0.0.1::2222 ` +
-            `linuxserver/openssh-server`,
+                `-e PASSWORD_ACCESS=true ` +
+                `-e USER_NAME=testuser ` +
+                `-e USER_PASSWORD=testpass ` +
+                `-p 127.0.0.1::2222 ` +
+                `linuxserver/openssh-server`,
             { stdio: "pipe" }
         );
 
         // Get the dynamic host port mapped to container port 2222
-        const portOutput = execSync(`docker port ${containerName} 2222`, { encoding: "utf8" }).trim();
+        const portOutput = execSync(`docker port ${containerName} 2222`, {
+            encoding: "utf8"
+        }).trim();
         const match = portOutput.match(/:(\d+)$/);
         if (!match) {
-            throw new Error(`Failed to parse docker port output: ${portOutput}`);
+            throw new Error(
+                `Failed to parse docker port output: ${portOutput}`
+            );
         }
         const sshPort = parseInt(match[1], 10);
-        console.log(`[TEST LOG] SSH Docker port mapped to: ${sshPort}`);
 
         // Wait for SSH to be ready by reading the greeting
-        console.log(`[TEST LOG] Waiting for SSH daemon greeting...`);
         let connected = false;
         for (let i = 0; i < 40; i++) {
             const socket = new net.Socket();
@@ -78,18 +79,15 @@ suite("net - integration", () => {
                 socket.setTimeout(1500);
                 socket.once("data", (data) => {
                     const str = data.toString();
-                    console.log(`[TEST LOG] Socket received: ${str.trim()}`);
                     done(str.startsWith("SSH-"));
                 });
                 socket.once("error", (err) => {
-                    console.log(`[TEST LOG] Socket error (refused/reset is normal during startup): ${err.message}`);
                     done(false);
                 });
                 socket.once("close", () => {
                     done(false);
                 });
                 socket.once("timeout", () => {
-                    console.log(`[TEST LOG] Socket connection timed out`);
                     done(false);
                 });
                 socket.connect(sshPort, "127.0.0.1");
@@ -104,50 +102,36 @@ suite("net - integration", () => {
         if (!connected) {
             throw new Error("SSH server failed to become ready in time");
         }
-        console.log(`[TEST LOG] SSH Daemon greeting received! Stabilizing 2s...`);
 
         // Wait an additional 2 seconds to ensure openssh has started accepting auth requests
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
         // Create browser for ssh sample
-        console.log(`[TEST LOG] Creating browser for ssh sample...`);
         const sshBrowser = await createBrowser("test/net/sample/ssh");
         try {
-            console.log(`[TEST LOG] Bundling ssh sample...`);
             const result = await bundle.bundle("test/net/sample/ssh/index.ts");
             assert.deepEqual(result.Errors, null);
             assert.deepEqual(result.Warnings, null);
 
             // Navigate passing the dynamic ssh port in query parameters
-            console.log(`[TEST LOG] Navigating browser page...`);
             const page = await sshBrowser.createPage(
                 `http://localhost:${sshBrowser.webview.port}/?port=${sshPort}`
             );
 
-            // Listen to browser console messages to print them for debugging
-            page.page.on("console", (msg) => {
-                console.log(`[BROWSER CONSOLE] ${msg.type().toUpperCase()}: ${msg.text()}`);
-            });
-            page.page.on("pageerror", (err: any) => {
-                console.error(`[BROWSER PAGEERROR] ${err.message}`);
-            });
-
-            console.log(`[TEST LOG] Waiting for body class "done"...`);
             await page.page.waitForFunction(
                 'document.body.classList.contains("done")',
                 { timeout: 35000 }
             );
 
             const content = await page.getTextContent("body");
-            console.log(`[TEST LOG] Text content of body: ${content}`);
             assert.deepEqual(content, "SUCCESS");
         } finally {
-            console.log(`[TEST LOG] Cleaning up sshBrowser and container...`);
             sshBrowser.end();
             if (containerName) {
                 try {
-                    execSync(`docker rm -f ${containerName}`, { stdio: "ignore" });
-                    console.log(`[TEST LOG] Container ${containerName} removed.`);
+                    execSync(`docker rm -f ${containerName}`, {
+                        stdio: "ignore"
+                    });
                 } catch {
                     // ignore
                 }

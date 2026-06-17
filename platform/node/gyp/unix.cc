@@ -6,6 +6,7 @@ CoreLib loadLibrary(std::string libPath) {
 
     CoreLib lib = {
         (Start)(dlsym(coreLib, "start")),
+        (Check)(dlsym(coreLib, "check")),
         (Stop)(dlsym(coreLib, "stop")),
         (SetOnStreamData)(dlsym(coreLib, "setOnStreamData")),
         (Call)(dlsym(coreLib, "call")),

@@ -23,9 +23,37 @@ func startMain(_ providedCtx: UInt8?) -> UInt8 {
     return ctx
 }
 
+/// Generic weak-proxy for WKScriptMessageHandler.
+/// WKUserContentController retains its handlers strongly, so adding `self` directly
+/// creates a retain cycle that prevents the WebView from ever being deallocated.
+/// This proxy holds only a weak reference to the real handler and forwards messages.
+class WeakMessageHandler: NSObject, WKScriptMessageHandler {
+    weak var target: (AnyObject & WKScriptMessageHandler)?
+    init(_ target: AnyObject & WKScriptMessageHandler) {
+        self.target = target
+    }
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        target?.userContentController(userContentController, didReceive: message)
+    }
+}
+
+class WebViewCloser: NSObject, WKScriptMessageHandler {
+    /// Weak to avoid a retain cycle: WebView owns closer, closer must not own WebView.
+    weak var webView: WebView?
+    
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if let id = self.webView?.id {
+            WebViewStore.getInstance().removeWebView(id)
+            self.webView?.close()
+        }
+    }
+}
+
 class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WKDownloadDelegate, Codable, Identifiable, ASWebAuthenticationPresentationContextProviding {
     
     var id = UUID()
+    let closer = WebViewCloser();
+    
     public let requestHandler: RequestHandler
     public var main = false
     
@@ -61,9 +89,14 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         
         super.init(frame: CGRect(), configuration: wkWebViewConfig)
         
+        self.closer.webView = self
+        
         self.isInspectable = true
         self.navigationDelegate = self
-        userContentController.add(self, name: "bridge")
+        // Use WeakMessageHandler proxies so WKUserContentController does not
+        // hold strong references to self or closer, preventing retain cycles.
+        userContentController.add(WeakMessageHandler(self), name: "bridge")
+        userContentController.add(WeakMessageHandler(self.closer), name: "exit")
         
         self.load(URLRequest(url: URL(string: "fs://localhost")!))
     }
@@ -71,7 +104,9 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     override func close(){
         self.navigationDelegate = nil
         self.configuration.userContentController.removeScriptMessageHandler(forName: "bridge")
+        self.configuration.userContentController.removeScriptMessageHandler(forName: "exit")
         stop(self.requestHandler.ctx)
+        self.closer.webView = nil
         super.close()
     }
     

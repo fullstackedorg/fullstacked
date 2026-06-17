@@ -72,37 +72,25 @@ export class Socket extends RealDuplex {
     connect(port: number, host?: string): void;
     connect(optionsOrPort: Partial<ConnectOpts> | number, maybeHost?: string) {
         const { host, port } = parseOptions(optionsOrPort, maybeHost);
-        console.log(`[JS Socket] connect called for ${host}:${port}`);
 
         bridge({
             mod: Net,
             fn: Connect,
             data: [port, host]
-        }).then(async (d) => {
-            console.log(`[JS Socket] bridge connection returned duplex stream`);
+        }).then((d) => {
             this.duplex = d;
             this.duplex.on("data", (data: Uint8Array) => {
                 if (this.destroyed) return;
-                console.log(`[JS Socket] received data: ${data.length} bytes`);
                 this.push(Buffer.from(data));
             });
             this.duplex.on("close", () => {
-                console.log(`[JS Socket] duplex close event`);
                 if (!this.destroyed) {
                     this.push(null);
                 }
                 this.emit("close");
             });
-            try {
-                console.log(`[JS Socket] opening duplex...`);
-                await d.open();
-                console.log(`[JS Socket] duplex open succeeded, emitting connect & ready`);
-                this.emit("connect");
-                this.emit("ready");
-            } catch (err: any) {
-                console.error(`[JS Socket] duplex open error:`, err);
-                this.emit("error", err);
-            }
+            this.emit("connect");
+            this.emit("ready");
         });
     }
 
@@ -114,22 +102,14 @@ export class Socket extends RealDuplex {
         callback: (error?: Error | null) => void
     ) {
         if (!this.duplex) {
-            console.log(`[JS Socket] write called before duplex ready, queuing...`);
             this.once("connect", () => this._write(chunk, encoding, callback));
             return;
         }
 
-        console.log(`[JS Socket] writing ${chunk.length} bytes to duplex...`);
         this.duplex
             .write(chunk)
-            .then(() => {
-                console.log(`[JS Socket] write succeeded`);
-                callback();
-            })
-            .catch((err) => {
-                console.error(`[JS Socket] write failed:`, err);
-                callback(err);
-            });
+            .then(() => callback())
+            .catch(callback);
     }
 
     _final(callback: (error?: Error | null) => void) {

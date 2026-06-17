@@ -63,17 +63,19 @@ suite("net - e2e", () => {
         // Start openssh-server container with password authentication enabled
         execSync(
             `docker run -d --name ${containerName} ` +
-            `-e PASSWORD_ACCESS=true ` +
-            `-e USER_NAME=testuser ` +
-            `-e USER_PASSWORD=testpass ` +
-            `-p 127.0.0.1::2222 ` +
-            `linuxserver/openssh-server`,
+                `-e PASSWORD_ACCESS=true ` +
+                `-e USER_NAME=testuser ` +
+                `-e USER_PASSWORD=testpass ` +
+                `-p 127.0.0.1::2222 ` +
+                `linuxserver/openssh-server`,
             { stdio: "pipe" }
         );
 
         try {
             // Get mapped port
-            const portOutput = execSync(`docker port ${containerName} 2222`, { encoding: "utf8" }).trim();
+            const portOutput = execSync(`docker port ${containerName} 2222`, {
+                encoding: "utf8"
+            }).trim();
             const match = portOutput.match(/:(\d+)$/);
             if (!match) {
                 throw new Error(`Failed to parse port: ${portOutput}`);
@@ -141,7 +143,9 @@ suite("net - e2e", () => {
         } finally {
             if (containerName) {
                 try {
-                    execSync(`docker rm -f ${containerName}`, { stdio: "ignore" });
+                    execSync(`docker rm -f ${containerName}`, {
+                        stdio: "ignore"
+                    });
                 } catch {
                     // ignore
                 }

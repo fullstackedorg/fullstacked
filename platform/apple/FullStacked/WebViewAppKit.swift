@@ -4,7 +4,8 @@ import SwiftUI
 // MacOS
 
 class ResizeHelper: NSObject, WKScriptMessageHandler {
-    var webView: WebViewExtended?
+    /// Weak reference to avoid a retain cycle with the owning WebViewExtended.
+    weak var webView: WebViewExtended?
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         let body = message.body as! String
         
@@ -79,7 +80,7 @@ class WebViewExtended: WKWebView, WKUIDelegate {
         
         super.init(frame: frame, configuration: configuration)
         
-        configuration.userContentController.add(self.resizeHelper, name: "resize")
+        configuration.userContentController.add(WeakMessageHandler(self.resizeHelper), name: "resize")
         
         self.resizeHelper.webView = self
         
@@ -101,6 +102,7 @@ class WebViewExtended: WKWebView, WKUIDelegate {
     func close() {
         self.resizeHelper.webView = nil
         self.configuration.userContentController.removeScriptMessageHandler(forName: "resize")
+        self.window?.close()
     }
     
     func webView(_ webView: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping ([URL]?) -> Void) {

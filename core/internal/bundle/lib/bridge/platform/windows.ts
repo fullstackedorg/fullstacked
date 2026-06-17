@@ -16,6 +16,8 @@ export async function BridgeWindowsInit(): Promise<PlatformBridge> {
 
     const ctx = await (await globalThis.originalFetch("/ctx")).json();
 
+    globalThis.exit = () => globalThis.originalFetch("/exit");
+
     globalThis.resize = function (sizeOrGet: string) {
         if (sizeOrGet === "get") {
             return globalThis.originalFetch("/resize").then((r) => r.text());

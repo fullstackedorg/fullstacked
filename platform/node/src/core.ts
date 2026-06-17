@@ -13,6 +13,7 @@ globalThis.require = createRequire(import.meta.url);
 export interface Core {
     load(libPath: string): void;
     start(root: string, build: string): number;
+    check(ctx: number): boolean;
     stop(ctx: number): void;
     call(payload: ArrayBuffer): ArrayBuffer;
     setOnStreamData(

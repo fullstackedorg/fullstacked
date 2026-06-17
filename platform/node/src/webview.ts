@@ -34,14 +34,19 @@ export async function createWebView(
     opts: {
         openBrowser?: boolean;
         quiet?: boolean;
+        didClose?: () => void;
     }
 ) {
     const port = await getNextAvailablePort(mainPort);
     const server = http.createServer(createHandler(core, ctx));
 
     const close = () => {
-        core.stop(ctx);
+        if (core.check(ctx)) {
+            return;
+        }
+
         server.close();
+        opts.didClose?.();
     };
 
     const webSockets = createWebSocketServer(server, close);
@@ -253,20 +258,12 @@ function getNextAvailablePort(
 function createWebSocketServer(server: http.Server, close: () => void) {
     const webSockets = new Set<WebSocket>();
     const wss = new WebSocketServer({ noServer: true });
-    let closeTimeout: NodeJS.Timeout | undefined;
 
     const onClose = (ws: WebSocket) => {
         webSockets.delete(ws);
-        if (webSockets.size === 0) {
-            closeTimeout = setTimeout(close, 5000);
-        }
+        close();
     };
     const handleUpgrade = (ws: WebSocket) => {
-        if (closeTimeout) {
-            clearTimeout(closeTimeout);
-            closeTimeout = undefined;
-        }
-
         webSockets.add(ws);
 
         ws.on("close", () => onClose(ws));

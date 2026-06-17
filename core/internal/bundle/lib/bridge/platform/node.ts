@@ -7,8 +7,9 @@ export async function BridgeNodeInit(): Promise<PlatformBridge> {
 
     const ctx = await (await globalThis.originalFetch("/ctx")).json();
 
+    let ws: WebSocket;
     const webSocketForCallback = new Promise((res) => {
-        const ws = new WebSocket(webSocketUrl);
+        ws = new WebSocket(webSocketUrl);
         ws.binaryType = "arraybuffer";
         ws.onmessage = (e: { data: ArrayBuffer }) => {
             globalThis.callback(
@@ -20,6 +21,16 @@ export async function BridgeNodeInit(): Promise<PlatformBridge> {
     });
 
     await webSocketForCallback;
+
+    globalThis.exit = function () {
+        ws.close();
+
+        if (window.opener || (window.history && window.history.length === 1)) {
+            window.close();
+        } else {
+            window.location.reload();
+        }
+    };
 
     return {
         ctx,

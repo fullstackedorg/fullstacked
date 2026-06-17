@@ -62,8 +62,8 @@ func check(
 		defer sentry.Recover()
 	}
 
-	_, ok := store.Contexts[uint8(ctxId)]
-	if !ok {
+	ctx, ok := store.Contexts[uint8(ctxId)]
+	if !ok || ctx.Exit {
 		return 0
 	}
 	return 1

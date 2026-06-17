@@ -87,6 +87,8 @@ struct FullStackedApp: App {
                                 .onAppear{
                                     if(self.supportsMultipleWindows) {
                                         self.webViewStore.openWindow = self.openWindow
+                                    } else {
+                                        self.webViewStore.addWebView(self.webViewStore.getOrCreate(id))
                                     }
                                 }
                                 .onDisappear{
@@ -98,21 +100,24 @@ struct FullStackedApp: App {
                             if(self.webViewStore.getOrCreate(id).main) {
                                 ForEach(self.webViewStore.webViewsPublished, id: \.self) { webView in
                                     VStack {
-                                        HStack(alignment: .center) {
-                                            Button {
-                                                self.webViewStore.removeWebView(webView.id)
-                                            } label: {
-                                                Image(systemName: "xmark")
-                                                    .tint(getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[webView.id]?.1) == .dark
-                                                          ? .white
-                                                          : .black)
+                                        if self.webViewStore.webViewsPublished.count > 1 {
+                                            HStack(alignment: .center) {
+                                                Button {
+                                                    self.webViewStore.removeWebView(webView.id)
+                                                } label: {
+                                                    Image(systemName: "xmark")
+                                                        .tint(getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[webView.id]?.1) == .dark
+                                                              ? .white
+                                                              : .black)
+                                                }
+                                                .frame(maxWidth: .infinity, alignment: .trailing)
+                                                .padding(windowSize.width > windowSize.height
+                                                         ? EdgeInsets(top: 10, leading: 0, bottom: 2, trailing: 10)
+                                                         : EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 10))
+                                                    
                                             }
-                                            .frame(maxWidth: .infinity, alignment: .trailing)
-                                            .padding(windowSize.width > windowSize.height
-                                                     ? EdgeInsets(top: 10, leading: 0, bottom: 2, trailing: 10)
-                                                     : EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 10))
-                                                
                                         }
+                                        
                                         WebViewRepresentable(webView)
                                             .ignoresSafeArea()
                                             
@@ -145,7 +150,8 @@ class WebViewStore: ObservableObject {
     }
     
     init() {
-        Timer.scheduledTimer(withTimeInterval: 1, repeats: true, block: { _ in
+        Timer.scheduledTimer(withTimeInterval: 1, repeats: true, block: { [weak self] _ in
+            guard let self = self else { return }
             self.webViews.forEach { webView in
                 var title = webView.title
                 if(title == nil || title!.isEmpty) {
@@ -185,12 +191,24 @@ class WebViewStore: ObservableObject {
         return webView
     }
     
+    func swapToPublished(_ id: UUID) {
+        if let index = self.webViews.firstIndex(where: { $0.id == id }) {
+            self.webViewsPublished.append(self.webViews.remove(at: index))
+        }
+    }
+    
     func removeWebView(_ id: UUID){
         if let index = self.webViewsPublished.firstIndex(where: { $0.id == id }) {
             self.webViewsPublished.remove(at: index).close()
         }
         if let index = self.webViews.firstIndex(where: { $0.id == id }) {
             self.webViews.remove(at: index).close()
+        }
+        
+        self.webViewsMeta.removeValue(forKey: id)
+        
+        if(self.webViewsPublished.isEmpty && self.openWindow == nil) {
+            self.addWebView(WebView(nil))
         }
     }
 }

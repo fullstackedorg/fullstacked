@@ -25,6 +25,12 @@ Napi::Number N_Start(const Napi::CallbackInfo &info) {
                                        (char *)build.Utf8Value().c_str()));
 }
 
+Napi::Boolean N_Check(const Napi::CallbackInfo &info) {
+    uint32_t ctxId = info[0].As<Napi::Number>().Uint32Value();
+    return Napi::Boolean::New(info.Env(),
+                              lib.check(static_cast<uint8_t>(ctxId)));
+}
+
 void N_Stop(const Napi::CallbackInfo &info) {
     uint32_t ctxId = info[0].As<Napi::Number>().Uint32Value();
     lib.stop(static_cast<uint8_t>(ctxId));
@@ -107,6 +113,9 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
 
     exports.Set(Napi::String::New(env, "start"),
                 Napi::Function::New(env, N_Start));
+
+    exports.Set(Napi::String::New(env, "check"),
+                Napi::Function::New(env, N_Check));
 
     exports.Set(Napi::String::New(env, "stop"),
                 Napi::Function::New(env, N_Stop));

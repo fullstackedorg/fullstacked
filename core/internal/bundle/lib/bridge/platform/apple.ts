@@ -18,6 +18,9 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
 
     const ctx = await (await globalThis.originalFetch("/ctx")).json();
 
+    globalThis.exit = () =>
+        globalThis.webkit.messageHandlers.exit.postMessage("");
+
     if (globalThis.webkit.messageHandlers.clipboard) {
         const td = new TextDecoder();
         globalThis.respondClipboard = function (

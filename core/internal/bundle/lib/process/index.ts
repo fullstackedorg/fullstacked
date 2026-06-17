@@ -1,5 +1,5 @@
 import { Core } from "../@types/index.ts";
-import { GetEnv } from "../@types/router.ts";
+import { Exit, GetEnv } from "../@types/router.ts";
 import { bridge } from "../bridge/index.ts";
 import { isWorker } from "../bridge/isWorker.ts";
 import { chdir } from "./cwd/chdir.ts";
@@ -159,5 +159,24 @@ if (typeof globalThis.resize === "function") {
         }
     })();
 }
+
+process.exit = function () {
+    if (typeof globalThis.exit !== "function") {
+        return false;
+    }
+
+    bridge(
+        {
+            mod: Core,
+            fn: Exit,
+            data: []
+        },
+        true
+    );
+
+    globalThis.exit();
+
+    return true;
+};
 
 export default process;
