@@ -63,6 +63,7 @@ func createSocket(
 					n, err := socket.Read(buffer)
 
 					if err != nil {
+						socket.Close()
 						store.StreamChunk(ctx, streamId, nil, true)
 						return
 					}

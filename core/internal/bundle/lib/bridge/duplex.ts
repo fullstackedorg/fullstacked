@@ -108,6 +108,7 @@ export interface Duplex extends ReadableStream<Uint8Array<ArrayBuffer>> {
     ): void;
     promise(): Promise<any>;
     eventEmitter(): ReturnType<typeof createEventEmitter>;
+    open(): Promise<void>;
 }
 
 const te = new TextEncoder();
@@ -133,11 +134,11 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
 
     const open = () => {
         if (duplex.open) {
-            throw "trying to open a duplex already opened";
+            return Promise.resolve();
         }
 
         if (duplex.opening) {
-            throw "trying to open a duplex opening";
+            return duplex.opening;
         }
 
         duplex.opening = new Promise(async (resolveOpening) => {
@@ -261,6 +262,8 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
     stream.eventEmitter = () => {
         return createEventEmitter(stream);
     };
+
+    stream.open = open;
 
     return stream;
 }

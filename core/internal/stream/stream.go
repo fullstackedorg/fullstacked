@@ -78,7 +78,7 @@ func writeStream(ctx *types.Context, streamId uint8, data []byte) error {
 	ctx.StreamsMutex.Unlock()
 
 	if !ok {
-		return errors.New("no stream for id")
+		return nil
 	}
 
 	if !stream.Opened {
@@ -100,7 +100,7 @@ func writeEventStream(ctx *types.Context, streamId uint8, event string, data []t
 	ctx.StreamsMutex.Unlock()
 
 	if !ok {
-		return errors.New("no stream for id")
+		return nil
 	}
 
 	if !stream.Opened {
