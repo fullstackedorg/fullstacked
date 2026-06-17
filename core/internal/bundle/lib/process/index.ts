@@ -151,7 +151,9 @@ if (typeof globalThis.resize === "function") {
             if (savedSize === "kiosk") {
                 savedSize = "fullscreen";
             }
-            defaultSize = savedSize;
+            if (!defaultSize) {
+                defaultSize = savedSize;
+            }
         }
 
         if (defaultSize) {

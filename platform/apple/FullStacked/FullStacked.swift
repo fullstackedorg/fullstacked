@@ -42,6 +42,7 @@ struct FullStackedApp: App {
     @State private var windowSize: CGSize = .zero
     
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
     @Environment(\.supportsMultipleWindows) private var supportsMultipleWindows
     
     init() {
@@ -87,6 +88,14 @@ struct FullStackedApp: App {
                                 .onAppear{
                                     if(self.supportsMultipleWindows) {
                                         self.webViewStore.openWindow = self.openWindow
+                                        self.webViewStore.dismissWindow = self.dismissWindow
+                                        #if os(iOS)
+                                        // Cache the scene while the view is in the hierarchy.
+                                        // removeWebView may race ahead of webView.window being set.
+                                        if let scene = self.webViewStore.getOrCreate(id).window?.windowScene {
+                                            self.webViewStore.cacheScene(scene, for: id)
+                                        }
+                                        #endif
                                     } else {
                                         self.webViewStore.addWebView(self.webViewStore.getOrCreate(id))
                                     }
@@ -165,11 +174,20 @@ class WebViewStore: ObservableObject {
     }
     
     var openWindow: OpenWindowAction?
+    var dismissWindow: DismissWindowAction?
     
     var webViews: [WebView] = []
     @Published var webViewsPublished: [WebView] = []
     // title, bgColor
     @Published var webViewsMeta: [UUID:(String, Color)] = [:]
+    // IDs that have been explicitly closed — getOrCreate must not resurrect them
+    private var closedIDs: Set<UUID> = []
+    #if os(iOS)
+    // Scene cache: populated in onAppear (view guaranteed in hierarchy) so
+    // removeWebView can close the scene even if called before webView.window is set.
+    private var cachedScenes: [UUID: UIWindowScene] = [:]
+    func cacheScene(_ scene: UIWindowScene, for id: UUID) { cachedScenes[id] = scene }
+    #endif
     
     func addWebView(_ webView: WebView) {
         self.webViews.append(webView)
@@ -185,24 +203,45 @@ class WebViewStore: ObservableObject {
             return webView
         }
         
+        // Don't resurrect a WebView that was intentionally closed.
+        // SwiftUI re-renders the WindowGroup body after @Published changes, which
+        // calls getOrCreate again for the same UUID — without this guard it would
+        // silently create a fresh WebView(nil) and spawn a second app instance.
+        if self.closedIDs.contains(id), let existing = self.webViews.first {
+            return existing
+        }
+        
         let webView = WebView(nil)
         webView.id = id
         self.webViews.append(webView)
         return webView
     }
     
-    func swapToPublished(_ id: UUID) {
-        if let index = self.webViews.firstIndex(where: { $0.id == id }) {
-            self.webViewsPublished.append(self.webViews.remove(at: index))
-        }
-    }
-    
     func removeWebView(_ id: UUID){
+        self.closedIDs.insert(id)
         if let index = self.webViewsPublished.firstIndex(where: { $0.id == id }) {
             self.webViewsPublished.remove(at: index).close()
         }
         if let index = self.webViews.firstIndex(where: { $0.id == id }) {
-            self.webViews.remove(at: index).close()
+            let webView = self.webViews.remove(at: index)
+            #if os(iOS)
+            // Use the cached scene (stored in onAppear) as fallback when webView.window
+            // is nil — this happens when exit runs before the view is fully in the hierarchy.
+            // Destroy only when other WebViews exist; if this is the last one, iOS would
+            // immediately auto-spawn a replacement, so fall back to dismissWindow instead.
+            let scene = webView.window?.windowScene ?? self.cachedScenes[id]
+            if let scene = scene, !self.webViews.isEmpty {
+                UIApplication.shared.requestSceneSessionDestruction(scene.session, options: nil)
+            } else if let dismissWindow = self.dismissWindow {
+                dismissWindow(value: webView.id)
+            }
+            self.cachedScenes.removeValue(forKey: id)
+            #else
+            if let dismissWindow = self.dismissWindow {
+                dismissWindow(value: webView.id)
+            }
+            #endif
+            webView.close()
         }
         
         self.webViewsMeta.removeValue(forKey: id)
