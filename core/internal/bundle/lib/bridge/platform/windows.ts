@@ -16,6 +16,21 @@ export async function BridgeWindowsInit(): Promise<PlatformBridge> {
 
     const ctx = await (await globalThis.originalFetch("/ctx")).json();
 
+    globalThis.resize = function (sizeOrGet: string) {
+        if (sizeOrGet === "get") {
+            return globalThis.originalFetch("/resize").then((r) => r.text());
+        } else {
+            const components = sizeOrGet.split(":");
+            let url = "/resize";
+            if (components.length === 2) {
+                url += `?width=${components[0]}&height=${components[1]}`;
+            } else if (components.length === 4) {
+                url += `?width=${components[0]}&height=${components[1]}&x=${components[2]}&y=${components[3]}`;
+            }
+            return globalThis.originalFetch(url).then(() => {});
+        }
+    };
+
     if (isWorker) {
         globalThis.onmessage = (event) => {
             const buffer: ArrayBuffer = event.data;

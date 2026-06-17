@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Dispatching;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
@@ -126,6 +126,63 @@ namespace FullStacked
                         }
                     }
 
+                    return;
+                } else if (pathname.StartsWith("/resize")) {
+                    var queryParams = new Dictionary<string, string>();
+                    string query = uri.Query.TrimStart('?');
+                    if (!string.IsNullOrEmpty(query))
+                    {
+                        foreach (string part in query.Split('&'))
+                        {
+                            string[] kv = part.Split('=');
+                            if (kv.Length == 2)
+                            {
+                                queryParams[kv[0]] = Uri.UnescapeDataString(kv[1]);
+                            }
+                        }
+                    }
+
+                    if (queryParams.TryGetValue("width", out string wStr) &&
+                        queryParams.TryGetValue("height", out string hStr))
+                    {
+                        int w = int.Parse(wStr);
+                        int h = int.Parse(hStr);
+
+                        if (queryParams.TryGetValue("x", out string xStr) &&
+                            queryParams.TryGetValue("y", out string yStr))
+                        {
+                            int x = int.Parse(xStr);
+                            int y = int.Parse(yStr);
+                            this.AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(x, y, w, h));
+                        }
+                        else
+                        {
+                            int currentW = this.AppWindow.Size.Width;
+                            int currentH = this.AppWindow.Size.Height;
+                            int currentX = this.AppWindow.Position.X;
+                            int currentY = this.AppWindow.Position.Y;
+
+                            int newX = currentX + (currentW - w) / 2;
+                            int newY = currentY + (currentH - h) / 2;
+
+                            this.AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(newX, newY, w, h));
+                        }
+
+                        (stream, headers) = this.bufferToResponseStream([]);
+                        args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
+                    }
+                    else
+                    {
+                        int width = this.AppWindow.Size.Width;
+                        int height = this.AppWindow.Size.Height;
+                        int x = this.AppWindow.Position.X;
+                        int y = this.AppWindow.Position.Y;
+                        string responseStr = $"{width}:{height}:{x}:{y}";
+
+                        byte[] responseBuffer = Encoding.UTF8.GetBytes(responseStr);
+                        (stream, headers) = this.bufferToResponseStream(responseBuffer);
+                        args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
+                    }
                     return;
                 }
 
