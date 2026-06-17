@@ -1,5 +1,7 @@
 import { getConfig, setConfig } from "./shell/cli/config";
 
+globalThis.disableAutoWindowSize?.();
+
 const saveSkipWelcomeUntil = (dontShowAgain: boolean) => {
     const until = dontShowAgain
         ? Number.MAX_SAFE_INTEGER

@@ -71,7 +71,6 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     override func close(){
         self.navigationDelegate = nil
         self.configuration.userContentController.removeScriptMessageHandler(forName: "bridge")
-        self.configuration.userContentController.removeScriptMessageHandler(forName: "auth")
         stop(self.requestHandler.ctx)
         super.close()
     }

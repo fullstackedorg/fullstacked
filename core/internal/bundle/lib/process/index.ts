@@ -7,6 +7,7 @@ import { cwd } from "./cwd/index.ts";
 import process from "./process.js";
 export * from "./process.js";
 import fullstacked from "./version.json";
+import { readFile, writeFile, mkdir } from "../fs/promises.ts";
 
 if (globalThis.process === undefined) {
     globalThis.process = process;
@@ -78,5 +79,72 @@ process.env = {
     ...process.env,
     ...(envData || {})
 };
+
+if (typeof globalThis.resize === "function") {
+    let defaultSize = process.env.WINDOW_SIZE;
+    let isAutoResizeDisabled =
+        (globalThis as any).disableAutoWindowSize === true;
+
+    const loadSavedSize = async (): Promise<string | null> => {
+        if (isAutoResizeDisabled) {
+            return null;
+        }
+        try {
+            const savedData = await readFile("/.git/window-size.txt", {
+                encoding: "utf-8"
+            });
+            if (savedData) {
+                const savedSize = savedData.trim();
+                if (savedSize && savedSize.includes(":")) {
+                    return savedSize;
+                }
+            }
+        } catch (e) {
+            // Ignore error
+        }
+        return null;
+    };
+
+    let saveTimeout: any = null;
+    const onResize = () => {
+        if (isAutoResizeDisabled) {
+            return;
+        }
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(async () => {
+            try {
+                const sizeStr = await (globalThis as any).resize("get");
+                if (sizeStr && sizeStr.includes(":")) {
+                    try {
+                        await mkdir("/.git");
+                    } catch (e) {
+                        // Ignore folder already exists error
+                    }
+                    await writeFile("/.git/window-size.txt", sizeStr.trim());
+                }
+            } catch (e) {
+                // Ignore
+            }
+        }, 200);
+    };
+
+    globalThis.addEventListener("resize", onResize);
+
+    (globalThis as any).disableAutoWindowSize = () => {
+        isAutoResizeDisabled = true;
+        globalThis.removeEventListener("resize", onResize);
+    };
+
+    (async () => {
+        const savedSize = await loadSavedSize();
+        if (savedSize) {
+            defaultSize = savedSize;
+        }
+
+        if (defaultSize) {
+            globalThis.resize(defaultSize);
+        }
+    })();
+}
 
 export default process;

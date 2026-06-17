@@ -41,6 +41,26 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
         };
     }
 
+    if (globalThis.webkit.messageHandlers.resize) {
+        const resizeResponsePromises: ((response: string) => void)[] = [];
+
+        globalThis.respondResize = function (response: string) {
+            const resolve = resizeResponsePromises.shift();
+            resolve?.(response);
+        };
+
+        globalThis.resize = function (sizeOrGet: string) {
+            if (sizeOrGet === "get") {
+                return new Promise<string>((resolve) => {
+                    resizeResponsePromises.push(resolve);
+                    globalThis.webkit.messageHandlers.resize.postMessage("get");
+                });
+            } else {
+                globalThis.webkit.messageHandlers.resize.postMessage(sizeOrGet);
+            }
+        };
+    }
+
     if (isWorker) {
         globalThis.onmessage = (event) => {
             const buffer: ArrayBuffer = event.data;

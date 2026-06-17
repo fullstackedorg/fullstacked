@@ -3,9 +3,62 @@ import SwiftUI
 
 // MacOS
 
+class ResizeHelper: NSObject, WKScriptMessageHandler {
+    var webView: WebViewExtended?
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        let body = message.body as! String
+        
+        if body == "get" {
+            if let activeWindow = self.webView?.window {
+                let frame = activeWindow.frame
+                let responseStr = "\(frame.size.width):\(frame.size.height):\(frame.origin.x):\(frame.origin.y)"
+                self.webView?.evaluateJavaScript("window.respondResize(\"\(responseStr)\")")
+            }
+            return
+        }
+        
+        let components = body.split(separator: ":")
+        if components.count == 2 {
+            let width = Double(components[0])!
+            let height = Double(components[1])!
+            
+            if let activeWindow = self.webView?.window {
+                let currentFrame = activeWindow.frame
+                let newWidth = CGFloat(width)
+                let newHeight = CGFloat(height)
+                
+                let newX = currentFrame.origin.x + (currentFrame.size.width - newWidth) / 2.0
+                let newY = currentFrame.origin.y + (currentFrame.size.height - newHeight) / 2.0
+                
+                let frame = NSRect(x: newX, y: newY, width: newWidth, height: newHeight)
+                activeWindow.setFrame(frame, display: true)
+            }
+        } else if components.count == 4 {
+            let width = Double(components[0])!
+            let height = Double(components[1])!
+            let x = Double(components[2])!
+            let y = Double(components[3])!
+            
+            if let activeWindow = self.webView?.window {
+                let frame = NSRect(x: CGFloat(x), y: CGFloat(y), width: CGFloat(width), height: CGFloat(height))
+                activeWindow.setFrame(frame, display: true)
+            }
+        }
+    }
+}
+
 class WebViewExtended: WKWebView, WKUIDelegate {
+    let resizeHelper: ResizeHelper
+    
     override init(frame: CGRect, configuration: WKWebViewConfiguration){
+        self.resizeHelper = ResizeHelper()
+        
         super.init(frame: frame, configuration: configuration)
+        
+        configuration.userContentController.add(self.resizeHelper, name: "resize")
+        
+        self.resizeHelper.webView = self
+        
         self.uiDelegate = self
     }
     
@@ -22,7 +75,8 @@ class WebViewExtended: WKWebView, WKUIDelegate {
     }
     
     func close() {
-        
+        self.resizeHelper.webView = nil
+        self.configuration.userContentController.removeScriptMessageHandler(forName: "resize")
     }
     
     func webView(_ webView: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping ([URL]?) -> Void) {
@@ -59,12 +113,12 @@ struct WebViewRepresentable: NSViewRepresentable {
         }
         
         self.webView.autoresizingMask = [.width, .height]
-        view.addSubview(webView);
+        view.addSubview(self.webView);
         return view
     }
     
     
-    func updateNSView(_ uiView: NSView, context: Context) { }
+    func updateNSView(_ uiView: NSView, context: Context) {    }
 }
 
 extension Color {
