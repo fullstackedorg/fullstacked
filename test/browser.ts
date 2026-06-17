@@ -91,6 +91,7 @@ export async function createBrowser(directory: string) {
         sleep: (ms: number) => new Promise((res) => setTimeout(res, ms)),
         end() {
             core.callbackListeners.delete(webview.callback);
+            core.instance.stop(ctx);
             webview.close();
             return browser.close();
         },

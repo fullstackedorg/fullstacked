@@ -2,7 +2,6 @@ package store
 
 import (
 	"errors"
-	"fmt"
 	"fullstackedorg/fullstacked/internal/serialization"
 	"fullstackedorg/fullstacked/types"
 	"path"
@@ -83,7 +82,6 @@ func ExitContext(ctxId uint8) {
 }
 
 func EndContext(ctxId uint8) {
-	fmt.Println("Closing", ctxId)
 	ctxMutex.Lock()
 
 	ctx, ok := Contexts[ctxId]
