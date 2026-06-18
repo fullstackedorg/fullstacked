@@ -53,7 +53,8 @@
         "util": "^0.12.5"
     },
     "overrides": {
-        "tar": "^7.5.16"
+        "tar": "^7.5.16",
+        "undici": "^7.28.0"
     },
     "devDependencies": {
         "@types/node": "^25.9.3"
