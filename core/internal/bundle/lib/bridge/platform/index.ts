@@ -15,6 +15,14 @@ let platformBridge: {
     bridge?: PlatformBridge;
 } = null;
 
+if (isWorker) {
+    self.addEventListener("message", (event: MessageEvent) => {
+        if (event.data && event.data.type === "stream-callback") {
+            globalThis.callback(event.data.streamId, event.data.payload);
+        }
+    });
+}
+
 if (globalThis.process) {
     platformBridge = {
         ready: new Promise<void>((res) => res()),

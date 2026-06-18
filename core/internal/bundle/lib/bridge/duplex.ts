@@ -24,6 +24,30 @@ type DuplexItem = {
 const activeDuplexes = new Map<number, DuplexItem[]>();
 
 globalThis.callback = function (id: number, payload: ArrayBuffer | string) {
+    const workerStreams = (globalThis as any).__workerStreams;
+    if (workerStreams) {
+        const worker = workerStreams.get(id);
+        if (worker) {
+            const chunk =
+                typeof payload === "string"
+                    ? toByteArray(payload)
+                    : new Uint8Array(payload);
+            if (chunk[0] === 1) {
+                workerStreams.delete(id);
+            }
+
+            worker.postMessage(
+                {
+                    type: "stream-callback",
+                    streamId: id,
+                    payload
+                },
+                [payload].filter((p) => p instanceof ArrayBuffer)
+            );
+            return;
+        }
+    }
+
     const duplexes = activeDuplexes.get(id);
 
     if (!duplexes || duplexes.length === 0) {

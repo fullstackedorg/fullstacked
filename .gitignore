@@ -16,5 +16,6 @@ test/**/_index.ts.css
 test/**/_index.ts.tailwind.css
 test/**/output.css
 test/**/test
+test/worker/sample/worker.ts.js
 platform/@fullstacked
 app/user_data

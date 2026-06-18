@@ -42,6 +42,16 @@ func OpenGitDirectory(directory string) (*GitDirectory, error) {
 	return &gitRepository, nil
 }
 
+func (r *GitDirectory) Close() error {
+	if r.repository != nil {
+		err := r.repository.Close()
+		r.repository = nil
+		r.worktree = nil
+		return err
+	}
+	return nil
+}
+
 func (r *GitDirectory) Repository() (*git.Repository, error) {
 	if r.repository != nil {
 		return r.repository, nil

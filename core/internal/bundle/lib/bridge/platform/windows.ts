@@ -16,33 +16,11 @@ export async function BridgeWindowsInit(): Promise<PlatformBridge> {
 
     const ctx = await (await globalThis.originalFetch("/ctx")).json();
 
-    globalThis.exit = () => globalThis.originalFetch("/exit");
-
-    globalThis.resize = function (sizeOrGet: string) {
-        if (sizeOrGet === "get") {
-            return globalThis.originalFetch("/resize").then((r) => r.text());
-        } else if (sizeOrGet === "fullscreen") {
-            return globalThis
-                .originalFetch("/resize?fullscreen=true")
-                .then(() => {});
-        } else if (sizeOrGet === "kiosk") {
-            return globalThis
-                .originalFetch("/resize?kiosk=true")
-                .then(() => {});
-        } else {
-            const components = sizeOrGet.split(":");
-            let url = "/resize";
-            if (components.length === 2) {
-                url += `?width=${components[0]}&height=${components[1]}`;
-            } else if (components.length === 4) {
-                url += `?width=${components[0]}&height=${components[1]}&x=${components[2]}&y=${components[3]}`;
-            }
-            return globalThis.originalFetch(url).then(() => {});
-        }
-    };
-
     if (isWorker) {
         globalThis.onmessage = (event) => {
+            if (!(event.data instanceof ArrayBuffer)) {
+                return;
+            }
             const buffer: ArrayBuffer = event.data;
             const dataView = new DataView(buffer);
             const id = dataView.getUint8(0);
@@ -51,6 +29,33 @@ export async function BridgeWindowsInit(): Promise<PlatformBridge> {
             const promise = asyncResponsePromises.get(id);
             promise?.(response.buffer);
             asyncResponsePromises.delete(id);
+        };
+    } else {
+        globalThis.exit = () => globalThis.originalFetch("/exit");
+
+        globalThis.resize = function (sizeOrGet: string) {
+            if (sizeOrGet === "get") {
+                return globalThis
+                    .originalFetch("/resize")
+                    .then((r) => r.text());
+            } else if (sizeOrGet === "fullscreen") {
+                return globalThis
+                    .originalFetch("/resize?fullscreen=true")
+                    .then(() => {});
+            } else if (sizeOrGet === "kiosk") {
+                return globalThis
+                    .originalFetch("/resize?kiosk=true")
+                    .then(() => {});
+            } else {
+                const components = sizeOrGet.split(":");
+                let url = "/resize";
+                if (components.length === 2) {
+                    url += `?width=${components[0]}&height=${components[1]}`;
+                } else if (components.length === 4) {
+                    url += `?width=${components[0]}&height=${components[1]}&x=${components[2]}&y=${components[3]}`;
+                }
+                return globalThis.originalFetch(url).then(() => {});
+            }
         };
     }
 

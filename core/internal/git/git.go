@@ -357,8 +357,12 @@ func Switch(
 }
 
 func HasGitFn(directory string) bool {
-	_, err := OpenGitDirectory(directory)
-	return err == nil
+	dir, err := OpenGitDirectory(directory)
+	if err != nil {
+		return false
+	}
+	_ = dir.Close()
+	return true
 }
 
 func initFn(directory string, url string) error {
@@ -400,6 +404,7 @@ func HeadFn(directory string) (GitHead, error) {
 	if err != nil {
 		return GitHead{}, err
 	}
+	defer dir.Close()
 
 	repository, err := dir.Repository()
 	if err != nil {
@@ -453,6 +458,7 @@ func status(directory string) (GitStatus, error) {
 	if err != nil {
 		return s, err
 	}
+	defer dir.Close()
 
 	repository, err := dir.Repository()
 
@@ -516,6 +522,7 @@ func add(directory string, path string) error {
 	if err != nil {
 		return err
 	}
+	defer dir.Close()
 
 	repository, err := dir.Repository()
 
@@ -561,6 +568,7 @@ func log(directory string, n int) ([]GitCommit, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer dir.Close()
 
 	repository, err := dir.Repository()
 
@@ -606,6 +614,7 @@ func commit(directory string, message string, author GitAuthor) (string, error) 
 	if err != nil {
 		return "", err
 	}
+	defer dir.Close()
 
 	repository, err := dir.Repository()
 
@@ -709,10 +718,14 @@ func clone(
 			}
 
 			var cloneErr error
+			var r *git.Repository
 			if USE_CUSTOM_FS {
-				_, cloneErr = CustomCloneContext(context.Background(), directory, &options)
+				r, cloneErr = CustomCloneContext(context.Background(), directory, &options)
 			} else {
-				_, cloneErr = git.PlainClone(directory, &options)
+				r, cloneErr = git.PlainClone(directory, &options)
+			}
+			if r != nil {
+				_ = r.Close()
 			}
 
 			if cloneErr != nil {
@@ -723,9 +736,12 @@ func clone(
 					if err == nil {
 						options.ClientOptions = clientOpts
 						if USE_CUSTOM_FS {
-							_, cloneErr = CustomCloneContext(context.Background(), directory, &options)
+							r, cloneErr = CustomCloneContext(context.Background(), directory, &options)
 						} else {
-							_, cloneErr = git.PlainClone(directory, &options)
+							r, cloneErr = git.PlainClone(directory, &options)
+						}
+						if r != nil {
+							_ = r.Close()
 						}
 					}
 				}
@@ -770,10 +786,14 @@ func CloneRepo(ctx *types.Context, urlStr string, directory string, progress io.
 	}
 
 	var cloneErr error
+	var r *git.Repository
 	if USE_CUSTOM_FS {
-		_, cloneErr = CustomCloneContext(context.Background(), directory, &options)
+		r, cloneErr = CustomCloneContext(context.Background(), directory, &options)
 	} else {
-		_, cloneErr = git.PlainClone(directory, &options)
+		r, cloneErr = git.PlainClone(directory, &options)
+	}
+	if r != nil {
+		_ = r.Close()
 	}
 
 	if cloneErr != nil {
@@ -784,9 +804,12 @@ func CloneRepo(ctx *types.Context, urlStr string, directory string, progress io.
 			if err == nil {
 				options.ClientOptions = clientOpts
 				if USE_CUSTOM_FS {
-					_, cloneErr = CustomCloneContext(context.Background(), directory, &options)
+					r, cloneErr = CustomCloneContext(context.Background(), directory, &options)
 				} else {
-					_, cloneErr = git.PlainClone(directory, &options)
+					r, cloneErr = git.PlainClone(directory, &options)
+				}
+				if r != nil {
+					_ = r.Close()
 				}
 			}
 		}
@@ -810,34 +833,40 @@ func pull(directory string, proxy string) (*types.ResponseStream, error) {
 	urlStr, err := dir.GetUrl()
 
 	if err != nil {
+		_ = dir.Close()
 		return nil, err
 	}
 
 	err = testHost(urlStr, proxy)
 
 	if err != nil {
+		_ = dir.Close()
 		return nil, err
 	}
 
 	repository, err := dir.Repository()
 
 	if err != nil {
+		_ = dir.Close()
 		return nil, err
 	}
 
 	head, err := repository.Head()
 
 	if err != nil {
+		_ = dir.Close()
 		return nil, err
 	}
 
 	worktree, err := dir.Worktree()
 
 	if err != nil {
+		_ = dir.Close()
 		return nil, err
 	}
 	return &types.ResponseStream{
 		Open: func(ctx *types.Context, streamId uint8) {
+			defer dir.Close()
 
 			options := git.PullOptions{
 				Progress: &GitStream{
@@ -885,23 +914,27 @@ func push(directory string, proxy string) (*types.ResponseStream, error) {
 	urlStr, err := dir.GetUrl()
 
 	if err != nil {
+		_ = dir.Close()
 		return nil, err
 	}
 
 	err = testHost(urlStr, proxy)
 
 	if err != nil {
+		_ = dir.Close()
 		return nil, err
 	}
 
 	repository, err := dir.Repository()
 
 	if err != nil {
+		_ = dir.Close()
 		return nil, err
 	}
 
 	return &types.ResponseStream{
 		Open: func(ctx *types.Context, streamId uint8) {
+			defer dir.Close()
 			options := git.PushOptions{
 				Progress: &GitStream{
 					ctx:      ctx,
@@ -939,6 +972,7 @@ func reset(directory string, hard bool, files []string) error {
 	if err != nil {
 		return err
 	}
+	defer dir.Close()
 
 	repository, err := dir.Repository()
 
@@ -985,6 +1019,7 @@ func branch(ctx *types.Context, directory string) ([]GitBranch, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer dir.Close()
 
 	refsRemote, err := dir.LsRemote(ctx, "origin")
 
@@ -1054,6 +1089,7 @@ func tags(ctx *types.Context, directory string) ([]GitTag, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer dir.Close()
 
 	refsRemote, err := dir.LsRemote(ctx, "origin")
 
@@ -1124,6 +1160,7 @@ func checkout(ctx *types.Context, directory string, ref string, create bool, pro
 	refType, remote, err := dir.FindRefType(ctx, ref)
 
 	if err != nil {
+		_ = dir.Close()
 		return nil, err
 	}
 
@@ -1134,17 +1171,20 @@ func checkout(ctx *types.Context, directory string, ref string, create bool, pro
 	repository, err := dir.Repository()
 
 	if err != nil {
+		_ = dir.Close()
 		return nil, err
 	}
 
 	worktree, err := repository.Worktree()
 
 	if err != nil {
+		_ = dir.Close()
 		return nil, err
 	}
 
 	return &types.ResponseStream{
 		Open: func(ctx *types.Context, streamId uint8) {
+			defer dir.Close()
 			switch refType {
 			case RefCommit:
 				err = worktree.Checkout(&git.CheckoutOptions{
@@ -1190,6 +1230,7 @@ func merge(directory string, branchName string) error {
 	if err != nil {
 		return err
 	}
+	defer dir.Close()
 
 	branch, err := dir.Branch(branchName)
 
@@ -1263,6 +1304,7 @@ func restore(directory string, paths []string) error {
 	if err != nil {
 		return err
 	}
+	defer dir.Close()
 
 	worktree, err := dir.Worktree()
 
