@@ -202,6 +202,7 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
 
     const stream: any = {
         duplex: true,
+        id,
         [Symbol.asyncIterator]() {
             return {
                 next
@@ -228,7 +229,10 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
         }
     };
 
-    stream.write = (data: Uint8Array | string) => {
+    stream.write = async (data: Uint8Array | string) => {
+        if (!duplex.open) {
+            await open();
+        }
         data = typeof data === "string" ? te.encode(data) : data;
         return bridgeFn({
             mod: Stream,
@@ -237,19 +241,27 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
         });
     };
 
-    stream.writeEvent = (event: string, ...args: SerializableData[]) =>
-        bridgeFn({
+    stream.writeEvent = async (event: string, ...args: SerializableData[]) => {
+        if (!duplex.open) {
+            await open();
+        }
+        return bridgeFn({
             mod: Stream,
             fn: WriteEvent,
             data: [id, event, ...args]
         });
+    };
 
-    stream.end = () =>
-        bridgeFn({
+    stream.end = async () => {
+        if (!duplex.open) {
+            await open();
+        }
+        return bridgeFn({
             mod: Stream,
             fn: Close,
             data: [id]
         });
+    };
 
     stream.promise = async () => {
         let data = new Uint8Array();

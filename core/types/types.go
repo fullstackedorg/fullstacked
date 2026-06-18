@@ -84,6 +84,8 @@ type Context struct {
 	Streams      map[uint8]*StoredStream
 	StreamsMutex *sync.Mutex
 
+	NextStreamId uint8
+
 	Exit bool
 }
 

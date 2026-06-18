@@ -46,12 +46,7 @@ export async function createWebView(
         opts.didClose?.();
     };
 
-    const webSockets = createWebSocketServer(
-        core,
-        ctx,
-        server,
-        close
-    );
+    const webSockets = createWebSocketServer(core, ctx, server, close);
     const callback = (id: number, buffer: ArrayBuffer) => {
         const payload = new Uint8Array(buffer.byteLength + 1);
         payload[0] = id;
@@ -76,8 +71,14 @@ export async function createWebView(
     };
 }
 
+let nextCallId = 0;
+
 async function coreCall(core: Core, req: http.IncomingMessage) {
     const payload = await readBody(req);
+    if (payload.length >= 2) {
+        nextCallId = (nextCallId % 255) + 1;
+        payload[1] = nextCallId;
+    }
     const data = core.call(payload.buffer);
     return new Uint8Array(data);
 }
@@ -175,49 +176,23 @@ export function coreStaticFile(
     };
 }
 
-const readBodyQueue: {
-    req: http.IncomingMessage;
-    resolve: (body: Uint8Array<ArrayBuffer>) => void;
-}[] = [];
-let processingRequestLock = false;
-function processRequests() {
-    if (processingRequestLock) {
-        return;
-    }
-    const readBody = readBodyQueue.shift();
-    if (!readBody) {
-        return;
-    }
-    processingRequestLock = true;
-    const { req, resolve } = readBody;
-
-    const end = (body: Uint8Array<ArrayBuffer>) => {
-        resolve(body);
-        processingRequestLock = false;
-        processRequests();
-    };
-
-    const contentLengthStr = req.headers["content-length"] || "0";
-    const contentLength = parseInt(contentLengthStr);
-    if (!contentLength) {
-        return end(new Uint8Array());
-    }
-
-    const body = new Uint8Array(contentLength);
-    let i = 0;
-    req.on("data", (chunk: Buffer) => {
-        for (let j = 0; j < chunk.byteLength; j++) {
-            body[j + i] = chunk[j];
-        }
-        i += chunk.length;
-    });
-    req.on("end", () => end(body));
-}
-
 function readBody(req: http.IncomingMessage) {
     return new Promise<Uint8Array<ArrayBuffer>>((resolve) => {
-        readBodyQueue.push({ req, resolve });
-        processRequests();
+        const contentLengthStr = req.headers["content-length"] || "0";
+        const contentLength = parseInt(contentLengthStr);
+        if (!contentLength) {
+            return resolve(new Uint8Array());
+        }
+
+        const body = new Uint8Array(contentLength);
+        let i = 0;
+        req.on("data", (chunk: Buffer) => {
+            for (let j = 0; j < chunk.byteLength; j++) {
+                body[j + i] = chunk[j];
+            }
+            i += chunk.length;
+        });
+        req.on("end", () => resolve(body));
     });
 }
 

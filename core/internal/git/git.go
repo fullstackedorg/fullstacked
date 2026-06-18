@@ -127,7 +127,7 @@ type HTTPBasicAuth struct {
 }
 
 func (a *HTTPBasicAuth) Authorizer(r *nethttp.Request) error {
-	if a.GitAuth != nil {
+	if a.GitAuth != nil && (a.GitAuth.Username != "" || a.GitAuth.Password != "") {
 		r.SetBasicAuth(a.GitAuth.Username, a.GitAuth.Password)
 	}
 

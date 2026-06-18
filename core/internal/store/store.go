@@ -61,6 +61,8 @@ func NewContextWithCtxId(ctxId uint8, root string, build string) {
 
 		Streams:      map[uint8]*types.StoredStream{},
 		StreamsMutex: &sync.Mutex{},
+
+		NextStreamId: 1,
 	}
 }
 
@@ -166,8 +168,14 @@ func storeResponseStream(
 		return 0, errors.New("cannot store response stream with stream nil")
 	}
 
-	streamId := uint8(1)
-	for ctx.Streams[streamId] != nil {
+	streamId := ctx.NextStreamId
+	for {
+		if streamId == 0 {
+			streamId = 1
+		}
+		if ctx.Streams[streamId] == nil {
+			break
+		}
 		streamId++
 	}
 
@@ -181,6 +189,15 @@ func storeResponseStream(
 		Ended:      false,
 		Buffer:     []byte{},
 	}
+
+	ctx.NextStreamId = storedStreamId + 1
+	if ctx.NextStreamId == 0 {
+		ctx.NextStreamId = 1
+	}
+
+	ctxMutex.Lock()
+	Contexts[ctx.Id] = *ctx
+	ctxMutex.Unlock()
 
 	payload := []byte{response.Type}
 	storedStreamIdSerialized, err := serialization.Serialize(float64(storedStreamId))

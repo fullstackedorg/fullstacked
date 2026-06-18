@@ -74,7 +74,7 @@ export function bridge(opts: BridgeOpts, sync?: boolean) {
 }
 
 function processResponse(buffer: ArrayBuffer | void) {
-    if (!buffer) {
+    if (!buffer || buffer.byteLength === 0) {
         return new Error("received empty response");
     }
 

@@ -38,6 +38,11 @@ export async function BridgeNodeInit(): Promise<PlatformBridge> {
             const xmlHttpRequest = new XMLHttpRequest();
             xmlHttpRequest.open("POST", "/sync", false);
             xmlHttpRequest.send(new Uint8Array(payload));
+            if (xmlHttpRequest.status !== 200) {
+                throw new Error(
+                    `Sync POST /sync failed with status ${xmlHttpRequest.status}: ${xmlHttpRequest.statusText}`
+                );
+            }
             const response = xmlHttpRequest.response;
             return toByteArray(response).buffer;
         },
@@ -46,6 +51,12 @@ export async function BridgeNodeInit(): Promise<PlatformBridge> {
                 method: "POST",
                 body: payload
             });
+            if (!response.ok) {
+                const text = await response.text().catch(() => "");
+                throw new Error(
+                    `fetch /call failed with status ${response.status}: ${text}`
+                );
+            }
             return response.arrayBuffer();
         }
     };

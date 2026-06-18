@@ -16,6 +16,7 @@ let tests = [
     "./events/index.ts",
     "./fetch/index.ts",
     "./net/index.ts",
+    "./tunnel/index.ts",
     "./dgram/index.ts",
     "./dns/index.ts",
     "./git/index.ts",
@@ -24,7 +25,7 @@ let tests = [
 
 const definedTests = process.argv
     .slice(2)
-    .filter((arg) => !arg.startsWith("--"));
+    .filter((arg) => !arg.startsWith("--") && arg !== "test");
 if (definedTests.length > 0) {
     tests = definedTests.map((test) => "." + test.replace("test", ""));
 }

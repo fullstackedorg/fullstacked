@@ -68,6 +68,10 @@ export class Socket extends RealDuplex {
         super(options);
     }
 
+    getStreamId() {
+        return this.duplex?.id;
+    }
+
     connect(options: Partial<ConnectOpts>): void;
     connect(port: number, host?: string): void;
     connect(optionsOrPort: Partial<ConnectOpts> | number, maybeHost?: string) {
@@ -77,7 +81,7 @@ export class Socket extends RealDuplex {
             mod: Net,
             fn: Connect,
             data: [port, host]
-        }).then((d) => {
+        }).then(async (d) => {
             this.duplex = d;
             this.duplex.on("data", (data: Uint8Array) => {
                 if (this.destroyed) return;
@@ -89,6 +93,7 @@ export class Socket extends RealDuplex {
                 }
                 this.emit("close");
             });
+            await this.duplex.open();
             this.emit("connect");
             this.emit("ready");
         });
