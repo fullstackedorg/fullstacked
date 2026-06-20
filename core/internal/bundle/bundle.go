@@ -58,7 +58,7 @@ var libModules = map[string]string{
 	"sqlite":              "/lib/unavailable/index.js",
 	"timers":              "/lib/timers/index.ts",
 	"timers/promises":     "/lib/timers/promises.ts",
-	"tls":                 "/lib/unavailable/index.ts",
+	"tls":                 "/lib/tls/index.ts",
 	"tunnel":              "/lib/tunnel/index.ts",
 	"tty":                 "/lib/tty/index.ts",
 	"url":                 "/lib/url/index.ts",

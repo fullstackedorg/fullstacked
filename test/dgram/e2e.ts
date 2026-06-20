@@ -32,6 +32,28 @@ suite("dgram - e2e", () => {
         });
     });
 
+    test("close socket does not emit error", async () => {
+        const socket = dgramGo.createSocket("udp4");
+
+        let errorEmitted = false;
+        socket.on("error", (err) => {
+            errorEmitted = true;
+        });
+
+        await new Promise<void>((resolve) => {
+            socket.bind(0, () => {
+                socket.close();
+                setTimeout(resolve, 100);
+            });
+        });
+
+        assert.equal(
+            errorEmitted,
+            false,
+            "Should not emit error event on close"
+        );
+    });
+
     after(() => {
         server.terminate();
     });

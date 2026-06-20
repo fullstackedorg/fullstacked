@@ -80,7 +80,9 @@ func createSocket(
 					n, remoteAddr, err := conn.ReadFromUDP(buffer)
 
 					if err != nil {
-						store.StreamEvent(ctx, streamId, "error", []types.SerializableData{err.Error()}, false)
+						if !errors.Is(err, net.ErrClosed) {
+							store.StreamEvent(ctx, streamId, "error", []types.SerializableData{err.Error()}, false)
+						}
 						store.StreamChunk(ctx, streamId, nil, true)
 						return
 					}

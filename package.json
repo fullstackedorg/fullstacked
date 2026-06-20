@@ -22,7 +22,7 @@
         "trailingComma": "none"
     },
     "dependencies": {
-        "@aws-sdk/client-s3": "^3.1068.0",
+        "@aws-sdk/client-s3": "^3.1073.0",
         "@fullstacked/builder-tailwindcss": "github:fullstackedorg/builder-tailwindcss",
         "@nitrogql/esbuild-register": "^1.7.2",
         "@tailwindcss/cli": "^4.3.1",
@@ -42,8 +42,7 @@
         "fast-querystring": "^1.1.2",
         "node-gyp": "^13.0.0",
         "node-ssh": "^13.2.1",
-        "npm": "^11.17.0",
-        "pg": "^8.21.0",
+        "pg": "^8.22.0",
         "prettier": "^3.8.4",
         "process": "^0.11.10",
         "puppeteer": "^25.1.0",
@@ -54,9 +53,9 @@
     },
     "overrides": {
         "tar": "^7.5.16",
-        "undici": "^7.28.0"
+        "undici": "^6.27.0 || ^7.28.0"
     },
     "devDependencies": {
-        "@types/node": "^25.9.3"
+        "@types/node": "^26.0.0"
     }
 }

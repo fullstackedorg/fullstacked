@@ -4,6 +4,7 @@ import { Buffer } from "buffer";
 const socket = dgram.createSocket("udp4");
 socket.on("message", (msg) => {
     document.body.innerText = Buffer.from(msg).toString();
+    socket.close();
     document.body.classList.add("done");
 });
 
