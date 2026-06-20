@@ -13,6 +13,7 @@ import atImport from "postcss-import";
 import tailwindcss from "@tailwindcss/postcss";
 import autoprefixer from "autoprefixer";
 import fs from "node:fs";
+import { findArg, getPositionalArgs } from "./args.ts";
 
 const end = () => {
     core.end();
@@ -50,12 +51,23 @@ const core = await load(
     }
 );
 
-const args = process.argv.slice(2);
-const help = args.includes("-h") || args.includes("--help");
-const showVersion = args.includes("-v") || args.includes("--version");
-const openBrowser = args.includes("-o") || args.includes("--open");
-const buildOnly = args.includes("-b") || args.includes("--build");
-const positionalArgs = args.filter((arg) => !arg.startsWith("-"));
+const help = findArg(["-h", "--help"]);
+const showVersion = findArg(["-v", "--version"]);
+const openBrowser = findArg(["-o", "--open"]);
+const buildOnly = findArg(["-b", "--build"]);
+const envArgs = findArg(["-e", "--env"], true);
+const env: Record<string, string> = {};
+for (const val of envArgs) {
+    const index = val.indexOf("=");
+    if (index !== -1) {
+        const key = val.slice(0, index);
+        const value = val.slice(index + 1);
+        env[key] = value;
+    } else if (val) {
+        env[val] = "";
+    }
+}
+const positionalArgs = getPositionalArgs();
 const directory = path.resolve(positionalArgs.at(-1) || ".");
 
 if (showVersion) {
@@ -118,7 +130,7 @@ if (result.Warnings?.length) {
 if (result.Errors?.length) {
     console.error("Errors:", result.Errors);
 } else if (!buildOnly) {
-    run();
+    run({ env });
 } else {
     console.log("Build complete.");
     end();
