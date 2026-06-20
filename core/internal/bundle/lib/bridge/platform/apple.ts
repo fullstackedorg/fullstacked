@@ -57,6 +57,13 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
                     clipboardResponsePromises.set(id, resolve);
                 });
             };
+
+            globalThis.copy = function (text: string) {
+                globalThis.webkit.messageHandlers.clipboard.postMessage({
+                    action: "copy",
+                    text
+                });
+            };
         }
 
         if (globalThis.webkit.messageHandlers.resize) {

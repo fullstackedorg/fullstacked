@@ -12,9 +12,19 @@ class ClipboardHelper: NSObject, WKScriptMessageHandler {
     
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         if let callback = self.cb {
-            let requestClipboardID = message.body as! String;
-            let clipboardContent = UIPasteboard.general.string ?? "";
-            callback(requestClipboardID, clipboardContent)
+            if let bodyDict = message.body as? [String: Any] {
+                if let action = bodyDict["action"] as? String {
+                    if action == "copy", let text = bodyDict["text"] as? String {
+                        UIPasteboard.general.string = text
+                    } else if action == "paste", let requestClipboardID = bodyDict["id"] as? String {
+                        let clipboardContent = UIPasteboard.general.string ?? ""
+                        callback(requestClipboardID, clipboardContent)
+                    }
+                }
+            } else if let requestClipboardID = message.body as? String {
+                let clipboardContent = UIPasteboard.general.string ?? ""
+                callback(requestClipboardID, clipboardContent)
+            }
         }
     }
 }
