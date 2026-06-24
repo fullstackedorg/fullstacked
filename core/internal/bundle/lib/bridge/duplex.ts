@@ -23,7 +23,7 @@ type DuplexItem = {
 
 const activeDuplexes = new Map<number, DuplexItem[]>();
 
-globalThis.callback = function (id: number, payload: ArrayBuffer | string) {
+(globalThis as any).callback = function (id: number, payload: ArrayBuffer | string) {
     const workerStreams = (globalThis as any).__workerStreams;
     if (workerStreams) {
         const worker = workerStreams.get(id);
@@ -125,11 +125,7 @@ export interface Duplex extends ReadableStream<Uint8Array<ArrayBuffer>> {
     on(event: "close", callback: EndCallback): void;
     write(data: StreamData): Promise<any>;
     writeEvent(event: string, ...args: SerializableData[]): Promise<any>;
-    end(
-        chunk?: StreamData,
-        encoding?: string | EndCallback,
-        callback?: EndCallback
-    ): void;
+    end(): Promise<any>;
     promise(): Promise<any>;
     eventEmitter(): ReturnType<typeof createEventEmitter>;
     open(): Promise<void>;
@@ -234,7 +230,7 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
         }
     };
 
-    stream.on = (event: string, cb) => {
+    stream.on = (event: string, cb: any) => {
         switch (event) {
             case "data":
                 duplex.listeners.data.add(cb);
@@ -280,11 +276,26 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
         if (!duplex.open) {
             await open();
         }
-        return bridgeFn({
+
+        const res = await bridgeFn({
             mod: Stream,
             fn: Close,
             data: [id]
         });
+
+        if (duplex.done) {
+            return res;
+        }
+
+        await new Promise<void>((resolve) => {
+            const onClose = () => {
+                duplex.listeners.close.delete(onClose);
+                resolve();
+            };
+            duplex.listeners.close.add(onClose);
+        });
+
+        return res;
     };
 
     stream.promise = async () => {

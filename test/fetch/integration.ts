@@ -25,7 +25,7 @@ suite("fetch - integration", () => {
                 'document.body.classList.contains("done")'
             );
 
-            const response = await (globalThis.originalFetch as typeof fetch)(
+            const response = await ((globalThis as any).originalFetch as typeof fetch)(
                 "http://localhost:9090",
                 {
                     method: "POST",

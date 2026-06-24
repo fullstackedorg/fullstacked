@@ -12,7 +12,7 @@ const response = await fetch("http://localhost:9090", {
     body: new Uint8Array([1, 2, 3])
 });
 head.innerHTML = JSON.stringify(response, null, 2);
-const headersObj = {};
+const headersObj: Record<string, string> = {};
 response.headers.forEach((value, key) => (headersObj[key] = value));
 headers.innerHTML = JSON.stringify(headersObj, null, 2);
 const payload = await response.arrayBuffer();

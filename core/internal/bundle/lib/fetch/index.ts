@@ -38,6 +38,10 @@ function urlOrStringToUrl(url: URL | string) {
           );
 }
 
+function getAbortError() {
+    return new DOMException("The operation was aborted.", "AbortError");
+}
+
 async function fetchCore(
     request: string | URL | Request,
     init?: RequestInit
@@ -64,8 +68,9 @@ async function fetchCore(
     }
 
     const signal = init?.signal;
+    const cleanupAbortListener = () => signal?.removeEventListener("abort", onAbort);
     if (signal?.aborted) {
-        throw new DOMException("The operation was aborted.", "AbortError");
+        throw getAbortError();
     }
 
     const url = (
@@ -101,12 +106,7 @@ async function fetchCore(
     let rejectHead: (reason?: any) => void;
 
     const onAbort = () => {
-        const error = new DOMException(
-            "The operation was aborted.",
-            "AbortError"
-        );
-
-        rejectHead?.(error);
+        rejectHead?.(getAbortError());
 
         responseHeadEE?.duplex.end();
 
@@ -150,7 +150,7 @@ async function fetchCore(
         });
 
         if (signal?.aborted) {
-            throw new DOMException("The operation was aborted.", "AbortError");
+            throw getAbortError();
         }
 
         responseBodyStream = await bridge({
@@ -159,38 +159,27 @@ async function fetchCore(
             data: [responseHead.Id]
         });
 
-        responseBodyStream.on("close", () => {
-            if (signal) {
-                signal.removeEventListener("abort", onAbort);
-            }
-        });
+        responseBodyStream.on("close", cleanupAbortListener);
     } catch (e) {
-        if (signal) {
-            signal.removeEventListener("abort", onAbort);
-        }
+        cleanupAbortListener();
         throw e;
     }
 
     const readBody = async () => {
         if (signal?.aborted) {
-            throw new DOMException("The operation was aborted.", "AbortError");
+            throw getAbortError();
         }
         try {
             let buffer = new Uint8Array();
-            for await (const chunk of responseBodyStream) {
+            for await (const chunk of response.body) {
                 if (signal?.aborted) {
-                    throw new DOMException(
-                        "The operation was aborted.",
-                        "AbortError"
-                    );
+                    throw getAbortError();
                 }
                 buffer = mergeUint8Arrays(buffer, chunk);
             }
             return buffer;
         } finally {
-            if (signal) {
-                signal.removeEventListener("abort", onAbort);
-            }
+            cleanupAbortListener();
         }
     };
 
@@ -206,20 +195,42 @@ async function fetchCore(
             ""
         ).trim(),
         bodyUsed: false,
-        body: new ReadableStream({
-            async pull(controller) {
-                const iterator = responseBodyStream[Symbol.asyncIterator]();
-                const { value, done } = await iterator.next();
-                if (done) {
-                    controller.close();
-                } else {
-                    controller.enqueue(value);
+        body: (() => {
+            const iterator = responseBodyStream[Symbol.asyncIterator]();
+            const stream = new ReadableStream({
+                async pull(controller) {
+                    const { value, done } = await iterator.next();
+                    if (done) {
+                        controller.close();
+                    } else {
+                        controller.enqueue(value);
+                    }
+                },
+                cancel() {
+                    responseBodyStream.end();
                 }
-            },
-            cancel() {
-                responseBodyStream.end();
+            });
+            if (!(Symbol.asyncIterator in stream)) {
+                (stream as any)[Symbol.asyncIterator] = function () {
+                    const reader = (stream as any).getReader();
+                    return {
+                        async next() {
+                            const { value, done } = await reader.read();
+                            return { value, done } as any;
+                        },
+                        async return() {
+                            reader.releaseLock();
+                            await (stream as any).cancel();
+                            return { done: true, value: undefined as any };
+                        },
+                        [Symbol.asyncIterator]() {
+                            return this;
+                        }
+                    };
+                };
             }
-        }) as any,
+            return stream;
+        })() as any,
         json: async () => {
             return JSON.parse(new TextDecoder().decode(await readBody()));
         },
@@ -242,5 +253,5 @@ async function fetchCore(
     return response;
 }
 
-globalThis.originalFetch = fetch;
-globalThis.fetch = fetchCore;
+(globalThis as any).originalFetch = fetch;
+(globalThis as any).fetch = fetchCore;

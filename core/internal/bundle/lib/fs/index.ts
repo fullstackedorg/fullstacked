@@ -371,7 +371,7 @@ export class WriteStream extends Writable {
             this.duplex
                 .end()
                 .then(() => callback(error))
-                .catch((err) => callback(err || error));
+                .catch((err: any) => callback(err || error));
         } else {
             callback(error);
         }
