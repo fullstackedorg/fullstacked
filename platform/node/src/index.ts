@@ -15,12 +15,12 @@ import autoprefixer from "autoprefixer";
 import fs from "node:fs";
 import { findArg, getPositionalArgs } from "./args.ts";
 
-const end = () => {
+const end = (code: number) => {
     core.end();
-    process.exit();
+    process.exit(code);
 };
 
-["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => process.on(signal, end));
+["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => process.on(signal, () => end(0)));
 
 const webviews: Map<
     number,
@@ -124,14 +124,17 @@ tailwindcssBuilder.on("build", async (entryfile, outfile) => {
 });
 
 const result = await bundle();
+
 if (result.Warnings?.length) {
     console.warn("Warnings:", result.Warnings);
 }
+
 if (result.Errors?.length) {
     console.error("Errors:", result.Errors);
+    end(1);
 } else if (!buildOnly) {
     run({ env });
 } else {
     console.log("Build complete.");
-    end();
+    end(0);
 }

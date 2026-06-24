@@ -42,6 +42,7 @@ var libModules = map[string]string{
 	"fullstacked":         "/lib/fullstacked/index.ts",
 	"git":                 "/lib/git/index.ts",
 	"http":                "/lib/http/index.ts",
+	"http2":               "/lib/http2/index.ts",
 	"https":               "/lib/https/index.ts",
 	"module":              "/lib/unavailable/index.ts",
 	"net":                 "/lib/net/index.ts",
