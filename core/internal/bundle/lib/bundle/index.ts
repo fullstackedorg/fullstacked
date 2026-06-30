@@ -42,10 +42,25 @@ export function bundleFile(entryPoint: string): Promise<EsbuildResult> {
     });
 }
 
+// 2026-06-30: removed
+export async function builderTailwindCSS() {
+    console.warn(
+        "[WARNING]: TailwindCSS builder has been removed. Use plugin system."
+    );
+    return {
+        on() {
+            console.warn(
+                "[WARNING]: TailwindCSS builder has been removed. Use plugin system."
+            );
+        }
+    };
+}
+
 const bundler = {
     esbuildVersion,
     bundle,
-    bundleFile
+    bundleFile,
+    builderTailwindCSS
 };
 
 export default bundler;

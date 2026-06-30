@@ -12,7 +12,7 @@ if (fs.existsSync("app/shell/package.json")) {
         }
     );
 
-    await fs.promises.rm("app/out", { recursive: true });
+    await fs.promises.rm("app/out", { recursive: true, force: true });
     await fs.promises.rename("out", "app/out");
 
     const shellVersion = getVersion("app/shell");

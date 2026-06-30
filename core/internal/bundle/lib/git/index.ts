@@ -26,6 +26,20 @@ import {
 } from "../@types/git.ts";
 import type { Duplex } from "../bridge/duplex.ts";
 
+// 2026-06-30: removed
+export async function createGitAuthManager() {
+    console.warn(
+        "[WARNING]: Git auth manager has been removed. Use plugin system."
+    );
+    return {
+        on() {
+            console.warn(
+                "[WARNING]: Git auth manager has been removed. Use plugin system."
+            );
+        }
+    };
+}
+
 export function hasGit(directory: string): Promise<boolean> {
     return bridge({
         mod: Git,
@@ -187,7 +201,8 @@ const git = {
     tags,
     checkout,
     merge,
-    restore
+    restore,
+    createGitAuthManager
 };
 
 export default git;
