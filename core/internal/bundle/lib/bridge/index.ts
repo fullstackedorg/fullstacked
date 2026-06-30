@@ -60,6 +60,12 @@ export function bridge(opts: BridgeOpts, sync?: boolean) {
 
     return new Promise<SerializableData>(async (resolve, reject) => {
         await platformBridge.ready;
+        if (
+            globalThis.pluginConnectionPromise &&
+            !(opts.mod === 15 && opts.fn === 0)
+        ) {
+            await globalThis.pluginConnectionPromise;
+        }
         const payload = preparePayload();
         const responseBuffer = await platformBridge.bridge.Async(
             payload.buffer

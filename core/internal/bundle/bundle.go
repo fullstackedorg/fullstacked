@@ -2,9 +2,12 @@ package bundle
 
 import (
 	"embed"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"fullstackedorg/fullstacked/internal/fs"
 	fspath "fullstackedorg/fullstacked/internal/path"
+	"fullstackedorg/fullstacked/internal/plugin"
 	"fullstackedorg/fullstacked/internal/serialization"
 	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/types"
@@ -19,7 +22,7 @@ import (
 )
 
 //go:embed lib
-var lib embed.FS
+var lib embed.FS // force rebuild 4
 
 var libModules = map[string]string{
 	"auth":                "/lib/auth/index.ts",
@@ -50,6 +53,7 @@ var libModules = map[string]string{
 	"packages":            "/lib/packages/index.ts",
 	"path":                "/lib/path/index.ts",
 	"perf_hooks":          "/lib/perf_hooks/index.ts",
+	"plugin":              "/lib/plugin/index.ts",
 	"process":             "/lib/process/index.ts",
 	"querystring":         "/lib/querystring/index.ts",
 	"run":                 "/lib/run/index.ts",
@@ -86,15 +90,6 @@ const (
 	BuilderSASS        BundleFn = 4
 )
 
-type TailwindCSSBuilder struct {
-	ctx      *types.Context
-	streamId uint8
-	wg       *sync.WaitGroup
-}
-
-// ctx.Id -> builderTailwindCSS
-var builderTailwindCSS = make(map[uint8]TailwindCSSBuilder)
-
 func Switch(
 	ctx *types.Context,
 	header types.CoreCallHeader,
@@ -129,33 +124,6 @@ func Switch(
 		result := BundleFileFn(ctx, entryPoint)
 		response.Type = types.CoreResponseData
 		response.Data = result
-		return nil
-	case BuilderTailwindCSS:
-		response.Type = types.CoreResponseStream
-		response.Stream = &types.ResponseStream{
-			Open: func(ctx *types.Context, streamId uint8) {
-				builderTailwindCSS[ctx.Id] = TailwindCSSBuilder{
-					ctx:      ctx,
-					streamId: streamId,
-					wg:       &sync.WaitGroup{},
-				}
-			},
-			WriteEvent: func(ctx *types.Context, streamId uint8, event string, data []types.DeserializedData) {
-				if event != "build-done" {
-					return
-				}
-
-				builder, ok := builderTailwindCSS[ctx.Id]
-				if !ok {
-					return
-				}
-
-				builder.wg.Done()
-			},
-			Close: func(ctx *types.Context, streamId uint8) {
-				delete(builderTailwindCSS, ctx.Id)
-			},
-		}
 		return nil
 	}
 
@@ -268,6 +236,27 @@ func prepareBundleOptions(entryPoint string) (esbuild.BuildOptions, error) {
 	return esbuildBuildOptions, nil
 }
 
+type PluginBuildData struct {
+	Filter string    `json:"filter"`
+	Ext    *[]string `json:"ext"`
+}
+
+type PluginResolvedFile struct {
+	Importer    string `json:"importer"`
+	Path        string `json:"path"`
+	ResolvedDir string `json:"resolvedDir"`
+}
+
+type PluginParams struct {
+	Sources  []string             `json:"sources"`
+	Resolved []PluginResolvedFile `json:"resolved"`
+}
+
+type BuildPluginOutputFile struct {
+	OutputName string `json:"outputName"`
+	Contents   []byte `json:"contents"`
+}
+
 // bundle a directory into a bundled html file
 // you can still pass then main entrypoint as param
 // ie.  [ . | index.ts ] 	-> /out/index.ts.js
@@ -300,10 +289,21 @@ func BundleDirFn(ctx *types.Context, entryPoint string) EsbuildResult {
 	// setup outdir
 	buildOptions.Outdir = filepath.Join(filepath.Dir(buildOptions.Stdin.Sourcefile), "out")
 
-	// prepare tailwind
-	tailwindcssEntry := ""
-	sources := []string{buildOptions.Stdin.Sourcefile}
-	buildOptions.Plugins = append(buildOptions.Plugins, prepareTailwindcssPlugin(&tailwindcssEntry, &sources))
+	// prepare plugins
+	plugins, err := addContextBuildPluginsToBuildOptions(ctx, &buildOptions)
+	if err != nil {
+		return EsbuildResult{
+			Errors: []esbuild.Message{
+				{
+					Text: err.Error(),
+				},
+			},
+		}
+	}
+
+	// catch all source files
+	sourceFiles := []string{buildOptions.Stdin.Sourcefile}
+	addCatchAllSourceFilePlugin(&buildOptions, &sourceFiles)
 
 	result := esbuild.Build(buildOptions)
 
@@ -321,6 +321,12 @@ func BundleDirFn(ctx *types.Context, entryPoint string) EsbuildResult {
 
 		entrypointBaseName := filepath.Base(buildOptions.Stdin.Sourcefile)
 
+		// update source files to be relative to ctx root
+		for i, source := range sourceFiles {
+			sourceFiles[i] = fspath.RelativeToRoot(ctx, source)
+		}
+
+		// update esbuild output paths
 		for _, file := range result.OutputFiles {
 			if strings.HasPrefix(filepath.Base(file.Path), "stdin") {
 				file.Path = filepath.Join(filepath.Dir(file.Path), entrypointBaseName+filepath.Ext(file.Path))
@@ -335,16 +341,34 @@ func BundleDirFn(ctx *types.Context, entryPoint string) EsbuildResult {
 			esbuildResult.OutputFiles = append(esbuildResult.OutputFiles, fspath.RelativeToRoot(ctx, file.Path))
 		}
 
-		if tailwindcssEntry != "" {
-			tailwindOutput := filepath.Join(buildOptions.Outdir, entrypointBaseName+".tailwind.css")
-			err := tailwindCSSBuild(ctx, tailwindcssEntry, tailwindOutput, sources)
-			if err == nil {
-				// relative to build dir
-				pathRel, _ := filepath.Rel(buildOptions.Outdir, tailwindOutput)
-				htmlAssets = append(htmlAssets, pathRel)
+		// process plugins
+		for p, params := range plugins {
+			params.Sources = sourceFiles
+			response, err := plugin.Call(ctx, p.Id, []types.SerializableData{params})
 
-				// relative to ctx root dir
-				esbuildResult.OutputFiles = append(esbuildResult.OutputFiles, fspath.RelativeToRoot(ctx, tailwindOutput))
+			if err != nil {
+				return EsbuildResult{
+					Errors: []esbuild.Message{
+						{
+							ID:         fmt.Sprintf("plugin:%d", p.Id),
+							PluginName: p.Name,
+							Text:       err.Error(),
+						},
+					},
+				}
+			}
+
+			// the reponse is in the form of : ["outputName1", "contents1", "outputName2", "contents2", ... ]
+			// we need to process them in pairs
+			for i := 0; i < len(response); i += 2 {
+				outputName := response[i].Data.(string)
+				contents := response[i+1].Data.([]byte)
+
+				outputFilePath := filepath.Join(buildOptions.Outdir, outputName)
+				fs.WriteFileFn(outputFilePath, contents)
+
+				htmlAssets = append(htmlAssets, outputName)
+				esbuildResult.OutputFiles = append(esbuildResult.OutputFiles, fspath.RelativeToRoot(ctx, outputFilePath))
 			}
 		}
 
@@ -359,7 +383,6 @@ func BundleDirFn(ctx *types.Context, entryPoint string) EsbuildResult {
 }
 
 // bundle a file into a single bundled file
-// no css output, no tailwindcss output, no html output, no assets
 // ie. index.ts -> index.ts.js
 func BundleFileFn(ctx *types.Context, entryPoint string) EsbuildResult {
 	buildOptions, err := prepareBundleOptions(entryPoint)
@@ -468,60 +491,95 @@ var esbuildPluginsLib = []esbuild.Plugin{
 	},
 }
 
-func prepareTailwindcssPlugin(tailwindcssEntry *string, sourceFiles *[]string) esbuild.Plugin {
-	return esbuild.Plugin{
-		Name: "tailwindcss",
+func addCatchAllSourceFilePlugin(buildOptions *esbuild.BuildOptions, sourceFiles *[]string) {
+	buildOptions.Plugins = append(buildOptions.Plugins, esbuild.Plugin{
+		Name: "catch-all-source-files",
 		Setup: func(build esbuild.PluginBuild) {
-			// catch lib modules
-			build.OnResolve(esbuild.OnResolveOptions{Filter: ".*"}, func(args esbuild.OnResolveArgs) (esbuild.OnResolveResult, error) {
-				if args.Path == "tailwindcss" && strings.HasSuffix(args.Importer, ".css") {
-					*tailwindcssEntry = args.Importer
-					return esbuild.OnResolveResult{
-						Path:      args.Path,
-						Namespace: "tailwindcss",
-					}, nil
-				}
-
-				return esbuild.OnResolveResult{}, nil
-			})
-
 			build.OnLoad(esbuild.OnLoadOptions{Filter: ".*"}, func(args esbuild.OnLoadArgs) (esbuild.OnLoadResult, error) {
-				if args.Namespace != "lib" && args.Namespace != "tailwindcss" && !strings.Contains(args.Path, "node_modules") {
+				if !strings.Contains(args.Path, "node_modules") {
 					*sourceFiles = append(*sourceFiles, args.Path)
 				}
 				return esbuild.OnLoadResult{}, nil
 			})
-
-			build.OnLoad(esbuild.OnLoadOptions{Namespace: "tailwindcss", Filter: ".*"}, func(args esbuild.OnLoadArgs) (esbuild.OnLoadResult, error) {
-				str := ""
-				return esbuild.OnLoadResult{
-					Loader:   esbuild.LoaderCSS,
-					Contents: &str,
-				}, nil
-			})
 		},
-	}
+	})
 }
 
-func tailwindCSSBuild(ctx *types.Context, entry string, outfile string, sources []string) error {
-	builder, ok := builderTailwindCSS[ctx.Id]
-	if !ok {
-		return errors.New("no tailwindcss builder")
+func addContextBuildPluginsToBuildOptions(
+	ctx *types.Context,
+	buildOptions *esbuild.BuildOptions,
+) (map[*types.ContextPlugin]*PluginParams, error) {
+
+	// catch all imports for build plugins
+	mu := &sync.Mutex{}
+	buildPlugins := map[*types.ContextPlugin]*PluginParams{}
+
+	for _, plugin := range ctx.Plugins {
+		if plugin.Type != types.PluginTypeBuild {
+			continue
+		}
+
+		pluginData := PluginBuildData{}
+		err := json.Unmarshal(plugin.Data.Data, &pluginData)
+		if err != nil {
+			return nil, errors.New("build plugin [" + plugin.Name + "] is misconfigured, needs onResolve filter")
+		}
+
+		// catch all imports for build plugins
+		params := PluginParams{
+			Resolved: []PluginResolvedFile{},
+		}
+		mu.Lock()
+		buildPlugins[plugin] = &params
+		mu.Unlock()
+
+		namespace := "build-plugin-" + plugin.Name
+
+		buildOptions.Plugins = append(buildOptions.Plugins, esbuild.Plugin{
+			Name: plugin.Name,
+			Setup: func(build esbuild.PluginBuild) {
+				build.OnResolve(esbuild.OnResolveOptions{
+					Filter: pluginData.Filter,
+				}, func(args esbuild.OnResolveArgs) (esbuild.OnResolveResult, error) {
+
+					if pluginData.Ext != nil {
+						shouldInclude := false
+						for _, ext := range *pluginData.Ext {
+							if strings.HasSuffix(args.Importer, ext) {
+								shouldInclude = true
+								break
+							}
+						}
+
+						if !shouldInclude {
+							return esbuild.OnResolveResult{}, nil
+						}
+					}
+
+					params.Resolved = append(params.Resolved, PluginResolvedFile{
+						Importer:    fspath.RelativeToRoot(ctx, args.Importer),
+						Path:        args.Path,
+						ResolvedDir: fspath.RelativeToRoot(ctx, args.ResolveDir),
+					})
+
+					return esbuild.OnResolveResult{
+						Path:      args.Path,
+						Namespace: namespace,
+					}, nil
+				})
+
+				str := ""
+
+				build.OnLoad(esbuild.OnLoadOptions{Namespace: namespace, Filter: ".*"}, func(args esbuild.OnLoadArgs) (esbuild.OnLoadResult, error) {
+					return esbuild.OnLoadResult{
+						Loader:   esbuild.LoaderEmpty,
+						Contents: &str,
+					}, nil
+				})
+
+			},
+		})
 	}
 
-	// entry and outfile relative to root
-	data := []types.SerializableData{
-		fspath.RelativeToRoot(ctx, entry),
-		fspath.RelativeToRoot(ctx, outfile),
-	}
-
-	// sources relative to root
-	for i := range sources {
-		data = append(data, fspath.RelativeToRoot(ctx, sources[i]))
-	}
-
-	builder.wg.Add(1)
-	store.StreamEvent(ctx, builder.streamId, "build", data, false)
-	builder.wg.Wait()
-	return nil
+	return buildPlugins, nil
 }

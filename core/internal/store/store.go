@@ -17,7 +17,7 @@ var OnStreamData = (func(uint8, uint8, int))(nil)
 var HasSentry = false
 
 var nextCtxId uint8 = 0
-var Contexts = map[uint8]types.Context{}
+var Contexts = map[uint8]*types.Context{}
 var ctxMutex = sync.Mutex{}
 
 func NewContext(root string, build string) uint8 {
@@ -52,7 +52,7 @@ func NewContextWithCtxId(ctxId uint8, root string, build string) {
 		Build: build,
 	}
 
-	Contexts[ctxId] = types.Context{
+	Contexts[ctxId] = &types.Context{
 		Id:          ctxId,
 		Directories: directories,
 
@@ -72,7 +72,6 @@ func ExitContext(ctxId uint8) {
 
 	if ok {
 		ctx.Exit = true
-		Contexts[ctxId] = ctx
 	}
 
 	ctxMutex.Unlock()
@@ -90,8 +89,14 @@ func EndContext(ctxId uint8) {
 
 	if ok {
 		for i := range ctx.Streams {
-			ctx.Streams[i].Close(&ctx, i)
+			ctx.Streams[i].Close(ctx, i)
 		}
+
+		ctx.Responses = nil
+		ctx.Streams = nil
+		ctx.Env = nil
+		ctx.Plugins = nil
+		ctx.GitAuths = nil
 	}
 
 	delete(Contexts, ctxId)
@@ -109,7 +114,6 @@ func SetEnvironmentData(ctxId uint8, data map[string]string) {
 	}
 
 	ctx.Env = data
-	Contexts[ctxId] = ctx
 }
 
 func StoreResponse(
@@ -195,10 +199,6 @@ func storeResponseStream(
 		ctx.NextStreamId = 1
 	}
 
-	ctxMutex.Lock()
-	Contexts[ctx.Id] = *ctx
-	ctxMutex.Unlock()
-
 	payload := []byte{response.Type}
 	storedStreamIdSerialized, err := serialization.Serialize(float64(storedStreamId))
 	if err != nil {
@@ -240,9 +240,9 @@ func GetCorePayload(
 
 	switch coreType {
 	case types.CoreResponseData:
-		return getCorePayloadData(&ctx, id)
+		return getCorePayloadData(ctx, id)
 	case types.CoreResponseStream:
-		return getCorePayloadStream(&ctx, id, size)
+		return getCorePayloadStream(ctx, id, size)
 	}
 
 	return nil, errors.New("unknown core type")

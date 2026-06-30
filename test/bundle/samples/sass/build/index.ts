@@ -2,15 +2,15 @@
 import bundle from "bundle";
 // @ts-ignore
 import plugin from "plugin";
-import pluginTailwindcss from "../../../../../plugins/tailwindcss";
+import pluginSass from "../../../../../plugins/sass";
 
-await plugin.register("build", pluginTailwindcss);
+await plugin.register("build", pluginSass);
 
 console.log(await bundle.bundle("./project"));
 
 const link = document.createElement("link");
 link.rel = "stylesheet";
-link.href = "./project/out/index.css.tailwind.css";
+link.href = "./project/out/style.scss.css";
 document.head.appendChild(link);
 
 const projectEntry = "./project/out/index.ts.js?v=2";

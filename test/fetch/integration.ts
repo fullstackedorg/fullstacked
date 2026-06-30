@@ -3,7 +3,7 @@ import { startServer } from "./server";
 import { Worker } from "node:worker_threads";
 import assert from "node:assert";
 import { Browser, createBrowser } from "../browser.ts";
-import * as bundle from "../../core/internal/bundle/lib/bundle/index.ts";
+import bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 
 suite("fetch - integration", () => {
     let browser: Browser = null,
@@ -25,13 +25,12 @@ suite("fetch - integration", () => {
                 'document.body.classList.contains("done")'
             );
 
-            const response = await ((globalThis as any).originalFetch as typeof fetch)(
-                "http://localhost:9090",
-                {
-                    method: "POST",
-                    body: new Uint8Array([1, 2, 3])
-                }
-            );
+            const response = await (
+                (globalThis as any).originalFetch as typeof fetch
+            )("http://localhost:9090", {
+                method: "POST",
+                body: new Uint8Array([1, 2, 3])
+            });
 
             const head: typeof response = JSON.parse(
                 await page.getTextContent("#head")

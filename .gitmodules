@@ -4,3 +4,9 @@
 [submodule "app/demo"]
 	path = app/demo
 	url = https://github.com/fullstackedorg/demo.git
+[submodule "plugins/tailwindcss"]
+	path = plugins/tailwindcss
+	url = https://github.com/fullstackedorg/tailwindcss.git
+[submodule "plugins/sass"]
+	path = plugins/sass
+	url = https://github.com/fullstackedorg/sass.git

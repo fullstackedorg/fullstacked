@@ -20,17 +20,17 @@ export async function createBrowser(directory: string) {
 
     const createPage = async (url?: string) => {
         const page = await browser.newPage();
-        // page.on("console", (message) =>
-        //     console.log(
-        //         `[${page.url()}] ${message.type()} ${message.text()}`
-        //     )
+        // page.on("pageerror", ({ message }) =>
+        //     console.log(`[${page.url()}] ERROR ${message}`)
         // )
-        //     .on("pageerror", ({ message }) =>
-        //         console.log(`[${page.url()}] ERROR ${message}`)
-        //     )
+        //     .on("response", (response) => {
+        //         if (response.status() >= 400) {
+        //             console.log(`[${page.url()}] HTTP ${response.status()} ${response.url()}`);
+        //         }
+        //     })
         //     .on("requestfailed", (request) =>
         //         console.log(
-        //             `[${page.url()}] ${request.failure().errorText} ${request.url()}`
+        //             `[${page.url()}] ${request.failure()?.errorText || "failed"} ${request.url()}`
         //         )
         //     );
         if (url !== null) {

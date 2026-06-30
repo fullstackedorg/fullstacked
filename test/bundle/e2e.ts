@@ -3,8 +3,8 @@ import assert from "node:assert";
 import fs from "node:fs";
 import path from "node:path";
 import child_process from "node:child_process";
-import * as bundle from "../../core/internal/bundle/lib/bundle/index.ts";
-import { tailwindcssBuilder, cleanup } from "./common.ts";
+import bundle from "../../core/internal/bundle/lib/bundle/index.ts";
+import { tailwindcssBuilder, cleanup, sassBuilder } from "./common.ts";
 
 suite("bundle - e2e", () => {
     before(cleanup);
@@ -85,6 +85,9 @@ suite("bundle - e2e", () => {
             "test/bundle/samples/tailwindcss/index.ts"
         );
 
+        assert.deepEqual(result.Errors, null);
+        assert.deepEqual(result.Warnings, null);
+
         assert.deepEqual(result.OutputFiles, [
             path.join(
                 "test",
@@ -108,7 +111,7 @@ suite("bundle - e2e", () => {
                 "samples",
                 "tailwindcss",
                 "out",
-                "index.ts.tailwind.css"
+                "index.css.tailwind.css"
             ),
             path.join(
                 "test",
@@ -122,9 +125,52 @@ suite("bundle - e2e", () => {
 
         assert.deepEqual(
             fs.readFileSync(
-                "test/bundle/samples/tailwindcss/out/index.ts.tailwind.css"
+                "test/bundle/samples/tailwindcss/out/index.css.tailwind.css"
             ),
             fs.readFileSync("test/bundle/samples/tailwindcss/output.css")
+        );
+        builder.end();
+    });
+
+    test("bundle - sass", async () => {
+        child_process.execSync(
+            "npx sass style.scss output.css --no-source-map",
+            {
+                stdio: "ignore",
+                cwd: "test/bundle/samples/sass"
+            }
+        );
+
+        const builder = await sassBuilder();
+
+        const result = await bundle.bundle("test/bundle/samples/sass/index.ts");
+
+        assert.deepEqual(result.Errors, null);
+        assert.deepEqual(result.Warnings, null);
+
+        assert.deepEqual(result.OutputFiles, [
+            path.join(
+                "test",
+                "bundle",
+                "samples",
+                "sass",
+                "out",
+                "index.ts.js"
+            ),
+            path.join(
+                "test",
+                "bundle",
+                "samples",
+                "sass",
+                "out",
+                "style.scss.css"
+            ),
+            path.join("test", "bundle", "samples", "sass", "out", "index.html")
+        ]);
+
+        assert.deepEqual(
+            fs.readFileSync("test/bundle/samples/sass/out/style.scss.css"),
+            fs.readFileSync("test/bundle/samples/sass/output.css")
         );
         builder.end();
     });

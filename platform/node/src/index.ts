@@ -2,25 +2,23 @@
 import path from "node:path";
 import { load } from "./core.ts";
 import { createWebView } from "./webview.ts";
-import {
-    bundle,
-    builderTailwindCSS
-} from "../../../core/internal/bundle/lib/bundle/index.ts";
+import { bundle } from "../../../core/internal/bundle/lib/bundle/index.ts";
+import plugin from "../../../core/internal/bundle/lib/plugin/index.ts";
 import { run } from "../../../core/internal/bundle/lib/run/index.ts";
 import version from "../../../core/internal/bundle/lib/process/version.json";
-import postcss from "postcss";
-import atImport from "postcss-import";
-import tailwindcss from "@tailwindcss/postcss";
-import autoprefixer from "autoprefixer";
-import fs from "node:fs";
 import { findArg, getPositionalArgs } from "./args.ts";
+import pluginTailwindcss, {
+    initialize
+} from "@fullstacked/tailwindcss/index.ts";
 
 const end = (code: number) => {
     core.end();
     process.exit(code);
 };
 
-["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => process.on(signal, () => end(0)));
+["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) =>
+    process.on(signal, () => end(0))
+);
 
 const webviews: Map<
     number,
@@ -102,26 +100,14 @@ globalThis.bridges = {
     Async: async (payload: ArrayBuffer) => core.call(payload)
 };
 
-const tailwindcssBuilder = await builderTailwindCSS();
-tailwindcssBuilder.on("build", async (entryfile, outfile) => {
-    const from = path.resolve(directory, entryfile);
-    const to = path.resolve(directory, outfile);
-    const css = await fs.promises.readFile(from, "utf-8");
-    const result = await postcss([
-        atImport({
-            addModulesDirectories: [
-                path.resolve(import.meta.dirname, "node_modules")
-            ]
-        }),
-        tailwindcss(),
-        autoprefixer()
-    ]).process(css, {
-        from,
-        to
-    });
-    await fs.promises.writeFile(to, result.css);
-    tailwindcssBuilder.writeEvent("build-done");
+await initialize({
+    oxide: "node_modules/oxide-wasm/pkg/oxide_wasm_bg.wasm",
+    lightningcss: "node_modules/lightningcss-wasm/lightningcss_node.wasm",
+    tailwindcss: "node_modules/tailwindcss",
+    baseDirectory: directory
 });
+
+await plugin.register("build", pluginTailwindcss);
 
 const result = await bundle();
 

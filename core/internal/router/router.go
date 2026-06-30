@@ -13,6 +13,7 @@ import (
 	"fullstackedorg/fullstacked/internal/os"
 	"fullstackedorg/fullstacked/internal/packages"
 	"fullstackedorg/fullstacked/internal/path"
+	"fullstackedorg/fullstacked/internal/plugin"
 	"fullstackedorg/fullstacked/internal/sentry"
 	"fullstackedorg/fullstacked/internal/serialization"
 	"fullstackedorg/fullstacked/internal/store"
@@ -79,16 +80,16 @@ func Call(payload []byte) (int, error) {
 
 	response := types.CoreCallResponse{}
 
-	coreError := callProcess(&ctx, header, data, &response)
+	coreError := callProcess(ctx, header, data, &response)
 
 	size := 0
 	if coreError != nil {
-		size, err = store.StoreResponse(&ctx, header, types.CoreCallResponse{
+		size, err = store.StoreResponse(ctx, header, types.CoreCallResponse{
 			Type: types.CoreResponseError,
 			Data: coreError.Error(),
 		})
 	} else {
-		size, err = store.StoreResponse(&ctx, header, response)
+		size, err = store.StoreResponse(ctx, header, response)
 	}
 
 	if err != nil {
@@ -114,6 +115,7 @@ var modules = map[types.CoreModule]types.ModuleSwitch{
 	types.Sentry:   sentry.Switch,
 	types.Dgram:    dgram.Switch,
 	types.Test:     test.Switch,
+	types.Plugin:   plugin.Switch,
 }
 
 func callProcess(

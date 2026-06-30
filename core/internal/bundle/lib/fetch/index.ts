@@ -68,7 +68,8 @@ async function fetchCore(
     }
 
     const signal = init?.signal;
-    const cleanupAbortListener = () => signal?.removeEventListener("abort", onAbort);
+    const cleanupAbortListener = () =>
+        signal?.removeEventListener("abort", onAbort);
     if (signal?.aborted) {
         throw getAbortError();
     }

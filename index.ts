@@ -1,30 +1,19 @@
 import "./build.ts";
 import "./platform/node/build.ts";
-import fs from "fs";
+import fs from "node:fs";
+import child_process from "node:child_process";
 import { getVersion } from "./version.ts";
 
 if (fs.existsSync("app/shell/package.json")) {
-    // this is a duplicate of the shell/prestart.ts
-    // at some point, there won't be any default app in this repository
-    // for now we keep the shell and demo as submodule to accelerate the development
+    child_process.execSync(
+        "node --experimental-strip-types app/shell/prestart.ts",
+        {
+            stdio: "inherit"
+        }
+    );
 
-    await Promise.all([
-        fs.promises.cp(
-            "app/shell/node_modules/oxide-wasm/pkg/oxide_wasm_bg.wasm",
-            "app/out/oxide_wasm_bg.wasm"
-        ),
-        fs.promises.cp(
-            "app/shell/node_modules/lightningcss-wasm/lightningcss_node.wasm",
-            "app/out/lightningcss_node.wasm"
-        ),
-        fs.promises.cp(
-            "app/shell/node_modules/tailwindcss",
-            "app/out/tailwindcss",
-            {
-                recursive: true
-            }
-        )
-    ]);
+    await fs.promises.rm("app/out", { recursive: true });
+    await fs.promises.rename("out", "app/out");
 
     const shellVersion = getVersion("app/shell");
     fs.writeFileSync(

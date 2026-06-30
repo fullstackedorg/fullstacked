@@ -1,6 +1,6 @@
 import test, { after, before, suite, afterEach } from "node:test";
 import { Browser, createBrowser } from "../browser.ts";
-import * as bundle from "../../core/internal/bundle/lib/bundle/index.ts";
+import bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 import assert from "node:assert";
 import fs from "node:fs";
 import { cleanup, tailwindcssBuilder } from "./common.ts";
@@ -122,6 +122,25 @@ suite("bundle - style builders - integration", () => {
                 y: 0
             }),
             [251, 44, 54]
+        );
+    });
+
+    test("sass - build", async () => {
+        await bundle.bundle("test/bundle/samples/sass/build/index.ts");
+
+        browser = await createBrowser("test/bundle/samples/sass/build");
+        const page = await browser.createPage();
+
+        await page.page.waitForFunction(
+            'document.body.classList.contains("done")'
+        );
+
+        assert.deepEqual(
+            await page.getPixelColorRGB({
+                x: 0,
+                y: 0
+            }),
+            [0, 255, 0]
         );
     });
 });

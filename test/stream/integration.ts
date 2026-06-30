@@ -1,7 +1,7 @@
 import test, { after, suite } from "node:test";
 import assert from "node:assert";
 import { Browser, createBrowser } from "../browser.ts";
-import * as bundle from "../../core/internal/bundle/lib/bundle/index.ts";
+import bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 
 suite("stream - integration", () => {
     let browsers: Browser[] = [];

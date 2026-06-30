@@ -3,13 +3,11 @@ import { Bundle } from "../@types/index.ts";
 import {
     EsbuildVersion,
     EsbuildResult,
-    BuilderTailwindCSS,
     BundleDir,
     BundleFile
 } from "../@types/bundle.ts";
 import path from "../path/index.ts";
 import { Duplex } from "../bridge/duplex.ts";
-import { EventEmitter } from "../bridge/eventEmitter.ts";
 
 export function esbuildVersion(): Promise<string> {
     return bridge({
@@ -28,9 +26,7 @@ export function bundle(entryPoint?: string): Promise<EsbuildResult> {
                 fn: BundleDir,
                 data: [resolved]
             })) as Duplex
-        ).eventEmitter() as EventEmitter<{
-            result: [EsbuildResult];
-        }>;
+        ).eventEmitter() as any;
 
         ee.on("result", resolve);
     });
@@ -46,24 +42,10 @@ export function bundleFile(entryPoint: string): Promise<EsbuildResult> {
     });
 }
 
-export async function builderTailwindCSS() {
-    return (
-        (await bridge({
-            mod: Bundle,
-            fn: BuilderTailwindCSS
-        })) as Duplex
-    ).eventEmitter() as EventEmitter<{
-        // [entryfile, outfile, ...sources]
-        build: string[];
-        "build-done": [];
-    }>;
-}
-
 const bundler = {
     esbuildVersion,
     bundle,
-    bundleFile,
-    builderTailwindCSS
+    bundleFile
 };
 
 export default bundler;

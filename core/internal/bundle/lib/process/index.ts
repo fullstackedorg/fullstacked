@@ -54,13 +54,34 @@ export function exit() {
             targetOrigin: "process"
         });
         self.close();
+        return true;
     }
+
+    if (typeof globalThis.exit !== "function") {
+        return false;
+    }
+
+    bridge(
+        {
+            mod: Core,
+            fn: Exit,
+            data: []
+        },
+        true
+    );
+
+    globalThis.exit();
+
+    return true;
 }
 
 process.hrtime = hrtime;
 process.cwd = cwd;
 process.chdir = chdir;
-process.versions = { node: "", fullstacked };
+process.versions = {
+    // node: "",
+    fullstacked
+};
 process.exit = exit;
 process.stdout = {
     isTTY: false
@@ -161,24 +182,5 @@ if (typeof globalThis.resize === "function") {
         }
     })();
 }
-
-process.exit = function () {
-    if (typeof globalThis.exit !== "function") {
-        return false;
-    }
-
-    bridge(
-        {
-            mod: Core,
-            fn: Exit,
-            data: []
-        },
-        true
-    );
-
-    globalThis.exit();
-
-    return true;
-};
 
 export default process;

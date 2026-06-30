@@ -2,6 +2,7 @@ import { after, before, beforeEach, suite, test } from "node:test";
 import child_process from "node:child_process";
 import fs from "node:fs";
 import git from "../../core/internal/bundle/lib/git/index.ts";
+import plugin from "../../core/internal/bundle/lib/plugin/index.ts";
 import assert from "node:assert";
 
 const localGitServerDirectory = "test/git/local-git-server";
@@ -42,20 +43,17 @@ async function cloneRepository(
 }
 
 suite("git - e2e", () => {
-    let authManager;
-
     before(async () => {
         child_process.execSync("docker compose up --build -d", {
             cwd: localGitServerDirectory,
             stdio: "ignore"
         });
 
-        authManager = await git.createGitAuthManager();
-        authManager.on("auth", (host) => {
-            authManager.writeEvent("authResponse", host, {
+        await plugin.register("git-auth", {
+            callback: () => ({
                 username: "test",
                 password: "testing"
-            });
+            })
         });
     });
 

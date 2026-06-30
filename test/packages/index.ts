@@ -169,13 +169,13 @@ suite("packages - e2e", () => {
             const ee = await packages.install(
                 testDirectoryGo,
                 false,
-                "https://github.com/fullstackedorg/builder-tailwindcss.git"
+                "https://github.com/fullstackedorg/tailwindcss.git"
             );
             ee.duplex.on("close", res);
         });
 
         child_process.execSync(
-            "npm install https://github.com/fullstackedorg/builder-tailwindcss.git",
+            "npm install https://github.com/fullstackedorg/tailwindcss.git",
             {
                 cwd: testDirectoryNode,
                 stdio: "ignore"
@@ -202,10 +202,10 @@ suite("packages - e2e", () => {
 
         assert.deepEqual(
             fs.readdirSync(
-                `${testDirectoryGo}/node_modules/@fullstacked/builder-tailwindcss`
+                `${testDirectoryGo}/node_modules/@fullstacked/tailwindcss`
             ),
             fs.readdirSync(
-                `${testDirectoryNode}/node_modules/@fullstacked/builder-tailwindcss`
+                `${testDirectoryNode}/node_modules/@fullstacked/tailwindcss`
             )
         );
 
@@ -251,10 +251,10 @@ suite("packages - e2e", () => {
 
         assert.deepEqual(
             fs.readdirSync(
-                `${testDirectoryGo}/node_modules/@fullstacked/builder-tailwindcss`
+                `${testDirectoryGo}/node_modules/@fullstacked/tailwindcss`
             ),
             fs.readdirSync(
-                `${testDirectoryNode}/node_modules/@fullstacked/builder-tailwindcss`
+                `${testDirectoryNode}/node_modules/@fullstacked/tailwindcss`
             )
         );
     });

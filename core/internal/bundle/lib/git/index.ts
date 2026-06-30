@@ -2,12 +2,10 @@ import { bridge } from "../bridge/index.ts";
 import { Git } from "../@types/index.ts";
 import {
     Add,
-    AuthManager,
     Branch,
     Checkout,
     Clone,
     Commit,
-    GitAuth,
     GitAuthor,
     GitBranch,
     GitCommit,
@@ -27,20 +25,6 @@ import {
     Tags
 } from "../@types/git.ts";
 import type { Duplex } from "../bridge/duplex.ts";
-import { EventEmitter } from "../bridge/eventEmitter.ts";
-
-export async function createGitAuthManager() {
-    return (
-        await bridge({
-            mod: Git,
-            fn: AuthManager,
-            data: []
-        })
-    ).eventEmitter() as EventEmitter<{
-        auth: [string];
-        authResponse: [string, Partial<GitAuth>];
-    }>;
-}
 
 export function hasGit(directory: string): Promise<boolean> {
     return bridge({
@@ -188,7 +172,6 @@ export function restore(directory: string, ...files: string[]) {
 }
 
 const git = {
-    createGitAuthManager,
     hasGit,
     init,
     head,

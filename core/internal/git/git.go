@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"fullstackedorg/fullstacked/internal/fs"
 	"fullstackedorg/fullstacked/internal/path"
+	"fullstackedorg/fullstacked/internal/plugin"
 	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/internal/tunnel"
 	"fullstackedorg/fullstacked/types"
@@ -30,41 +31,23 @@ import (
 type GitFn = uint8
 
 const (
-	AuthManager GitFn = 0
-	HasGit      GitFn = 1
-	Init        GitFn = 2
-	Head        GitFn = 3
-	Status      GitFn = 4
-	Add         GitFn = 5
-	Log         GitFn = 6
-	Commit      GitFn = 7
-	Clone       GitFn = 8
-	Pull        GitFn = 9
-	Push        GitFn = 10
-	Reset       GitFn = 11
-	Branch      GitFn = 12
-	Tags        GitFn = 13
-	Checkout    GitFn = 14
-	Merge       GitFn = 15
-	Restore     GitFn = 16
+	HasGit   GitFn = 0
+	Init     GitFn = 1
+	Head     GitFn = 2
+	Status   GitFn = 3
+	Add      GitFn = 4
+	Log      GitFn = 5
+	Commit   GitFn = 6
+	Clone    GitFn = 7
+	Pull     GitFn = 8
+	Push     GitFn = 9
+	Reset    GitFn = 10
+	Branch   GitFn = 11
+	Tags     GitFn = 12
+	Checkout GitFn = 13
+	Merge    GitFn = 14
+	Restore  GitFn = 15
 )
-
-type gitAuthManager struct {
-	ctx      *types.Context
-	streamId uint8
-	auths    map[string]GitAuth
-	requests map[string]*authRequest
-}
-
-type authRequest struct {
-	wg   *sync.WaitGroup
-	auth *GitAuth
-}
-
-// ctx.Id -> gitAuthManager
-var gitAuthManagers = make(map[uint8]gitAuthManager)
-
-var ErrNoGitAuthManager = errors.New("no git auth manager found for context")
 
 // 2026-06-15
 // USE_CUSTOM_FS toggles the use of our custom filesystem wrapper (fs.go).
@@ -74,56 +57,72 @@ var ErrNoGitAuthManager = errors.New("no git auth manager found for context")
 // instead of ErrNotExist, causing failures during git operations.
 var USE_CUSTOM_FS = true
 
-func getGitAuthManager(ctx *types.Context) (*gitAuthManager, error) {
-	gitAuthManager, ok := gitAuthManagers[ctx.Id]
-	if !ok {
-		return nil, ErrNoGitAuthManager
-	}
-	return &gitAuthManager, nil
-}
-
-func RequestAuth(ctx *types.Context, urlStr string, requestUser bool) (*GitAuth, error) {
+func RequestAuth(ctx *types.Context, urlStr string, requestUser bool) (*types.GitAuth, error) {
 	url, err := url.Parse(urlStr)
 	if err != nil {
 		return nil, err
 	}
 
-	gitAuthManager, err := getGitAuthManager(ctx)
+	if ctx.GitAuthsMutex == nil {
+		ctx.GitAuthsMutex = &sync.Mutex{}
+	}
+	ctx.GitAuthsMutex.Lock()
+	if ctx.GitAuths == nil {
+		ctx.GitAuths = make(map[string]*types.GitAuth)
+	}
+	ctx.GitAuthsMutex.Unlock()
+
+	ctx.GitAuthsMutex.Lock()
+	auth := ctx.GitAuths[url.Host]
+	ctx.GitAuthsMutex.Unlock()
+
+	if !requestUser {
+		return auth, nil
+	}
+
+	if ctx.PluginsMutex == nil {
+		ctx.PluginsMutex = &sync.Mutex{}
+	}
+	ctx.PluginsMutex.Lock()
+	if ctx.Plugins == nil {
+		ctx.Plugins = make(map[uint8]*types.ContextPlugin)
+	}
+	ctx.PluginsMutex.Unlock()
+
+	gitAuthPlugins := plugin.GetPluginsOfTypes(ctx, types.PluginTypeGitAuth)
+	if len(gitAuthPlugins) == 0 {
+		return nil, errors.New("no git auth plugins")
+	}
+
+	if len(gitAuthPlugins) > 1 {
+		return nil, errors.New("not supporting multiple git auth plugins currently")
+	}
+
+	response, err := plugin.Call(ctx, gitAuthPlugins[0].Id, []types.SerializableData{url.Host})
 	if err != nil {
 		return nil, err
 	}
 
-	auth := gitAuthManager.auths[url.Host]
-	if !requestUser {
-		return &auth, nil
+	if len(response) == 0 || response[0].Type != types.OBJECT {
+		return nil, errors.New("git auth plugin responded wrong data type")
 	}
 
-	request, ok := gitAuthManager.requests[url.Host]
-	if !ok {
-		newRequest := authRequest{
-			wg: &sync.WaitGroup{},
-		}
-		newRequest.wg.Add(1)
-		request = &newRequest
-		gitAuthManager.requests[url.Host] = request
-		defer delete(gitAuthManager.requests, url.Host)
-		store.StreamEvent(gitAuthManager.ctx, gitAuthManager.streamId, "auth", []types.SerializableData{url.Host}, false)
+	gitAuth := types.GitAuth{}
+
+	err = json.Unmarshal(response[0].Data.(types.DeserializedRawObject).Data, &gitAuth)
+	if err != nil {
+		return nil, err
 	}
 
-	request.wg.Wait()
+	ctx.GitAuthsMutex.Lock()
+	ctx.GitAuths[url.Host] = &gitAuth
+	ctx.GitAuthsMutex.Unlock()
 
-	gitAuthManager.auths[url.Host] = GitAuth{
-		Host:     url.Host,
-		Username: request.auth.Username,
-		Password: request.auth.Password,
-		Email:    request.auth.Email,
-	}
-
-	return RequestAuth(ctx, urlStr, false)
+	return &gitAuth, nil
 }
 
 type HTTPBasicAuth struct {
-	GitAuth *GitAuth
+	GitAuth *types.GitAuth
 }
 
 func (a *HTTPBasicAuth) Authorizer(r *nethttp.Request) error {
@@ -141,46 +140,6 @@ func Switch(
 	response *types.CoreCallResponse,
 ) error {
 	switch header.Fn {
-	case AuthManager:
-		response.Type = types.CoreResponseStream
-
-		gitAuthManager := gitAuthManager{
-			requests: make(map[string]*authRequest),
-			auths:    make(map[string]GitAuth),
-		}
-
-		stream := types.ResponseStream{
-			Open: func(ctx *types.Context, streamId uint8) {
-				gitAuthManager.ctx = ctx
-				gitAuthManager.streamId = streamId
-				gitAuthManagers[ctx.Id] = gitAuthManager
-			},
-			Close: func(ctx *types.Context, streamId uint8) {
-				delete(gitAuthManagers, ctx.Id)
-			},
-			WriteEvent: func(ctx *types.Context, streamId uint8, event string, data []types.DeserializedData) {
-				if event != "authResponse" {
-					return
-				}
-
-				host := data[0].Data.(string)
-				request, ok := gitAuthManager.requests[host]
-				if !ok {
-					return
-				}
-
-				gitAuth := GitAuth{}
-				if data[1].Type == types.OBJECT {
-					json.Unmarshal(data[1].Data.(types.DeserializedRawObject).Data, &gitAuth)
-				}
-				request.auth = &gitAuth
-				request.wg.Done()
-			},
-		}
-
-		response.Stream = &stream
-
-		return nil
 	case HasGit:
 		response.Type = types.CoreResponseData
 		response.Data = HasGitFn(path.ResolveWithContext(ctx, data[0].Data.(string)))
@@ -651,13 +610,6 @@ type GitStream struct {
 func (progress *GitStream) Write(p []byte) (n int, err error) {
 	store.StreamChunk(progress.ctx, progress.streamId, p, false)
 	return len(p), nil
-}
-
-type GitAuth struct {
-	Host     string `json:"host"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Email    string `json:"email"`
 }
 
 func clone(

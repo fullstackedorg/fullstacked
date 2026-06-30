@@ -21,6 +21,7 @@ func main() {
 	mainTypesPackage := tygo.PackageConfig{
 		Path:       "fullstackedorg/fullstacked/types",
 		OutputPath: path.Join(outDir, "index.ts"),
+		EnumStyle:  "union",
 	}
 
 	packages := []*tygo.PackageConfig{&mainTypesPackage}
@@ -28,6 +29,7 @@ func main() {
 		p := tygo.PackageConfig{
 			Path:       "fullstackedorg/fullstacked/internal/" + m.Name(),
 			OutputPath: path.Join(outDir, m.Name()+".ts"),
+			EnumStyle:  "union",
 		}
 		packages = append(packages, &p)
 	}

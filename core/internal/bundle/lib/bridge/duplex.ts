@@ -23,7 +23,10 @@ type DuplexItem = {
 
 const activeDuplexes = new Map<number, DuplexItem[]>();
 
-(globalThis as any).callback = function (id: number, payload: ArrayBuffer | string) {
+(globalThis as any).callback = function (
+    id: number,
+    payload: ArrayBuffer | string
+) {
     const workerStreams = (globalThis as any).__workerStreams;
     if (workerStreams) {
         const worker = workerStreams.get(id);

@@ -13,7 +13,8 @@ import { mergeUint8Arrays } from "../../core/internal/bundle/lib/bridge/serializ
 import { startServer } from "../net/server.ts";
 import { startTunnelServer } from "./server.ts";
 import { Browser, createBrowser } from "../browser.ts";
-import * as bundle from "../../core/internal/bundle/lib/bundle/index.ts";
+import bundle from "../../core/internal/bundle/lib/bundle/index.ts";
+import plugin from "../../core/internal/bundle/lib/plugin/index.ts";
 
 const { Pool } = pg;
 
@@ -372,13 +373,12 @@ suite("tunnel - e2e", () => {
             unsecure: true
         });
 
-        // Initialize git auth manager for auth prompt
-        const authManager = await gitGo.createGitAuthManager();
-        authManager.on("auth", (host) => {
-            authManager.writeEvent("authResponse", host, {
+        // Initialize git auth plugin
+        await plugin.register("git-auth", {
+            callback: () => ({
                 username: "test",
                 password: "testing"
-            });
+            })
         });
 
         const testCloneDir = "test/tunnel/git-test-repo";

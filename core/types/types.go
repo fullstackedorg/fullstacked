@@ -20,6 +20,7 @@ const (
 	Packages CoreModule = 12
 	Sentry   CoreModule = 13
 	Dgram    CoreModule = 14
+	Plugin   CoreModule = 15
 )
 
 type ModuleSwitch = func(*Context, CoreCallHeader, []DeserializedData, *CoreCallResponse) error
@@ -72,6 +73,36 @@ type ContextDirectories struct {
 	Build string
 }
 
+type PluginType = string
+
+const (
+	PluginTypeGitAuth PluginType = "git-auth"
+	PluginTypeBuild   PluginType = "build"
+)
+
+type PluginRequest struct {
+	Response      []DeserializedData
+	ResponseError *string
+	Wg            *sync.WaitGroup
+}
+
+type ContextPlugin struct {
+	Id   uint8
+	Name string
+	Type PluginType
+	Data DeserializedRawObject
+
+	Requests      map[uint8]*PluginRequest
+	RequestsMutex *sync.Mutex
+}
+
+type GitAuth struct {
+	Host     string `json:"host"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Email    string `json:"email"`
+}
+
 type Context struct {
 	Id          uint8
 	Directories ContextDirectories
@@ -85,6 +116,13 @@ type Context struct {
 	StreamsMutex *sync.Mutex
 
 	NextStreamId uint8
+
+	PluginStreamId uint8
+	Plugins        map[uint8]*ContextPlugin
+	PluginsMutex   *sync.Mutex
+
+	GitAuths      map[string]*GitAuth
+	GitAuthsMutex *sync.Mutex
 
 	Exit bool
 }
