@@ -22,7 +22,7 @@ import (
 )
 
 //go:embed lib
-var lib embed.FS // force rebuild 4
+var lib embed.FS
 
 var libModules = map[string]string{
 	"auth":                "/lib/auth/index.ts",
@@ -343,6 +343,10 @@ func BundleDirFn(ctx *types.Context, entryPoint string) EsbuildResult {
 
 		// process plugins
 		for p, params := range plugins {
+			if len(params.Resolved) == 0 {
+				continue
+			}
+
 			params.Sources = sourceFiles
 			response, err := plugin.Call(ctx, p.Id, []types.SerializableData{params})
 
