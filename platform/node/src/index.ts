@@ -9,7 +9,7 @@ import version from "../../../core/internal/bundle/lib/process/version.json";
 import { findArg, getPositionalArgs } from "./args.ts";
 import pluginTailwindcss, {
     initialize
-} from "@fullstacked/tailwindcss/index.ts";
+} from "@fullstacked/tailwindcss";
 
 const end = (code: number) => {
     core.end();

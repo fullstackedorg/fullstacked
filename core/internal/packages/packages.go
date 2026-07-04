@@ -471,6 +471,7 @@ func install(
 					if err == nil {
 						fs.RmFn(filepath.Join(tDir, ".git"))
 						fs.RmFn(filepath.Join(tDir, ".gitignore"))
+						fs.RmFn(filepath.Join(tDir, ".npmignore"))
 						fs.RmFn(filepath.Join(tDir, "package-lock.json"))
 					} else {
 						fmt.Println("Git CloneRepo Error:", err)
@@ -624,6 +625,7 @@ func install(
 				if err == nil {
 					fs.RmFn(filepath.Join(tDir, ".git"))
 					fs.RmFn(filepath.Join(tDir, ".gitignore"))
+					fs.RmFn(filepath.Join(tDir, ".npmignore"))
 					fs.RmFn(filepath.Join(tDir, "package-lock.json"))
 				}
 			} else {
