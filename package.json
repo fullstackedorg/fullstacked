@@ -12,9 +12,7 @@
     "workspaces": [
         "platform/electron",
         "platform/node",
-        "platform/wasm",
-        "plugins/tailwindcss",
-        "plugins/sass"
+        "platform/wasm"
     ],
     "author": "FullStacked",
     "license": "MIT",
