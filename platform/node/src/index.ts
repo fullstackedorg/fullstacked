@@ -7,9 +7,7 @@ import plugin from "../../../core/internal/bundle/lib/plugin/index.ts";
 import { run } from "../../../core/internal/bundle/lib/run/index.ts";
 import version from "../../../core/internal/bundle/lib/process/version.json";
 import { findArg, getPositionalArgs } from "./args.ts";
-import pluginTailwindcss, {
-    initialize
-} from "@fullstacked/tailwindcss";
+import pluginTailwindcss from "@fullstacked/tailwindcss";
 
 const end = (code: number) => {
     core.end();
@@ -99,15 +97,18 @@ globalThis.bridges = {
     Sync: (payload: ArrayBuffer) => core.call(payload),
     Async: async (payload: ArrayBuffer) => core.call(payload)
 };
-
-await initialize({
-    oxide: "node_modules/oxide-wasm/pkg/oxide_wasm_bg.wasm",
-    lightningcss: "node_modules/lightningcss-wasm/lightningcss_node.wasm",
-    tailwindcss: "node_modules/tailwindcss",
-    baseDirectory: directory
+await plugin.register("build", {
+    data: pluginTailwindcss.data,
+    callback: async (params) => {
+        params.sources = params.sources.map((f) => path.join(directory, f));
+        params.resolved = params.resolved.map((r) => ({
+            ...r,
+            importer: path.join(directory, r.importer),
+            resolvedDir: path.join(directory, r.resolvedDir)
+        }));
+        return pluginTailwindcss.callback(params);
+    }
 });
-
-await plugin.register("build", pluginTailwindcss);
 
 const result = await bundle();
 

@@ -8,7 +8,7 @@ import {
 import { StartPluginStream, Register, Unregister } from "../@types/plugin.ts";
 import { Duplex } from "../bridge/duplex.ts";
 import { EventEmitter } from "../bridge/eventEmitter.ts";
-import { PluginBuildData, PluginResolvedFile } from "../@types/bundle.ts";
+import { PluginBuildData, PluginParams } from "../@types/bundle.ts";
 
 type CommonPluginData = {
     name?: string;
@@ -23,10 +23,9 @@ export type PluginRegistry = {
     };
     [PluginTypeBuild]: {
         data?: CommonPluginData & PluginBuildData;
-        callback: (params: {
-            resolved: PluginResolvedFile[]; // all occurrences found
-            sources: string[]; // all source files resolved
-        }) => Promise<{ outputName: string; contents: string | Uint8Array }[]>;
+        callback: (
+            params: PluginParams
+        ) => Promise<{ outputName: string; contents: string | Uint8Array }[]>;
     };
 };
 
