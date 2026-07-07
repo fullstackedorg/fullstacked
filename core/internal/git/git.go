@@ -9,7 +9,7 @@ import (
 	"fullstackedorg/fullstacked/internal/path"
 	"fullstackedorg/fullstacked/internal/plugin"
 	"fullstackedorg/fullstacked/internal/store"
-	"fullstackedorg/fullstacked/internal/tunnel"
+	tunnelPkg "fullstackedorg/fullstacked/internal/tunnel"
 	"fullstackedorg/fullstacked/types"
 	"io"
 	"net"
@@ -23,6 +23,7 @@ import (
 	git "github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/config"
 	"github.com/go-git/go-git/v6/plumbing"
+	formatconfig "github.com/go-git/go-git/v6/plumbing/format/config"
 	"github.com/go-git/go-git/v6/plumbing/object"
 	"github.com/go-git/go-git/v6/plumbing/storer"
 	"github.com/go-git/go-git/v6/plumbing/transport"
@@ -47,6 +48,7 @@ const (
 	Checkout GitFn = 13
 	Merge    GitFn = 14
 	Restore  GitFn = 15
+	SetConfig GitFn = 16
 )
 
 // 2026-06-15
@@ -193,14 +195,14 @@ func Switch(
 		return nil
 	case Clone:
 		response.Type = types.CoreResponseStream
-		proxy := ""
+		tunnel := ""
 		if len(data) > 2 && data[2].Type == types.STRING {
-			proxy = data[2].Data.(string)
+			tunnel = data[2].Data.(string)
 		}
 		stream, err := clone(
 			data[0].Data.(string),
 			path.ResolveWithContext(ctx, data[1].Data.(string)),
-			proxy,
+			tunnel,
 		)
 		if err != nil {
 			return err
@@ -209,11 +211,11 @@ func Switch(
 		return nil
 	case Pull:
 		response.Type = types.CoreResponseStream
-		proxy := ""
+		tunnel := ""
 		if len(data) > 1 && data[1].Type == types.STRING {
-			proxy = data[1].Data.(string)
+			tunnel = data[1].Data.(string)
 		}
-		stream, err := pull(path.ResolveWithContext(ctx, data[0].Data.(string)), proxy)
+		stream, err := pull(path.ResolveWithContext(ctx, data[0].Data.(string)), tunnel)
 		if err != nil {
 			return err
 		}
@@ -221,11 +223,11 @@ func Switch(
 		return nil
 	case Push:
 		response.Type = types.CoreResponseStream
-		proxy := ""
+		tunnel := ""
 		if len(data) > 1 && data[1].Type == types.STRING {
-			proxy = data[1].Data.(string)
+			tunnel = data[1].Data.(string)
 		}
-		stream, err := push(path.ResolveWithContext(ctx, data[0].Data.(string)), proxy)
+		stream, err := push(path.ResolveWithContext(ctx, data[0].Data.(string)), tunnel)
 		if err != nil {
 			return err
 		}
@@ -282,16 +284,16 @@ func Switch(
 		if len(data) > 2 && data[2].Type == types.BOOLEAN {
 			create = data[2].Data.(bool)
 		}
-		proxy := ""
+		tunnel := ""
 		if len(data) > 3 && data[3].Type == types.STRING {
-			proxy = data[3].Data.(string)
+			tunnel = data[3].Data.(string)
 		}
 		stream, err := checkout(
 			ctx,
 			path.ResolveWithContext(ctx, data[0].Data.(string)),
 			data[1].Data.(string),
 			create,
-			proxy,
+			tunnel,
 		)
 		if err != nil {
 			return err
@@ -310,6 +312,13 @@ func Switch(
 			}
 		}
 		return restore(path.ResolveWithContext(ctx, data[0].Data.(string)), files)
+	case SetConfig:
+		response.Type = types.CoreResponseData
+		return setConfig(
+			path.ResolveWithContext(ctx, data[0].Data.(string)),
+			data[1].Data.(string),
+			data[2].Data.(string),
+		)
 	}
 
 	return errors.New("unknown git function")
@@ -615,15 +624,15 @@ func (progress *GitStream) Write(p []byte) (n int, err error) {
 func clone(
 	urlStr string,
 	directory string,
-	proxy string,
+	tunnel string,
 ) (*types.ResponseStream, error) {
-	err := testHost(urlStr, proxy)
+	err := testHost(urlStr, tunnel, "")
 
 	if err != nil {
 		return nil, err
 	}
 
-	tempDir := &GitDirectory{Proxy: proxy}
+	tempDir := &GitDirectory{Tunnel: tunnel}
 
 	url, err := url.Parse(urlStr)
 
@@ -707,7 +716,7 @@ func clone(
 }
 
 func CloneRepo(ctx *types.Context, urlStr string, directory string, progress io.Writer) error {
-	err := testHost(urlStr, "")
+	err := testHost(urlStr, "", "")
 
 	if err != nil {
 		return err
@@ -772,10 +781,10 @@ func CloneRepo(ctx *types.Context, urlStr string, directory string, progress io.
 	return err
 }
 
-func pull(directory string, proxy string) (*types.ResponseStream, error) {
+func pull(directory string, tunnel string) (*types.ResponseStream, error) {
 	dir, err := OpenGitDirectory(directory)
 	if err == nil {
-		dir.Proxy = proxy
+		dir.Tunnel = tunnel
 	}
 
 	if err != nil {
@@ -789,7 +798,7 @@ func pull(directory string, proxy string) (*types.ResponseStream, error) {
 		return nil, err
 	}
 
-	err = testHost(urlStr, proxy)
+	err = testHost(urlStr, tunnel, directory)
 
 	if err != nil {
 		_ = dir.Close()
@@ -853,10 +862,10 @@ func pull(directory string, proxy string) (*types.ResponseStream, error) {
 	}, nil
 }
 
-func push(directory string, proxy string) (*types.ResponseStream, error) {
+func push(directory string, tunnel string) (*types.ResponseStream, error) {
 	dir, err := OpenGitDirectory(directory)
 	if err == nil {
-		dir.Proxy = proxy
+		dir.Tunnel = tunnel
 	}
 
 	if err != nil {
@@ -870,7 +879,7 @@ func push(directory string, proxy string) (*types.ResponseStream, error) {
 		return nil, err
 	}
 
-	err = testHost(urlStr, proxy)
+	err = testHost(urlStr, tunnel, directory)
 
 	if err != nil {
 		_ = dir.Close()
@@ -1099,10 +1108,10 @@ func tags(ctx *types.Context, directory string) ([]GitTag, error) {
 	return tags, nil
 }
 
-func checkout(ctx *types.Context, directory string, ref string, create bool, proxy string) (*types.ResponseStream, error) {
+func checkout(ctx *types.Context, directory string, ref string, create bool, tunnel string) (*types.ResponseStream, error) {
 	dir, err := OpenGitDirectory(directory)
 	if err == nil {
-		dir.Proxy = proxy
+		dir.Tunnel = tunnel
 	}
 
 	if err != nil {
@@ -1220,26 +1229,56 @@ func errIsAuthenticationRequired(err error) bool {
 	return strings.Contains(err.Error(), transport.ErrAuthenticationRequired.Error())
 }
 
-func testHost(urlStr string, proxy string) error {
+func testHost(urlStr string, tunnel string, directory string) error {
 	u, err := url.Parse(urlStr)
 	if err != nil {
 		return err
 	}
 
-	client := nethttp.Client{
-		Timeout: 5 * time.Second,
-	}
+	var baseTransport nethttp.RoundTripper = nethttp.DefaultTransport
 
-	if proxy != "" {
-		t := tunnel.FindTunnel(proxy)
+	if tunnel != "" {
+		t := tunnelPkg.FindTunnel(tunnel)
 		if t == nil {
 			return errors.New("tunnel not found")
 		}
-		client.Transport = &nethttp.Transport{
+		baseTransport = &nethttp.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 				return t.Dial(ctx)
 			},
 		}
+	} else if directory != "" {
+		dir, err := OpenGitDirectory(directory)
+		if err == nil {
+			defer dir.Close()
+			cfg, err := dir.repository.Config()
+			if err == nil && cfg.Raw != nil {
+				sec := cfg.Raw.Section("http")
+				if sec != nil {
+					proxyStr := sec.Option("proxy")
+					if proxyStr != "" {
+						proxyURL, err := url.Parse(proxyStr)
+						if err == nil {
+							baseTransport = &nethttp.Transport{
+								Proxy: nethttp.ProxyURL(proxyURL),
+							}
+						}
+					}
+					extraHeaders := sec.OptionAll("extraHeader")
+					if len(extraHeaders) > 0 {
+						baseTransport = &headerRoundTripper{
+							base:    baseTransport,
+							headers: extraHeaders,
+						}
+					}
+				}
+			}
+		}
+	}
+
+	client := nethttp.Client{
+		Timeout:   5 * time.Second,
+		Transport: baseTransport,
 	}
 
 	resp, err := client.Head(fmt.Sprintf("%s://%s", u.Scheme, u.Host))
@@ -1248,6 +1287,49 @@ func testHost(urlStr string, proxy string) error {
 	}
 
 	return resp.Body.Close()
+}
+
+func parseConfigKey(key string) (section, subsection, option string, err error) {
+	parts := strings.Split(key, ".")
+	if len(parts) < 2 {
+		return "", "", "", fmt.Errorf("invalid config key: %s", key)
+	}
+	if len(parts) == 2 {
+		return parts[0], "", parts[1], nil
+	}
+	return parts[0], strings.Join(parts[1:len(parts)-1], "."), parts[len(parts)-1], nil
+}
+
+func setConfig(directory string, key string, value string) error {
+	var repo *git.Repository
+	var err error
+	if USE_CUSTOM_FS {
+		repo, err = CustomOpen(directory)
+	} else {
+		repo, err = git.PlainOpen(directory)
+	}
+	if err != nil {
+		return err
+	}
+	defer repo.Close()
+
+	cfg, err := repo.Config()
+	if err != nil {
+		return err
+	}
+
+	section, subsection, option, err := parseConfigKey(key)
+	if err != nil {
+		return err
+	}
+
+	if cfg.Raw == nil {
+		cfg.Raw = formatconfig.New()
+	}
+
+	cfg.Raw.SetOption(section, subsection, option, value)
+
+	return repo.SetConfig(cfg)
 }
 
 func restore(directory string, paths []string) error {

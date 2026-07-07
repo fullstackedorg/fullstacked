@@ -12,11 +12,28 @@ import (
 	"github.com/go-git/go-git/v6/plumbing/client"
 	"net"
 	nethttp "net/http"
+	"net/url"
+	"strings"
 )
+
+type headerRoundTripper struct {
+	base    nethttp.RoundTripper
+	headers []string
+}
+
+func (h *headerRoundTripper) RoundTrip(req *nethttp.Request) (*nethttp.Response, error) {
+	for _, header := range h.headers {
+		parts := strings.SplitN(header, ":", 2)
+		if len(parts) == 2 {
+			req.Header.Add(strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
+		}
+	}
+	return h.base.RoundTrip(req)
+}
 
 type GitDirectory struct {
 	Directory  string
-	Proxy      string
+	Tunnel     string
 	repository *git.Repository
 	worktree   *git.Worktree
 }
@@ -93,17 +110,50 @@ func (r *GitDirectory) Worktree() (*git.Worktree, error) {
 func (r *GitDirectory) getClientOptions(ctx *types.Context, urlStr string, forcePrompt bool) ([]client.Option, error) {
 	clientOptions := []client.Option{}
 
-	if r.Proxy != "" {
-		t := tunnel.FindTunnel(r.Proxy)
+	var baseTransport nethttp.RoundTripper = nethttp.DefaultTransport
+	hasCustomClient := false
+
+	if r.Tunnel != "" {
+		t := tunnel.FindTunnel(r.Tunnel)
 		if t == nil {
 			return nil, errors.New("tunnel not found")
 		}
-		customClient := &nethttp.Client{
-			Transport: &nethttp.Transport{
-				DialContext: func(netCtx context.Context, network, addr string) (net.Conn, error) {
-					return t.Dial(netCtx)
-				},
+		baseTransport = &nethttp.Transport{
+			DialContext: func(netCtx context.Context, network, addr string) (net.Conn, error) {
+				return t.Dial(netCtx)
 			},
+		}
+		hasCustomClient = true
+	} else if r.repository != nil {
+		cfg, err := r.repository.Config()
+		if err == nil && cfg.Raw != nil {
+			sec := cfg.Raw.Section("http")
+			if sec != nil {
+				proxyStr := sec.Option("proxy")
+				if proxyStr != "" {
+					proxyURL, err := url.Parse(proxyStr)
+					if err == nil {
+						baseTransport = &nethttp.Transport{
+							Proxy: nethttp.ProxyURL(proxyURL),
+						}
+						hasCustomClient = true
+					}
+				}
+				extraHeaders := sec.OptionAll("extraHeader")
+				if len(extraHeaders) > 0 {
+					baseTransport = &headerRoundTripper{
+						base:    baseTransport,
+						headers: extraHeaders,
+					}
+					hasCustomClient = true
+				}
+			}
+		}
+	}
+
+	if hasCustomClient {
+		customClient := &nethttp.Client{
+			Transport: baseTransport,
 		}
 		clientOptions = append(clientOptions, client.WithHTTPClient(customClient))
 	}
@@ -129,7 +179,7 @@ func (r *GitDirectory) LsRemote(ctx *types.Context, remoteName string) ([]*plumb
 		return nil, err
 	}
 
-	err = testHost(urlStr, r.Proxy)
+	err = testHost(urlStr, r.Tunnel, r.Directory)
 
 	if err != nil {
 		return nil, err

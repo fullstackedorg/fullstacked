@@ -21,6 +21,7 @@ import {
     Push,
     Reset,
     Restore,
+    SetConfig,
     Status,
     Tags
 } from "../@types/git.ts";
@@ -91,12 +92,12 @@ export function log(directory: string): Promise<GitCommit[]> {
 export function clone(
     url: string,
     directory: string,
-    proxy?: string
+    tunnel?: string
 ): Promise<Duplex> {
     return bridge({
         mod: Git,
         fn: Clone,
-        data: [url, directory, proxy]
+        data: [url, directory, tunnel]
     });
 }
 
@@ -112,19 +113,19 @@ export function commit(
     });
 }
 
-export function pull(directory: string, proxy?: string): Promise<Duplex> {
+export function pull(directory: string, tunnel?: string): Promise<Duplex> {
     return bridge({
         mod: Git,
         fn: Pull,
-        data: [directory, proxy]
+        data: [directory, tunnel]
     });
 }
 
-export function push(directory: string, proxy?: string): Promise<Duplex> {
+export function push(directory: string, tunnel?: string): Promise<Duplex> {
     return bridge({
         mod: Git,
         fn: Push,
-        data: [directory, proxy]
+        data: [directory, tunnel]
     });
 }
 
@@ -160,12 +161,12 @@ export function checkout(
     directory: string,
     ref: string,
     create?: boolean,
-    proxy?: string
+    tunnel?: string
 ): Promise<Duplex> {
     return bridge({
         mod: Git,
         fn: Checkout,
-        data: [directory, ref, !!create, proxy || ""]
+        data: [directory, ref, !!create, tunnel || ""]
     });
 }
 
@@ -182,6 +183,18 @@ export function restore(directory: string, ...files: string[]) {
         mod: Git,
         fn: Restore,
         data: [directory, ...(files || [])]
+    });
+}
+
+export function setConfig(
+    directory: string,
+    key: string,
+    value: string
+): Promise<void> {
+    return bridge({
+        mod: Git,
+        fn: SetConfig,
+        data: [directory, key, value]
     });
 }
 
@@ -202,6 +215,7 @@ const git = {
     checkout,
     merge,
     restore,
+    setConfig,
     createGitAuthManager
 };
 
