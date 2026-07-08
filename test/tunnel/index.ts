@@ -403,7 +403,7 @@ suite("tunnel - e2e", () => {
             const duplex = await gitGo.clone(
                 "http://localhost:8080/test",
                 testCloneDir,
-                "git-tunnel-e2e"
+                { tunnel: "git-tunnel-e2e" }
             );
             await duplex.promise();
 

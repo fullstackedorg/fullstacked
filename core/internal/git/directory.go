@@ -1,19 +1,21 @@
 package git
 
 import (
-	"errors"
-	"fullstackedorg/fullstacked/types"
-
 	"context"
+	"errors"
+	"fmt"
 	"fullstackedorg/fullstacked/internal/tunnel"
-	git "github.com/go-git/go-git/v6"
-	"github.com/go-git/go-git/v6/config"
-	"github.com/go-git/go-git/v6/plumbing"
-	"github.com/go-git/go-git/v6/plumbing/client"
+	"fullstackedorg/fullstacked/types"
 	"net"
 	nethttp "net/http"
 	"net/url"
 	"strings"
+	"sync"
+
+	git "github.com/go-git/go-git/v6"
+	"github.com/go-git/go-git/v6/config"
+	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/go-git/go-git/v6/plumbing/client"
 )
 
 type headerRoundTripper struct {
@@ -34,6 +36,7 @@ func (h *headerRoundTripper) RoundTrip(req *nethttp.Request) (*nethttp.Response,
 type GitDirectory struct {
 	Directory  string
 	Tunnel     string
+	Proxy      *GitProxy
 	repository *git.Repository
 	worktree   *git.Worktree
 }
@@ -111,19 +114,38 @@ func (r *GitDirectory) getClientOptions(ctx *types.Context, urlStr string, force
 	clientOptions := []client.Option{}
 
 	var baseTransport nethttp.RoundTripper = nethttp.DefaultTransport
+	var transport *nethttp.Transport
 	hasCustomClient := false
 
+	var proxyURL *url.URL
+	var proxyHeaders map[string]string
+
+	// 1. Resolve basic transport
 	if r.Tunnel != "" {
 		t := tunnel.FindTunnel(r.Tunnel)
 		if t == nil {
 			return nil, errors.New("tunnel not found")
 		}
-		baseTransport = &nethttp.Transport{
+		transport = &nethttp.Transport{
 			DialContext: func(netCtx context.Context, network, addr string) (net.Conn, error) {
 				return t.Dial(netCtx)
 			},
 		}
+		baseTransport = transport
 		hasCustomClient = true
+	} else if r.Proxy != nil && r.Proxy.Url != "" {
+		proxyStr := r.Proxy.Url
+		if !strings.HasPrefix(proxyStr, "http://") && !strings.HasPrefix(proxyStr, "https://") {
+			proxyStr = "http://" + proxyStr
+		}
+		var err error
+		proxyURL, err = url.Parse(proxyStr)
+		if err == nil {
+			transport = nethttp.DefaultTransport.(*nethttp.Transport).Clone()
+			baseTransport = transport
+			hasCustomClient = true
+			proxyHeaders = r.Proxy.Headers
+		}
 	} else if r.repository != nil {
 		cfg, err := r.repository.Config()
 		if err == nil && cfg.Raw != nil {
@@ -131,14 +153,58 @@ func (r *GitDirectory) getClientOptions(ctx *types.Context, urlStr string, force
 			if sec != nil {
 				proxyStr := sec.Option("proxy")
 				if proxyStr != "" {
-					proxyURL, err := url.Parse(proxyStr)
+					var err error
+					proxyURL, err = url.Parse(proxyStr)
 					if err == nil {
-						baseTransport = &nethttp.Transport{
-							Proxy: nethttp.ProxyURL(proxyURL),
-						}
+						transport = nethttp.DefaultTransport.(*nethttp.Transport).Clone()
+						baseTransport = transport
 						hasCustomClient = true
+						
+						// Extract extra headers
+						extraHeaders := sec.OptionAll("extraHeader")
+						if len(extraHeaders) > 0 {
+							proxyHeaders = make(map[string]string)
+							for _, header := range extraHeaders {
+								parts := strings.SplitN(header, ":", 2)
+								if len(parts) == 2 {
+									proxyHeaders[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+								}
+							}
+						}
 					}
 				}
+			}
+		}
+	}
+
+
+	// 3. Configure reverse proxy RoundTripper if proxyURL is present
+	if proxyURL != nil {
+		baseTransport = &reverseProxyRoundTripper{
+			proxyURL:     proxyURL,
+			proxyHeaders: proxyHeaders,
+			base:         baseTransport,
+		}
+		hasCustomClient = true
+	}
+
+	// 4. Add extra headers wrapping
+	if r.Proxy != nil && r.Proxy.Url != "" {
+		if len(r.Proxy.Headers) > 0 {
+			headersSlice := make([]string, 0, len(r.Proxy.Headers))
+			for k, v := range r.Proxy.Headers {
+				headersSlice = append(headersSlice, fmt.Sprintf("%s: %s", k, v))
+			}
+			baseTransport = &headerRoundTripper{
+				base:    baseTransport,
+				headers: headersSlice,
+			}
+		}
+	} else if r.repository != nil {
+		cfg, err := r.repository.Config()
+		if err == nil && cfg.Raw != nil {
+			sec := cfg.Raw.Section("http")
+			if sec != nil {
 				extraHeaders := sec.OptionAll("extraHeader")
 				if len(extraHeaders) > 0 {
 					baseTransport = &headerRoundTripper{
@@ -179,7 +245,7 @@ func (r *GitDirectory) LsRemote(ctx *types.Context, remoteName string) ([]*plumb
 		return nil, err
 	}
 
-	err = testHost(urlStr, r.Tunnel, r.Directory)
+	err = testHost(urlStr, r.Tunnel, r.Directory, r.Proxy)
 
 	if err != nil {
 		return nil, err
@@ -383,4 +449,72 @@ func (r *GitDirectory) FetchBranch(branchName string, progress *GitStream) error
 	}
 
 	return err
+}
+
+type reverseProxyRoundTripper struct {
+	proxyURL     *url.URL
+	proxyHeaders map[string]string
+	base         nethttp.RoundTripper
+	originalHost string
+	authHeader   string
+	mu           sync.Mutex
+}
+
+func (r *reverseProxyRoundTripper) RoundTrip(req *nethttp.Request) (*nethttp.Response, error) {
+	reqCopy := req.Clone(req.Context())
+
+	r.mu.Lock()
+	if r.originalHost == "" && req.URL.Host != r.proxyURL.Host {
+		r.originalHost = req.URL.Host
+	}
+	if r.authHeader == "" {
+		if auth := req.Header.Get("Authorization"); auth != "" {
+			r.authHeader = auth
+		}
+	}
+	originalHost := r.originalHost
+	authHeader := r.authHeader
+	r.mu.Unlock()
+
+	if originalHost == "" {
+		originalHost = req.URL.Host
+	}
+
+	reqCopy.Host = ""
+	reqCopy.URL.Scheme = r.proxyURL.Scheme
+	reqCopy.URL.Host = r.proxyURL.Host
+	reqCopy.Header.Set("X-Proxy-Host", originalHost)
+
+	if reqCopy.Header.Get("Authorization") == "" && authHeader != "" {
+		reqCopy.Header.Set("Authorization", authHeader)
+	}
+
+	for k, v := range r.proxyHeaders {
+		reqCopy.Header.Set(k, v)
+	}
+	resp, err := r.base.RoundTrip(reqCopy)
+	if err != nil {
+		return nil, err
+	}
+
+	// Restore the original request object so callers (Go-git) see the original HTTPS/host URL
+	resp.Request = req
+
+	if loc := resp.Header.Get("Location"); loc != "" && (resp.StatusCode >= 300 && resp.StatusCode < 400) {
+		locURL, parseErr := url.Parse(loc)
+		if parseErr == nil {
+			resolvedURL := req.URL.ResolveReference(locURL)
+			if resolvedURL.Host == r.proxyURL.Host || resolvedURL.Host == "" {
+				resolvedURL.Host = originalHost
+			}
+			if req.URL.Scheme != "" {
+				resolvedURL.Scheme = req.URL.Scheme
+			} else {
+				resolvedURL.Scheme = "https"
+			}
+			resp.Header.Set("Location", resolvedURL.String())
+		}
+	}
+
+	return resp, nil
 }

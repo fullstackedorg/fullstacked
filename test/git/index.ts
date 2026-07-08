@@ -400,6 +400,51 @@ suite("git - e2e", () => {
         );
     });
 
+    test("clone with proxy", async () => {
+        const { fork } = await import("node:child_process");
+        const path = await import("node:path");
+
+        const proxyPath = path.resolve("test/git/proxy.js");
+
+        let headerChecked = false;
+        let port: number | null = null;
+
+        const proxyProcess = fork(proxyPath, [], {
+            execArgv: ["-r", "@nitrogql/esbuild-register"]
+        });
+
+        await new Promise<void>((resolve) => {
+            proxyProcess.on("message", (msg: string) => {
+                if (msg.startsWith("ready:")) {
+                    port = parseInt(msg.split(":")[1], 10);
+                    resolve();
+                } else if (msg === "header-checked") {
+                    headerChecked = true;
+                }
+            });
+        });
+
+        try {
+            const duplex = await git.clone("http://localhost:8080/test", testDirectory, {
+                proxy: {
+                    url: `http://127.0.0.1:${port}`,
+                    headers: {
+                        "X-Test-Header": "test-value"
+                    }
+                }
+            });
+            await duplex.promise();
+
+            // verify git config has proxy saved
+            const gitConfig = fs.readFileSync(`${testDirectory}/.git/config`, "utf-8");
+            assert.ok(gitConfig.includes(`proxy = http://127.0.0.1:${port}`));
+            assert.ok(gitConfig.includes("extraHeader = X-Test-Header: test-value"));
+            assert.ok(headerChecked, "Proxy should have received the custom header");
+        } finally {
+            proxyProcess.kill();
+        }
+    });
+
     after(async () => {
         await resetRepositories();
         child_process.execSync("docker compose down", {

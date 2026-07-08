@@ -10,6 +10,7 @@ import {
     GitBranch,
     GitCommit,
     GitHead,
+    GitProxy,
     GitStatus,
     GitTag,
     HasGit,
@@ -92,12 +93,15 @@ export function log(directory: string): Promise<GitCommit[]> {
 export function clone(
     url: string,
     directory: string,
-    tunnel?: string
+    opts?: {
+        tunnel?: string;
+        proxy?: GitProxy;
+    }
 ): Promise<Duplex> {
     return bridge({
         mod: Git,
         fn: Clone,
-        data: [url, directory, tunnel]
+        data: [url, directory, opts?.tunnel, opts?.proxy]
     });
 }
 

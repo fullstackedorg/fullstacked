@@ -32,22 +32,22 @@ import (
 type GitFn = uint8
 
 const (
-	HasGit   GitFn = 0
-	Init     GitFn = 1
-	Head     GitFn = 2
-	Status   GitFn = 3
-	Add      GitFn = 4
-	Log      GitFn = 5
-	Commit   GitFn = 6
-	Clone    GitFn = 7
-	Pull     GitFn = 8
-	Push     GitFn = 9
-	Reset    GitFn = 10
-	Branch   GitFn = 11
-	Tags     GitFn = 12
-	Checkout GitFn = 13
-	Merge    GitFn = 14
-	Restore  GitFn = 15
+	HasGit    GitFn = 0
+	Init      GitFn = 1
+	Head      GitFn = 2
+	Status    GitFn = 3
+	Add       GitFn = 4
+	Log       GitFn = 5
+	Commit    GitFn = 6
+	Clone     GitFn = 7
+	Pull      GitFn = 8
+	Push      GitFn = 9
+	Reset     GitFn = 10
+	Branch    GitFn = 11
+	Tags      GitFn = 12
+	Checkout  GitFn = 13
+	Merge     GitFn = 14
+	Restore   GitFn = 15
 	SetConfig GitFn = 16
 )
 
@@ -196,13 +196,20 @@ func Switch(
 	case Clone:
 		response.Type = types.CoreResponseStream
 		tunnel := ""
+		proxy := (*GitProxy)(nil)
 		if len(data) > 2 && data[2].Type == types.STRING {
 			tunnel = data[2].Data.(string)
 		}
+		if len(data) > 3 && data[3].Type == types.OBJECT {
+			proxy = &GitProxy{}
+			json.Unmarshal(data[3].Data.(types.DeserializedRawObject).Data, proxy)
+		}
+
 		stream, err := clone(
 			data[0].Data.(string),
 			path.ResolveWithContext(ctx, data[1].Data.(string)),
 			tunnel,
+			proxy,
 		)
 		if err != nil {
 			return err
@@ -621,18 +628,24 @@ func (progress *GitStream) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
+type GitProxy struct {
+	Url     string            `json:"url"`
+	Headers map[string]string `json:"headers"`
+}
+
 func clone(
 	urlStr string,
 	directory string,
 	tunnel string,
+	proxy *GitProxy,
 ) (*types.ResponseStream, error) {
-	err := testHost(urlStr, tunnel, "")
+	err := testHost(urlStr, tunnel, "", proxy)
 
 	if err != nil {
 		return nil, err
 	}
 
-	tempDir := &GitDirectory{Tunnel: tunnel}
+	tempDir := &GitDirectory{Tunnel: tunnel, Proxy: proxy}
 
 	url, err := url.Parse(urlStr)
 
@@ -685,6 +698,9 @@ func clone(
 			} else {
 				r, cloneErr = git.PlainClone(directory, &options)
 			}
+			if cloneErr == nil && r != nil {
+				saveProxyConfig(r, proxy)
+			}
 			if r != nil {
 				_ = r.Close()
 			}
@@ -701,6 +717,9 @@ func clone(
 						} else {
 							r, cloneErr = git.PlainClone(directory, &options)
 						}
+						if cloneErr == nil && r != nil {
+							saveProxyConfig(r, proxy)
+						}
 						if r != nil {
 							_ = r.Close()
 						}
@@ -715,8 +734,34 @@ func clone(
 	}, nil
 }
 
+func saveProxyConfig(r *git.Repository, proxy *GitProxy) {
+	if proxy == nil {
+		return
+	}
+	cfg, err := r.Config()
+	if err != nil {
+		return
+	}
+	if cfg.Raw == nil {
+		cfg.Raw = formatconfig.New()
+	}
+	if proxy.Url != "" {
+		cfg.Raw.SetOption("http", "", "proxy", proxy.Url)
+	}
+	if len(proxy.Headers) > 0 {
+		sec := cfg.Raw.Section("http")
+		if sec != nil {
+			sec.RemoveOption("extraHeader")
+		}
+		for k, v := range proxy.Headers {
+			cfg.Raw.AddOption("http", "", "extraHeader", fmt.Sprintf("%s: %s", k, v))
+		}
+	}
+	_ = r.SetConfig(cfg)
+}
+
 func CloneRepo(ctx *types.Context, urlStr string, directory string, progress io.Writer) error {
-	err := testHost(urlStr, "", "")
+	err := testHost(urlStr, "", "", nil)
 
 	if err != nil {
 		return err
@@ -798,7 +843,7 @@ func pull(directory string, tunnel string) (*types.ResponseStream, error) {
 		return nil, err
 	}
 
-	err = testHost(urlStr, tunnel, directory)
+	err = testHost(urlStr, tunnel, directory, nil)
 
 	if err != nil {
 		_ = dir.Close()
@@ -879,7 +924,7 @@ func push(directory string, tunnel string) (*types.ResponseStream, error) {
 		return nil, err
 	}
 
-	err = testHost(urlStr, tunnel, directory)
+	err = testHost(urlStr, tunnel, directory, nil)
 
 	if err != nil {
 		_ = dir.Close()
@@ -1229,23 +1274,41 @@ func errIsAuthenticationRequired(err error) bool {
 	return strings.Contains(err.Error(), transport.ErrAuthenticationRequired.Error())
 }
 
-func testHost(urlStr string, tunnel string, directory string) error {
+func testHost(urlStr string, tunnel string, directory string, proxy *GitProxy) error {
 	u, err := url.Parse(urlStr)
 	if err != nil {
 		return err
 	}
 
 	var baseTransport nethttp.RoundTripper = nethttp.DefaultTransport
+	var transport *nethttp.Transport
 
+	var proxyURL *url.URL
+	var proxyHeaders map[string]string
+
+	// 1. Resolve basic transport
 	if tunnel != "" {
 		t := tunnelPkg.FindTunnel(tunnel)
 		if t == nil {
 			return errors.New("tunnel not found")
 		}
-		baseTransport = &nethttp.Transport{
+		transport = &nethttp.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 				return t.Dial(ctx)
 			},
+		}
+		baseTransport = transport
+	} else if proxy != nil && proxy.Url != "" {
+		proxyStr := proxy.Url
+		if !strings.HasPrefix(proxyStr, "http://") && !strings.HasPrefix(proxyStr, "https://") {
+			proxyStr = "http://" + proxyStr
+		}
+		var err error
+		proxyURL, err = url.Parse(proxyStr)
+		if err == nil {
+			transport = nethttp.DefaultTransport.(*nethttp.Transport).Clone()
+			baseTransport = transport
+			proxyHeaders = proxy.Headers
 		}
 	} else if directory != "" {
 		dir, err := OpenGitDirectory(directory)
@@ -1257,13 +1320,61 @@ func testHost(urlStr string, tunnel string, directory string) error {
 				if sec != nil {
 					proxyStr := sec.Option("proxy")
 					if proxyStr != "" {
-						proxyURL, err := url.Parse(proxyStr)
+						var err error
+						proxyURL, err = url.Parse(proxyStr)
 						if err == nil {
-							baseTransport = &nethttp.Transport{
-								Proxy: nethttp.ProxyURL(proxyURL),
+							transport = nethttp.DefaultTransport.(*nethttp.Transport).Clone()
+							baseTransport = transport
+
+							// Extract extra headers
+							extraHeaders := sec.OptionAll("extraHeader")
+							if len(extraHeaders) > 0 {
+								proxyHeaders = make(map[string]string)
+								for _, header := range extraHeaders {
+									parts := strings.SplitN(header, ":", 2)
+									if len(parts) == 2 {
+										proxyHeaders[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+									}
+								}
 							}
 						}
 					}
+				}
+			}
+		}
+	}
+
+
+
+	// 3. Configure reverse proxy RoundTripper if proxyURL is present
+	if proxyURL != nil {
+		baseTransport = &reverseProxyRoundTripper{
+			proxyURL:     proxyURL,
+			proxyHeaders: proxyHeaders,
+			base:         baseTransport,
+		}
+	}
+
+	// 4. Add extra headers wrapping
+	if proxy != nil && proxy.Url != "" {
+		if len(proxy.Headers) > 0 {
+			headersSlice := make([]string, 0, len(proxy.Headers))
+			for k, v := range proxy.Headers {
+				headersSlice = append(headersSlice, fmt.Sprintf("%s: %s", k, v))
+			}
+			baseTransport = &headerRoundTripper{
+				base:    baseTransport,
+				headers: headersSlice,
+			}
+		}
+	} else if directory != "" {
+		dir, err := OpenGitDirectory(directory)
+		if err == nil {
+			defer dir.Close()
+			cfg, err := dir.repository.Config()
+			if err == nil && cfg.Raw != nil {
+				sec := cfg.Raw.Section("http")
+				if sec != nil {
 					extraHeaders := sec.OptionAll("extraHeader")
 					if len(extraHeaders) > 0 {
 						baseTransport = &headerRoundTripper{
