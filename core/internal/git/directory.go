@@ -281,6 +281,10 @@ func (r *GitDirectory) LsRemote(ctx *types.Context, remoteName string) ([]*plumb
 		}
 	}
 
+	if errIsAuthenticationRequired(err) {
+		invalidateAuth(ctx, urlStr)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -446,6 +450,10 @@ func (r *GitDirectory) FetchBranch(branchName string, progress *GitStream) error
 			options.ClientOptions = clientOpts
 			err = remote.Fetch(&options)
 		}
+	}
+
+	if errIsAuthenticationRequired(err) {
+		invalidateAuth(progress.ctx, urlStr)
 	}
 
 	return err

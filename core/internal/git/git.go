@@ -726,6 +726,9 @@ func clone(
 					}
 				}
 
+				if errIsAuthenticationRequired(cloneErr) {
+					invalidateAuth(ctx, urlStr)
+				}
 				processErr(ctx, streamId, cloneErr, true)
 			}
 
@@ -820,6 +823,9 @@ func CloneRepo(ctx *types.Context, urlStr string, directory string, progress io.
 			}
 		}
 
+		if errIsAuthenticationRequired(cloneErr) {
+			invalidateAuth(ctx, urlStr)
+		}
 		processErr(cloneErr)
 	}
 
@@ -898,6 +904,10 @@ func pull(directory string, tunnel string) (*types.ResponseStream, error) {
 				}
 			}
 
+			if errIsAuthenticationRequired(err) {
+				invalidateAuth(ctx, urlStr)
+			}
+
 			if err != nil {
 				store.StreamChunk(ctx, streamId, []byte(err.Error()+"\n"), false)
 			}
@@ -961,6 +971,10 @@ func push(directory string, tunnel string) (*types.ResponseStream, error) {
 					options.ClientOptions = clientOpts
 					err = repository.Push(&options)
 				}
+			}
+
+			if errIsAuthenticationRequired(err) {
+				invalidateAuth(ctx, urlStr)
 			}
 
 			if err != nil {
@@ -1278,6 +1292,21 @@ func errIsAuthenticationRequired(err error) bool {
 		return false
 	}
 	return strings.Contains(err.Error(), transport.ErrAuthenticationRequired.Error())
+}
+
+func invalidateAuth(ctx *types.Context, urlStr string) {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return
+	}
+	if ctx.GitAuthsMutex == nil {
+		ctx.GitAuthsMutex = &sync.Mutex{}
+	}
+	ctx.GitAuthsMutex.Lock()
+	if ctx.GitAuths != nil {
+		delete(ctx.GitAuths, u.Host)
+	}
+	ctx.GitAuthsMutex.Unlock()
 }
 
 func testHost(urlStr string, tunnel string, directory string, proxy *GitProxy) error {
