@@ -42,14 +42,21 @@ func Switch(
 	case StartPluginStream:
 		response.Type = types.CoreResponseStream
 
+		ctx.PluginsMutex = &sync.Mutex{}
+
 		stream := types.ResponseStream{
 			Open: func(ctx *types.Context, streamId uint8) {
+				ctx.PluginsMutex.Lock()
 				ctx.PluginStreamId = streamId
 				ctx.Plugins = make(map[uint8]*types.ContextPlugin)
-				ctx.PluginsMutex = &sync.Mutex{}
+				ctx.PluginsMutex.Unlock()
+
+				store.StreamEvent(ctx, streamId, "ready", nil, false)
 			},
 			Close: func(ctx *types.Context, streamId uint8) {
+				ctx.PluginsMutex.Lock()
 				ctx.PluginStreamId = 0
+				ctx.PluginsMutex.Unlock()
 			},
 			WriteEvent: func(ctx *types.Context, streamId uint8, event string, data []types.DeserializedData) {
 				if event != "plugin-response" {

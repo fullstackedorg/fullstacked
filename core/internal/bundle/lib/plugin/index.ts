@@ -42,6 +42,8 @@ let eventEmitter: EventEmitter<{
 
     // pluginId, requestId, errorMessage, ...result
     "plugin-response": [number, number, string | null, ...any[]];
+
+    ready: [];
 }> | null = null;
 
 let connectionPromise: Promise<void> | null = null;
@@ -58,10 +60,25 @@ async function connect(): Promise<void> {
         fn: StartPluginStream
     })) as Duplex;
 
+    const emitter = duplex.eventEmitter() as EventEmitter<{
+        "plugin-call": [number, number, ...any[]];
+        "plugin-response": [number, number, string | null, ...any[]];
+        ready: [];
+    }>;
+
+    const readyPromise = new Promise<void>((resolve) => {
+        emitter.on("ready", function onReady() {
+            emitter.off("ready", onReady);
+            resolve();
+        });
+    });
+
     await duplex.open();
 
+    await readyPromise;
+
     duplexStream = duplex;
-    eventEmitter = duplex.eventEmitter();
+    eventEmitter = emitter;
 
     eventEmitter.on(
         "plugin-call",
@@ -95,7 +112,7 @@ async function connect(): Promise<void> {
             }
 
             if (Array.isArray(result)) {
-                eventEmitter.writeEvent(
+                eventEmitter!.writeEvent(
                     "plugin-response",
                     pluginId,
                     requestId,
@@ -103,7 +120,7 @@ async function connect(): Promise<void> {
                     ...result
                 );
             } else {
-                eventEmitter.writeEvent(
+                eventEmitter!.writeEvent(
                     "plugin-response",
                     pluginId,
                     requestId,
