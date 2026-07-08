@@ -436,12 +436,8 @@ func install(
 				continue
 			}
 
-			pkgName := filepath.Base(pathKey)
+			pkgName := path.Base(pathKey)
 			if pkgName == "fullstacked" || !isPlatformSupported(pkg.OS, pkg.CPU) {
-				continue
-			}
-
-			if pkg.Resolved == "" {
 				continue
 			}
 
@@ -450,22 +446,31 @@ func install(
 				continue
 			}
 
+			resolved := pkg.Resolved
+			if resolved == "" {
+				displayName := pkgName
+				if strings.HasPrefix(path.Base(path.Dir(pathKey)), "@") {
+					displayName = path.Join(path.Base(path.Dir(pathKey)), pkgName)
+				}
+				resolved = getTarballURL(displayName, pkg.Version)
+			}
+
 			wg.Add(1)
-			go func(pKey string, p LockDependency, tDir string) {
+			go func(pKey string, p LockDependency, tDir string, resolvedURL string) {
 				defer wg.Done()
 				sem <- struct{}{}
 				defer func() { <-sem }()
 
-				pkgName := filepath.Base(pathKey)
+				pkgName := path.Base(pKey)
 				displayName := pkgName
-				if strings.HasPrefix(path.Base(path.Dir(pathKey)), "@") {
-					displayName = path.Join(path.Base(path.Dir(pathKey)), pkgName)
+				if strings.HasPrefix(path.Base(path.Dir(pKey)), "@") {
+					displayName = path.Join(path.Base(path.Dir(pKey)), pkgName)
 				}
 
 				fs.MkdirFn(tDir)
 
 				var err error
-				gitUrl, isGit := isGithubRepo(p.Resolved)
+				gitUrl, isGit := isGithubRepo(resolvedURL)
 				if isGit {
 					err = git.CloneRepo(ctx, gitUrl, tDir, nil)
 					if err == nil {
@@ -477,7 +482,7 @@ func install(
 						fmt.Println("Git CloneRepo Error:", err)
 					}
 				} else {
-					err = downloadAndExtract(p.Resolved, tDir, pkgName, func(prog float64) {
+					err = downloadAndExtract(resolvedURL, tDir, pkgName, func(prog float64) {
 						threadSafeProgress(Progress{
 							Name:     displayName,
 							Version:  p.Version,
@@ -499,7 +504,7 @@ func install(
 					Stage:    "Extracting",
 					Progress: 1,
 				})
-			}(pathKey, pkg, targetDir)
+			}(pathKey, pkg, targetDir, resolved)
 		}
 
 		wg.Wait()
@@ -740,7 +745,46 @@ func install(
 					sem <- struct{}{}
 					defer func() { <-sem }()
 
+					// 1. Ancestor Satisfaction Check (Before Resolving/Network Fetch)
 					stateMu.Lock()
+					satisfied := false
+					curr := parentPath
+					for {
+						checkPath := path.Join(curr, "node_modules", pName)
+						if pkg, ok := newLock.Packages[checkPath]; ok {
+							if v, err := semver.NewVersion(pkg.Version); err == nil {
+								if c, err := semver.NewConstraint(pRange); err == nil {
+									if c.Check(v) {
+										satisfied = true
+										break
+									}
+								} else if pkg.Version == pRange {
+									satisfied = true
+									break
+								}
+							}
+						}
+
+						if curr == "" || curr == "." {
+							break
+						}
+
+						index := strings.LastIndex(curr, "node_modules")
+						if index == -1 {
+							break
+						}
+
+						if index == 0 {
+							curr = ""
+						} else {
+							curr = path.Dir(path.Dir(curr))
+						}
+					}
+					if satisfied {
+						stateMu.Unlock()
+						return
+					}
+
 					resolvedCount++
 					// Progress update
 					onProgress(Progress{
@@ -778,6 +822,38 @@ func install(
 
 					// Critical Section: Hoisting & State Update
 					stateMu.Lock()
+
+					// 2. Ancestor Satisfaction Check (After Resolving/Fetch, to match concrete version)
+					ancestorHasExact := false
+					curr = parentPath
+					for {
+						checkPath := path.Join(curr, "node_modules", pName)
+						if pkg, ok := newLock.Packages[checkPath]; ok {
+							if pkg.Version == ver.Version {
+								ancestorHasExact = true
+								break
+							}
+						}
+
+						if curr == "" || curr == "." {
+							break
+						}
+
+						index := strings.LastIndex(curr, "node_modules")
+						if index == -1 {
+							break
+						}
+
+						if index == 0 {
+							curr = ""
+						} else {
+							curr = path.Dir(path.Dir(curr))
+						}
+					}
+					if ancestorHasExact {
+						stateMu.Unlock()
+						return
+					}
 
 					// Hoisting Logic
 					targetPath := ""
@@ -1337,4 +1413,14 @@ func (pr *ProgressReader) Read(p []byte) (int, error) {
 		pr.OnProgress(float64(pr.Current) / float64(pr.Total))
 	}
 	return n, err
+}
+
+func getTarballURL(packageName, version string) string {
+	if strings.Contains(packageName, "/") {
+		parts := strings.Split(packageName, "/")
+		if len(parts) == 2 {
+			return fmt.Sprintf("https://registry.npmjs.org/%s/%s/-/%s-%s.tgz", parts[0], parts[1], parts[1], version)
+		}
+	}
+	return fmt.Sprintf("https://registry.npmjs.org/%s/-/%s-%s.tgz", packageName, packageName, version)
 }

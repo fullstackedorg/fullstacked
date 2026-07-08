@@ -1710,3 +1710,142 @@ func TestInstall_TypesReact(t *testing.T) {
 		}
 	}
 }
+
+func TestInstall_FastPathEmptyResolved(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, ".tgz") {
+			tb, _ := createMockTarball(map[string]string{
+				"package/index.js": "fast-path-empty-resolved",
+			})
+			w.Write(tb)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	origUrl := registryBaseUrl
+	origClient := httpClient
+	registryBaseUrl = ts.URL + "/"
+	httpClient = ts.Client()
+	defer func() {
+		registryBaseUrl = origUrl
+		httpClient = origClient
+	}()
+
+	tmpDir := t.TempDir()
+
+	pkgJson := PackageJSON{
+		Name:    "fast-app-empty",
+		Version: "1.0.0",
+		Dependencies: map[string]string{
+			"@drizzle-team/brocli": "0.10.2",
+		},
+	}
+	pjBytes, _ := json.Marshal(pkgJson)
+	os.WriteFile(path.Join(tmpDir, "package.json"), pjBytes, 0644)
+
+	lock := PackageLock{
+		Name:            "fast-app-empty",
+		Version:         "1.0.0",
+		LockfileVersion: 3,
+		Packages: map[string]LockDependency{
+			"": {
+				Version: "1.0.0",
+				Dependencies: map[string]string{
+					"@drizzle-team/brocli": "0.10.2",
+				},
+			},
+			"node_modules/@drizzle-team/brocli": {
+				Version:   "0.10.2",
+				Integrity: "sha512-mock",
+			},
+		},
+	}
+	lockBytes, _ := json.Marshal(lock)
+	os.WriteFile(path.Join(tmpDir, "package-lock.json"), lockBytes, 0644)
+
+	install(nil, tmpDir, nil, false, 5, false, nil)
+
+	if _, err := os.Stat(path.Join(tmpDir, "node_modules/@drizzle-team/brocli/index.js")); os.IsNotExist(err) {
+		t.Error("@drizzle-team/brocli not installed via Fast Path when resolved is empty")
+	}
+}
+
+func TestInstall_CircularDependencies(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/pkg-a" {
+			json.NewEncoder(w).Encode(PackageMetadata{
+				Name: "pkg-a",
+				Versions: map[string]PackageVersion{
+					"1.0.0": {
+						Name:    "pkg-a",
+						Version: "1.0.0",
+						Dependencies: map[string]string{
+							"pkg-b": "1.0.0",
+						},
+						Dist: PackageDist{Tarball: "http://" + r.Host + "/pkg-a.tgz"},
+					},
+				},
+				DistTags: map[string]string{"latest": "1.0.0"},
+			})
+			return
+		}
+		if r.URL.Path == "/pkg-b" {
+			json.NewEncoder(w).Encode(PackageMetadata{
+				Name: "pkg-b",
+				Versions: map[string]PackageVersion{
+					"1.0.0": {
+						Name:    "pkg-b",
+						Version: "1.0.0",
+						Dependencies: map[string]string{
+							"pkg-a": "1.0.0",
+						},
+						Dist: PackageDist{Tarball: "http://" + r.Host + "/pkg-b.tgz"},
+					},
+				},
+				DistTags: map[string]string{"latest": "1.0.0"},
+			})
+			return
+		}
+		if r.URL.Path == "/pkg-a.tgz" || r.URL.Path == "/pkg-b.tgz" {
+			tb, _ := createMockTarball(map[string]string{
+				"package/index.js": "circular",
+			})
+			w.Write(tb)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer ts.Close()
+
+	origUrl := registryBaseUrl
+	origClient := httpClient
+	registryBaseUrl = ts.URL + "/"
+	httpClient = ts.Client()
+	defer func() {
+		registryBaseUrl = origUrl
+		httpClient = origClient
+	}()
+
+	tmpDir := t.TempDir()
+	pj := PackageJSON{
+		Name:         "test-circular",
+		Dependencies: map[string]string{"pkg-a": "1.0.0"},
+	}
+	pjBytes, _ := json.Marshal(pj)
+	os.WriteFile(path.Join(tmpDir, "package.json"), pjBytes, 0644)
+
+	install(nil, tmpDir, nil, false, 5, false, nil)
+
+	if _, err := os.Stat(path.Join(tmpDir, "node_modules/pkg-a/index.js")); os.IsNotExist(err) {
+		t.Error("pkg-a not installed")
+	}
+	if _, err := os.Stat(path.Join(tmpDir, "node_modules/pkg-b/index.js")); os.IsNotExist(err) {
+		t.Error("pkg-b not installed")
+	}
+	if _, err := os.Stat(path.Join(tmpDir, "node_modules/pkg-a/node_modules/pkg-b")); err == nil {
+		t.Error("Unexpected nested pkg-b installation (should be hoisted)")
+	}
+}
+
