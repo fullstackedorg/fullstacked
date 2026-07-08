@@ -1,5 +1,5 @@
 import platformBridge from "../bridge/platform/index.ts";
-import { cwd } from "../process/cwd/index.ts";
+import { cwd } from "../process/index.ts";
 import events from "events";
 import { deserialize } from "../bridge/serialization.ts";
 import { isWorker } from "../bridge/isWorker.ts";

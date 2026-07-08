@@ -290,7 +290,7 @@ func BundleDirFn(ctx *types.Context, entryPoint string) EsbuildResult {
 	buildOptions.Outdir = filepath.Join(filepath.Dir(buildOptions.Stdin.Sourcefile), "out")
 
 	// prepare plugins
-	plugins, err := addContextBuildPluginsToBuildOptions(ctx, entryPoint, &buildOptions)
+	plugins, err := addContextBuildPluginsToBuildOptions(ctx, &buildOptions)
 	if err != nil {
 		return EsbuildResult{
 			Errors: []esbuild.Message{
@@ -323,16 +323,7 @@ func BundleDirFn(ctx *types.Context, entryPoint string) EsbuildResult {
 
 		// update source files to be relative to ctx root
 		for i, source := range sourceFiles {
-			sourceFiles[i], err = filepath.Rel(entryPoint, source)
-			if err != nil {
-				return EsbuildResult{
-					Errors: []esbuild.Message{
-						{
-							Text: err.Error(),
-						},
-					},
-				}
-			}
+			sourceFiles[i] = fspath.RelativeToCwd(ctx, source)
 		}
 
 		// update esbuild output paths
@@ -520,7 +511,6 @@ func addCatchAllSourceFilePlugin(buildOptions *esbuild.BuildOptions, sourceFiles
 
 func addContextBuildPluginsToBuildOptions(
 	ctx *types.Context,
-	entryPoint string,
 	buildOptions *esbuild.BuildOptions,
 ) (map[*types.ContextPlugin]*PluginParams, error) {
 
@@ -570,20 +560,10 @@ func addContextBuildPluginsToBuildOptions(
 						}
 					}
 
-					importer, err := filepath.Rel(entryPoint, args.Importer)
-					if err != nil {
-						return esbuild.OnResolveResult{}, err
-					}
-
-					resolvedDir, err := filepath.Rel(entryPoint, args.ResolveDir)
-					if err != nil {
-						return esbuild.OnResolveResult{}, err
-					}
-
 					params.Resolved = append(params.Resolved, PluginResolvedFile{
-						Importer:    importer,
+						Importer:    fspath.RelativeToCwd(ctx, args.Importer),
 						Path:        args.Path,
-						ResolvedDir: resolvedDir,
+						ResolvedDir: fspath.RelativeToCwd(ctx, args.ResolveDir),
 					})
 
 					return esbuild.OnResolveResult{

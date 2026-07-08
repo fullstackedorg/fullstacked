@@ -32,8 +32,7 @@ if (globalThis.process) {
             },
             Async: (payload: ArrayBuffer) =>
                 globalThis.bridges.Async(payload) as Promise<ArrayBuffer>,
-            Sync: (payload: ArrayBuffer) =>
-                globalThis.bridges.Sync(payload) as ArrayBuffer
+            Sync: (payload: ArrayBuffer) => globalThis.bridges.Sync(payload) as ArrayBuffer
         }
     };
 } else {

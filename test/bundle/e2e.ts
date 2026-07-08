@@ -81,9 +81,7 @@ suite("bundle - e2e", () => {
 
         const builder = await tailwindcssBuilder();
 
-        const result = await bundle.bundle(
-            "test/bundle/samples/tailwindcss/index.ts"
-        );
+        const result = await bundle.bundle("test/bundle/samples/tailwindcss");
 
         assert.deepEqual(result.Errors, null);
         assert.deepEqual(result.Warnings, null);

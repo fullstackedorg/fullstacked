@@ -16,7 +16,7 @@ if (fs.existsSync("app/shell/package.json")) {
     await fs.promises.rename("out", "app/out");
 
     const shellVersion = getVersion("app/shell");
-    fs.writeFileSync(
+    await fs.promises.writeFile(
         "app/out/.build",
         `${shellVersion.major}.${shellVersion.minor}.${shellVersion.patch}, branch ${shellVersion.branch}, hash ${shellVersion.hash.substring(0, 8)}`
     );

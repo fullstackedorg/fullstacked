@@ -2,6 +2,7 @@ import test, { suite } from "node:test";
 import assert from "node:assert";
 import * as fs from "../../core/internal/bundle/lib/fs/index.ts";
 import * as nodeFs from "node:fs";
+import process from "../../core/internal/bundle/lib/process/index.ts";
 
 suite("fs - e2e", () => {
     test("existsSync", () => {
@@ -517,5 +518,65 @@ suite("fs - e2e", () => {
         stream.once("error", (err) => {
             done(err);
         });
+    });
+
+    test("resolve path using changed cwd", () => {
+        const originalCwd = process.cwd();
+        try {
+            if (nodeFs.existsSync("test-dir-cwd")) {
+                nodeFs.rmSync("test-dir-cwd", { recursive: true, force: true });
+            }
+            nodeFs.mkdirSync("test-dir-cwd", { recursive: true });
+            nodeFs.writeFileSync("test-dir-cwd/hello.txt", "cwd-work");
+
+            process.chdir("/test-dir-cwd");
+
+            assert.equal(fs.existsSync("hello.txt"), true);
+            assert.equal(fs.readFileSync("hello.txt", "utf-8"), "cwd-work");
+        } finally {
+            process.chdir(originalCwd);
+            if (nodeFs.existsSync("test-dir-cwd")) {
+                nodeFs.rmSync("test-dir-cwd", { recursive: true, force: true });
+            }
+        }
+    });
+
+    test("prevent sandbox escape traversal", () => {
+        // Attempting to escape the root directory using traversal
+        // should be restricted to the root directory itself (which is a directory and cannot be read as a file).
+        // The host /etc/passwd exists and is readable outside the sandbox.
+        assert.equal(nodeFs.existsSync("/etc/passwd"), true);
+
+        // Within sandbox, trying to escape to host /etc/passwd must fail
+        assert.throws(() => {
+            fs.readFileSync("../../../../../../../../etc/passwd");
+        });
+    });
+
+    test("chdir resolution, safety and traversal prevention", () => {
+        const originalCwd = process.cwd();
+        try {
+            process.chdir("");
+            assert.equal(process.cwd(), "/");
+
+            if (nodeFs.existsSync("test-chdir-safety")) {
+                nodeFs.rmSync("test-chdir-safety", { recursive: true, force: true });
+            }
+            nodeFs.mkdirSync("test-chdir-safety/child", { recursive: true });
+            
+            process.chdir("/test-chdir-safety");
+            assert.equal(process.cwd(), "/test-chdir-safety");
+
+            process.chdir("child");
+            assert.equal(process.cwd(), "/test-chdir-safety/child");
+
+            process.chdir("../../../../../");
+            assert.equal(process.cwd(), "/");
+        } finally {
+            process.chdir(originalCwd);
+            if (nodeFs.existsSync("test-chdir-safety")) {
+                nodeFs.rmSync("test-chdir-safety", { recursive: true, force: true });
+            }
+        }
     });
 });

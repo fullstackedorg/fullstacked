@@ -10,7 +10,7 @@ import {
     Relative,
     Resolve
 } from "../@types/path.ts";
-import { cwd } from "../process/cwd/index.ts";
+import { cwd } from "../process/index.ts";
 import os from "../os/index.ts";
 
 export let sep = "/";

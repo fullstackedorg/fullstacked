@@ -40,9 +40,6 @@ export function cleanup() {
 
 export async function tailwindcssBuilder() {
     await initialize({
-        oxide: "node_modules/oxide-wasm/pkg/oxide_wasm_bg.wasm",
-        lightningcss: "node_modules/lightningcss-wasm/lightningcss_node.wasm",
-        tailwindcss: "node_modules/tailwindcss",
         skipLightning: true
     });
     const p = await plugin.register("build", pluginTailwindcss);

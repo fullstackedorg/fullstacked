@@ -10,9 +10,11 @@ export function formatPathLike(path: PathLike) {
     return pathStr;
 }
 
-export type ReadFileOpts = {
-    encoding: string;
-};
+export type ReadFileOpts =
+    | string
+    | {
+          encoding: string;
+      };
 
 export function decodeStringData(data: Uint8Array, options: ReadFileOpts) {
     if (typeof options === "string") {

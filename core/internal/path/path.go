@@ -72,22 +72,62 @@ func RelativeToRoot(ctx *types.Context, path string) string {
 	return str
 }
 
-func ResolveWithContext(ctx *types.Context, paths ...string) string {
-	var baseDir string
-	if ctx != nil {
-		baseDir = ctx.Directories.Root
+func RelativeToCwd(ctx *types.Context, path string) string {
+	relativeToRoot := RelativeToRoot(ctx, path)
+	if ctx == nil || ctx.Cwd == "" {
+		return relativeToRoot
 	}
 
-	if strings.HasPrefix(paths[0], "build:") {
-		baseDir = ctx.Directories.Build
-		paths[0] = strings.TrimPrefix(paths[0], "build:")
+	virtualAbsPath := filepath.Join("/", relativeToRoot)
+	virtualAbsPath = filepath.Clean(virtualAbsPath)
+	cwd := filepath.Clean(ctx.Cwd)
+
+	if !strings.HasPrefix(cwd, "/") && !strings.HasPrefix(cwd, "\\") {
+		cwd = "/" + cwd
+	}
+	cwd = filepath.ToSlash(cwd)
+	virtualAbsPath = filepath.ToSlash(virtualAbsPath)
+
+	str, err := filepath.Rel(cwd, virtualAbsPath)
+	if err != nil {
+		return relativeToRoot
+	}
+	return str
+}
+
+func ResolveWithContext(ctx *types.Context, paths ...string) string {
+	var baseDir string
+	var rootDir string
+	if ctx != nil {
+		if strings.HasPrefix(paths[0], "build:") {
+			baseDir = ctx.Directories.Build
+			rootDir = ctx.Directories.Build
+			paths[0] = strings.TrimPrefix(paths[0], "build:")
+		} else {
+			rootDir = ctx.Directories.Root
+			isAbs := filepath.IsAbs(paths[0]) || strings.HasPrefix(paths[0], "/") || strings.HasPrefix(paths[0], "\\")
+			if isAbs {
+				baseDir = ctx.Directories.Root
+			} else {
+				baseDir = filepath.Join(ctx.Directories.Root, ctx.Cwd)
+			}
+		}
 	}
 
 	strSlice := []string{
 		baseDir,
 	}
 	strSlice = append(strSlice, paths...)
-	return filepath.Join(strSlice...)
+	resolved := filepath.Clean(filepath.Join(strSlice...))
+
+	if ctx != nil && rootDir != "" {
+		rel, err := filepath.Rel(rootDir, resolved)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			return rootDir
+		}
+	}
+
+	return resolved
 }
 
 func DataToStringSlice(data ...types.DeserializedData) []string {

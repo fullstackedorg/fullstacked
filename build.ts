@@ -13,7 +13,6 @@ import version from "./version.ts";
 // string_decoder : https://www.npmjs.com/package/string_decoder
 // buffer : https://www.npmjs.com/package/buffer
 // stream : https://www.npmjs.com/package/readable-stream
-// process : https://www.npmjs.com/package/process
 // crypto : https://www.npmjs.com/package/crypto-browserify
 // zlib : https://www.npmjs.com/package/browserify-zlib
 // querystring : https://www.npmjs.com/package/fast-querystring
@@ -49,10 +48,6 @@ const packagesToBundle = [
     {
         entryPoint: "node_modules/readable-stream/lib/ours/browser.js",
         outfile: "core/internal/bundle/lib/stream/index.js"
-    },
-    {
-        entryPoint: "node_modules/process/browser.js",
-        outfile: "core/internal/bundle/lib/process/process.js"
     },
     {
         entryPoint: "node_modules/crypto-browserify/index.js",

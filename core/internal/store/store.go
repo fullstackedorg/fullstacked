@@ -56,6 +56,8 @@ func NewContextWithCtxId(ctxId uint8, root string, build string) {
 		Id:          ctxId,
 		Directories: directories,
 
+		Cwd: "/",
+
 		Responses:      map[uint8][]byte{},
 		ResponsesMutex: &sync.Mutex{},
 

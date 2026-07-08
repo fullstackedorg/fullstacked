@@ -23,7 +23,6 @@ import {
 } from "../@types/fs.ts";
 import { bridge } from "../bridge/index.ts";
 import { Fs } from "../@types/index.ts";
-import { resolve } from "../path/index.ts";
 
 export async function readFile(path: PathLike): Promise<Buffer<ArrayBuffer>>;
 export async function readFile(
@@ -34,7 +33,7 @@ export async function readFile(path: PathLike, options?: ReadFileOpts) {
     const data: Uint8Array = await bridge({
         mod: Fs,
         fn: ReadFile,
-        data: [resolve(formatPathLike(path))]
+        data: [formatPathLike(path)]
     });
 
     return decodeStringData(data, options);
@@ -56,7 +55,7 @@ export async function readdir(
     const items: GoFileInfo[] = await bridge({
         mod: Fs,
         fn: ReadDir,
-        data: [resolve(baseDir), options?.recursive ?? false]
+        data: [baseDir, options?.recursive ?? false]
     });
     return convertGoFileInfo(baseDir, items, options?.withFileTypes);
 }
@@ -68,18 +67,17 @@ export async function stat(
     const fileInfo: GoFileInfo = await bridge({
         mod: Fs,
         fn: Stats,
-        data: [resolve(formatPathLike(path))]
+        data: [formatPathLike(path)]
     });
 
     return fileInfoToStat(fileInfo);
 }
 
 export function writeFile(path: PathLike, data: string | Uint8Array) {
-    const resolved = resolve(formatPathLike(path));
     return bridge({
         mod: Fs,
         fn: WriteFile,
-        data: [resolved, data]
+        data: [formatPathLike(path), data]
     });
 }
 
@@ -87,7 +85,7 @@ export function mkdir(path: PathLike) {
     return bridge({
         mod: Fs,
         fn: Mkdir,
-        data: [resolve(formatPathLike(path))]
+        data: [formatPathLike(path)]
     });
 }
 
@@ -95,7 +93,7 @@ export function rm(path: PathLike) {
     return bridge({
         mod: Fs,
         fn: Rm,
-        data: [resolve(formatPathLike(path))]
+        data: [formatPathLike(path)]
     });
 }
 
@@ -103,7 +101,7 @@ export function unlink(path: PathLike) {
     return bridge({
         mod: Fs,
         fn: Rm,
-        data: [resolve(formatPathLike(path))]
+        data: [formatPathLike(path)]
     });
 }
 
@@ -111,7 +109,7 @@ export function rename(path: PathLike, path2: PathLike) {
     return bridge({
         mod: Fs,
         fn: Rename,
-        data: [resolve(formatPathLike(path)), resolve(formatPathLike(path2))]
+        data: [formatPathLike(path), formatPathLike(path2)]
     });
 }
 
@@ -119,7 +117,7 @@ export function cp(src: PathLike, dst: PathLike) {
     return bridge({
         mod: Fs,
         fn: Copy,
-        data: [resolve(formatPathLike(src)), resolve(formatPathLike(dst))]
+        data: [formatPathLike(src), formatPathLike(dst)]
     });
 }
 

@@ -23,6 +23,7 @@ import (
 	"fullstackedorg/fullstacked/types"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 type CoreFn = uint8
@@ -30,8 +31,10 @@ type CoreFn = uint8
 const (
 	StaticFile CoreFn = 0
 	Run        CoreFn = 1
-	GetEnv     CoreFn = 2
-	Exit       CoreFn = 3
+	Cwd        CoreFn = 2
+	Chdir      CoreFn = 3
+	GetEnv     CoreFn = 4
+	Exit       CoreFn = 5
 )
 
 /*
@@ -166,6 +169,43 @@ func Switch(
 		}
 
 		store.OnStreamData(id, 0, 0)
+		return nil
+	case Cwd:
+		response.Type = types.CoreResponseData
+		response.Data = ctx.Cwd
+		return nil
+	case Chdir:
+		response.Type = types.CoreResponseData
+		dir := data[0].Data.(string)
+		if dir == "" {
+			dir = "/"
+		}
+
+		currentCwd := ctx.Cwd
+		if currentCwd == "" {
+			currentCwd = "/"
+		}
+
+		isAbs := filepath.IsAbs(dir) || strings.HasPrefix(dir, "/") || strings.HasPrefix(dir, "\\")
+		var targetCwd string
+		if isAbs {
+			targetCwd = dir
+		} else {
+			targetCwd = filepath.Join(currentCwd, dir)
+		}
+
+		targetCwd = filepath.Clean(targetCwd)
+		if !strings.HasPrefix(targetCwd, "/") && !strings.HasPrefix(targetCwd, "\\") {
+			targetCwd = "/" + targetCwd
+		}
+		targetCwd = filepath.ToSlash(targetCwd)
+		targetCwd = filepath.Clean(targetCwd)
+
+		if targetCwd == "" || targetCwd == "." {
+			targetCwd = "/"
+		}
+
+		ctx.Cwd = targetCwd
 		return nil
 	case GetEnv:
 		response.Type = types.CoreResponseData

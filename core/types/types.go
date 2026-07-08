@@ -108,6 +108,7 @@ type Context struct {
 	Directories ContextDirectories
 
 	Env map[string]string
+	Cwd string
 
 	Responses      map[uint8][]byte
 	ResponsesMutex *sync.Mutex
