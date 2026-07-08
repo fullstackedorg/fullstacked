@@ -1154,43 +1154,45 @@ func tags(ctx *types.Context, directory string) ([]GitTag, error) {
 }
 
 func checkout(ctx *types.Context, directory string, ref string, create bool, tunnel string) (*types.ResponseStream, error) {
-	dir, err := OpenGitDirectory(directory)
-	if err == nil {
-		dir.Tunnel = tunnel
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	refType, remote, err := dir.FindRefType(ctx, ref)
-
-	if err != nil {
-		_ = dir.Close()
-		return nil, err
-	}
-
-	if create {
-		refType = RefBranch
-	}
-
-	repository, err := dir.Repository()
-
-	if err != nil {
-		_ = dir.Close()
-		return nil, err
-	}
-
-	worktree, err := repository.Worktree()
-
-	if err != nil {
-		_ = dir.Close()
-		return nil, err
-	}
-
 	return &types.ResponseStream{
 		Open: func(ctx *types.Context, streamId uint8) {
+			dir, err := OpenGitDirectory(directory)
+			if err == nil {
+				dir.Tunnel = tunnel
+			}
+
+			if err != nil {
+				store.StreamChunk(ctx, streamId, []byte(err.Error()+"\n"), false)
+				store.StreamChunk(ctx, streamId, nil, true)
+				return
+			}
 			defer dir.Close()
+
+			refType, remote, err := dir.FindRefType(ctx, ref)
+			if err != nil {
+				store.StreamChunk(ctx, streamId, []byte(err.Error()+"\n"), false)
+				store.StreamChunk(ctx, streamId, nil, true)
+				return
+			}
+
+			if create {
+				refType = RefBranch
+			}
+
+			repository, err := dir.Repository()
+			if err != nil {
+				store.StreamChunk(ctx, streamId, []byte(err.Error()+"\n"), false)
+				store.StreamChunk(ctx, streamId, nil, true)
+				return
+			}
+
+			worktree, err := repository.Worktree()
+			if err != nil {
+				store.StreamChunk(ctx, streamId, []byte(err.Error()+"\n"), false)
+				store.StreamChunk(ctx, streamId, nil, true)
+				return
+			}
+
 			switch refType {
 			case RefCommit:
 				err = worktree.Checkout(&git.CheckoutOptions{
@@ -1223,6 +1225,10 @@ func checkout(ctx *types.Context, directory string, ref string, create bool, tun
 				if err != nil {
 					fmt.Println(err)
 				}
+			}
+
+			if err != nil {
+				store.StreamChunk(ctx, streamId, []byte(err.Error()+"\n"), false)
 			}
 
 			store.StreamChunk(ctx, streamId, nil, true)
