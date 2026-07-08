@@ -1848,4 +1848,3 @@ func TestInstall_CircularDependencies(t *testing.T) {
 		t.Error("Unexpected nested pkg-b installation (should be hoisted)")
 	}
 }
-

@@ -1379,8 +1379,6 @@ func testHost(urlStr string, tunnel string, directory string, proxy *GitProxy) e
 		}
 	}
 
-
-
 	// 3. Configure reverse proxy RoundTripper if proxyURL is present
 	if proxyURL != nil {
 		baseTransport = &reverseProxyRoundTripper{

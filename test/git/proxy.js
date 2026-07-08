@@ -9,7 +9,10 @@ const server = http.createServer((req, res) => {
     }
     let url;
     if (req.url.startsWith("/")) {
-        url = new URL(req.url, `http://${req.headers["x-proxy-host"] || req.headers.host || "localhost"}`);
+        url = new URL(
+            req.url,
+            `http://${req.headers["x-proxy-host"] || req.headers.host || "localhost"}`
+        );
     } else {
         url = new URL(req.url);
     }
@@ -19,25 +22,32 @@ const server = http.createServer((req, res) => {
         delete headers["x-proxy-host"];
     }
     headers["connection"] = "close";
-    const proxyReq = http.request({
-        hostname: url.hostname,
-        port: url.port || 80,
-        path: url.pathname + url.search,
-        method: req.method,
-        headers
-    }, (proxyRes) => {
-        res.writeHead(proxyRes.statusCode, proxyRes.headers);
-        if (req.method === "HEAD") {
-            res.end();
-        } else {
-            proxyRes.pipe(res);
+    const proxyReq = http.request(
+        {
+            hostname: url.hostname,
+            port: url.port || 80,
+            path: url.pathname + url.search,
+            method: req.method,
+            headers
+        },
+        (proxyRes) => {
+            res.writeHead(proxyRes.statusCode, proxyRes.headers);
+            if (req.method === "HEAD") {
+                res.end();
+            } else {
+                proxyRes.pipe(res);
+            }
         }
-    });
+    );
     proxyReq.on("error", (err) => {
         res.writeHead(502);
         res.end();
     });
-    if (req.method === "POST" || req.method === "PUT" || req.method === "PATCH") {
+    if (
+        req.method === "POST" ||
+        req.method === "PUT" ||
+        req.method === "PATCH"
+    ) {
         req.pipe(proxyReq);
     } else {
         proxyReq.end();

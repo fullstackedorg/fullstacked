@@ -80,29 +80,29 @@ packagesToBundle.forEach(({ entryPoint, outfile }) =>
     entryPoint.endsWith(".json")
         ? fs.cpSync(entryPoint, outfile, { recursive: true })
         : esbuild.buildSync({
-            entryPoints: [entryPoint],
-            outfile,
-            bundle: true,
-            // format: "esm",
-            platform: "node",
-            define: {
-                "process.versions.node": "\"0.0.0\""
-            },
-            external: ["process/", "create-hash/browser/md5"],
-            alias: {
-                // source: https://soatok.blog/2025/11/19/moving-beyond-the-npm-elliptic-package/
-                // elliptic: "@soatok/elliptic-to-noble",
+              entryPoints: [entryPoint],
+              outfile,
+              bundle: true,
+              // format: "esm",
+              platform: "node",
+              define: {
+                  "process.versions.node": '"0.0.0"'
+              },
+              external: ["process/", "create-hash/browser/md5"],
+              alias: {
+                  // source: https://soatok.blog/2025/11/19/moving-beyond-the-npm-elliptic-package/
+                  // elliptic: "@soatok/elliptic-to-noble",
 
-                randombytes: "randombytes/browser",
-                "create-ecdh": "create-ecdh/browser",
-                "create-hash": "create-hash/browser",
-                "create-hmac": "create-hmac/browser",
-                "browserify-cipher": "browserify-cipher/browser",
-                "browserify-sign": "browserify-sign/browser",
-                "browserify-sign/algos": "browserify-sign/algos"
-                // "browserify-aes": "browserify-aes/browser",
-            }
-        })
+                  randombytes: "randombytes/browser",
+                  "create-ecdh": "create-ecdh/browser",
+                  "create-hash": "create-hash/browser",
+                  "create-hmac": "create-hmac/browser",
+                  "browserify-cipher": "browserify-cipher/browser",
+                  "browserify-sign": "browserify-sign/browser",
+                  "browserify-sign/algos": "browserify-sign/algos"
+                  // "browserify-aes": "browserify-aes/browser",
+              }
+          })
 );
 
 // types
@@ -142,8 +142,8 @@ export const sharedLibLocation = path.resolve(
 
 console.log(
     `\nBuilt FullStacked v${version.major}.${version.minor}.${version.patch}\n` +
-    `\tbuild: ${version.build}\n` +
-    `\tbranch: ${version.branch}\n` +
-    `\thash: ${version.hash.slice(0, 8)}\n` +
-    `\tplatform: ${platform}-${arch}\n`
+        `\tbuild: ${version.build}\n` +
+        `\tbranch: ${version.branch}\n` +
+        `\thash: ${version.hash.slice(0, 8)}\n` +
+        `\tplatform: ${platform}-${arch}\n`
 );

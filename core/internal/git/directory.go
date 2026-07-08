@@ -159,7 +159,7 @@ func (r *GitDirectory) getClientOptions(ctx *types.Context, urlStr string, force
 						transport = nethttp.DefaultTransport.(*nethttp.Transport).Clone()
 						baseTransport = transport
 						hasCustomClient = true
-						
+
 						// Extract extra headers
 						extraHeaders := sec.OptionAll("extraHeader")
 						if len(extraHeaders) > 0 {
@@ -176,7 +176,6 @@ func (r *GitDirectory) getClientOptions(ctx *types.Context, urlStr string, force
 			}
 		}
 	}
-
 
 	// 3. Configure reverse proxy RoundTripper if proxyURL is present
 	if proxyURL != nil {

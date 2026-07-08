@@ -425,21 +425,33 @@ suite("git - e2e", () => {
         });
 
         try {
-            const duplex = await git.clone("http://localhost:8080/test", testDirectory, {
-                proxy: {
-                    url: `http://127.0.0.1:${port}`,
-                    headers: {
-                        "X-Test-Header": "test-value"
+            const duplex = await git.clone(
+                "http://localhost:8080/test",
+                testDirectory,
+                {
+                    proxy: {
+                        url: `http://127.0.0.1:${port}`,
+                        headers: {
+                            "X-Test-Header": "test-value"
+                        }
                     }
                 }
-            });
+            );
             await duplex.promise();
 
             // verify git config has proxy saved
-            const gitConfig = fs.readFileSync(`${testDirectory}/.git/config`, "utf-8");
+            const gitConfig = fs.readFileSync(
+                `${testDirectory}/.git/config`,
+                "utf-8"
+            );
             assert.ok(gitConfig.includes(`proxy = http://127.0.0.1:${port}`));
-            assert.ok(gitConfig.includes("extraHeader = X-Test-Header: test-value"));
-            assert.ok(headerChecked, "Proxy should have received the custom header");
+            assert.ok(
+                gitConfig.includes("extraHeader = X-Test-Header: test-value")
+            );
+            assert.ok(
+                headerChecked,
+                "Proxy should have received the custom header"
+            );
         } finally {
             proxyProcess.kill();
         }
