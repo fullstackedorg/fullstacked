@@ -544,13 +544,20 @@ suite("fs - e2e", () => {
     test("prevent sandbox escape traversal", () => {
         // Attempting to escape the root directory using traversal
         // should be restricted to the root directory itself (which is a directory and cannot be read as a file).
-        // The host /etc/passwd exists and is readable outside the sandbox.
-        assert.equal(nodeFs.existsSync("/etc/passwd"), true);
+        const hostFile = "../test-outside-sandbox.txt";
+        nodeFs.writeFileSync(hostFile, "outside");
+        try {
+            assert.equal(nodeFs.existsSync(hostFile), true);
 
-        // Within sandbox, trying to escape to host /etc/passwd must fail
-        assert.throws(() => {
-            fs.readFileSync("../../../../../../../../etc/passwd");
-        });
+            // Within sandbox, trying to escape to host file must fail
+            assert.throws(() => {
+                fs.readFileSync("../test-outside-sandbox.txt");
+            });
+        } finally {
+            if (nodeFs.existsSync(hostFile)) {
+                nodeFs.rmSync(hostFile);
+            }
+        }
     });
 
     test("chdir resolution, safety and traversal prevention", () => {

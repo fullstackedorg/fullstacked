@@ -199,7 +199,6 @@ func Switch(
 			targetCwd = "/" + targetCwd
 		}
 		targetCwd = filepath.ToSlash(targetCwd)
-		targetCwd = filepath.Clean(targetCwd)
 
 		if targetCwd == "" || targetCwd == "." {
 			targetCwd = "/"
