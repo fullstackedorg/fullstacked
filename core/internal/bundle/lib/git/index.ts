@@ -98,10 +98,12 @@ export function clone(
         proxy?: GitProxy;
     }
 ): Promise<Duplex> {
+    // backward compat, 2026-07-08
+    const options = typeof opts === "string" ? { tunnel: opts } : opts;
     return bridge({
         mod: Git,
         fn: Clone,
-        data: [url, directory, opts?.tunnel, opts?.proxy]
+        data: [url, directory, options?.tunnel, options?.proxy]
     });
 }
 
