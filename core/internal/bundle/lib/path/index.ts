@@ -26,10 +26,14 @@ const constants = {
     }
 };
 
+export function isAbsolute(path: string) {
+    return path.startsWith("/") || path.startsWith("\\") || /^[a-zA-Z]:[/\\]/.test(path);
+}
+
 export function resolve(...paths: string[]): string {
     if (paths[0].startsWith("build:")) {
         return paths.join(constants.sep);
-    } else if (!paths[0].startsWith(constants.sep)) {
+    } else if (!isAbsolute(paths[0])) {
         paths.unshift(cwd());
     }
     return bridge(
@@ -91,9 +95,7 @@ export function basename(path: string, suffix?: string) {
     return base;
 }
 
-export function isAbsolute(path: string) {
-    return parse(path).root !== "";
-}
+// handled above
 
 export function relative(from: string, to: string) {
     return bridge(
