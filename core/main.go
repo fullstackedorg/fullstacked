@@ -21,12 +21,27 @@ import (
 	"fmt"
 	"fullstackedorg/fullstacked/internal/router"
 	"fullstackedorg/fullstacked/internal/store"
+	"os"
+	"path"
+	"runtime/debug"
 	"unsafe"
 
 	"github.com/getsentry/sentry-go"
 )
 
 func main() {}
+
+var didSetCrashOpt = false
+
+func setCrashOpt(directory string) {
+	if didSetCrashOpt {
+		return
+	}
+
+	f, _ := os.Create(path.Join(directory, "crash.log"))
+	debug.SetCrashOutput(f, debug.CrashOptions{})
+	didSetCrashOpt = true
+}
 
 //export start
 func start(
@@ -37,7 +52,11 @@ func start(
 		defer sentry.Recover()
 	}
 
-	id := store.NewContext(C.GoString(root), C.GoString(build))
+	rootStr := C.GoString(root)
+
+	setCrashOpt(rootStr)
+
+	id := store.NewContext(rootStr, C.GoString(build))
 	return C.uint8_t(id)
 }
 
@@ -51,7 +70,11 @@ func startWithCtx(
 		defer sentry.Recover()
 	}
 
-	store.NewContextWithCtxId(uint8(ctxId), C.GoString(root), C.GoString(build))
+	rootStr := C.GoString(root)
+
+	setCrashOpt(rootStr)
+
+	store.NewContextWithCtxId(uint8(ctxId), rootStr, C.GoString(build))
 }
 
 //export check

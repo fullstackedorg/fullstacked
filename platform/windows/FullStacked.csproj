@@ -129,7 +129,7 @@
     <GenerateTemporaryStoreCertificate>True</GenerateTemporaryStoreCertificate>
     <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
-    <PackageCertificateThumbprint>C78BDB8C6ADF2B177ED6B9AC337BDA3F265B9BD9</PackageCertificateThumbprint>
+    <PackageCertificateKeyFile>FullStacked_TemporaryKey.pfx</PackageCertificateKeyFile>
   </PropertyGroup>
 
   <!--
