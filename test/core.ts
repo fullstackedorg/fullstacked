@@ -1,5 +1,3 @@
-import path from "node:path";
-import fs from "node:fs";
 import { load } from "../platform/node/src/core.ts";
 
 ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) =>
@@ -31,15 +29,5 @@ export default {
             }
         });
         core.start(process.cwd(), process.cwd());
-        cleanupBundledFiles();
     }
 };
-
-export function cleanupBundledFiles() {
-    fs.readdirSync("test", { recursive: true })
-        .filter(
-            (f: string) =>
-                !f.includes("static-file") && f.split("/").pop().startsWith("_")
-        )
-        .forEach((f: string) => fs.rmSync(path.join("test", f)));
-}

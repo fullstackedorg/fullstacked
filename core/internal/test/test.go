@@ -17,6 +17,7 @@ const (
 	Stream             TestFn = 3
 	StreamWrite        TestFn = 4
 	EventEmitter       TestFn = 5
+	Panic              TestFn = 6
 )
 
 type TestObject struct {
@@ -95,6 +96,8 @@ func Switch(
 			},
 		}
 		return nil
+	case Panic:
+		panic(data[0].Data.(string))
 	}
 
 	return errors.New("unknown test function")

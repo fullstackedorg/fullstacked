@@ -296,7 +296,6 @@ func Switch(
 			tunnel = data[3].Data.(string)
 		}
 		stream, err := checkout(
-			ctx,
 			path.ResolveWithContext(ctx, data[0].Data.(string)),
 			data[1].Data.(string),
 			create,
@@ -1167,7 +1166,7 @@ func tags(ctx *types.Context, directory string) ([]GitTag, error) {
 	return tags, nil
 }
 
-func checkout(ctx *types.Context, directory string, ref string, create bool, tunnel string) (*types.ResponseStream, error) {
+func checkout(directory string, ref string, create bool, tunnel string) (*types.ResponseStream, error) {
 	return &types.ResponseStream{
 		Open: func(ctx *types.Context, streamId uint8) {
 			dir, err := OpenGitDirectory(directory)

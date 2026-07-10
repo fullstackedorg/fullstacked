@@ -38,8 +38,13 @@ func setCrashOpt(directory string) {
 		return
 	}
 
-	f, _ := os.Create(path.Join(directory, "crash.log"))
-	debug.SetCrashOutput(f, debug.CrashOptions{})
+	gitDir := path.Join(directory, ".git")
+	os.MkdirAll(gitDir, 0700)
+	f, err := os.OpenFile(path.Join(gitDir, "crash.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if err == nil {
+		debug.SetCrashOutput(f, debug.CrashOptions{})
+		f.Close()
+	}
 	didSetCrashOpt = true
 }
 

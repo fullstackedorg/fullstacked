@@ -21,7 +21,8 @@ let tests = [
     "./dns/index.ts",
     "./git/index.ts",
     "./packages/index.ts",
-    "./worker/index.ts"
+    "./worker/index.ts",
+    "./crash-log/index.ts"
 ];
 
 const definedTests = process.argv

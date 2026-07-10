@@ -6,7 +6,8 @@ import {
     Serialization,
     SerializationIndex,
     Stream,
-    StreamWrite
+    StreamWrite,
+    Panic
 } from "../@types/test.ts";
 import { Duplex } from "../bridge/duplex.ts";
 import { EventEmitter } from "../bridge/eventEmitter.ts";
@@ -94,13 +95,25 @@ function eventEmitter(
     ).eventEmitter();
 }
 
+function panic(message: string): void {
+    bridge(
+        {
+            mod: Test,
+            fn: Panic,
+            data: [message]
+        },
+        true
+    );
+}
+
 const test = {
     hello,
     serialization,
     serializationIndex,
     streaming,
     streamWrite,
-    eventEmitter
+    eventEmitter,
+    panic
 };
 
 export default test;
