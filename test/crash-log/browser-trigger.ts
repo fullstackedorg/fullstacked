@@ -18,11 +18,13 @@ const browser = await createBrowser("sample");
 const pageObj = await browser.createPage(null);
 const page = pageObj.page;
 
-page.on("console", msg => console.log("BROWSER LOG:", msg.text()));
-page.on("pageerror", err => console.error("BROWSER ERROR:", err));
+page.on("console", (msg) => console.log("BROWSER LOG:", msg.text()));
+page.on("pageerror", (err) => console.error("BROWSER ERROR:", err));
 
 // 4. Navigate to the webview port and pass the query param
-await page.goto(`http://localhost:${browser.webview.port}/?message=${encodeURIComponent(message)}`);
+await page.goto(
+    `http://localhost:${browser.webview.port}/?message=${encodeURIComponent(message)}`
+);
 
 // 5. Set a timeout to exit if it hasn't crashed
 setTimeout(() => {

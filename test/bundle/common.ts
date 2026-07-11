@@ -36,6 +36,10 @@ export function cleanup() {
     fs.rmSync("test/bundle/samples/sass/output.css", {
         force: true
     });
+    fs.rmSync("test/bundle/samples/browser-only/out", {
+        force: true,
+        recursive: true
+    });
 }
 
 export async function tailwindcssBuilder() {

@@ -567,10 +567,13 @@ suite("fs - e2e", () => {
             assert.equal(process.cwd(), "/");
 
             if (nodeFs.existsSync("test-chdir-safety")) {
-                nodeFs.rmSync("test-chdir-safety", { recursive: true, force: true });
+                nodeFs.rmSync("test-chdir-safety", {
+                    recursive: true,
+                    force: true
+                });
             }
             nodeFs.mkdirSync("test-chdir-safety/child", { recursive: true });
-            
+
             process.chdir("/test-chdir-safety");
             assert.equal(process.cwd(), "/test-chdir-safety");
 
@@ -582,7 +585,10 @@ suite("fs - e2e", () => {
         } finally {
             process.chdir(originalCwd);
             if (nodeFs.existsSync("test-chdir-safety")) {
-                nodeFs.rmSync("test-chdir-safety", { recursive: true, force: true });
+                nodeFs.rmSync("test-chdir-safety", {
+                    recursive: true,
+                    force: true
+                });
             }
         }
     });

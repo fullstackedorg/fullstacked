@@ -12,7 +12,7 @@ suite("crash log - integration", () => {
         if (fs.existsSync(crashLogPath)) {
             fs.unlinkSync(crashLogPath);
         }
-    })
+    });
 
     after(() => {
         // Clean up the generated crash log file
@@ -21,10 +21,12 @@ suite("crash log - integration", () => {
         }
         // Cleanup sample out dir created during test
         if (fs.existsSync("test/crash-log/sample/out")) {
-            fs.rmSync("test/crash-log/sample/out", { recursive: true, force: true });
+            fs.rmSync("test/crash-log/sample/out", {
+                recursive: true,
+                force: true
+            });
         }
-    })
-
+    });
 
     test("does not overwrite or truncate crash log on subsequent runs using browser/webview", async () => {
         // 1. Pre-bundle the sample app using the test runner core context
@@ -48,9 +50,16 @@ suite("crash log - integration", () => {
         );
 
         // Verify first run wrote to the crash log
-        assert.ok(fs.existsSync(crashLogPath), "crash.log should exist after first browser crash");
+        assert.ok(
+            fs.existsSync(crashLogPath),
+            "crash.log should exist after first browser crash"
+        );
         const logContent1 = fs.readFileSync(crashLogPath, "utf8");
-        assert.match(logContent1, /FIRST_BROWSER_CRASH_PANIC_MESSAGE/, "crash.log should contain the first browser crash message");
+        assert.match(
+            logContent1,
+            /FIRST_BROWSER_CRASH_PANIC_MESSAGE/,
+            "crash.log should contain the first browser crash message"
+        );
 
         // Second run: trigger the second crash
         child_process.spawnSync(
@@ -70,7 +79,15 @@ suite("crash log - integration", () => {
         // Verify both crashes are preserved in the log
         assert.ok(fs.existsSync(crashLogPath), "crash.log should still exist");
         const logContent2 = fs.readFileSync(crashLogPath, "utf8");
-        assert.match(logContent2, /FIRST_BROWSER_CRASH_PANIC_MESSAGE/, "crash.log should still contain the first browser crash message");
-        assert.match(logContent2, /SECOND_BROWSER_CRASH_PANIC_MESSAGE/, "crash.log should contain the second browser crash message");
+        assert.match(
+            logContent2,
+            /FIRST_BROWSER_CRASH_PANIC_MESSAGE/,
+            "crash.log should still contain the first browser crash message"
+        );
+        assert.match(
+            logContent2,
+            /SECOND_BROWSER_CRASH_PANIC_MESSAGE/,
+            "crash.log should contain the second browser crash message"
+        );
     });
 });

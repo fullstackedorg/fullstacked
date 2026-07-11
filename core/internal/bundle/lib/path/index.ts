@@ -27,7 +27,11 @@ const constants = {
 };
 
 export function isAbsolute(path: string) {
-    return path.startsWith("/") || path.startsWith("\\") || /^[a-zA-Z]:[/\\]/.test(path);
+    return (
+        path.startsWith("/") ||
+        path.startsWith("\\") ||
+        /^[a-zA-Z]:[/\\]/.test(path)
+    );
 }
 
 export function resolve(...paths: string[]): string {

@@ -94,21 +94,24 @@ export const version = "";
 export const versions = {
     fullstacked
 };
-export const env = new Proxy({}, {
-    get(target, prop) {
-        return (process.env as any)[prop];
-    },
-    set(target, prop, val) {
-        (process.env as any)[prop] = val;
-        return true;
-    },
-    ownKeys() {
-        return Reflect.ownKeys(process.env);
-    },
-    getOwnPropertyDescriptor(target, prop) {
-        return Reflect.getOwnPropertyDescriptor(process.env, prop);
+export const env = new Proxy(
+    {},
+    {
+        get(target, prop) {
+            return (process.env as any)[prop];
+        },
+        set(target, prop, val) {
+            (process.env as any)[prop] = val;
+            return true;
+        },
+        ownKeys() {
+            return Reflect.ownKeys(process.env);
+        },
+        getOwnPropertyDescriptor(target, prop) {
+            return Reflect.getOwnPropertyDescriptor(process.env, prop);
+        }
     }
-}) as Record<string, string>;
+) as Record<string, string>;
 
 export function hrtime(previousTimestamp?: [number, number]) {
     const clocktime = performanceNow.call(performance) * 1e-3;
@@ -214,13 +217,15 @@ export const process = {
     title,
     browser,
     get env() {
-        return bridge(
-            {
-                mod: Core,
-                fn: GetEnv
-            },
-            true
-        ) || {};
+        return (
+            bridge(
+                {
+                    mod: Core,
+                    fn: GetEnv
+                },
+                true
+            ) || {}
+        );
     },
     argv,
     version,
@@ -249,7 +254,6 @@ export const process = {
 if (globalThis.process === undefined) {
     globalThis.process = process as any;
 }
-
 
 if (typeof globalThis.resize === "function") {
     let defaultSize = process.env.WINDOW_SIZE;
