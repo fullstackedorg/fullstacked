@@ -22,7 +22,7 @@ export default {
         core = await load((ctx, id, buffer) => {
             if (ctx === 0) {
                 // e2e tests
-                globalThis.callback(id, buffer);
+                globalThis.fullstacked.onStreamData(id, buffer);
             } else {
                 // integration tests
                 callbackListeners.forEach((cb) => cb(id, buffer));

@@ -25,8 +25,6 @@ import (
 	"path"
 	"runtime/debug"
 	"unsafe"
-
-	"github.com/getsentry/sentry-go"
 )
 
 func main() {}
@@ -53,10 +51,6 @@ func start(
 	root *C.char,
 	build *C.char,
 ) C.uint8_t {
-	if store.HasSentry {
-		defer sentry.Recover()
-	}
-
 	rootStr := C.GoString(root)
 
 	setCrashOpt(rootStr)
@@ -71,10 +65,6 @@ func startWithCtx(
 	build *C.char,
 	ctxId C.uint8_t,
 ) {
-	if store.HasSentry {
-		defer sentry.Recover()
-	}
-
 	rootStr := C.GoString(root)
 
 	setCrashOpt(rootStr)
@@ -86,10 +76,6 @@ func startWithCtx(
 func check(
 	ctxId C.uint8_t,
 ) C.int {
-	if store.HasSentry {
-		defer sentry.Recover()
-	}
-
 	ctx, ok := store.Contexts[uint8(ctxId)]
 	if !ok || ctx.Exit {
 		return 0
@@ -101,10 +87,6 @@ func check(
 func stop(
 	ctxId C.uint8_t,
 ) {
-	if store.HasSentry {
-		defer sentry.Recover()
-	}
-
 	store.EndContext(uint8(ctxId))
 }
 
@@ -136,10 +118,6 @@ func getCorePayload(
 	ptr unsafe.Pointer,
 	size C.int,
 ) {
-	if store.HasSentry {
-		defer sentry.Recover()
-	}
-
 	response, err := store.GetCorePayload(uint8(ctx), uint8(coreType), uint8(id), int(size))
 
 	if err != nil {
@@ -154,10 +132,6 @@ func getCorePayload(
 
 //export call
 func call(buffer unsafe.Pointer, length C.int) C.int {
-	if store.HasSentry {
-		defer sentry.Recover()
-	}
-
 	size, err := router.Call(C.GoBytes(buffer, length))
 
 	if err != nil {
@@ -170,10 +144,6 @@ func call(buffer unsafe.Pointer, length C.int) C.int {
 
 //export freePtr
 func freePtr(ptr unsafe.Pointer) {
-	if store.HasSentry {
-		defer sentry.Recover()
-	}
-
 	C.free(ptr)
 }
 

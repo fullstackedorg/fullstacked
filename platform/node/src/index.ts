@@ -28,7 +28,7 @@ const webviews: Map<
 const core = await load(
     (ctx: number, streamId: number, buffer: ArrayBuffer) => {
         if (ctx === mainCtx) {
-            globalThis.callback(streamId, buffer);
+            globalThis.fullstacked.onStreamData(streamId, buffer);
             return;
         }
 

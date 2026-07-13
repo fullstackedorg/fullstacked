@@ -54,7 +54,7 @@ async function connect(): Promise<void> {
         return;
     }
 
-    const duplex = (await bridge({
+    const duplex = (await globalThis.fullstacked.bridge({
         mod: PluginModule,
         fn: StartPluginStream
     })) as Duplex;
@@ -142,7 +142,7 @@ export async function register<T extends keyof PluginRegistry>(
 
     const { name, ...pluginData } = plugin.data || {};
 
-    const id = await bridge({
+    const id = await globalThis.fullstacked.bridge({
         mod: PluginModule,
         fn: Register,
         data: [type, name || "plugin-" + type, pluginData]
@@ -153,7 +153,7 @@ export async function register<T extends keyof PluginRegistry>(
     return {
         unregister: async () => {
             plugins.delete(id);
-            await bridge({
+            await globalThis.fullstacked.bridge({
                 mod: PluginModule,
                 fn: Unregister,
                 data: [id]

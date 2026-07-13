@@ -4,14 +4,6 @@ import events from "events";
 import { deserializeNumber } from "../bridge/serialization.ts";
 import { isWorker } from "../bridge/isWorker.ts";
 
-declare global {
-    var __workerStreams: Map<number, any>;
-}
-
-if (!globalThis.__workerStreams) {
-    globalThis.__workerStreams = new Map<number, any>();
-}
-
 export let parentPort: any = null;
 
 if (isWorker) {
@@ -19,7 +11,7 @@ if (isWorker) {
         constructor() {
             super();
             self.addEventListener("message", (e: MessageEvent) => {
-                if (e.data && e.data.type === "stream-callback") {
+                if (e.data && e.data.type === "on-stream-data") {
                     return;
                 }
                 this.emit("message", e);
@@ -53,7 +45,7 @@ export class Worker extends events.EventEmitter {
                     const responseView = new DataView(res);
                     if (res.byteLength > 0 && responseView.getUint8(0) === 2) {
                         const streamId = deserializeNumber(res, 1).data;
-                        globalThis.__workerStreams.set(
+                        globalThis.fullstacked.workerStreams.set(
                             streamId,
                             this.w
                         );
@@ -74,7 +66,7 @@ export class Worker extends events.EventEmitter {
     }
 
     cleanup() {
-        const workerStreams = globalThis.__workerStreams;
+        const workerStreams = globalThis.fullstacked.workerStreams;
         if (workerStreams) {
             for (const [streamId, worker] of workerStreams.entries()) {
                 if (worker === this.w) {

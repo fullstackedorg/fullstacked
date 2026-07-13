@@ -10,13 +10,14 @@ const asyncResponsePromises = new Map<
 const clipboardResponsePromises = new Map<number, (response: string) => void>();
 
 export async function BridgeAppleInit(): Promise<PlatformBridge> {
-    globalThis.respond = function (id: number, responseB64: string) {
+
+    globalThis.fullstacked.respond = (id: number, responseBase64: string) => {
         const promise = asyncResponsePromises.get(id);
-        promise?.(toByteArray(responseB64).buffer);
+        promise?.(toByteArray(responseBase64).buffer);
         asyncResponsePromises.delete(id);
     };
 
-    const ctx = await (await globalThis.originalFetch("/ctx")).json();
+    const ctx = await (await fetch("/ctx")).json();
 
     if (isWorker) {
         globalThis.onmessage = (event) => {
@@ -33,22 +34,18 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
             asyncResponsePromises.delete(id);
         };
     } else {
-        globalThis.exit = () =>
+        globalThis.fullstacked.exit = () =>
             globalThis.webkit.messageHandlers.exit.postMessage("");
 
         if (globalThis.webkit.messageHandlers.clipboard) {
             const td = new TextDecoder();
-            globalThis.respondClipboard = function (
-                idStr: string,
-                response: string
-            ) {
-                const id = parseInt(idStr);
+            globalThis.fullstacked.clipboard.respondPaste = (id: number, responseBase64: string) => {
                 const promise = clipboardResponsePromises.get(id);
-                promise?.(td.decode(toByteArray(response)));
+                promise?.(td.decode(toByteArray(responseBase64)));
                 clipboardResponsePromises.delete(id);
             };
 
-            globalThis.paste = function () {
+            globalThis.fullstacked.clipboard.paste = () => {
                 const id = Math.floor(Math.random() * 1000000);
                 return new Promise<string>((resolve) => {
                     globalThis.webkit.messageHandlers.clipboard.postMessage(
@@ -58,7 +55,7 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
                 });
             };
 
-            globalThis.copy = function (text: string) {
+            globalThis.fullstacked.clipboard.copy = (text: string) => {
                 globalThis.webkit.messageHandlers.clipboard.postMessage({
                     action: "copy",
                     text
@@ -67,26 +64,26 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
         }
 
         if (globalThis.webkit.messageHandlers.resize) {
-            const resizeResponsePromises: ((response: string) => void)[] = [];
+            const resizeResponsePromises: ((size: string) => void)[] = [];
 
-            globalThis.respondResize = function (response: string) {
+            globalThis.fullstacked.window.respondGetSize = function (response: string) {
                 const resolve = resizeResponsePromises.shift();
                 resolve?.(response);
             };
 
-            globalThis.resize = function (sizeOrGet: string) {
-                if (sizeOrGet === "get") {
-                    return new Promise<string>((resolve) => {
-                        resizeResponsePromises.push(resolve);
-                        globalThis.webkit.messageHandlers.resize.postMessage(
-                            "get"
-                        );
-                    });
-                } else {
+            globalThis.fullstacked.window.resize = function (size: string) {
+                globalThis.webkit.messageHandlers.resize.postMessage(
+                    size
+                );
+            };
+
+            globalThis.fullstacked.window.getSize = function () {
+                return new Promise<string>((resolve) => {
+                    resizeResponsePromises.push(resolve);
                     globalThis.webkit.messageHandlers.resize.postMessage(
-                        sizeOrGet
+                        "get"
                     );
-                }
+                });
             };
         }
     }

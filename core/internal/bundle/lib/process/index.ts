@@ -3,14 +3,13 @@ import { Chdir, Cwd, Exit, GetEnv } from "../@types/router.ts";
 import { isWorker } from "../bridge/isWorker.ts";
 import fullstacked from "./version.json" with { type: "json" };
 import { setTimeout, clearTimeout } from "../timers/index.ts";
-import { readFile, writeFile, mkdir } from "../fs/promises.ts";
 
 // Shims from process.browser.js
 class Item {
     constructor(
         public fun: Function,
         public array: any[]
-    ) {}
+    ) { }
     run() {
         this.fun.apply(null, this.array);
     }
@@ -85,7 +84,7 @@ const performanceNow =
     };
 
 // Local variables / functions
-export const noop = () => {};
+export const noop = () => { };
 export const title = "browser";
 export const browser = true;
 export const argv: string[] = [];
@@ -136,11 +135,11 @@ export function exit() {
         return true;
     }
 
-    if (typeof globalThis.exit !== "function") {
+    if (typeof globalThis.fullstacked.exit !== "function") {
         return false;
     }
 
-    bridge(
+    globalThis.fullstacked.bridge(
         {
             mod: Core,
             fn: Exit,
@@ -149,7 +148,7 @@ export function exit() {
         true
     );
 
-    globalThis.exit();
+    globalThis.fullstacked.exit();
     return true;
 }
 
@@ -169,7 +168,7 @@ export function binding(name: string) {
 }
 
 export function cwd() {
-    return bridge(
+    return globalThis.fullstacked.bridge(
         {
             mod: Core,
             fn: Cwd,
@@ -180,7 +179,7 @@ export function cwd() {
 }
 
 export function chdir(dir: string) {
-    return bridge(
+    return globalThis.fullstacked.bridge(
         {
             mod: Core,
             fn: Chdir,
@@ -217,7 +216,7 @@ export const process = {
     browser,
     get env() {
         return (
-            bridge(
+            globalThis.fullstacked.bridge(
                 {
                     mod: Core,
                     fn: GetEnv
@@ -249,91 +248,5 @@ export const process = {
     stdout,
     stderr
 };
-
-if (globalThis.process === undefined) {
-    globalThis.process = process as any;
-}
-
-if (typeof globalThis.resize === "function") {
-    let defaultSize = process.env.WINDOW_SIZE;
-    let isAutoResizeDisabled =
-        (globalThis as any).disableAutoWindowSize === true;
-
-    const loadSavedSize = async (): Promise<string | null> => {
-        if (isAutoResizeDisabled) {
-            return null;
-        }
-        try {
-            const savedData = await readFile("/.git/window-size.txt", {
-                encoding: "utf-8"
-            });
-            if (savedData) {
-                const savedSize = savedData.trim();
-                if (
-                    savedSize &&
-                    (savedSize.includes(":") ||
-                        savedSize === "fullscreen" ||
-                        savedSize === "kiosk")
-                ) {
-                    return savedSize;
-                }
-            }
-        } catch (e) {
-            // Ignore error
-        }
-        return null;
-    };
-
-    let saveTimeout: any = null;
-    const onResize = () => {
-        if (isAutoResizeDisabled) {
-            return;
-        }
-        clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(async () => {
-            try {
-                const sizeStr = await (globalThis as any).resize("get");
-                if (
-                    sizeStr &&
-                    (sizeStr.includes(":") ||
-                        sizeStr === "fullscreen" ||
-                        sizeStr === "kiosk")
-                ) {
-                    try {
-                        await mkdir("/.git");
-                    } catch (e) {
-                        // Ignore folder already exists error
-                    }
-                    await writeFile("/.git/window-size.txt", sizeStr.trim());
-                }
-            } catch (e) {
-                // Ignore
-            }
-        }, 200);
-    };
-
-    globalThis.addEventListener("resize", onResize);
-
-    (globalThis as any).disableAutoWindowSize = () => {
-        isAutoResizeDisabled = true;
-        globalThis.removeEventListener("resize", onResize);
-    };
-
-    (async () => {
-        let savedSize = await loadSavedSize();
-        if (savedSize) {
-            if (savedSize === "kiosk") {
-                savedSize = "fullscreen";
-            }
-            if (!defaultSize) {
-                defaultSize = savedSize;
-            }
-        }
-
-        if (defaultSize) {
-            globalThis.resize(defaultSize);
-        }
-    })();
-}
 
 export default process;

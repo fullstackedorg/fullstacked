@@ -138,9 +138,9 @@ export function fromByteArray(uint8: Uint8Array): string {
         tmp = (uint8[len - 2] << 8) + uint8[len - 1];
         parts.push(
             lookup[tmp >> 10] +
-                lookup[(tmp >> 4) & 0x3f] +
-                lookup[(tmp << 2) & 0x3f] +
-                "="
+            lookup[(tmp >> 4) & 0x3f] +
+            lookup[(tmp << 2) & 0x3f] +
+            "="
         );
     }
 

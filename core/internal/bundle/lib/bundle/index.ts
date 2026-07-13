@@ -9,7 +9,7 @@ import path from "../path/index.ts";
 import { Duplex } from "../bridge/duplex.ts";
 
 export function esbuildVersion(): Promise<string> {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Bundle,
         fn: EsbuildVersion
     });
@@ -19,13 +19,13 @@ export function bundle(entryPoint?: string): Promise<EsbuildResult> {
     const resolved = path.resolve(entryPoint ?? ".");
     return new Promise(async (resolve) => {
         const ee = (
-            (await bridge({
+            (await globalThis.fullstacked.bridge({
                 mod: Bundle,
                 fn: BundleDir,
                 data: [resolved]
             })) as Duplex
         ).eventEmitter() as any;
-        
+
         ee.on("result", resolve);
     });
 }
@@ -33,7 +33,7 @@ export function bundle(entryPoint?: string): Promise<EsbuildResult> {
 export function bundleFile(entryPoint: string): Promise<EsbuildResult> {
     const resolved = path.resolve(entryPoint);
 
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Bundle,
         fn: BundleFile,
         data: [resolved]

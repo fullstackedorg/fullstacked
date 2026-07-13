@@ -17,8 +17,8 @@ let platformBridge: {
 
 if (isWorker) {
     self.addEventListener("message", (event: MessageEvent) => {
-        if (event.data && event.data.type === "stream-callback") {
-            globalThis.callback(event.data.streamId, event.data.payload);
+        if (event.data && event.data.type === "on-stream-data") {
+            globalThis.fullstacked.onStreamData(event.data.streamId, event.data.payload);
         }
     });
 }
@@ -61,13 +61,6 @@ else {
             } catch {
                 return failedPlatformRequest();
             }
-
-            await Promise.all([
-                // @ts-ignore
-                import("fetch"),
-                import("timers"),
-                import("buffer")
-            ]);
 
             switch (platform) {
                 case "node":

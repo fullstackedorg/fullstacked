@@ -1,6 +1,7 @@
+import parentWindow from "fullstacked/parentWindow"
 import { getConfig, setConfig } from "./shell/cli/config";
 
-globalThis.disableAutoWindowSize?.();
+parentWindow.disableAutoWindowSize();
 
 const saveSkipWelcomeUntil = (dontShowAgain: boolean) => {
     const until = dontShowAgain

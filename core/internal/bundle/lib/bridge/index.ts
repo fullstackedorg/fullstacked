@@ -7,13 +7,44 @@ import {
     CoreResponseStream,
     SerializableData
 } from "../@types/index.ts";
-import { createDuplex } from "./duplex.ts";
+import onStreamData, { createDuplex } from "./duplex.ts";
 import type platformBridgeType from "./platform/index.ts";
+import fetchCore from "../fetch/index.ts";
+import parentWindow from "../parentWindow/index.ts";
 
 declare global {
-    var bridge: bridge;
-    var platformBridge: typeof platformBridgeType;
+    var fullstacked: Partial<FullStacked>;
     var __dirname: string;
+}
+
+type FullStacked = {
+    bridge: Bridge;
+    platformBridge: typeof platformBridgeType;
+
+    respond(id: number, responseBase64: string): void;
+
+    onStreamData: (
+        id: number,
+        payload: ArrayBuffer | string
+    ) => void;
+
+    workerStreams: Map<number, any>;
+
+    exit: () => void;
+
+    clipboard: {
+        copy?: (text: string) => void;
+        paste?: () => string | Promise<string>;
+        respondPaste?: (id: number, responseBase64: string) => void
+    }
+
+    window: {
+        resize?: (size: string) => void;
+        getSize?: () => Promise<string>;
+        respondGetSize?: (response: any) => void;
+    }
+
+    fetch: typeof fetch;
 }
 
 globalThis.__dirname = "/";
@@ -24,13 +55,22 @@ type BridgeOpts = {
     data?: SerializableData[];
 };
 
-type bridgeAsync = (opts: BridgeOpts) => Promise<SerializableData>;
-type bridgeSync<T extends boolean> = (opts: BridgeOpts, sync: T) => T extends true ? SerializableData : Promise<SerializableData>;
-type bridge = bridgeSync<boolean> & bridgeAsync;
+type BridgeAsync = (opts: BridgeOpts) => Promise<SerializableData>;
+type BridgeSync<T extends boolean> = (opts: BridgeOpts, sync: T) => T extends true ? SerializableData : Promise<SerializableData>;
+type Bridge = BridgeSync<boolean> & BridgeAsync;
 
 async function init() {
+    if (globalThis.fullstacked) {
+        return;
+    }
+
+    globalThis.fullstacked = {
+        clipboard: {},
+        window: {},
+        workerStreams: new Map()
+    }
+
     const platformBridge = (await import("./platform/index.ts")).default;
-    globalThis.platformBridge = platformBridge;
     try {
         await platformBridge.ready;
     } catch {
@@ -38,7 +78,8 @@ async function init() {
     }
 
     let id = 0;
-    globalThis.bridge = function (opts: BridgeOpts, sync?: boolean) {
+    const bridge: Bridge = (opts: BridgeOpts, sync?: boolean) => {
+
         const preparePayload = () => {
             id = (id + 1) % 256;
 
@@ -83,16 +124,28 @@ async function init() {
                 resolve(response);
             }
         });
-    };
+    }
+
+    globalThis.fullstacked.platformBridge = platformBridge;
+    globalThis.fullstacked.bridge = bridge;
+    globalThis.fullstacked.fetch = fetch.bind(globalThis);
+    globalThis.fullstacked.onStreamData = onStreamData;
+
+    globalThis.fetch = fetchCore;
+
+    await Promise.all([
+        import("timers"),
+        import("buffer")
+    ]);
 
     if (!globalThis.process) {
-        await import("process");
+        globalThis.process = (await import("process")).default;
     }
+
+    await parentWindow.setup();
 }
 
-if (!globalThis.bridge) {
-    await init();
-}
+await init();
 
 function processResponse(buffer: ArrayBuffer | void) {
     if (!buffer || buffer.byteLength === 0) {
@@ -114,7 +167,7 @@ function processResponse(buffer: ArrayBuffer | void) {
             return deserialize(buffer, 1).data;
         case CoreResponseStream:
             const streamId = deserialize(buffer, 1).data as number;
-            return createDuplex(streamId, bridge);
+            return createDuplex(streamId);
     }
 
     throw new Error("don't know how to process response from core");

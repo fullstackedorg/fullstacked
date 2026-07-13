@@ -22,6 +22,7 @@
         "core/internal/bundle/lib/bundle/index.ts",
         "core/internal/bundle/lib/git/index.ts",
         "core/internal/bundle/lib/packages/index.ts",
+        "core/internal/bundle/lib/parentWindow/index.ts",
         "core/internal/bundle/lib/plugin/index.ts",
         "core/internal/bundle/lib/run/index.ts",
         "core/internal/bundle/lib/sentry/index.ts",

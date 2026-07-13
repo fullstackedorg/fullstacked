@@ -29,7 +29,7 @@ export async function readFile(
     options: ReadFileOpts
 ): Promise<string>;
 export async function readFile(path: PathLike, options?: ReadFileOpts) {
-    const data: Uint8Array = await bridge({
+    const data: Uint8Array = await globalThis.fullstacked.bridge({
         mod: Fs,
         fn: ReadFile,
         data: [formatPathLike(path)]
@@ -51,7 +51,7 @@ export async function readdir(
     options?: Partial<ReadDirOpts>
 ): Promise<string[] | Dirent[]> {
     const baseDir = formatPathLike(path);
-    const items: GoFileInfo[] = await bridge({
+    const items: GoFileInfo[] = await globalThis.fullstacked.bridge({
         mod: Fs,
         fn: ReadDir,
         data: [baseDir, options?.recursive ?? false]
@@ -63,7 +63,7 @@ export async function stat(
     path: PathLike,
     options?: StatOpts
 ): Promise<StatsInterface> {
-    const fileInfo: GoFileInfo = await bridge({
+    const fileInfo: GoFileInfo = await globalThis.fullstacked.bridge({
         mod: Fs,
         fn: Stats,
         data: [formatPathLike(path)]
@@ -73,7 +73,7 @@ export async function stat(
 }
 
 export function writeFile(path: PathLike, data: string | Uint8Array) {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Fs,
         fn: WriteFile,
         data: [formatPathLike(path), data]
@@ -81,7 +81,7 @@ export function writeFile(path: PathLike, data: string | Uint8Array) {
 }
 
 export function mkdir(path: PathLike) {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Fs,
         fn: Mkdir,
         data: [formatPathLike(path)]
@@ -89,7 +89,7 @@ export function mkdir(path: PathLike) {
 }
 
 export function rm(path: PathLike) {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Fs,
         fn: Rm,
         data: [formatPathLike(path)]
@@ -97,7 +97,7 @@ export function rm(path: PathLike) {
 }
 
 export function unlink(path: PathLike) {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Fs,
         fn: Rm,
         data: [formatPathLike(path)]
@@ -105,7 +105,7 @@ export function unlink(path: PathLike) {
 }
 
 export function rename(path: PathLike, path2: PathLike) {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Fs,
         fn: Rename,
         data: [formatPathLike(path), formatPathLike(path2)]
@@ -113,7 +113,7 @@ export function rename(path: PathLike, path2: PathLike) {
 }
 
 export function cp(src: PathLike, dst: PathLike) {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Fs,
         fn: Copy,
         data: [formatPathLike(src), formatPathLike(dst)]

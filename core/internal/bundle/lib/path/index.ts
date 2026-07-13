@@ -39,7 +39,7 @@ export function resolve(...paths: string[]): string {
     } else if (!isAbsolute(paths[0])) {
         paths.unshift(cwd());
     }
-    return bridge(
+    return globalThis.fullstacked.bridge(
         {
             mod: Path,
             fn: Resolve,
@@ -50,7 +50,7 @@ export function resolve(...paths: string[]): string {
 }
 
 export function join(...paths: string[]): string {
-    return bridge(
+    return globalThis.fullstacked.bridge(
         {
             mod: Path,
             fn: Join,
@@ -61,7 +61,7 @@ export function join(...paths: string[]): string {
 }
 
 export function normalize(path: string): string {
-    return bridge(
+    return globalThis.fullstacked.bridge(
         {
             mod: Path,
             fn: Normalize,
@@ -72,7 +72,7 @@ export function normalize(path: string): string {
 }
 
 export function parse(path: string): ParsedPath {
-    return bridge(
+    return globalThis.fullstacked.bridge(
         {
             mod: Path,
             fn: Parse,
@@ -101,7 +101,7 @@ export function basename(path: string, suffix?: string) {
 // handled above
 
 export function relative(from: string, to: string) {
-    return bridge(
+    return globalThis.fullstacked.bridge(
         {
             mod: Path,
             fn: Relative,

@@ -23,7 +23,7 @@ export async function BridgeNodeInit(): Promise<PlatformBridge> {
             asyncResponsePromises.delete(id);
         };
 
-        const ctx = await (await globalThis.originalFetch("/ctx")).json();
+        const ctx = await (await fetch("/ctx")).json();
 
         return {
             ctx,
@@ -53,14 +53,14 @@ export async function BridgeNodeInit(): Promise<PlatformBridge> {
     const webSocketUrl = new URL(self.location.href);
     webSocketUrl.protocol = webSocketUrl.protocol === "https:" ? "wss:" : "ws:";
 
-    const ctx = await (await globalThis.originalFetch("/ctx")).json();
+    const ctx = await (await fetch("/ctx")).json();
 
     let ws: WebSocket;
     const webSocketForCallback = new Promise((res) => {
         ws = new WebSocket(webSocketUrl);
         ws.binaryType = "arraybuffer";
         ws.onmessage = (e: { data: ArrayBuffer }) => {
-            globalThis.callback(
+            globalThis.fullstacked.onStreamData(
                 new DataView(e.data).getUint8(0),
                 e.data.slice(1)
             );
@@ -70,7 +70,7 @@ export async function BridgeNodeInit(): Promise<PlatformBridge> {
 
     await webSocketForCallback;
 
-    globalThis.exit = function () {
+    globalThis.fullstacked.exit = function () {
         ws.close();
 
         if (window.opener || (window.history && window.history.length === 1)) {
@@ -95,7 +95,7 @@ export async function BridgeNodeInit(): Promise<PlatformBridge> {
             return toByteArray(response).buffer;
         },
         async Async(payload: ArrayBuffer) {
-            const response = await globalThis.originalFetch("/call", {
+            const response = await globalThis.fullstacked.fetch("/call", {
                 method: "POST",
                 body: payload
             });

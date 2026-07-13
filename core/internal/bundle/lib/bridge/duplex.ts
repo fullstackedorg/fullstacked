@@ -20,21 +20,14 @@ type DuplexItem = {
     queuedPackets: (ArrayBuffer | string)[];
 };
 
-declare global {
-    var callback: typeof callbackResponder
-}
-
-if (!globalThis.callback) {
-    globalThis.callback = callbackResponder;
-}
 
 const activeDuplexes = new Map<number, DuplexItem[]>();
 
-function callbackResponder(
+function onStreamData(
     id: number,
     payload: ArrayBuffer | string
 ) {
-    const workerStreams = globalThis.__workerStreams;
+    const workerStreams = globalThis.fullstacked.workerStreams;
     if (workerStreams) {
         const worker = workerStreams.get(id);
         if (worker) {
@@ -48,7 +41,7 @@ function callbackResponder(
 
             worker.postMessage(
                 {
-                    type: "stream-callback",
+                    type: "on-stream-data",
                     streamId: id,
                     payload
                 },
@@ -61,7 +54,7 @@ function callbackResponder(
     const duplexes = activeDuplexes.get(id);
 
     if (!duplexes || duplexes.length === 0) {
-        bridge({
+        globalThis.fullstacked.bridge({
             mod: Stream,
             fn: Close,
             data: [id]
@@ -144,7 +137,7 @@ export interface Duplex extends ReadableStream<Uint8Array<ArrayBuffer>> {
 
 const te = new TextEncoder();
 
-export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
+export function createDuplex(id: number): Duplex {
     const duplex: DuplexItem = {
         opening: null,
         open: false,
@@ -173,7 +166,7 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
         }
 
         duplex.opening = new Promise(async (resolveOpening) => {
-            await bridgeFn({
+            await globalThis.fullstacked.bridge({
                 mod: Stream,
                 fn: Open,
                 data: [id]
@@ -265,7 +258,7 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
             await open();
         }
         data = typeof data === "string" ? te.encode(data) : data;
-        return bridgeFn({
+        return globalThis.fullstacked.bridge({
             mod: Stream,
             fn: Write,
             data: [id, data]
@@ -276,7 +269,7 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
         if (!duplex.open) {
             await open();
         }
-        return bridgeFn({
+        return globalThis.fullstacked.bridge({
             mod: Stream,
             fn: WriteEvent,
             data: [id, event, ...args]
@@ -288,7 +281,7 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
             await open();
         }
 
-        const res = await bridgeFn({
+        const res = await globalThis.fullstacked.bridge({
             mod: Stream,
             fn: Close,
             data: [id]
@@ -327,3 +320,5 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
 
     return stream;
 }
+
+export default onStreamData;

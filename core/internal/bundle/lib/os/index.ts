@@ -20,7 +20,7 @@ const cache = {
 
 export function platform(): string {
     if (cache.platform === null) {
-        cache.platform = bridge(
+        cache.platform = globalThis.fullstacked.bridge(
             {
                 mod: Os,
                 fn: Platform
@@ -33,7 +33,7 @@ export function platform(): string {
 
 export function arch(): string {
     if (cache.arch === null) {
-        cache.arch = bridge(
+        cache.arch = globalThis.fullstacked.bridge(
             {
                 mod: Os,
                 fn: Arch
@@ -46,7 +46,7 @@ export function arch(): string {
 
 export function endianness(): string {
     if (cache.endianness === null) {
-        cache.endianness = bridge(
+        cache.endianness = globalThis.fullstacked.bridge(
             {
                 mod: Os,
                 fn: Endieness
@@ -59,7 +59,7 @@ export function endianness(): string {
 
 function getUname() {
     if (cache.uname === null) {
-        cache.uname = bridge(
+        cache.uname = globalThis.fullstacked.bridge(
             {
                 mod: Os,
                 fn: Uname
@@ -81,7 +81,7 @@ export function type(): string {
 
 export function hostname(): string {
     if (cache.hostname === null) {
-        cache.hostname = bridge(
+        cache.hostname = globalThis.fullstacked.bridge(
             {
                 mod: Os,
                 fn: Hostname

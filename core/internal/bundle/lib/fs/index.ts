@@ -32,7 +32,7 @@ import promises from "./promises.ts";
 import { resolve } from "../path/index.ts";
 
 export function existsSync(path: PathLike): boolean {
-    return bridge(
+    return globalThis.fullstacked.bridge(
         {
             mod: Fs,
             fn: Exists,
@@ -43,7 +43,7 @@ export function existsSync(path: PathLike): boolean {
 }
 
 export function statSync(path: PathLike, options?: StatOpts): StatsInterface {
-    const fileInfo: GoFileInfo = bridge(
+    const fileInfo: GoFileInfo = globalThis.fullstacked.bridge(
         {
             mod: Fs,
             fn: Stats,
@@ -80,7 +80,7 @@ export function stat(
 export function readFileSync(path: PathLike): Buffer<ArrayBuffer>;
 export function readFileSync(path: PathLike, options: ReadFileOpts): string;
 export function readFileSync(path: PathLike, options?: ReadFileOpts) {
-    const data: Uint8Array = bridge(
+    const data: Uint8Array = globalThis.fullstacked.bridge(
         {
             mod: Fs,
             fn: ReadFile,
@@ -127,7 +127,7 @@ export function readdirSync(
     options?: Partial<ReadDirOpts>
 ): string[] | Dirent[] {
     const baseDir = formatPathLike(path);
-    const items: GoFileInfo[] = bridge(
+    const items: GoFileInfo[] = globalThis.fullstacked.bridge(
         {
             mod: Fs,
             fn: ReadDir,
@@ -161,7 +161,7 @@ export function readdir(
     const cb = typeof options === "function" ? options : callback;
     const opts = typeof options === "function" ? {} : options;
     const baseDir = formatPathLike(path);
-    bridge({
+    globalThis.fullstacked.bridge({
         mod: Fs,
         fn: ReadDir,
         data: [baseDir, opts?.recursive ?? false]
@@ -176,7 +176,7 @@ export function readdir(
 }
 
 export function mkdirSync(path: PathLike) {
-    return bridge(
+    return globalThis.fullstacked.bridge(
         {
             mod: Fs,
             fn: Mkdir,
@@ -194,7 +194,7 @@ export async function mkdir(path: PathLike, callback: (err: Error) => void) {
 }
 
 export function rmSync(path: PathLike) {
-    return bridge(
+    return globalThis.fullstacked.bridge(
         {
             mod: Fs,
             fn: Rm,
@@ -212,7 +212,7 @@ export async function rm(path: PathLike, callback: (err: Error) => void) {
 }
 
 export function unlinkSync(path: PathLike) {
-    return bridge(
+    return globalThis.fullstacked.bridge(
         {
             mod: Fs,
             fn: Rm,
@@ -230,7 +230,7 @@ export async function unlink(path: PathLike, callback: (err: Error) => void) {
 }
 
 export function writeFileSync(path: PathLike, data: string | Uint8Array) {
-    return bridge(
+    return globalThis.fullstacked.bridge(
         {
             mod: Fs,
             fn: WriteFile,
@@ -252,7 +252,7 @@ export function writeFile(
 }
 
 export function renameSync(path: PathLike, path2: PathLike) {
-    return bridge(
+    return globalThis.fullstacked.bridge(
         {
             mod: Fs,
             fn: Rename,
@@ -278,7 +278,7 @@ export function realpathSync(path: PathLike) {
 }
 
 export function cpSync(src: PathLike, dst: PathLike) {
-    return bridge(
+    return globalThis.fullstacked.bridge(
         {
             mod: Fs,
             fn: Copy,
@@ -306,7 +306,7 @@ export class WriteStream extends Writable {
     constructor(path: string, options?: any) {
         super(options);
 
-        bridge({
+        globalThis.fullstacked.bridge({
             mod: Fs,
             fn: CreateWriteStream,
             data: [formatPathLike(path)]

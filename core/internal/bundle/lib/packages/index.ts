@@ -13,7 +13,7 @@ export async function install(
     }>
 > {
     return (
-        (await bridge({
+        (await globalThis.fullstacked.bridge({
             mod: Packages,
             fn: Install,
             data: [directory, saveDev, ...(packages || [])]
@@ -23,7 +23,7 @@ export async function install(
 
 export async function uninstall(directory: string, ...packages: string[]) {
     return (
-        (await bridge({
+        (await globalThis.fullstacked.bridge({
             mod: Packages,
             fn: Uninstall,
             data: [directory, ...(packages || [])]
@@ -32,7 +32,7 @@ export async function uninstall(directory: string, ...packages: string[]) {
 }
 
 export function audit(directory: string) {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Packages,
         fn: Audit,
         data: [directory]

@@ -113,9 +113,9 @@ suite("tunnel - e2e", () => {
 
         execSync(
             `docker run -d --name ${containerName} ` +
-                `-e POSTGRES_PASSWORD=testpass ` +
-                `-p 127.0.0.1::5432 ` +
-                `postgres:alpine`,
+            `-e POSTGRES_PASSWORD=testpass ` +
+            `-p 127.0.0.1::5432 ` +
+            `postgres:alpine`,
             { stdio: "pipe" }
         );
 
@@ -324,7 +324,7 @@ suite("tunnel - e2e", () => {
         const { Connect } =
             await import("../../core/internal/bundle/lib/@types/net.ts");
 
-        const duplex = (await bridge({
+        const duplex = (await globalThis.fullstacked.bridge({
             mod: Net,
             fn: Connect,
             data: [9090, "test-tunnel-e2e"]

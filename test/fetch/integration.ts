@@ -25,9 +25,7 @@ suite("fetch - integration", () => {
                 'document.body.classList.contains("done")'
             );
 
-            const response = await (
-                (globalThis as any).originalFetch as typeof fetch
-            )("http://localhost:9090", {
+            const response = await (globalThis.fullstacked.fetch)("http://localhost:9090", {
                 method: "POST",
                 body: new Uint8Array([1, 2, 3])
             });

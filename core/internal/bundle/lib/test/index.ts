@@ -12,7 +12,7 @@ import { Duplex } from "../bridge/duplex.ts";
 import { EventEmitter } from "../bridge/eventEmitter.ts";
 
 function hello(): string {
-    return bridge(
+    return globalThis.fullstacked.bridge(
         {
             mod: Test,
             fn: Hello
@@ -22,7 +22,7 @@ function hello(): string {
 }
 
 function serialization(data: SerializableData): DeserializedData {
-    return bridge(
+    return globalThis.fullstacked.bridge(
         {
             mod: Test,
             fn: Serialization,
@@ -36,7 +36,7 @@ function serializationIndex(
     index: number,
     ...data: SerializableData[]
 ): DeserializedData {
-    return bridge(
+    return globalThis.fullstacked.bridge(
         {
             mod: Test,
             fn: SerializationIndex,
@@ -53,7 +53,7 @@ function streaming(
     async: true
 ): Promise<Duplex>;
 function streaming(data: Uint8Array, intervalMs: number, async: boolean) {
-    return bridge(
+    return globalThis.fullstacked.bridge(
         {
             mod: Test,
             fn: Stream,
@@ -66,7 +66,7 @@ function streaming(data: Uint8Array, intervalMs: number, async: boolean) {
 function streamWrite(async: false): Duplex;
 function streamWrite(async: true): Promise<Duplex>;
 function streamWrite(async: boolean) {
-    return bridge(
+    return globalThis.fullstacked.bridge(
         {
             mod: Test,
             fn: StreamWrite,
@@ -83,7 +83,7 @@ function eventEmitter(
     event: [any];
 }> {
     return (
-        bridge(
+        globalThis.fullstacked.bridge(
             {
                 mod: Test,
                 fn: EventEmitterFn,
@@ -95,7 +95,7 @@ function eventEmitter(
 }
 
 function panic(message: string): void {
-    bridge(
+    globalThis.fullstacked.bridge(
         {
             mod: Test,
             fn: Panic,

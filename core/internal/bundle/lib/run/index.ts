@@ -19,7 +19,7 @@ export function run(directoryOrOptions?: string | RunOptions): Promise<void> {
 
     const resolved = path.resolve(directory ?? ".");
 
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Core,
         fn: Run,
         data: [resolved, env]

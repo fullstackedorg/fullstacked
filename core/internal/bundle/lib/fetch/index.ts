@@ -32,9 +32,9 @@ function urlOrStringToUrl(url: URL | string) {
     return url instanceof URL
         ? url
         : new URL(
-              url,
-              url.startsWith("/") ? globalThis?.location?.host : undefined
-          );
+            url,
+            url.startsWith("/") ? globalThis?.location?.host : undefined
+        );
 }
 
 function getAbortError() {
@@ -49,8 +49,8 @@ async function fetchCore(
         request instanceof Request
             ? request.url
             : request instanceof URL
-              ? request.href
-              : request;
+                ? request.href
+                : request;
     if (typeof requestUrl === "string" && requestUrl.startsWith("data:")) {
         try {
             const parts = requestUrl.split(",");
@@ -97,9 +97,9 @@ async function fetchCore(
             : await bodyInitToBuffer(init?.body);
 
     let responseHeadEE: EventEmitter<{
-            response: [ResponseHead];
-            error: [string];
-        }>,
+        response: [ResponseHead];
+        error: [string];
+    }>,
         responseHead: ResponseHead,
         responseBodyStream: Duplex;
 
@@ -113,7 +113,7 @@ async function fetchCore(
         responseBodyStream?.end();
 
         if (responseHead) {
-            bridge({
+            globalThis.fullstacked.bridge({
                 mod: Fetch,
                 fn: Cancel,
                 data: [responseHead.Id]
@@ -129,7 +129,7 @@ async function fetchCore(
         responseHead = await new Promise(async (resolve, reject) => {
             rejectHead = reject;
             responseHeadEE = (
-                (await bridge({
+                (await globalThis.fullstacked.bridge({
                     mod: Fetch,
                     fn: FetchFn,
                     data: [requestHead, new Uint8Array(requestBody)]
@@ -153,7 +153,7 @@ async function fetchCore(
             throw getAbortError();
         }
 
-        responseBodyStream = await bridge({
+        responseBodyStream = await globalThis.fullstacked.bridge({
             mod: Fetch,
             fn: ResponseBody,
             data: [responseHead.Id]
@@ -253,5 +253,5 @@ async function fetchCore(
     return response;
 }
 
-(globalThis as any).originalFetch = fetch;
-(globalThis as any).fetch = fetchCore;
+
+export default fetchCore;

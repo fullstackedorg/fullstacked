@@ -42,7 +42,7 @@ export async function createGitAuthManager() {
 }
 
 export function hasGit(directory: string): Promise<boolean> {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Git,
         fn: HasGit,
         data: [directory]
@@ -50,7 +50,7 @@ export function hasGit(directory: string): Promise<boolean> {
 }
 
 export function init(directory: string, url: string) {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Git,
         fn: Init,
         data: [directory, url]
@@ -58,7 +58,7 @@ export function init(directory: string, url: string) {
 }
 
 export function head(directory: string): Promise<GitHead> {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Git,
         fn: Head,
         data: [directory]
@@ -66,7 +66,7 @@ export function head(directory: string): Promise<GitHead> {
 }
 
 export function status(directory: string): Promise<GitStatus> {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Git,
         fn: Status,
         data: [directory]
@@ -74,7 +74,7 @@ export function status(directory: string): Promise<GitStatus> {
 }
 
 export function add(directory: string, path: string) {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Git,
         fn: Add,
         data: [directory, path]
@@ -82,7 +82,7 @@ export function add(directory: string, path: string) {
 }
 
 export function log(directory: string): Promise<GitCommit[]> {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Git,
         fn: Log,
         data: [directory, 10]
@@ -99,7 +99,7 @@ export function clone(
 ): Promise<Duplex> {
     // backward compat, 2026-07-08
     const options = typeof opts === "string" ? { tunnel: opts } : opts;
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Git,
         fn: Clone,
         data: [url, directory, options?.tunnel, options?.proxy]
@@ -111,7 +111,7 @@ export function commit(
     message: string,
     author: GitAuthor
 ): Promise<string> {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Git,
         fn: Commit,
         data: [directory, message, author]
@@ -119,7 +119,7 @@ export function commit(
 }
 
 export function pull(directory: string, tunnel?: string): Promise<Duplex> {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Git,
         fn: Pull,
         data: [directory, tunnel]
@@ -127,7 +127,7 @@ export function pull(directory: string, tunnel?: string): Promise<Duplex> {
 }
 
 export function push(directory: string, tunnel?: string): Promise<Duplex> {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Git,
         fn: Push,
         data: [directory, tunnel]
@@ -135,7 +135,7 @@ export function push(directory: string, tunnel?: string): Promise<Duplex> {
 }
 
 export function reset(directory: string, hard: boolean, ...files: string[]) {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Git,
         fn: Reset,
         data: [directory, hard, ...(files || [])]
@@ -143,7 +143,7 @@ export function reset(directory: string, hard: boolean, ...files: string[]) {
 }
 
 export async function branch(directory: string): Promise<GitBranch[]> {
-    const duplex = (await bridge({
+    const duplex = (await globalThis.fullstacked.bridge({
         mod: Git,
         fn: Branch,
         data: [directory]
@@ -153,7 +153,7 @@ export async function branch(directory: string): Promise<GitBranch[]> {
 }
 
 export async function tags(directory: string): Promise<GitTag[]> {
-    const duplex = (await bridge({
+    const duplex = (await globalThis.fullstacked.bridge({
         mod: Git,
         fn: Tags,
         data: [directory]
@@ -168,7 +168,7 @@ export function checkout(
     create?: boolean,
     tunnel?: string
 ): Promise<Duplex> {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Git,
         fn: Checkout,
         data: [directory, ref, !!create, tunnel || ""]
@@ -176,7 +176,7 @@ export function checkout(
 }
 
 export function merge(directory: string, branch: string) {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Git,
         fn: Merge,
         data: [directory, branch]
@@ -184,7 +184,7 @@ export function merge(directory: string, branch: string) {
 }
 
 export function restore(directory: string, ...files: string[]) {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Git,
         fn: Restore,
         data: [directory, ...(files || [])]
@@ -196,7 +196,7 @@ export function setConfig(
     key: string,
     value: string
 ): Promise<void> {
-    return bridge({
+    return globalThis.fullstacked.bridge({
         mod: Git,
         fn: SetConfig,
         data: [directory, key, value]

@@ -46,7 +46,7 @@ export class Socket extends EventEmitter {
             this.once("listening", callback);
         }
 
-        bridge({
+        globalThis.fullstacked.bridge({
             mod: Dgram,
             fn: CreateSocket,
             data: [this.type, p, a]

@@ -76,7 +76,7 @@ export class Socket extends RealDuplex {
     connect(optionsOrPort: Partial<ConnectOpts> | number, maybeHost?: string) {
         const { host, port } = parseOptions(optionsOrPort, maybeHost);
 
-        bridge({
+        globalThis.fullstacked.bridge({
             mod: Net,
             fn: Connect,
             data: [port, host]

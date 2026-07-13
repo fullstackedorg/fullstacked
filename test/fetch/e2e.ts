@@ -13,9 +13,9 @@ suite("fetch - e2e", () => {
     });
 
     test("head", async () => {
-        assert.notEqual(fetch, (globalThis as any).originalFetch);
+        assert.notEqual(fetch, globalThis.fullstacked.fetch);
 
-        const responseNode = await (globalThis as any).originalFetch(
+        const responseNode = await globalThis.fullstacked.fetch(
             "http://localhost:9090"
         );
         const responseGo = await fetch("http://localhost:9090");
@@ -30,7 +30,7 @@ suite("fetch - e2e", () => {
     });
 
     test("response body - stream", async () => {
-        const responseNode = await (globalThis as any).originalFetch(
+        const responseNode = await globalThis.fullstacked.fetch(
             "http://localhost:9090"
         );
         let streamedNode = new Uint8Array();
@@ -64,7 +64,7 @@ suite("fetch - e2e", () => {
     });
 
     test("response body - bytes", async () => {
-        const responseNode = await (globalThis as any).originalFetch(
+        const responseNode = await globalThis.fullstacked.fetch(
             "http://localhost:9090"
         );
         const responseGo = await fetch("http://localhost:9090");
@@ -72,7 +72,7 @@ suite("fetch - e2e", () => {
     });
 
     test("response body - arraybuffer", async () => {
-        const responseNode = await (globalThis as any).originalFetch(
+        const responseNode = await globalThis.fullstacked.fetch(
             "http://localhost:9090"
         );
         const responseGo = await fetch("http://localhost:9090");
@@ -83,7 +83,7 @@ suite("fetch - e2e", () => {
     });
 
     test("response body - text", async () => {
-        const responseNode = await (globalThis as any).originalFetch(
+        const responseNode = await globalThis.fullstacked.fetch(
             "http://localhost:9090"
         );
         const responseGo = await fetch("http://localhost:9090");
@@ -91,7 +91,7 @@ suite("fetch - e2e", () => {
     });
 
     test("response body - json", async () => {
-        const responseNode = await (globalThis as any).originalFetch(
+        const responseNode = await globalThis.fullstacked.fetch(
             "http://localhost:9090/json"
         );
         const jsonNode = await responseNode.json();
@@ -110,7 +110,7 @@ suite("fetch - e2e", () => {
         });
         const responseGoBytes = await responseGo.bytes();
         assert.deepEqual(responseGoBytes, body);
-        const responseNode = await (globalThis as any).originalFetch(
+        const responseNode = await globalThis.fullstacked.fetch(
             "http://localhost:9090",
             {
                 method: "POST",

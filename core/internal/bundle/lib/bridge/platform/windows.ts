@@ -8,13 +8,14 @@ const asyncResponsePromises = new Map<
 >();
 
 export async function BridgeWindowsInit(): Promise<PlatformBridge> {
-    globalThis.respond = function (id: number, responseB64: string) {
+
+    globalThis.fullstacked.respond = function (id: number, responseBase64: string) {
         const promise = asyncResponsePromises.get(id);
-        promise?.(toByteArray(responseB64).buffer);
+        promise?.(toByteArray(responseBase64).buffer);
         asyncResponsePromises.delete(id);
     };
 
-    const ctx = await (await globalThis.originalFetch("/ctx")).json();
+    const ctx = await (await fetch("/ctx")).json();
 
     if (isWorker) {
         globalThis.onmessage = (event) => {
@@ -31,31 +32,15 @@ export async function BridgeWindowsInit(): Promise<PlatformBridge> {
             asyncResponsePromises.delete(id);
         };
     } else {
-        globalThis.exit = () => globalThis.originalFetch("/exit");
+        globalThis.fullstacked.exit = () => globalThis.fetch("/exit");
 
-        globalThis.resize = function (sizeOrGet: string) {
-            if (sizeOrGet === "get") {
-                return globalThis
-                    .originalFetch("/resize")
-                    .then((r) => r.text());
-            } else if (sizeOrGet === "fullscreen") {
-                return globalThis
-                    .originalFetch("/resize?fullscreen=true")
-                    .then(() => {});
-            } else if (sizeOrGet === "kiosk") {
-                return globalThis
-                    .originalFetch("/resize?kiosk=true")
-                    .then(() => {});
-            } else {
-                const components = sizeOrGet.split(":");
-                let url = "/resize";
-                if (components.length === 2) {
-                    url += `?width=${components[0]}&height=${components[1]}`;
-                } else if (components.length === 4) {
-                    url += `?width=${components[0]}&height=${components[1]}&x=${components[2]}&y=${components[3]}`;
-                }
-                return globalThis.originalFetch(url).then(() => {});
-            }
+        globalThis.fullstacked.window.getSize = () => globalThis
+            .fullstacked
+            .fetch("/resize")
+            .then((r) => r.text());
+
+        globalThis.fullstacked.window.resize = function (size: string) {
+            globalThis.fullstacked.fetch(`/resize?size=${size}`)
         };
     }
 
