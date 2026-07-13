@@ -1,11 +1,15 @@
-import platformBridge from "../bridge/platform/index.ts";
+import "../bridge/platform/index.ts";
 import { cwd } from "../process/index.ts";
 import events from "events";
-import { deserialize } from "../bridge/serialization.ts";
+import { deserializeNumber } from "../bridge/serialization.ts";
 import { isWorker } from "../bridge/isWorker.ts";
 
-if (!(globalThis as any).__workerStreams) {
-    (globalThis as any).__workerStreams = new Map<number, any>();
+declare global {
+    var __workerStreams: Map<number, any>;
+}
+
+if (!globalThis.__workerStreams) {
+    globalThis.__workerStreams = new Map<number, any>();
 }
 
 export let parentPort: any = null;
@@ -45,11 +49,11 @@ export class Worker extends events.EventEmitter {
                 const buffer: ArrayBuffer = e.data;
                 const dataView = new DataView(buffer);
                 const id = dataView.getUint8(1);
-                platformBridge.bridge.Async(buffer).then((res) => {
+                globalThis.platformBridge.bridge.Async(buffer).then((res) => {
                     const responseView = new DataView(res);
                     if (res.byteLength > 0 && responseView.getUint8(0) === 2) {
-                        const streamId = deserialize(res, 1).data as number;
-                        (globalThis as any).__workerStreams.set(
+                        const streamId = deserializeNumber(res, 1).data;
+                        globalThis.__workerStreams.set(
                             streamId,
                             this.w
                         );
@@ -70,7 +74,7 @@ export class Worker extends events.EventEmitter {
     }
 
     cleanup() {
-        const workerStreams = (globalThis as any).__workerStreams;
+        const workerStreams = globalThis.__workerStreams;
         if (workerStreams) {
             for (const [streamId, worker] of workerStreams.entries()) {
                 if (worker === this.w) {

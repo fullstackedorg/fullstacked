@@ -21,7 +21,6 @@ import {
     Rename,
     Copy
 } from "../@types/fs.ts";
-import { bridge } from "../bridge/index.ts";
 import { Fs } from "../@types/index.ts";
 
 export async function readFile(path: PathLike): Promise<Buffer<ArrayBuffer>>;

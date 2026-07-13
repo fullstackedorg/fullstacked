@@ -1,4 +1,3 @@
-import { bridge } from "../bridge/index.ts";
 import { Dns } from "../@types/index.ts";
 import {
     Resolve4,

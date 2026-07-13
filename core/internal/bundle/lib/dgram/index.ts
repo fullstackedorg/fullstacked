@@ -1,6 +1,5 @@
 import { EventEmitter } from "events";
 import { Buffer } from "buffer";
-import { bridge } from "../bridge/index.ts";
 import { Dgram } from "../@types/index.ts";
 import { CreateSocket } from "../@types/dgram.ts";
 import { Duplex } from "../bridge/duplex.ts";

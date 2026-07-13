@@ -1,4 +1,3 @@
-import { bridge } from "../bridge/index.ts";
 import { DeserializedData, SerializableData, Test } from "../@types/index.ts";
 import {
     EventEmitter as EventEmitterFn,

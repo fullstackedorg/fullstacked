@@ -1,7 +1,6 @@
 // nodejs source: https://nodejs.org/docs/latest/api/net.html
 
 import "buffer";
-import { bridge } from "../bridge/index.ts";
 import { Net } from "../@types/index.ts";
 import { Connect } from "../@types/net.ts";
 import { Duplex } from "../bridge/duplex.ts";

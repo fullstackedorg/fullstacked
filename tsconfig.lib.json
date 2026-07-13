@@ -12,9 +12,12 @@
         "skipLibCheck": true,
         "strictNullChecks": false,
         "noImplicitAny": false,
-        "types": ["node"]
+        "types": [
+            "node"
+        ]
     },
     "include": [
+        "core/internal/bundle/lib/bridge/index.ts",
         "core/internal/bundle/lib/auth/index.ts",
         "core/internal/bundle/lib/bundle/index.ts",
         "core/internal/bundle/lib/git/index.ts",

@@ -1,6 +1,5 @@
 // nodejs source: https://nodejs.org/api/os.html
 
-import { bridge } from "../bridge/index.ts";
 import { Os } from "../@types/index.ts";
 import {
     Arch,

@@ -1,4 +1,3 @@
-import { bridge } from "../bridge/index.ts";
 import { Git } from "../@types/index.ts";
 import {
     Add,

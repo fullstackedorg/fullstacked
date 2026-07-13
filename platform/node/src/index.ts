@@ -1,13 +1,15 @@
 #!/usr/bin/env node
+import "../../../core/internal/bundle/lib/fullstacked/index.ts"
 import path from "node:path";
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
 import { load } from "./core.ts";
 import { createWebView } from "./webview.ts";
 import { bundle } from "../../../core/internal/bundle/lib/bundle/index.ts";
-import plugin from "../../../core/internal/bundle/lib/plugin/index.ts";
 import { run } from "../../../core/internal/bundle/lib/run/index.ts";
 import version from "../../../core/internal/bundle/lib/process/version.json";
 import { findArg, getPositionalArgs } from "./args.ts";
-import pluginTailwindcss from "@fullstacked/tailwindcss";
+import plugin from "../../../core/internal/bundle/lib/plugin/index.ts";
 
 const end = (code: number) => {
     core.end();
@@ -52,6 +54,7 @@ const showVersion = findArg(["-v", "--version"]);
 const openBrowser = findArg(["-o", "--open"]);
 const buildOnly = findArg(["-b", "--build"]);
 const envArgs = findArg(["-e", "--env"], true);
+const pluginsArgs = findArg(["-p", "--plugin"], true);
 const env: Record<string, string> = {};
 for (const val of envArgs) {
     const index = val.indexOf("=");
@@ -90,6 +93,8 @@ Directory:
     process.exit(0);
 }
 
+process.chdir(directory);
+
 const mainCtx = core.start(directory, directory);
 
 globalThis.bridges = {
@@ -97,18 +102,28 @@ globalThis.bridges = {
     Sync: (payload: ArrayBuffer) => core.call(payload),
     Async: async (payload: ArrayBuffer) => core.call(payload)
 };
-await plugin.register("build", {
-    data: pluginTailwindcss.data,
-    callback: async (params) => {
-        params.sources = params.sources.map((f) => path.join(directory, f));
-        params.resolved = params.resolved.map((r) => ({
-            ...r,
-            importer: path.join(directory, r.importer),
-            resolvedDir: path.join(directory, r.resolvedDir)
-        }));
-        return pluginTailwindcss.callback(params);
+
+async function importPlugin(p: string) {
+    if (p.startsWith(".") || path.isAbsolute(p)) {
+        return (await import(pathToFileURL(path.resolve(p)).href)).default;
     }
-});
+
+    try {
+        const requireFromCwd = createRequire(path.join(process.cwd(), "index.js"));
+        const resolved = requireFromCwd.resolve(p);
+        return (await import(pathToFileURL(resolved).href)).default;
+    } catch {
+        try {
+            const requireFromModule = createRequire(import.meta.url);
+            const resolved = requireFromModule.resolve(p);
+            return (await import(pathToFileURL(resolved).href)).default;
+        } catch {
+            return (await import(p)).default;
+        }
+    }
+}
+
+await Promise.all(pluginsArgs.map(async p => plugin.register("build", await importPlugin(p))));
 
 const result = await bundle();
 

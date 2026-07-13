@@ -6,7 +6,6 @@ import {
     ResponseBody,
     ResponseHead
 } from "../@types/fetch.ts";
-import { bridge } from "../bridge/index.ts";
 import { mergeUint8Arrays } from "../bridge/serialization.ts";
 import { Duplex } from "../bridge/duplex.ts";
 import { EventEmitter } from "../bridge/eventEmitter.ts";

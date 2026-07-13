@@ -1,6 +1,5 @@
 // nodejs source : https://nodejs.org/docs/latest/api/path.html
 
-import { bridge } from "../bridge/index.ts";
 import { Path } from "../@types/index.ts";
 import {
     Join,

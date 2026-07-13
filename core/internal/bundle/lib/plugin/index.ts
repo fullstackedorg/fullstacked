@@ -1,4 +1,3 @@
-import { bridge } from "../bridge/index.ts";
 import {
     Plugin as PluginModule,
     GitAuth,

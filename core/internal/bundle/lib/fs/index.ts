@@ -1,6 +1,5 @@
 // nodejs source: https://nodejs.org/docs/latest/api/fs.html
 
-import { bridge } from "../bridge/index.ts";
 import {
     Copy,
     CreateWriteStream,

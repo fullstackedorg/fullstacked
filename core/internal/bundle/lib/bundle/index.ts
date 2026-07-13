@@ -1,4 +1,3 @@
-import { bridge } from "../bridge/index.ts";
 import { Bundle } from "../@types/index.ts";
 import {
     EsbuildVersion,
@@ -18,7 +17,6 @@ export function esbuildVersion(): Promise<string> {
 
 export function bundle(entryPoint?: string): Promise<EsbuildResult> {
     const resolved = path.resolve(entryPoint ?? ".");
-
     return new Promise(async (resolve) => {
         const ee = (
             (await bridge({
@@ -27,7 +25,7 @@ export function bundle(entryPoint?: string): Promise<EsbuildResult> {
                 data: [resolved]
             })) as Duplex
         ).eventEmitter() as any;
-
+        
         ee.on("result", resolve);
     });
 }

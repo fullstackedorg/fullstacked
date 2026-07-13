@@ -1,3 +1,4 @@
+import "../core/internal/bundle/lib/fullstacked/index.ts";
 import core from "./core.ts";
 import { after, before } from "node:test";
 import { URL } from "node:url";

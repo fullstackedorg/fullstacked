@@ -2,7 +2,6 @@ import { Packages } from "../@types/index.ts";
 import { Install, Progress, Audit, Uninstall } from "../@types/packages.ts";
 import { Duplex } from "../bridge/duplex.ts";
 import { EventEmitter } from "../bridge/eventEmitter.ts";
-import { bridge } from "../bridge/index.ts";
 
 export async function install(
     directory: string,

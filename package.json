@@ -10,9 +10,11 @@
         "test": "node --experimental-test-coverage --test-coverage-exclude='**/*.js' --test-coverage-exclude='test/**/*' -r @nitrogql/esbuild-register test"
     },
     "workspaces": [
+        "app/*",
         "platform/electron",
         "platform/node",
-        "platform/wasm"
+        "platform/wasm",
+        "plugins/*"
     ],
     "author": "FullStacked",
     "license": "MIT",

@@ -319,8 +319,6 @@ suite("tunnel - e2e", () => {
     });
 
     test("duplex - write before open", async () => {
-        const { bridge } =
-            await import("../../core/internal/bundle/lib/bridge/index.ts");
         const { Net } =
             await import("../../core/internal/bundle/lib/@types/index.ts");
         const { Connect } =

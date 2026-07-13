@@ -1,6 +1,5 @@
 import { Core } from "../@types/index.ts";
 import { Run } from "../@types/router.ts";
-import { bridge } from "../bridge/index.ts";
 import path from "../path/index.ts";
 
 type RunOptions = {

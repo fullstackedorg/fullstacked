@@ -1,6 +1,5 @@
 import { Core } from "../@types/index.ts";
 import { Chdir, Cwd, Exit, GetEnv } from "../@types/router.ts";
-import { bridge } from "../bridge/index.ts";
 import { isWorker } from "../bridge/isWorker.ts";
 import fullstacked from "./version.json" with { type: "json" };
 import { setTimeout, clearTimeout } from "../timers/index.ts";

@@ -2,7 +2,6 @@ import { toByteArray } from "./base64.ts";
 import { SerializableData, Stream } from "../@types/index.ts";
 import { Close, Open, Write, WriteEvent } from "../@types/stream.ts";
 import { mergeUint8Arrays } from "./serialization.ts";
-import { bridge } from "./index.ts";
 import { createEventEmitter } from "./eventEmitter.ts";
 
 type DuplexItem = {
@@ -21,13 +20,21 @@ type DuplexItem = {
     queuedPackets: (ArrayBuffer | string)[];
 };
 
+declare global {
+    var callback: typeof callbackResponder
+}
+
+if (!globalThis.callback) {
+    globalThis.callback = callbackResponder;
+}
+
 const activeDuplexes = new Map<number, DuplexItem[]>();
 
-(globalThis as any).callback = function (
+function callbackResponder(
     id: number,
     payload: ArrayBuffer | string
 ) {
-    const workerStreams = (globalThis as any).__workerStreams;
+    const workerStreams = globalThis.__workerStreams;
     if (workerStreams) {
         const worker = workerStreams.get(id);
         if (worker) {
@@ -121,6 +128,7 @@ type StreamData = string | Buffer | Uint8Array | DataView;
 type EndCallback = () => void;
 
 export interface Duplex extends ReadableStream<Uint8Array<ArrayBuffer>> {
+    id: number
     on(
         event: "data",
         callback: (chunk: StreamData, encoding?: string) => void
@@ -314,6 +322,8 @@ export function createDuplex(id: number, bridgeFn: typeof bridge): Duplex {
     };
 
     stream.open = open;
+
+    stream.id = id;
 
     return stream;
 }

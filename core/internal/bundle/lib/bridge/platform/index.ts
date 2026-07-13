@@ -23,9 +23,10 @@ if (isWorker) {
     });
 }
 
+// nodejs
 if (globalThis.process) {
     platformBridge = {
-        ready: new Promise<void>((res) => res()),
+        ready: Promise.resolve(),
         bridge: {
             get ctx() {
                 return globalThis.ctxId;
@@ -35,19 +36,15 @@ if (globalThis.process) {
             Sync: (payload: ArrayBuffer) => globalThis.bridges.Sync(payload) as ArrayBuffer
         }
     };
-} else {
+}
+// every other platform (browser)
+else {
     globalThis.global = globalThis;
     platformBridge = {
         ready: new Promise<void>(async (resolve, reject) => {
-            let cwd = "/";
             if (isWorker) {
                 await new Promise<void>((workerReady) => {
-                    self.onmessage = (message: MessageEvent) => {
-                        if (message.data.cwd) {
-                            cwd = message.data.cwd;
-                            workerReady();
-                        }
-                    };
+                    self.onmessage = () => workerReady();
                 });
             }
 
@@ -68,7 +65,8 @@ if (globalThis.process) {
             await Promise.all([
                 // @ts-ignore
                 import("fetch"),
-                import("timers")
+                import("timers"),
+                import("buffer")
             ]);
 
             switch (platform) {
@@ -82,11 +80,6 @@ if (globalThis.process) {
                     platformBridge.bridge = await BridgeWindowsInit();
                     break;
             }
-
-            // globals process, fetch and buffer
-            await import("process");
-            process.chdir(cwd);
-            await import("buffer");
 
             resolve();
         })
