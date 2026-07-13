@@ -41,7 +41,7 @@ export class Worker extends events.EventEmitter {
                 const buffer: ArrayBuffer = e.data;
                 const dataView = new DataView(buffer);
                 const id = dataView.getUint8(1);
-                globalThis.platformBridge.bridge.Async(buffer).then((res) => {
+                globalThis.fullstacked.platformBridge.bridge.Async(buffer).then((res) => {
                     const responseView = new DataView(res);
                     if (res.byteLength > 0 && responseView.getUint8(0) === 2) {
                         const streamId = deserializeNumber(res, 1).data;
