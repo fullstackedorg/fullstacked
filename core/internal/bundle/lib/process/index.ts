@@ -87,7 +87,20 @@ const performanceNow =
 export const noop = () => { };
 export const title = "browser";
 export const browser = true;
+const getQueryArgv = () => {
+    try {
+        const urlObj = new URL(import.meta.url);
+        return urlObj.searchParams.getAll("argv");
+    } catch {
+        return [];
+    }
+};
+
 export const argv: string[] = [];
+const queryArgv = getQueryArgv();
+if (queryArgv.length > 0) {
+    argv.push(...queryArgv);
+}
 export const version = "";
 export const versions = {
     fullstacked
