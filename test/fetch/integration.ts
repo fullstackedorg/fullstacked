@@ -25,10 +25,13 @@ suite("fetch - integration", () => {
                 'document.body.classList.contains("done")'
             );
 
-            const response = await (globalThis.fullstacked.fetch)("http://localhost:9090", {
-                method: "POST",
-                body: new Uint8Array([1, 2, 3])
-            });
+            const response = await globalThis.fullstacked.fetch(
+                "http://localhost:9090",
+                {
+                    method: "POST",
+                    body: new Uint8Array([1, 2, 3])
+                }
+            );
 
             const head: typeof response = JSON.parse(
                 await page.getTextContent("#head")

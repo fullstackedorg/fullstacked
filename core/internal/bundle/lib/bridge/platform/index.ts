@@ -18,7 +18,10 @@ let platformBridge: {
 if (isWorker) {
     self.addEventListener("message", (event: MessageEvent) => {
         if (event.data && event.data.type === "on-stream-data") {
-            globalThis.fullstacked.onStreamData(event.data.streamId, event.data.payload);
+            globalThis.fullstacked.onStreamData(
+                event.data.streamId,
+                event.data.payload
+            );
         }
     });
 }
@@ -33,7 +36,8 @@ if (globalThis.process) {
             },
             Async: (payload: ArrayBuffer) =>
                 globalThis.bridges.Async(payload) as Promise<ArrayBuffer>,
-            Sync: (payload: ArrayBuffer) => globalThis.bridges.Sync(payload) as ArrayBuffer
+            Sync: (payload: ArrayBuffer) =>
+                globalThis.bridges.Sync(payload) as ArrayBuffer
         }
     };
 }

@@ -1,4 +1,4 @@
-import parentWindow from "fullstacked/parentWindow"
+import parentWindow from "fullstacked/parentWindow";
 import { getConfig, setConfig } from "./shell/cli/config";
 
 parentWindow.disableAutoWindowSize();

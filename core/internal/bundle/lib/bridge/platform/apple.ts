@@ -10,7 +10,6 @@ const asyncResponsePromises = new Map<
 const clipboardResponsePromises = new Map<number, (response: string) => void>();
 
 export async function BridgeAppleInit(): Promise<PlatformBridge> {
-
     globalThis.fullstacked.respond = (id: number, responseBase64: string) => {
         const promise = asyncResponsePromises.get(id);
         promise?.(toByteArray(responseBase64).buffer);
@@ -39,7 +38,10 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
 
         if (globalThis.webkit.messageHandlers.clipboard) {
             const td = new TextDecoder();
-            globalThis.fullstacked.clipboard.respondPaste = (id: number, responseBase64: string) => {
+            globalThis.fullstacked.clipboard.respondPaste = (
+                id: number,
+                responseBase64: string
+            ) => {
                 const promise = clipboardResponsePromises.get(id);
                 promise?.(td.decode(toByteArray(responseBase64)));
                 clipboardResponsePromises.delete(id);
@@ -66,23 +68,21 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
         if (globalThis.webkit.messageHandlers.resize) {
             const resizeResponsePromises: ((size: string) => void)[] = [];
 
-            globalThis.fullstacked.window.respondGetSize = function (response: string) {
+            globalThis.fullstacked.window.respondGetSize = function (
+                response: string
+            ) {
                 const resolve = resizeResponsePromises.shift();
                 resolve?.(response);
             };
 
             globalThis.fullstacked.window.resize = function (size: string) {
-                globalThis.webkit.messageHandlers.resize.postMessage(
-                    size
-                );
+                globalThis.webkit.messageHandlers.resize.postMessage(size);
             };
 
             globalThis.fullstacked.window.getSize = function () {
                 return new Promise<string>((resolve) => {
                     resizeResponsePromises.push(resolve);
-                    globalThis.webkit.messageHandlers.resize.postMessage(
-                        "get"
-                    );
+                    globalThis.webkit.messageHandlers.resize.postMessage("get");
                 });
             };
         }

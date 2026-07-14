@@ -22,11 +22,10 @@ async function loadSavedSize() {
                 return savedSize;
             }
         }
-    } catch { }
+    } catch {}
 
     return null;
 }
-
 
 let saveTimeout: any = null;
 
@@ -48,22 +47,27 @@ function onResize() {
             ) {
                 try {
                     await fs.promises.mkdir("/.git");
-                } catch { }
-                await fs.promises.writeFile("/.git/window-size.txt", sizeStr.trim());
+                } catch {}
+                await fs.promises.writeFile(
+                    "/.git/window-size.txt",
+                    sizeStr.trim()
+                );
             }
-        } catch { }
+        } catch {}
     }, 200);
 }
 
 export async function setup() {
-    if (!globalThis.fullstacked.window.resize) { return; }
+    if (!globalThis.fullstacked.window.resize) {
+        return;
+    }
 
     let defaultSize = process.env.WINDOW_SIZE;
 
     globalThis.addEventListener("resize", onResize);
 
     if (isAutoResizeDisabled) {
-        return
+        return;
     }
 
     let savedSize = await loadSavedSize();
@@ -78,13 +82,13 @@ export async function setup() {
     }
 
     if (defaultSize) {
-        globalThis.fullstacked.window.resize?.(defaultSize)
+        globalThis.fullstacked.window.resize?.(defaultSize);
     }
 }
 
 const parentWindow = {
     disableAutoWindowSize,
     setup
-}
+};
 
 export default parentWindow;

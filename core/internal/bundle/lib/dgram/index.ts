@@ -46,48 +46,54 @@ export class Socket extends EventEmitter {
             this.once("listening", callback);
         }
 
-        globalThis.fullstacked.bridge({
-            mod: Dgram,
-            fn: CreateSocket,
-            data: [this.type, p, a]
-        }).then((d: Duplex) => {
-            this.duplex = d;
+        globalThis.fullstacked
+            .bridge({
+                mod: Dgram,
+                fn: CreateSocket,
+                data: [this.type, p, a]
+            })
+            .then((d: Duplex) => {
+                this.duplex = d;
 
-            const em = this.duplex.eventEmitter();
-            em.on("listening", (addr: string, portNumber: number) => {
-                this.isBound = true;
-                this.emit("listening");
-                while (this.bindQueue.length > 0) {
-                    const cb = this.bindQueue.shift();
-                    if (cb) cb();
-                }
+                const em = this.duplex.eventEmitter();
+                em.on("listening", (addr: string, portNumber: number) => {
+                    this.isBound = true;
+                    this.emit("listening");
+                    while (this.bindQueue.length > 0) {
+                        const cb = this.bindQueue.shift();
+                        if (cb) cb();
+                    }
+                });
+
+                em.on(
+                    "message",
+                    (msg: Uint8Array, raddr: string, rport: number) => {
+                        const rinfo: RemoteInfo = {
+                            address: raddr,
+                            family: this.type,
+                            port: rport,
+                            size: msg.byteLength
+                        };
+                        this.emit(
+                            "message",
+                            Buffer.from(
+                                msg.buffer,
+                                msg.byteOffset,
+                                msg.byteLength
+                            ),
+                            rinfo
+                        );
+                    }
+                );
+
+                em.on("error", (err: string) => {
+                    this.emit("error", new Error(err));
+                });
+
+                this.duplex.on("close", () => {
+                    this.emit("close");
+                });
             });
-
-            em.on(
-                "message",
-                (msg: Uint8Array, raddr: string, rport: number) => {
-                    const rinfo: RemoteInfo = {
-                        address: raddr,
-                        family: this.type,
-                        port: rport,
-                        size: msg.byteLength
-                    };
-                    this.emit(
-                        "message",
-                        Buffer.from(msg.buffer, msg.byteOffset, msg.byteLength),
-                        rinfo
-                    );
-                }
-            );
-
-            em.on("error", (err: string) => {
-                this.emit("error", new Error(err));
-            });
-
-            this.duplex.on("close", () => {
-                this.emit("close");
-            });
-        });
 
         return this;
     }

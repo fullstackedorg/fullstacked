@@ -41,21 +41,26 @@ export class Worker extends events.EventEmitter {
                 const buffer: ArrayBuffer = e.data;
                 const dataView = new DataView(buffer);
                 const id = dataView.getUint8(1);
-                globalThis.fullstacked.platformBridge.bridge.Async(buffer).then((res) => {
-                    const responseView = new DataView(res);
-                    if (res.byteLength > 0 && responseView.getUint8(0) === 2) {
-                        const streamId = deserializeNumber(res, 1).data;
-                        globalThis.fullstacked.workerStreams.set(
-                            streamId,
-                            this.w
-                        );
-                    }
+                globalThis.fullstacked.platformBridge.bridge
+                    .Async(buffer)
+                    .then((res) => {
+                        const responseView = new DataView(res);
+                        if (
+                            res.byteLength > 0 &&
+                            responseView.getUint8(0) === 2
+                        ) {
+                            const streamId = deserializeNumber(res, 1).data;
+                            globalThis.fullstacked.workerStreams.set(
+                                streamId,
+                                this.w
+                            );
+                        }
 
-                    const response = new Uint8Array(res.byteLength + 1);
-                    response[0] = id;
-                    response.set(new Uint8Array(res), 1);
-                    this.w.postMessage(response.buffer);
-                });
+                        const response = new Uint8Array(res.byteLength + 1);
+                        response[0] = id;
+                        response.set(new Uint8Array(res), 1);
+                        this.w.postMessage(response.buffer);
+                    });
             } else if (typeof e.data === "string" && e.data === "exit") {
                 this.cleanup();
                 this.emit("exit");

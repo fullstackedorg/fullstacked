@@ -23,10 +23,7 @@ type FullStacked = {
 
     respond(id: number, responseBase64: string): void;
 
-    onStreamData: (
-        id: number,
-        payload: ArrayBuffer | string
-    ) => void;
+    onStreamData: (id: number, payload: ArrayBuffer | string) => void;
 
     workerStreams: Map<number, any>;
 
@@ -35,17 +32,17 @@ type FullStacked = {
     clipboard: {
         copy?: (text: string) => void;
         paste?: () => string | Promise<string>;
-        respondPaste?: (id: number, responseBase64: string) => void
-    }
+        respondPaste?: (id: number, responseBase64: string) => void;
+    };
 
     window: {
         resize?: (size: string) => void;
         getSize?: () => Promise<string>;
         respondGetSize?: (response: any) => void;
-    }
+    };
 
     fetch: typeof fetch;
-}
+};
 
 globalThis.__dirname = "/";
 
@@ -56,7 +53,10 @@ type BridgeOpts = {
 };
 
 type BridgeAsync = (opts: BridgeOpts) => Promise<SerializableData>;
-type BridgeSync<T extends boolean> = (opts: BridgeOpts, sync: T) => T extends true ? SerializableData : Promise<SerializableData>;
+type BridgeSync<T extends boolean> = (
+    opts: BridgeOpts,
+    sync: T
+) => T extends true ? SerializableData : Promise<SerializableData>;
 type Bridge = BridgeSync<boolean> & BridgeAsync;
 
 async function init() {
@@ -68,7 +68,7 @@ async function init() {
         clipboard: {},
         window: {},
         workerStreams: new Map()
-    }
+    };
 
     const platformBridge = (await import("./platform/index.ts")).default;
     try {
@@ -79,7 +79,6 @@ async function init() {
 
     let id = 0;
     const bridge: Bridge = (opts: BridgeOpts, sync?: boolean) => {
-
         const preparePayload = () => {
             id = (id + 1) % 256;
 
@@ -124,7 +123,7 @@ async function init() {
                 resolve(response);
             }
         });
-    }
+    };
 
     globalThis.fullstacked.platformBridge = platformBridge;
     globalThis.fullstacked.bridge = bridge;
@@ -133,10 +132,7 @@ async function init() {
 
     globalThis.fetch = fetchCore;
 
-    await Promise.all([
-        import("timers"),
-        import("buffer")
-    ]);
+    await Promise.all([import("timers"), import("buffer")]);
 
     if (!globalThis.process) {
         globalThis.process = (await import("process")).default;

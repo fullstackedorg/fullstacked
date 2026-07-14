@@ -161,11 +161,12 @@ export function readdir(
     const cb = typeof options === "function" ? options : callback;
     const opts = typeof options === "function" ? {} : options;
     const baseDir = formatPathLike(path);
-    globalThis.fullstacked.bridge({
-        mod: Fs,
-        fn: ReadDir,
-        data: [baseDir, opts?.recursive ?? false]
-    })
+    globalThis.fullstacked
+        .bridge({
+            mod: Fs,
+            fn: ReadDir,
+            data: [baseDir, opts?.recursive ?? false]
+        })
         .then((items: GoFileInfo[]) =>
             cb(
                 null,
@@ -306,11 +307,12 @@ export class WriteStream extends Writable {
     constructor(path: string, options?: any) {
         super(options);
 
-        globalThis.fullstacked.bridge({
-            mod: Fs,
-            fn: CreateWriteStream,
-            data: [formatPathLike(path)]
-        })
+        globalThis.fullstacked
+            .bridge({
+                mod: Fs,
+                fn: CreateWriteStream,
+                data: [formatPathLike(path)]
+            })
             .then((d) => {
                 this.duplex = d;
                 this.eventEmitter = d.eventEmitter();

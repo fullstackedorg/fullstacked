@@ -60,6 +60,7 @@ type StoredStream struct {
 	WriteEvent func(ctx *Context, streamId uint8, event string, data []DeserializedData)
 	Close      func(ctx *Context, streamId uint8)
 	Ended      bool
+	Error      error
 }
 
 type StoredResponse struct {

@@ -38,6 +38,22 @@ suite("packages - e2e", () => {
         });
     });
 
+    test("install - error", async () => {
+        let errorEmitted: Error | null = null;
+        const ee = await packages.install(
+            testDirectoryGo,
+            false,
+            "non-existent-package-xyz-12345"
+        );
+        ee.duplex.on("error", (err) => {
+            errorEmitted = err;
+        });
+        await assert.rejects(async () => {
+            await ee.duplex.promise();
+        });
+        assert.ok(errorEmitted);
+    });
+
     test("install", async () => {
         await new Promise<void>(async (res) => {
             const ee = await packages.install(testDirectoryGo, false, "react");

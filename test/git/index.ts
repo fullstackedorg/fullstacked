@@ -64,6 +64,21 @@ suite("git - e2e", () => {
         assert.deepEqual([".git"], fs.readdirSync(testDirectory));
     });
 
+    test("clone - error", async () => {
+        const duplex = await git.clone(
+            "http://localhost:8080/non-existent",
+            testDirectory
+        );
+        let errorEmitted: Error | null = null;
+        duplex.on("error", (err) => {
+            errorEmitted = err;
+        });
+        await assert.rejects(async () => {
+            await duplex.promise();
+        });
+        assert.ok(errorEmitted);
+    });
+
     test("clone", async () => {
         await cloneRepository("test");
         assert.deepEqual([".git", "test.txt"], fs.readdirSync(testDirectory));

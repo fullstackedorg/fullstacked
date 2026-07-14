@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import "../../../core/internal/bundle/lib/fullstacked/index.ts"
+import "../../../core/internal/bundle/lib/fullstacked/index.ts";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
@@ -109,7 +109,9 @@ async function importPlugin(p: string) {
     }
 
     try {
-        const requireFromCwd = createRequire(path.join(process.cwd(), "index.js"));
+        const requireFromCwd = createRequire(
+            path.join(process.cwd(), "index.js")
+        );
         const resolved = requireFromCwd.resolve(p);
         return (await import(pathToFileURL(resolved).href)).default;
     } catch {
@@ -123,7 +125,11 @@ async function importPlugin(p: string) {
     }
 }
 
-await Promise.all(pluginsArgs.map(async p => plugin.register("build", await importPlugin(p))));
+await Promise.all(
+    pluginsArgs.map(async (p) =>
+        plugin.register("build", await importPlugin(p))
+    )
+);
 
 const result = await bundle();
 

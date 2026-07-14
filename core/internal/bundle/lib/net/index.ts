@@ -76,26 +76,28 @@ export class Socket extends RealDuplex {
     connect(optionsOrPort: Partial<ConnectOpts> | number, maybeHost?: string) {
         const { host, port } = parseOptions(optionsOrPort, maybeHost);
 
-        globalThis.fullstacked.bridge({
-            mod: Net,
-            fn: Connect,
-            data: [port, host]
-        }).then(async (d) => {
-            this.duplex = d;
-            this.duplex.on("data", (data: Uint8Array) => {
-                if (this.destroyed) return;
-                this.push(Buffer.from(data));
+        globalThis.fullstacked
+            .bridge({
+                mod: Net,
+                fn: Connect,
+                data: [port, host]
+            })
+            .then(async (d) => {
+                this.duplex = d;
+                this.duplex.on("data", (data: Uint8Array) => {
+                    if (this.destroyed) return;
+                    this.push(Buffer.from(data));
+                });
+                this.duplex.on("close", () => {
+                    if (!this.destroyed) {
+                        this.push(null);
+                    }
+                    this.emit("close");
+                });
+                await this.duplex.open();
+                this.emit("connect");
+                this.emit("ready");
             });
-            this.duplex.on("close", () => {
-                if (!this.destroyed) {
-                    this.push(null);
-                }
-                this.emit("close");
-            });
-            await this.duplex.open();
-            this.emit("connect");
-            this.emit("ready");
-        });
     }
 
     _read(size: number) {}

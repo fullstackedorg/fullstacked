@@ -269,7 +269,14 @@ func getCorePayloadStream(ctx *types.Context, id uint8, size int) ([]byte, error
 		return nil, errors.New("cannot find stream for id")
 	}
 
-	buffer, err := serialization.MergeBuffers([]byte{0}, stream.Buffer[0:size-1])
+	var headerByte byte = 0
+	if stream.Error != nil {
+		headerByte = 2
+	} else if stream.Ended {
+		headerByte = 1
+	}
+
+	buffer, err := serialization.MergeBuffers([]byte{headerByte}, stream.Buffer[0:size-1])
 
 	if err != nil {
 		ctx.StreamsMutex.Unlock()
@@ -278,13 +285,57 @@ func getCorePayloadStream(ctx *types.Context, id uint8, size int) ([]byte, error
 
 	stream.Buffer = stream.Buffer[size-1:]
 
-	if stream.Ended {
-		buffer[0] = 1
+	if stream.Error != nil || stream.Ended {
 		delete(ctx.Streams, id)
 	}
 	ctx.StreamsMutex.Unlock()
 
 	return buffer, nil
+}
+
+func StreamError(
+	ctx *types.Context,
+	storedStreamId uint8,
+	err error,
+) {
+	ctxMutex.Lock()
+	_, ok := Contexts[ctx.Id]
+	ctxMutex.Unlock()
+
+	if !ok {
+		return
+	}
+
+	ctx.StreamsMutex.Lock()
+
+	stream, ok := ctx.Streams[storedStreamId]
+
+	if !ok {
+		ctx.StreamsMutex.Unlock()
+		return
+	}
+
+	if !stream.Opened {
+		panic("streaming error for stream not opened")
+	}
+
+	stream.Ended = true
+	var errMsg string
+	if err != nil {
+		stream.Error = err
+		errMsg = err.Error()
+	} else {
+		errMsg = "unknown error"
+	}
+	stream.Buffer = []byte(errMsg)
+
+	if OnStreamData == nil {
+		panic("did not set OnStreamData")
+	}
+
+	ctx.StreamsMutex.Unlock()
+
+	OnStreamData(ctx.Id, storedStreamId, len(errMsg)+1)
 }
 
 func StreamChunk(

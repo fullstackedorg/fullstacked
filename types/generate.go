@@ -5,6 +5,7 @@ import (
 	"fullstackedorg/fullstacked/types"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/gzuidhof/tygo/tygo"
 )
@@ -40,11 +41,19 @@ func main() {
 			"time.Time":   "number /* time.Time */",
 			"os.FileMode": "number /* os.FileMode */",
 			"[]byte":      "Uint8Array",
+			"error":       "any",
 		},
 	}
 	gen := tygo.New(config)
 	err := gen.Generate()
 	if err != nil {
 		fmt.Println(err)
+	}
+
+	tsPath := path.Join(outDir, "index.ts")
+	content, readErr := os.ReadFile(tsPath)
+	if readErr == nil {
+		newContent := strings.ReplaceAll(string(content), "Error: error;", "Error: any;")
+		os.WriteFile(tsPath, []byte(newContent), 0644)
 	}
 }

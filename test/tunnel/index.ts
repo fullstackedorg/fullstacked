@@ -113,9 +113,9 @@ suite("tunnel - e2e", () => {
 
         execSync(
             `docker run -d --name ${containerName} ` +
-            `-e POSTGRES_PASSWORD=testpass ` +
-            `-p 127.0.0.1::5432 ` +
-            `postgres:alpine`,
+                `-e POSTGRES_PASSWORD=testpass ` +
+                `-p 127.0.0.1::5432 ` +
+                `postgres:alpine`,
             { stdio: "pipe" }
         );
 

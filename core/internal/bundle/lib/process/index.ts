@@ -9,7 +9,7 @@ class Item {
     constructor(
         public fun: Function,
         public array: any[]
-    ) { }
+    ) {}
     run() {
         this.fun.apply(null, this.array);
     }
@@ -84,7 +84,7 @@ const performanceNow =
     };
 
 // Local variables / functions
-export const noop = () => { };
+export const noop = () => {};
 export const title = "browser";
 export const browser = true;
 const getQueryArgv = () => {

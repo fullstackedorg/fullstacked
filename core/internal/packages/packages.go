@@ -36,6 +36,7 @@ type Progress struct {
 	Version  string  `json:"version,omitempty"`
 	Progress float64 `json:"progress,omitempty"`
 	Stage    string  `json:"stage"`
+	Error    string  `json:"error,omitempty"`
 }
 
 type ProgressCallback func(Progress)
@@ -81,7 +82,11 @@ func Switch(
 			Open: func(ctx *types.Context, streamId uint8) {
 				install(ctx, directory, packagesName, saveDev, 10, false, func(p Progress) {
 					if ctx != nil {
-						store.StreamEvent(ctx, streamId, "progress", []types.SerializableData{p}, p.Stage == "Done")
+						if p.Stage == "Error" {
+							store.StreamError(ctx, streamId, errors.New(p.Error))
+						} else {
+							store.StreamEvent(ctx, streamId, "progress", []types.SerializableData{p}, p.Stage == "Done")
+						}
 					}
 				})
 			},
@@ -112,7 +117,11 @@ func Switch(
 			Open: func(ctx *types.Context, streamId uint8) {
 				uninstall(ctx, directory, packagesName, func(p Progress) {
 					if ctx != nil {
-						store.StreamEvent(ctx, streamId, "progress", []types.SerializableData{p}, p.Stage == "Done")
+						if p.Stage == "Error" {
+							store.StreamError(ctx, streamId, errors.New(p.Error))
+						} else {
+							store.StreamEvent(ctx, streamId, "progress", []types.SerializableData{p}, p.Stage == "Done")
+						}
 					}
 				})
 			},
@@ -289,8 +298,14 @@ func install(
 	var pkgJSON PackageJSON
 	var rawPkgJSON map[string]interface{}
 	if err == nil {
-		json.Unmarshal(packageJsonContent, &pkgJSON)
-		json.Unmarshal(packageJsonContent, &rawPkgJSON)
+		if err := json.Unmarshal(packageJsonContent, &pkgJSON); err != nil {
+			onProgress(Progress{Stage: "Error", Error: err.Error()})
+			return
+		}
+		if err := json.Unmarshal(packageJsonContent, &rawPkgJSON); err != nil {
+			onProgress(Progress{Stage: "Error", Error: err.Error()})
+			return
+		}
 	}
 	if rawPkgJSON == nil {
 		rawPkgJSON = make(map[string]interface{})
@@ -331,7 +346,8 @@ func install(
 						rangeStr = gitUrl
 					}
 				} else {
-					fmt.Println("Metadata Fetch Error:", err)
+					onProgress(Progress{Stage: "Error", Error: err.Error()})
+					return
 				}
 			} else {
 				lastAt := strings.LastIndex(nameWithVersion, "@")
@@ -350,7 +366,8 @@ func install(
 				meta, err = fetchPackageMetadata(name)
 			}
 			if err != nil {
-				continue
+				onProgress(Progress{Stage: "Error", Error: err.Error()})
+				return
 			}
 
 			versionCaret := rangeStr
@@ -358,7 +375,8 @@ func install(
 				// Resolve version based on specifier
 				ver, err = resolveVersion(meta, rangeStr)
 				if err != nil {
-					continue
+					onProgress(Progress{Stage: "Error", Error: err.Error()})
+					return
 				}
 				if !isPlatformSupported(ver.OS, ver.CPU) {
 					continue
@@ -402,6 +420,9 @@ func install(
 			enc.SetEscapeHTML(false)
 			enc.SetIndent("", "  ")
 			enc.Encode(rawPkgJSON)
+		} else {
+			onProgress(Progress{Stage: "Error", Error: err.Error()})
+			return
 		}
 	}
 
@@ -413,7 +434,8 @@ func install(
 	if packageLockContent, err := fs.ReadFileFn(packageLockPath); err == nil {
 		oldLock = &PackageLock{}
 		if err := json.Unmarshal(packageLockContent, oldLock); err != nil {
-			oldLock = nil
+			onProgress(Progress{Stage: "Error", Error: err.Error()})
+			return
 		}
 	}
 
@@ -424,6 +446,7 @@ func install(
 		var wg sync.WaitGroup
 		var downloadCount int
 		var mu sync.Mutex
+		var downloadErr error
 
 		threadSafeProgress := func(p Progress) {
 			mu.Lock()
@@ -478,8 +501,6 @@ func install(
 						fs.RmFn(filepath.Join(tDir, ".gitignore"))
 						fs.RmFn(filepath.Join(tDir, ".npmignore"))
 						fs.RmFn(filepath.Join(tDir, "package-lock.json"))
-					} else {
-						fmt.Println("Git CloneRepo Error:", err)
 					}
 				} else {
 					err = downloadAndExtract(resolvedURL, tDir, pkgName, func(prog float64) {
@@ -496,6 +517,10 @@ func install(
 					mu.Lock()
 					downloadCount++
 					mu.Unlock()
+				} else {
+					mu.Lock()
+					downloadErr = err
+					mu.Unlock()
 				}
 
 				threadSafeProgress(Progress{
@@ -509,6 +534,11 @@ func install(
 
 		wg.Wait()
 
+		if downloadErr != nil {
+			onProgress(Progress{Stage: "Error", Error: downloadErr.Error()})
+			return
+		}
+
 		// Also create node_modules/.package-lock.json in fast path
 		fs.MkdirFn(filepath.Join(directory, "node_modules"))
 		nodeModulesLockPath := filepath.Join(directory, "node_modules", ".package-lock.json")
@@ -518,6 +548,9 @@ func install(
 			enc.SetEscapeHTML(false)
 			enc.SetIndent("", "  ")
 			enc.Encode(oldLock)
+		} else {
+			onProgress(Progress{Stage: "Error", Error: err.Error()})
+			return
 		}
 
 		onProgress(Progress{Stage: "Done", Progress: float64(downloadCount)})
@@ -572,6 +605,9 @@ func install(
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	var downloadCount int
+	var downloadErr error
+	var resolveErr error
+	var resolveErrMu sync.Mutex
 
 	threadSafeProgress := func(p Progress) {
 		mu.Lock()
@@ -647,6 +683,10 @@ func install(
 			if err == nil {
 				mu.Lock()
 				downloadCount++
+				mu.Unlock()
+			} else {
+				mu.Lock()
+				downloadErr = err
 				mu.Unlock()
 			}
 			threadSafeProgress(Progress{
@@ -813,6 +853,9 @@ func install(
 					}
 
 					if err != nil {
+						resolveErrMu.Lock()
+						resolveErr = err
+						resolveErrMu.Unlock()
 						return
 					}
 
@@ -1052,6 +1095,9 @@ func install(
 		enc.SetEscapeHTML(false)
 		enc.SetIndent("", "  ")
 		enc.Encode(newLock)
+	} else {
+		onProgress(Progress{Stage: "Error", Error: err.Error()})
+		return
 	}
 
 	// 6.5 Save node_modules/.package-lock.json
@@ -1063,10 +1109,21 @@ func install(
 		enc.SetEscapeHTML(false)
 		enc.SetIndent("", "  ")
 		if encodeErr := enc.Encode(newLock); encodeErr != nil {
-			panic("Encode error: " + encodeErr.Error())
+			onProgress(Progress{Stage: "Error", Error: encodeErr.Error()})
+			return
 		}
 	} else {
-		panic("Failed to create node_modules/.package-lock.json: " + err.Error())
+		onProgress(Progress{Stage: "Error", Error: err.Error()})
+		return
+	}
+
+	if resolveErr != nil {
+		onProgress(Progress{Stage: "Error", Error: resolveErr.Error()})
+		return
+	}
+	if downloadErr != nil {
+		onProgress(Progress{Stage: "Error", Error: downloadErr.Error()})
+		return
 	}
 
 	onProgress(Progress{Stage: "Done", Progress: float64(downloadCount)})

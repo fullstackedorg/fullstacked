@@ -262,6 +262,7 @@ func Switch(
 			Open: func(ctx *types.Context, streamId uint8) {
 				branches, err := branch(ctx, path.ResolveWithContext(ctx, data[0].Data.(string)))
 				if err != nil {
+					store.StreamError(ctx, streamId, err)
 					return
 				}
 				jsonBytes, _ := json.Marshal(branches)
@@ -277,6 +278,7 @@ func Switch(
 			Open: func(ctx *types.Context, streamId uint8) {
 				tags, err := tags(ctx, path.ResolveWithContext(ctx, data[0].Data.(string)))
 				if err != nil {
+					store.StreamError(ctx, streamId, err)
 					return
 				}
 				jsonBytes, _ := json.Marshal(tags)
@@ -728,7 +730,11 @@ func clone(
 				if errIsAuthenticationRequired(cloneErr) {
 					invalidateAuth(ctx, urlStr)
 				}
-				processErr(ctx, streamId, cloneErr, true)
+				if cloneErr != nil {
+					processErr(ctx, streamId, cloneErr, false)
+					store.StreamError(ctx, streamId, cloneErr)
+					return
+				}
 			}
 
 			store.StreamChunk(ctx, streamId, nil, true)
@@ -908,7 +914,8 @@ func pull(directory string, tunnel string) (*types.ResponseStream, error) {
 			}
 
 			if err != nil {
-				store.StreamChunk(ctx, streamId, []byte(err.Error()+"\n"), false)
+				store.StreamError(ctx, streamId, err)
+				return
 			}
 
 			store.StreamChunk(ctx, streamId, nil, true)
@@ -977,7 +984,8 @@ func push(directory string, tunnel string) (*types.ResponseStream, error) {
 			}
 
 			if err != nil {
-				store.StreamChunk(ctx, streamId, []byte(err.Error()+"\n"), false)
+				store.StreamError(ctx, streamId, err)
+				return
 			}
 
 			store.StreamChunk(ctx, streamId, nil, true)
@@ -1175,16 +1183,14 @@ func checkout(directory string, ref string, create bool, tunnel string) (*types.
 			}
 
 			if err != nil {
-				store.StreamChunk(ctx, streamId, []byte(err.Error()+"\n"), false)
-				store.StreamChunk(ctx, streamId, nil, true)
+				store.StreamError(ctx, streamId, err)
 				return
 			}
 			defer dir.Close()
 
 			refType, remote, err := dir.FindRefType(ctx, ref)
 			if err != nil {
-				store.StreamChunk(ctx, streamId, []byte(err.Error()+"\n"), false)
-				store.StreamChunk(ctx, streamId, nil, true)
+				store.StreamError(ctx, streamId, err)
 				return
 			}
 
@@ -1194,15 +1200,13 @@ func checkout(directory string, ref string, create bool, tunnel string) (*types.
 
 			repository, err := dir.Repository()
 			if err != nil {
-				store.StreamChunk(ctx, streamId, []byte(err.Error()+"\n"), false)
-				store.StreamChunk(ctx, streamId, nil, true)
+				store.StreamError(ctx, streamId, err)
 				return
 			}
 
 			worktree, err := repository.Worktree()
 			if err != nil {
-				store.StreamChunk(ctx, streamId, []byte(err.Error()+"\n"), false)
-				store.StreamChunk(ctx, streamId, nil, true)
+				store.StreamError(ctx, streamId, err)
 				return
 			}
 
@@ -1241,7 +1245,8 @@ func checkout(directory string, ref string, create bool, tunnel string) (*types.
 			}
 
 			if err != nil {
-				store.StreamChunk(ctx, streamId, []byte(err.Error()+"\n"), false)
+				store.StreamError(ctx, streamId, err)
+				return
 			}
 
 			store.StreamChunk(ctx, streamId, nil, true)

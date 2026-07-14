@@ -8,8 +8,10 @@ const asyncResponsePromises = new Map<
 >();
 
 export async function BridgeWindowsInit(): Promise<PlatformBridge> {
-
-    globalThis.fullstacked.respond = function (id: number, responseBase64: string) {
+    globalThis.fullstacked.respond = function (
+        id: number,
+        responseBase64: string
+    ) {
         const promise = asyncResponsePromises.get(id);
         promise?.(toByteArray(responseBase64).buffer);
         asyncResponsePromises.delete(id);
@@ -34,13 +36,11 @@ export async function BridgeWindowsInit(): Promise<PlatformBridge> {
     } else {
         globalThis.fullstacked.exit = () => globalThis.fetch("/exit");
 
-        globalThis.fullstacked.window.getSize = () => globalThis
-            .fullstacked
-            .fetch("/resize")
-            .then((r) => r.text());
+        globalThis.fullstacked.window.getSize = () =>
+            globalThis.fullstacked.fetch("/resize").then((r) => r.text());
 
         globalThis.fullstacked.window.resize = function (size: string) {
-            globalThis.fullstacked.fetch(`/resize?size=${size}`)
+            globalThis.fullstacked.fetch(`/resize?size=${size}`);
         };
     }
 
