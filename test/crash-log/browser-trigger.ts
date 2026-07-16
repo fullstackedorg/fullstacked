@@ -1,5 +1,7 @@
+import "../../core/internal/bundle/lib/fullstacked/index.ts";
 import core from "../core.ts";
 import { createBrowser } from "../browser.ts";
+import * as fs from "../../core/internal/bundle/lib/fs/index.ts";
 
 const message = process.argv[2];
 
@@ -10,6 +12,9 @@ if (!message) {
 
 // 1. Start core (loads core and registers standard callback listeners)
 await core.start();
+
+// Append to the crash log from JS context before browser crash panic
+await fs.promises.appendFile("crash.log", `JS_LOG_PREFIX: ${message}\n`);
 
 // 2. Start browser webview using sample directory
 const browser = await createBrowser("sample");

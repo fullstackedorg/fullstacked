@@ -5,7 +5,7 @@ import fs from "node:fs";
 import bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 
 suite("crash log - integration", () => {
-    const crashLogPath = "test/crash-log/.git/crash.log";
+    const crashLogPath = "test/crash-log/crash.log";
 
     before(() => {
         // Clean up any existing crash log
@@ -57,6 +57,11 @@ suite("crash log - integration", () => {
         const logContent1 = fs.readFileSync(crashLogPath, "utf8");
         assert.match(
             logContent1,
+            /JS_LOG_PREFIX: FIRST_BROWSER_CRASH_PANIC_MESSAGE/,
+            "crash.log should contain the first browser JS append log"
+        );
+        assert.match(
+            logContent1,
             /FIRST_BROWSER_CRASH_PANIC_MESSAGE/,
             "crash.log should contain the first browser crash message"
         );
@@ -81,8 +86,18 @@ suite("crash log - integration", () => {
         const logContent2 = fs.readFileSync(crashLogPath, "utf8");
         assert.match(
             logContent2,
+            /JS_LOG_PREFIX: FIRST_BROWSER_CRASH_PANIC_MESSAGE/,
+            "crash.log should still contain the first browser JS append log"
+        );
+        assert.match(
+            logContent2,
             /FIRST_BROWSER_CRASH_PANIC_MESSAGE/,
             "crash.log should still contain the first browser crash message"
+        );
+        assert.match(
+            logContent2,
+            /JS_LOG_PREFIX: SECOND_BROWSER_CRASH_PANIC_MESSAGE/,
+            "crash.log should contain the second browser JS append log"
         );
         assert.match(
             logContent2,

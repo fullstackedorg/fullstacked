@@ -24,25 +24,39 @@ import (
 	"os"
 	"path"
 	"runtime/debug"
+	"time"
 	"unsafe"
 )
 
 func main() {}
 
 var didSetCrashOpt = false
+var crashLogDir string
+
+func handlePanic() {
+	if r := recover(); r != nil {
+		writeCrashLogAndPanic(r)
+	}
+}
+
+func writeCrashLogAndPanic(r interface{}) {
+	if crashLogDir == "" {
+		crashLogDir = "."
+	}
+	f, err := os.OpenFile(path.Join(crashLogDir, "crash.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if err == nil {
+		f.WriteString(fmt.Sprintf("--- Crash Log Session Started: %s ---\n", time.Now().Format("2006-01-02 15:04:05")))
+		debug.SetCrashOutput(f, debug.CrashOptions{})
+		f.Close()
+	}
+	panic(r)
+}
 
 func setCrashOpt(directory string) {
 	if didSetCrashOpt {
 		return
 	}
-
-	gitDir := path.Join(directory, ".git")
-	os.MkdirAll(gitDir, 0700)
-	f, err := os.OpenFile(path.Join(gitDir, "crash.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-	if err == nil {
-		debug.SetCrashOutput(f, debug.CrashOptions{})
-		f.Close()
-	}
+	crashLogDir = directory
 	didSetCrashOpt = true
 }
 
@@ -51,6 +65,7 @@ func start(
 	root *C.char,
 	build *C.char,
 ) C.uint8_t {
+	defer handlePanic()
 	rootStr := C.GoString(root)
 
 	setCrashOpt(rootStr)
@@ -65,6 +80,7 @@ func startWithCtx(
 	build *C.char,
 	ctxId C.uint8_t,
 ) {
+	defer handlePanic()
 	rootStr := C.GoString(root)
 
 	setCrashOpt(rootStr)
@@ -118,6 +134,7 @@ func getCorePayload(
 	ptr unsafe.Pointer,
 	size C.int,
 ) {
+	defer handlePanic()
 	response, err := store.GetCorePayload(uint8(ctx), uint8(coreType), uint8(id), int(size))
 
 	if err != nil {
@@ -132,6 +149,7 @@ func getCorePayload(
 
 //export call
 func call(buffer unsafe.Pointer, length C.int) C.int {
+	defer handlePanic()
 	size, err := router.Call(C.GoBytes(buffer, length))
 
 	if err != nil {

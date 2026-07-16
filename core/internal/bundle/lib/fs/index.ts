@@ -11,7 +11,8 @@ import {
     Rename,
     Rm,
     Stats,
-    WriteFile
+    WriteFile,
+    AppendFile
 } from "../@types/fs.ts";
 import { Fs } from "../@types/index.ts";
 import { Writable } from "stream";
@@ -252,6 +253,28 @@ export function writeFile(
         .catch((e) => callback(e));
 }
 
+export function appendFileSync(path: PathLike, data: string | Uint8Array) {
+    return globalThis.fullstacked.bridge(
+        {
+            mod: Fs,
+            fn: AppendFile,
+            data: [formatPathLike(path), data]
+        },
+        true
+    );
+}
+
+export function appendFile(
+    path: PathLike,
+    data: string | Uint8Array,
+    callback: (err: Error) => void
+) {
+    promises
+        .appendFile(path, data)
+        .then(() => callback(null))
+        .catch((e) => callback(e));
+}
+
 export function renameSync(path: PathLike, path2: PathLike) {
     return globalThis.fullstacked.bridge(
         {
@@ -395,6 +418,8 @@ export default {
     unlink,
     writeFileSync,
     writeFile,
+    appendFileSync,
+    appendFile,
     renameSync,
     rename,
     realpathSync,

@@ -592,4 +592,66 @@ suite("fs - e2e", () => {
             }
         }
     });
+
+    test("appendFileSync", () => {
+        const path = "test-append-sync";
+        if (nodeFs.existsSync(path)) {
+            nodeFs.rmSync(path);
+        }
+
+        // 1. Create and write first content
+        fs.appendFileSync(path, "hello ");
+        assert.ok(nodeFs.existsSync(path));
+        assert.equal(nodeFs.readFileSync(path, "utf-8"), "hello ");
+
+        // 2. Append second content
+        fs.appendFileSync(path, "world");
+        assert.equal(nodeFs.readFileSync(path, "utf-8"), "hello world");
+
+        nodeFs.rmSync(path);
+    });
+
+    test("appendFile", (_, done) => {
+        const path = "test-append-callback";
+        if (nodeFs.existsSync(path)) {
+            nodeFs.rmSync(path);
+        }
+
+        fs.appendFile(path, "hello ", (err) => {
+            if (err) return done(err);
+            try {
+                assert.ok(nodeFs.existsSync(path));
+                assert.equal(nodeFs.readFileSync(path, "utf-8"), "hello ");
+
+                fs.appendFile(path, "world", (err) => {
+                    if (err) return done(err);
+                    try {
+                        assert.equal(nodeFs.readFileSync(path, "utf-8"), "hello world");
+                        nodeFs.rmSync(path);
+                        done();
+                    } catch (e) {
+                        done(e);
+                    }
+                });
+            } catch (e) {
+                done(e);
+            }
+        });
+    });
+
+    test("promises.appendFile", async () => {
+        const path = "test-append-promise";
+        if (nodeFs.existsSync(path)) {
+            nodeFs.rmSync(path);
+        }
+
+        await fs.promises.appendFile(path, "hello ");
+        assert.ok(nodeFs.existsSync(path));
+        assert.equal(nodeFs.readFileSync(path, "utf-8"), "hello ");
+
+        await fs.promises.appendFile(path, "world");
+        assert.equal(nodeFs.readFileSync(path, "utf-8"), "hello world");
+
+        nodeFs.rmSync(path);
+    });
 });

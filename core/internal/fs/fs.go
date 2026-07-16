@@ -28,6 +28,7 @@ const (
 	Rename            FsFn = 7
 	Copy              FsFn = 8
 	CreateWriteStream FsFn = 9
+	AppendFile         FsFn = 10
 )
 
 func Switch(
@@ -90,6 +91,18 @@ func Switch(
 		}
 
 		return WriteFileFn(path.ResolveWithContext(ctx, data[0].Data.(string)), contents)
+	case AppendFile:
+		response.Type = types.CoreResponseData
+
+		var contents []byte
+		switch data[1].Type {
+		case types.STRING:
+			contents = []byte(data[1].Data.(string))
+		case types.BUFFER:
+			contents = data[1].Data.([]byte)
+		}
+
+		return AppendFileFn(path.ResolveWithContext(ctx, data[0].Data.(string)), contents)
 	case Rename:
 		response.Type = types.CoreResponseData
 		return RenameFn(path.ResolveWithContext(ctx, data[0].Data.(string)), path.ResolveWithContext(ctx, data[1].Data.(string)))
@@ -217,6 +230,16 @@ func ReadFileFn(p string) ([]byte, error) {
 
 func WriteFileFn(p string, data []byte) error {
 	return os.WriteFile(p, data, 0644)
+}
+
+func AppendFileFn(p string, data []byte) error {
+	f, err := os.OpenFile(p, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.Write(data)
+	return err
 }
 
 func ReadDirFn(p string) ([]GoFileInfo, error) {

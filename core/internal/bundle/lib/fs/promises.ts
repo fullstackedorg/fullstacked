@@ -18,6 +18,7 @@ import {
     Mkdir,
     Rm,
     WriteFile,
+    AppendFile,
     Rename,
     Copy
 } from "../@types/fs.ts";
@@ -80,6 +81,14 @@ export function writeFile(path: PathLike, data: string | Uint8Array) {
     });
 }
 
+export function appendFile(path: PathLike, data: string | Uint8Array) {
+    return globalThis.fullstacked.bridge({
+        mod: Fs,
+        fn: AppendFile,
+        data: [formatPathLike(path), data]
+    });
+}
+
 export function mkdir(path: PathLike) {
     return globalThis.fullstacked.bridge({
         mod: Fs,
@@ -128,6 +137,7 @@ export default {
     rm,
     unlink,
     writeFile,
+    appendFile,
     rename,
     cp
 };
