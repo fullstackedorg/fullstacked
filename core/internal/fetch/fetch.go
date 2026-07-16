@@ -103,9 +103,10 @@ func Switch(
 }
 
 type RequestHead struct {
-	Url     string
-	Method  string
-	Headers map[string]string
+	Url      string
+	Method   string
+	Headers  map[string]string
+	Redirect *bool
 }
 
 type Request struct {
@@ -122,6 +123,7 @@ type ResponseHead struct {
 	Status     int
 	StatusText string
 	Headers    map[string][]string
+	Url        string
 }
 
 var fetchResponses = map[int]*http.Response{}
@@ -176,7 +178,22 @@ func FetchFnApply(id int, requestHead RequestHead, body []byte) (ResponseHead, e
 	// infinite timeout
 	client.Timeout = 0
 
-	response, err := client.Do(request)
+	followRedirect := true
+	if requestHead.Redirect != nil {
+		followRedirect = *requestHead.Redirect
+	}
+
+	reqClient := &http.Client{
+		Transport: client.Transport,
+		Timeout:   0,
+	}
+	if !followRedirect {
+		reqClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		}
+	}
+
+	response, err := reqClient.Do(request)
 
 	if err != nil {
 		closeFetchRequest(id)
@@ -187,11 +204,17 @@ func FetchFnApply(id int, requestHead RequestHead, body []byte) (ResponseHead, e
 	fetchResponses[id] = response
 	fetchResponsesMutex.Unlock()
 
+	finalUrl := requestHead.Url
+	if response.Request != nil && response.Request.URL != nil {
+		finalUrl = response.Request.URL.String()
+	}
+
 	responseHead := ResponseHead{
 		Id:         id,
 		Status:     response.StatusCode,
 		StatusText: response.Status,
 		Headers:    response.Header,
+		Url:        finalUrl,
 	}
 
 	return responseHead, nil

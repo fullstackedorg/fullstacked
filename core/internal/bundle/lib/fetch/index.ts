@@ -85,10 +85,20 @@ async function fetchCore(
         (request instanceof Request ? request.headers : init?.headers) || null
     );
 
+    const redirectOption =
+        request instanceof Request
+            ? (request as any).redirect
+            : (init as any)?.redirect;
+    const followRedirect =
+        redirectOption !== false &&
+        redirectOption !== "manual" &&
+        redirectOption !== "error";
+
     const requestHead: RequestHead = {
         Url: url,
         Method: method,
-        Headers: headers
+        Headers: headers,
+        Redirect: followRedirect
     };
 
     const requestBody =
@@ -184,8 +194,8 @@ async function fetchCore(
     };
 
     const response: Response = {
-        url,
-        redirected: false,
+        url: responseHead.Url || url,
+        redirected: responseHead.Url ? responseHead.Url !== url : false,
         headers: objToHeader(responseHead.Headers),
         type: "default",
         ok: responseHead.Status >= 200 && responseHead.Status <= 299,

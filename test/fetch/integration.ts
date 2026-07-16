@@ -71,6 +71,24 @@ suite("fetch - integration", () => {
         await test();
     });
 
+    test("fetch - redirect", async () => {
+        const responseFollow = await globalThis.fullstacked.fetch(
+            "http://localhost:9090/redirect"
+        );
+        assert.deepEqual(responseFollow.status, 200);
+        assert.deepEqual(responseFollow.url, "http://localhost:9090/redirect-target");
+        assert.deepEqual(responseFollow.redirected, true);
+        assert.deepEqual(await responseFollow.text(), "redirect target reached");
+
+        const responseManual = await globalThis.fullstacked.fetch(
+            "http://localhost:9090/redirect",
+            { redirect: "manual" }
+        );
+        assert.deepEqual(responseManual.status, 302);
+        assert.deepEqual(responseManual.url, "http://localhost:9090/redirect");
+        assert.deepEqual(responseManual.redirected, false);
+    });
+
     after(() => {
         worker.terminate();
         browser.end();

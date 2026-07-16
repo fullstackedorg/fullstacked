@@ -143,6 +143,30 @@ suite("fetch - e2e", () => {
         assert.rejects(response.text());
     });
 
+    test("redirect - follow", async () => {
+        const response = await fetch("http://localhost:9090/redirect");
+        assert.deepEqual(response.status, 200);
+        assert.deepEqual(response.url, "http://localhost:9090/redirect-target");
+        assert.deepEqual(response.redirected, true);
+        assert.deepEqual(await response.text(), "redirect target reached");
+    });
+
+    test("redirect - manual / false", async () => {
+        const responseManual = await fetch("http://localhost:9090/redirect", {
+            redirect: "manual"
+        });
+        assert.deepEqual(responseManual.status, 302);
+        assert.deepEqual(responseManual.url, "http://localhost:9090/redirect");
+        assert.deepEqual(responseManual.redirected, false);
+
+        const responseBool = await fetch("http://localhost:9090/redirect", {
+            redirect: false as any
+        });
+        assert.deepEqual(responseBool.status, 302);
+        assert.deepEqual(responseBool.url, "http://localhost:9090/redirect");
+        assert.deepEqual(responseBool.redirected, false);
+    });
+
     after(() => {
         worker.terminate();
     });

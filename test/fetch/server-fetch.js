@@ -15,7 +15,15 @@ function readBody(req) {
 }
 
 http.createServer(async (req, res) => {
-    res.writeHead(200, { "x-header-test": "test" });
+    if (req.url === "/redirect") {
+        res.writeHead(302, { "Location": "/redirect-target", "x-header-test": "test" });
+        return res.end();
+    }
+
+    if (req.url === "/redirect-target") {
+        res.writeHead(200, { "x-header-test": "test" });
+        return res.end("redirect target reached");
+    }
 
     if (req.url === "/wait") {
         await new Promise((resolve) =>
@@ -24,6 +32,7 @@ http.createServer(async (req, res) => {
     }
 
     if (req.url === "/stream") {
+        res.writeHead(200, { "x-header-test": "test" });
         for (let i = 0; i < 10; i++) {
             res.write("chunk");
 
@@ -33,6 +42,8 @@ http.createServer(async (req, res) => {
         }
         return res.end();
     }
+
+    res.writeHead(200, { "x-header-test": "test" });
 
     const responseBody =
         req.method === "POST"
