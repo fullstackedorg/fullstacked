@@ -913,6 +913,10 @@ func pull(directory string, tunnel string) (*types.ResponseStream, error) {
 				invalidateAuth(ctx, urlStr)
 			}
 
+			if errors.Is(err, git.NoErrAlreadyUpToDate) {
+				err = nil
+			}
+
 			if err != nil {
 				store.StreamError(ctx, streamId, err)
 				return
@@ -981,6 +985,10 @@ func push(directory string, tunnel string) (*types.ResponseStream, error) {
 
 			if errIsAuthenticationRequired(err) {
 				invalidateAuth(ctx, urlStr)
+			}
+
+			if errors.Is(err, git.NoErrAlreadyUpToDate) {
+				err = nil
 			}
 
 			if err != nil {
@@ -1317,6 +1325,10 @@ func testHost(urlStr string, tunnel string, directory string, proxy *GitProxy) e
 	u, err := url.Parse(urlStr)
 	if err != nil {
 		return err
+	}
+
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return nil
 	}
 
 	var baseTransport nethttp.RoundTripper = nethttp.DefaultTransport

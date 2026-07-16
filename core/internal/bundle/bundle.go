@@ -413,7 +413,7 @@ func BundleFileFn(ctx *types.Context, entryPoint string) EsbuildResult {
 	if len(result.Errors) == 0 {
 		for i := range result.OutputFiles {
 			fs.WriteFileFn(result.OutputFiles[i].Path, result.OutputFiles[i].Contents)
-			pathRel := fspath.RelativeToRoot(ctx, result.OutputFiles[i].Path)
+			pathRel := fspath.RelativeToCwd(ctx, result.OutputFiles[i].Path)
 			esbuildResult.OutputFiles = append(esbuildResult.OutputFiles, pathRel)
 		}
 	}

@@ -455,6 +455,10 @@ func (r *GitDirectory) FetchBranch(branchName string, progress *GitStream) error
 		invalidateAuth(progress.ctx, urlStr)
 	}
 
+	if errors.Is(err, git.NoErrAlreadyUpToDate) {
+		err = nil
+	}
+
 	return err
 }
 
