@@ -61,7 +61,7 @@ namespace FullStacked
                 // Async
                 else
                 {
-                    _ = this.webview.CoreWebView2.ExecuteScriptAsync("window.respond(" + id + ",`" + Convert.ToBase64String(response) + "`)");
+                    _ = this.webview.CoreWebView2.ExecuteScriptAsync("window.fullstacked.respond(" + id + ",`" + Convert.ToBase64String(response) + "`)");
                 }
 
 
@@ -284,7 +284,7 @@ namespace FullStacked
         {
             this.webview.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.High, () =>
             {
-                _ = this.webview.CoreWebView2.ExecuteScriptAsync("window.callback(" + streamId + ", `" + Convert.ToBase64String(data) + "`)");
+                _ = this.webview.CoreWebView2.ExecuteScriptAsync("window.fullstacked.onStreamData(" + streamId + ", `" + Convert.ToBase64String(data) + "`)");
             });
         }
 

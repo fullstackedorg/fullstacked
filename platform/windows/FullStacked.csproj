@@ -130,6 +130,7 @@
     <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
     <PackageCertificateKeyFile>FullStacked_TemporaryKey.pfx</PackageCertificateKeyFile>
+    <PackageCertificateThumbprint>17BDBFE0E8A7456A7BC4C0373E1A4269F4F6A28D</PackageCertificateThumbprint>
   </PropertyGroup>
 
   <!--
