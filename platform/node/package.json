@@ -10,7 +10,6 @@
         "prepack": "npm run build"
     },
     "dependencies": {
-        "fullstacked": "file:fullstacked-1.0.0-alpha.1725.tgz",
         "open": "^11.0.0",
         "ws": "^8.21.0"
     },
