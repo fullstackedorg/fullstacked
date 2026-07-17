@@ -50,10 +50,10 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
             globalThis.fullstacked.clipboard.paste = () => {
                 const id = Math.floor(Math.random() * 1000000);
                 return new Promise<string>((resolve) => {
+                    clipboardResponsePromises.set(id, resolve);
                     globalThis.webkit.messageHandlers.clipboard.postMessage(
                         id.toString()
                     );
-                    clipboardResponsePromises.set(id, resolve);
                 });
             };
 

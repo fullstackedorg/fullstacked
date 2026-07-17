@@ -30,9 +30,6 @@ import (
 
 func main() {}
 
-var didSetCrashOpt = false
-var crashLogDir string
-
 func handlePanic() {
 	if r := recover(); r != nil {
 		writeCrashLogAndPanic(r)
@@ -40,24 +37,16 @@ func handlePanic() {
 }
 
 func writeCrashLogAndPanic(r interface{}) {
-	if crashLogDir == "" {
-		crashLogDir = "."
+	if store.CrashLogDir == "" {
+		store.CrashLogDir = "."
 	}
-	f, err := os.OpenFile(path.Join(crashLogDir, "crash.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	f, err := os.OpenFile(path.Join(store.CrashLogDir, "crash.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err == nil {
 		f.WriteString(fmt.Sprintf("--- Crash Log Session Started: %s ---\n", time.Now().Format("2006-01-02 15:04:05")))
 		debug.SetCrashOutput(f, debug.CrashOptions{})
 		f.Close()
 	}
 	panic(r)
-}
-
-func setCrashOpt(directory string) {
-	if didSetCrashOpt {
-		return
-	}
-	crashLogDir = directory
-	didSetCrashOpt = true
 }
 
 //export start
@@ -67,8 +56,6 @@ func start(
 ) C.uint8_t {
 	defer handlePanic()
 	rootStr := C.GoString(root)
-
-	setCrashOpt(rootStr)
 
 	id := store.NewContext(rootStr, C.GoString(build))
 	return C.uint8_t(id)
@@ -82,8 +69,6 @@ func startWithCtx(
 ) {
 	defer handlePanic()
 	rootStr := C.GoString(root)
-
-	setCrashOpt(rootStr)
 
 	store.NewContextWithCtxId(uint8(ctxId), rootStr, C.GoString(build))
 }

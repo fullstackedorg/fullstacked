@@ -18,6 +18,8 @@ var nextCtxId uint8 = 0
 var Contexts = map[uint8]*types.Context{}
 var ctxMutex = sync.Mutex{}
 
+var CrashLogDir string
+
 func NewContext(root string, build string) uint8 {
 	ctxMutex.Lock()
 
@@ -49,6 +51,8 @@ func NewContextWithCtxId(ctxId uint8, root string, build string) {
 		Root:  root,
 		Build: build,
 	}
+
+	CrashLogDir = root
 
 	Contexts[ctxId] = &types.Context{
 		Id:          ctxId,

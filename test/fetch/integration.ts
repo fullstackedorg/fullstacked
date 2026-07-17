@@ -76,9 +76,15 @@ suite("fetch - integration", () => {
             "http://localhost:9090/redirect"
         );
         assert.deepEqual(responseFollow.status, 200);
-        assert.deepEqual(responseFollow.url, "http://localhost:9090/redirect-target");
+        assert.deepEqual(
+            responseFollow.url,
+            "http://localhost:9090/redirect-target"
+        );
         assert.deepEqual(responseFollow.redirected, true);
-        assert.deepEqual(await responseFollow.text(), "redirect target reached");
+        assert.deepEqual(
+            await responseFollow.text(),
+            "redirect target reached"
+        );
 
         const responseManual = await globalThis.fullstacked.fetch(
             "http://localhost:9090/redirect",

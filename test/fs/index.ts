@@ -626,7 +626,10 @@ suite("fs - e2e", () => {
                 fs.appendFile(path, "world", (err) => {
                     if (err) return done(err);
                     try {
-                        assert.equal(nodeFs.readFileSync(path, "utf-8"), "hello world");
+                        assert.equal(
+                            nodeFs.readFileSync(path, "utf-8"),
+                            "hello world"
+                        );
                         nodeFs.rmSync(path);
                         done();
                     } catch (e) {

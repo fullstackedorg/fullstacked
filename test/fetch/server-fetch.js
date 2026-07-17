@@ -16,7 +16,10 @@ function readBody(req) {
 
 http.createServer(async (req, res) => {
     if (req.url === "/redirect") {
-        res.writeHead(302, { "Location": "/redirect-target", "x-header-test": "test" });
+        res.writeHead(302, {
+            Location: "/redirect-target",
+            "x-header-test": "test"
+        });
         return res.end();
     }
 

@@ -28,7 +28,7 @@ const (
 	Rename            FsFn = 7
 	Copy              FsFn = 8
 	CreateWriteStream FsFn = 9
-	AppendFile         FsFn = 10
+	AppendFile        FsFn = 10
 )
 
 func Switch(

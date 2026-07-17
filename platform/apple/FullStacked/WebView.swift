@@ -116,7 +116,7 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
 
     func onStreamData(streamId: UInt8, buffer: Data){
         DispatchQueue.main.async {
-            self.evaluateJavaScript("window.callback(\(streamId),`\(buffer.base64EncodedString())`)")
+            self.evaluateJavaScript("window.fullstacked.onStreamData(\(streamId),`\(buffer.base64EncodedString())`)")
         }
     }
     
@@ -177,7 +177,7 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         }
         // Async
         else {
-            self.evaluateJavaScript("window.respond(\(payload[payload.startIndex + 1]),`\(response.base64EncodedString())`)")
+            self.evaluateJavaScript("window.fullstacked.respond(\(payload[payload.startIndex + 1]),`\(response.base64EncodedString())`)")
         }
     }
     

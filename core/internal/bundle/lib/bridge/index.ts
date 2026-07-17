@@ -35,6 +35,9 @@ type FullStacked = {
         respondPaste?: (id: number, responseBase64: string) => void;
     };
 
+    // size string is : `${width}:${height}:${x}:${y}`
+    // `kiosk` <= Mode kiosk
+    // `fullscreen` <= Fullscreen/Maximized
     window: {
         resize?: (size: string) => void;
         getSize?: () => Promise<string>;

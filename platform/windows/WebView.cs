@@ -142,61 +142,66 @@ namespace FullStacked
                         }
                     }
 
-                    if (queryParams.TryGetValue("kiosk", out string kioskVal) && kioskVal == "true")
+                    if (queryParams.TryGetValue("size", out string sizeVal) && !string.IsNullOrEmpty(sizeVal))
                     {
-                        this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen);
-                        (stream, headers) = this.bufferToResponseStream([]);
-                        args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
-                    }
-                    else if (queryParams.TryGetValue("fullscreen", out string fsVal) && fsVal == "true")
-                    {
-                        this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Default);
-                        var overlappedPresenter = this.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
-                        if (overlappedPresenter != null)
+                        if (sizeVal == "kiosk")
                         {
-                            overlappedPresenter.Maximize();
+                            this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen);
+                            (stream, headers) = this.bufferToResponseStream([]);
+                            args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
                         }
-                        (stream, headers) = this.bufferToResponseStream([]);
-                        args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
-                    }
-                    else if (queryParams.TryGetValue("width", out string wStr) &&
-                             queryParams.TryGetValue("height", out string hStr))
-                    {
-                        int w = int.Parse(wStr);
-                        int h = int.Parse(hStr);
-
-                        if (this.AppWindow.Presenter.Kind == Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen)
+                        else if (sizeVal == "fullscreen")
                         {
                             this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Default);
-                        }
-                        var overlappedPresenter = this.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
-                        if (overlappedPresenter != null && overlappedPresenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Maximized)
-                        {
-                            overlappedPresenter.Restore();
-                        }
-
-                        if (queryParams.TryGetValue("x", out string xStr) &&
-                            queryParams.TryGetValue("y", out string yStr))
-                        {
-                            int x = int.Parse(xStr);
-                            int y = int.Parse(yStr);
-                            this.AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(x, y, w, h));
+                            var overlappedPresenter = this.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
+                            if (overlappedPresenter != null)
+                            {
+                                overlappedPresenter.Maximize();
+                            }
+                            (stream, headers) = this.bufferToResponseStream([]);
+                            args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
                         }
                         else
                         {
-                            int currentW = this.AppWindow.Size.Width;
-                            int currentH = this.AppWindow.Size.Height;
-                            int currentX = this.AppWindow.Position.X;
-                            int currentY = this.AppWindow.Position.Y;
+                            string[] parts = sizeVal.Split(':');
+                            if (parts.Length >= 2)
+                            {
+                                int w = int.Parse(parts[0]);
+                                int h = int.Parse(parts[1]);
 
-                            int newX = currentX + (currentW - w) / 2;
-                            int newY = currentY + (currentH - h) / 2;
+                                if (this.AppWindow.Presenter.Kind == Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen)
+                                {
+                                    this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Default);
+                                }
+                                var overlappedPresenter = this.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
+                                if (overlappedPresenter != null && overlappedPresenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Maximized)
+                                {
+                                    overlappedPresenter.Restore();
+                                }
 
-                            this.AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(newX, newY, w, h));
+                                if (parts.Length == 4)
+                                {
+                                    int x = int.Parse(parts[2]);
+                                    int y = int.Parse(parts[3]);
+                                    this.AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(x, y, w, h));
+                                }
+                                else
+                                {
+                                    int currentW = this.AppWindow.Size.Width;
+                                    int currentH = this.AppWindow.Size.Height;
+                                    int currentX = this.AppWindow.Position.X;
+                                    int currentY = this.AppWindow.Position.Y;
+
+                                    int newX = currentX + (currentW - w) / 2;
+                                    int newY = currentY + (currentH - h) / 2;
+
+                                    this.AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(newX, newY, w, h));
+                                }
+                            }
+
+                            (stream, headers) = this.bufferToResponseStream([]);
+                            args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
                         }
-
-                        (stream, headers) = this.bufferToResponseStream([]);
-                        args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
                     }
                     else
                     {

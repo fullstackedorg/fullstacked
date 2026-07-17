@@ -47,7 +47,7 @@ class WebViewExtended: WKWebView, WKUIDelegate  {
         self.clipboardHelper.setCallback { [weak self] (requestClipboardID, clipboardContent) in
             guard let self = self else { return }
             let b64 = Data(clipboardContent.utf8).base64EncodedString()
-            self.evaluateJavaScript("window.respondClipboard(\"\(requestClipboardID)\", \"\(b64)\")")
+            self.evaluateJavaScript("window.fullstacked.clipboard.respondPaste(\(requestClipboardID), \"\(b64)\")")
         }
         
         self.uiDelegate = self

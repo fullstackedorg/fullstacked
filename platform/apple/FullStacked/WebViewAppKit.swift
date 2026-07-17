@@ -25,7 +25,7 @@ class ResizeHelper: NSObject, WKScriptMessageHandler {
                 } else {
                     responseStr = "\(frame.size.width):\(frame.size.height):\(frame.origin.x):\(frame.origin.y)"
                 }
-                self.webView?.evaluateJavaScript("window.respondResize(\"\(responseStr)\")")
+                self.webView?.evaluateJavaScript("window.fullstacked.window.respondGetSize(\"\(responseStr)\")")
                 return
             }
             

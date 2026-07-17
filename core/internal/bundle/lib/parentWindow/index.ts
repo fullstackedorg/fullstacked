@@ -38,7 +38,7 @@ function onResize() {
 
     saveTimeout = setTimeout(async () => {
         try {
-            const sizeStr = await (globalThis as any).resize("get");
+            const sizeStr = await globalThis.fullstacked.window.getSize();
             if (
                 sizeStr &&
                 (sizeStr.includes(":") ||
