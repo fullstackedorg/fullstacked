@@ -34,7 +34,8 @@ export async function BridgeWindowsInit(): Promise<PlatformBridge> {
             asyncResponsePromises.delete(id);
         };
     } else {
-        globalThis.fullstacked.exit = () => globalThis.fetch("/exit");
+        globalThis.fullstacked.exit = () =>
+            globalThis.fullstacked.fetch("/exit");
 
         globalThis.fullstacked.window.getSize = () =>
             globalThis.fullstacked.fetch("/resize").then((r) => r.text());
