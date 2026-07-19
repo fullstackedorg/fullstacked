@@ -1,4 +1,5 @@
 import net from "net";
+// @ts-ignore
 import tunnel from "tunnel";
 
 // Port 9091 is where our websocket tunnel proxy server will be listening
@@ -13,10 +14,12 @@ tunnel
         const socket = new net.Socket();
         socket.on("connect", () => {
             socket.write(new Uint8Array([7, 8, 9]));
-            setTimeout(socket.destroy.bind(socket), 300);
         });
         socket.on("data", (chunk: Uint8Array) => {
             document.body.innerText += chunk.join("").toString();
+            if (document.body.innerText.trim().length >= 3) {
+                socket.destroy();
+            }
         });
         socket.on("close", () => {
             document.body.classList.add("done");

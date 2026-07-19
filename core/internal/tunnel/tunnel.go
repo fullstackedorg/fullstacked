@@ -2,10 +2,10 @@ package tunnel
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fullstackedorg/fullstacked/internal/store"
+	"fullstackedorg/fullstacked/internal/utils"
 	"fullstackedorg/fullstacked/types"
 	"net"
 	"net/http"
@@ -68,7 +68,7 @@ func RegisterTunnelFn(tunnel Tunnel) (string, error) {
 	}
 
 	if tunnel.Name == "" {
-		tunnel.Name = rand.Text()
+		tunnel.Name, _ = utils.RandomAlpha(8)
 	}
 
 	if tunnel.Port == 0 {
