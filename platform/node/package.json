@@ -1,6 +1,6 @@
 {
     "name": "fullstacked",
-    "version": "1.0.0-alpha.1742",
+    "version": "1.0.0-alpha.1743",
     "bin": {
         "fullstacked": "index.js"
     },
@@ -20,12 +20,12 @@
         "node-addon-api": "^8.8.0"
     },
     "optionalDependencies": {
-        "@fullstacked/darwin-arm64": "1.0.0-alpha.1742",
-        "@fullstacked/darwin-x64": "1.0.0-alpha.1742",
-        "@fullstacked/linux-arm64": "1.0.0-alpha.1742",
-        "@fullstacked/linux-x64": "1.0.0-alpha.1742",
-        "@fullstacked/win32-arm64": "1.0.0-alpha.1742",
-        "@fullstacked/win32-x64": "1.0.0-alpha.1742"
+        "@fullstacked/darwin-arm64": "1.0.0-alpha.1743",
+        "@fullstacked/darwin-x64": "1.0.0-alpha.1743",
+        "@fullstacked/linux-arm64": "1.0.0-alpha.1743",
+        "@fullstacked/linux-x64": "1.0.0-alpha.1743",
+        "@fullstacked/win32-arm64": "1.0.0-alpha.1743",
+        "@fullstacked/win32-x64": "1.0.0-alpha.1743"
     },
     "author": "FullStacked",
     "license": "MIT",
