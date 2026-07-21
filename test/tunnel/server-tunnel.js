@@ -10,14 +10,13 @@ wss.on("connection", async (ws) => {
     const dataQueue = [];
     const pushQueue = (data) => {
         dataQueue.push(data);
-    }
+    };
 
-    ws.on("message", pushQueue)
+    ws.on("message", pushQueue);
 
-    await new Promise(res => setTimeout(res, 500));
+    await new Promise((res) => setTimeout(res, 500));
 
     const tcpSocket = net.connect(tcpPort, "127.0.0.1");
-
 
     dataQueue.forEach((data) => {
         let buffer;
@@ -31,7 +30,7 @@ wss.on("connection", async (ws) => {
             buffer = Buffer.from(data);
         }
         tcpSocket.write(buffer);
-    })
+    });
 
     ws.off("message", pushQueue);
 

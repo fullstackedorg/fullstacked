@@ -42,15 +42,12 @@ suite("tunnel - e2e", () => {
             socket.on("connect", () => {
                 socket.write(data);
             });
-            socket.on(
-                "data",
-                (chunk) => {
-                    received = mergeUint8Arrays(received, chunk);
-                    if (received.length >= data.length) {
-                        socket.destroy();
-                    }
+            socket.on("data", (chunk) => {
+                received = mergeUint8Arrays(received, chunk);
+                if (received.length >= data.length) {
+                    socket.destroy();
                 }
-            );
+            });
             socket.on("close", resolve);
             socket.connect(9090, "test-tunnel-e2e");
         });
@@ -66,15 +63,12 @@ suite("tunnel - e2e", () => {
                 socket.on("connect", () => {
                     socket.write(data);
                 });
-                socket.on(
-                    "data",
-                    (chunk) => {
-                        received = mergeUint8Arrays(received, chunk);
-                        if (received.length >= data.length) {
-                            socket.destroy();
-                        }
+                socket.on("data", (chunk) => {
+                    received = mergeUint8Arrays(received, chunk);
+                    if (received.length >= data.length) {
+                        socket.destroy();
                     }
-                );
+                });
                 socket.on("close", resolve);
                 socket.connect(9090, "test-tunnel-e2e");
             });
@@ -92,15 +86,12 @@ suite("tunnel - e2e", () => {
                 socket.on("connect", () => {
                     socket.write(data);
                 });
-                socket.on(
-                    "data",
-                    (chunk) => {
-                        received = mergeUint8Arrays(received, chunk);
-                        if (received.length >= data.length) {
-                            socket.destroy();
-                        }
+                socket.on("data", (chunk) => {
+                    received = mergeUint8Arrays(received, chunk);
+                    if (received.length >= data.length) {
+                        socket.destroy();
                     }
-                );
+                });
                 socket.on("close", () => {
                     assert.deepEqual(received, data);
                     resolve();
@@ -317,15 +308,12 @@ suite("tunnel - e2e", () => {
         const socket = new netGo.Socket();
         await new Promise<void>((resolve, reject) => {
             socket.on("error", reject);
-            socket.on(
-                "data",
-                (chunk) => {
-                    received = mergeUint8Arrays(received, chunk);
-                    if (received.length >= data.length) {
-                        socket.destroy();
-                    }
+            socket.on("data", (chunk) => {
+                received = mergeUint8Arrays(received, chunk);
+                if (received.length >= data.length) {
+                    socket.destroy();
                 }
-            );
+            });
             socket.on("close", resolve);
             socket.connect(9090, "test-tunnel-e2e");
             socket.write(data);
@@ -358,7 +346,9 @@ suite("tunnel - e2e", () => {
             assert.equal(text, "hello from http server");
         } finally {
             await fetchWsTunnelServer.terminate();
-            await new Promise<void>((resolve) => httpServer.close(() => resolve()));
+            await new Promise<void>((resolve) =>
+                httpServer.close(() => resolve())
+            );
         }
     });
 

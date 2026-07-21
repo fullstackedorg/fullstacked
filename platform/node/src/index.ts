@@ -1,15 +1,12 @@
 #!/usr/bin/env node
 import "../../../core/internal/bundle/lib/fullstacked/index.ts";
 import path from "node:path";
-import { createRequire } from "node:module";
-import { pathToFileURL } from "node:url";
 import { load } from "./core.ts";
 import { createWebView } from "./webview.ts";
-import { bundle } from "../../../core/internal/bundle/lib/bundle/index.ts";
-import { run } from "../../../core/internal/bundle/lib/run/index.ts";
 import version from "../../../core/internal/bundle/lib/process/version.json";
 import { findArg, getPositionalArgs } from "./args.ts";
-import plugin from "../../../core/internal/bundle/lib/plugin/index.ts";
+import { runFile } from "./run/file.ts";
+import { runDirectory } from "./run/directory.ts";
 
 const end = (code: number) => {
     core.end();
@@ -55,6 +52,7 @@ const openBrowser = findArg(["-o", "--open"]);
 const buildOnly = findArg(["-b", "--build"]);
 const envArgs = findArg(["-e", "--env"], true);
 const pluginsArgs = findArg(["-p", "--plugin"], true);
+const fileFlag = findArg(["-f", "--file"]);
 const env: Record<string, string> = {};
 for (const val of envArgs) {
     const index = val.indexOf("=");
@@ -67,7 +65,9 @@ for (const val of envArgs) {
     }
 }
 const positionalArgs = getPositionalArgs();
-const directory = path.resolve(positionalArgs.at(-1) || ".");
+const directory = fileFlag
+    ? process.cwd()
+    : path.resolve(positionalArgs.at(-1) || ".");
 
 if (showVersion) {
     console.log(
@@ -109,6 +109,7 @@ Options:
   -e, --env     Define environment variables in KEY=VALUE format (can be used multiple times)
   -o, --open    Directly open the browser
   -b, --build   Only bundle the project, don't run it afterward
+  -f, --file    Bundle and execute a single script file
   -h, --help    Display this help message
 
 Directory:
@@ -121,52 +122,15 @@ process.chdir(directory);
 
 const mainCtx = core.start(directory, directory);
 
+globalThis.ctxId = mainCtx;
 globalThis.bridges = {
     ctxId: mainCtx,
     Sync: (payload: ArrayBuffer) => core.call(payload),
     Async: async (payload: ArrayBuffer) => core.call(payload)
 };
 
-async function importPlugin(p: string) {
-    if (p.startsWith(".") || path.isAbsolute(p)) {
-        return (await import(pathToFileURL(path.resolve(p)).href)).default;
-    }
-
-    try {
-        const requireFromCwd = createRequire(
-            path.join(process.cwd(), "index.js")
-        );
-        const resolved = requireFromCwd.resolve(p);
-        return (await import(pathToFileURL(resolved).href)).default;
-    } catch {
-        try {
-            const requireFromModule = createRequire(import.meta.url);
-            const resolved = requireFromModule.resolve(p);
-            return (await import(pathToFileURL(resolved).href)).default;
-        } catch {
-            return (await import(p)).default;
-        }
-    }
-}
-
-await Promise.all(
-    pluginsArgs.map(async (p) =>
-        plugin.register("build", await importPlugin(p))
-    )
-);
-
-const result = await bundle();
-
-if (result.Warnings?.length) {
-    console.warn("Warnings:", result.Warnings);
-}
-
-if (result.Errors?.length) {
-    console.error("Errors:", result.Errors);
-    end(1);
-} else if (!buildOnly) {
-    run({ env });
+if (fileFlag) {
+    await runFile(positionalArgs, end);
 } else {
-    console.log("Build complete.");
-    end(0);
+    await runDirectory(pluginsArgs, buildOnly, env, end);
 }

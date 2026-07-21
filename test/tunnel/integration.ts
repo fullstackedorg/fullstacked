@@ -24,7 +24,9 @@ suite("tunnel - integration", () => {
             res.writeHead(200, { "Content-Type": "text/plain" });
             res.end("fetch integration success");
         });
-        await new Promise<void>((resolve) => fetchHttpServer.listen(0, resolve));
+        await new Promise<void>((resolve) =>
+            fetchHttpServer.listen(0, resolve)
+        );
         const httpPort = fetchHttpServer.address().port;
 
         // Start tunnel server for fetch on port 9093
@@ -40,7 +42,9 @@ suite("tunnel - integration", () => {
     });
 
     test("socket connection through registered tunnel in browser", async () => {
-        const result = await bundle.bundle("test/tunnel/sample/socket/index.ts");
+        const result = await bundle.bundle(
+            "test/tunnel/sample/socket/index.ts"
+        );
         assert.deepEqual(result.Errors, null);
         assert.deepEqual(result.Warnings, null);
 
@@ -79,6 +83,8 @@ suite("tunnel - integration", () => {
         await tcpServer.terminate();
         await wsTunnelServer.terminate();
         await fetchTunnelServer.terminate();
-        await new Promise<void>((resolve) => fetchHttpServer.close(() => resolve()));
+        await new Promise<void>((resolve) =>
+            fetchHttpServer.close(() => resolve())
+        );
     });
 });
