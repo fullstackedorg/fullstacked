@@ -78,15 +78,17 @@ if (showVersion) {
 
 if (help) {
     console.log(`
-Usage: fullstacked [options] [directory]
+Usage: 
+  fullstacked [options] [directory]
 
-This CLI compiles and runs projects designed for the FullStacked runtime.
-Unlike traditional JS/TS projects with separate frontend and backend layers:
-- NodeJS and Browser APIs are available seamlessly within the same files.
-- ES module syntax.
-- TypeScript support.
-- No HTML files.
-- Start with an entrypoint: index.js(x) or index.ts(x).
+Description:
+  This CLI compiles and runs projects designed for the FullStacked runtime.
+  Unlike traditional JS/TS projects with separate frontend and backend layers:
+  - NodeJS and Browser APIs are available seamlessly within the same files.
+  - ES module syntax.
+  - TypeScript support.
+  - No HTML files.
+  - Start with an entrypoint: index.js(x) or index.ts(x).
 
 Example:
   // index.jsx
