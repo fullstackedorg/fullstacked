@@ -518,12 +518,15 @@ var esbuildPluginsLib = []esbuild.Plugin{
 }
 
 func addCatchAllSourceFilePlugin(buildOptions *esbuild.BuildOptions, sourceFiles *[]string) {
+	var mu sync.Mutex
 	buildOptions.Plugins = append(buildOptions.Plugins, esbuild.Plugin{
 		Name: "catch-all-source-files",
 		Setup: func(build esbuild.PluginBuild) {
 			build.OnLoad(esbuild.OnLoadOptions{Filter: ".*"}, func(args esbuild.OnLoadArgs) (esbuild.OnLoadResult, error) {
 				if !strings.Contains(args.Path, "node_modules") {
+					mu.Lock()
 					*sourceFiles = append(*sourceFiles, args.Path)
+					mu.Unlock()
 				}
 				return esbuild.OnLoadResult{}, nil
 			})
@@ -560,6 +563,7 @@ func addContextBuildPluginsToBuildOptions(
 		mu.Unlock()
 
 		namespace := "build-plugin-" + plugin.Name
+		var pluginMu sync.Mutex
 
 		buildOptions.Plugins = append(buildOptions.Plugins, esbuild.Plugin{
 			Name: plugin.Name,
@@ -582,11 +586,13 @@ func addContextBuildPluginsToBuildOptions(
 						}
 					}
 
+					pluginMu.Lock()
 					params.Resolved = append(params.Resolved, PluginResolvedFile{
 						Importer:    fspath.RelativeToCwd(ctx, args.Importer),
 						Path:        args.Path,
 						ResolvedDir: fspath.RelativeToCwd(ctx, args.ResolveDir),
 					})
+					pluginMu.Unlock()
 
 					return esbuild.OnResolveResult{
 						Path:      args.Path,

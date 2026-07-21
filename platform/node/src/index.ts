@@ -80,11 +80,33 @@ if (help) {
     console.log(`
 Usage: fullstacked [options] [directory]
 
+This CLI compiles and runs projects designed for the FullStacked runtime.
+Unlike traditional JS/TS projects with separate frontend and backend layers:
+- NodeJS and Browser APIs are available seamlessly within the same files.
+- ES module syntax.
+- TypeScript support.
+- No HTML files.
+- Start with an entrypoint: index.js(x) or index.ts(x).
+
+Example:
+  // index.jsx
+  import React from "react";
+  import { createRoot } from "react-dom/client";
+  import fs from "node:fs";
+
+  const div = document.createElement("div");
+  document.body.append(div);
+
+  const root = createRoot(div);
+  root.render(<h1>{await fs.promises.readFile("hello-world.txt")}</h1>);
+
 Options:
   -v, --version Display the current version
   -p, --port    Define the main starting port (defaults to 9000)
+  -p, --plugin  Specify a plugin for the build process (can be used multiple times)
+  -e, --env     Define environment variables in KEY=VALUE format (can be used multiple times)
   -o, --open    Directly open the browser
-  -b, --build   Only bundle, don't run afterward
+  -b, --build   Only bundle the project, don't run it afterward
   -h, --help    Display this help message
 
 Directory:
