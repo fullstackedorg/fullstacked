@@ -6,6 +6,7 @@ import packages from "../packages/index.ts";
 import path from "../path/index.ts";
 import fs from "../fs/index.ts";
 import version from "../process/version.json" with { type: "json" };
+import os from "../os/index.ts";
 
 export interface ExecuteOptions {
     stdio?: any[];
@@ -210,7 +211,7 @@ async function bundleAndImportFile(
     try {
         await fs.promises.stat(targetFilePath);
         fileExists = true;
-    } catch {}
+    } catch { }
 
     if (!fileExists) {
         writeErr(formatMessage(`Error: file not found: ${file}`, false));
@@ -234,9 +235,17 @@ async function bundleAndImportFile(
         return null;
     }
 
-    const absoluteOutputFile = path.resolve(process.cwd(), outputFile);
+    let absoluteOutputFile = path.resolve(process.cwd(), outputFile);
+    if (os.platform() === "win32") {
+        // to forward slash
+        absoluteOutputFile = absoluteOutputFile.replaceAll("\\", "/");
+        // remove drive letter
+        absoluteOutputFile = absoluteOutputFile.at(1) === ":"
+            ? absoluteOutputFile.slice(2)
+            : absoluteOutputFile;
+    }
     const cleanup = async () => {
-        await fs.promises.rm(absoluteOutputFile).catch(() => {});
+        await fs.promises.rm(absoluteOutputFile).catch(() => { });
     };
 
     try {
@@ -279,12 +288,12 @@ async function runDirectory(
         for (const bp of buildPlugins) {
             try {
                 await bp.unregister();
-            } catch {}
+            } catch { }
         }
         for (const tempFile of tempPluginFiles) {
             try {
-                await fs.promises.rm(tempFile).catch(() => {});
-            } catch {}
+                await fs.promises.rm(tempFile).catch(() => { });
+            } catch { }
         }
     };
 
