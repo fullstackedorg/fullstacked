@@ -38,10 +38,10 @@ func Switch(
 		return nil
 	case Resolve:
 		response.Type = types.CoreResponseData
-		strSlice := []string{
-			"/",
+		strSlice := DataToStringSlice(data...)
+		if len(strSlice) > 0 && !filepath.IsAbs(strSlice[0]) {
+			strSlice = append([]string{"/"}, strSlice...)
 		}
-		strSlice = append(strSlice, DataToStringSlice(data...)...)
 		response.Data = filepath.Clean(filepath.Join(strSlice...))
 		return nil
 	case Normalize:
