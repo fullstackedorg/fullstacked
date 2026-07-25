@@ -3,6 +3,8 @@ import core from "./core.ts";
 import { after, before } from "node:test";
 import { URL } from "node:url";
 
+process.env.TEST = "1";
+
 before(core.start);
 
 let tests = [

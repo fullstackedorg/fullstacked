@@ -21,7 +21,7 @@ func onStreamDataCallback(
         webView.onStreamData(streamId: streamId, buffer: buffer)
         bufferPtr.deallocate()
     } else {
-        WebViewStore.getInstance().addWebView(WebView(ctx))
+        print("[onStreamData] Unknown ctx")
     }
 }
 

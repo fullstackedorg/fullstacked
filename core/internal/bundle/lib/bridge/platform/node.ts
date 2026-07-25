@@ -70,6 +70,13 @@ export async function BridgeNodeInit(): Promise<PlatformBridge> {
 
     await webSocketForCallback;
 
+    globalThis.fullstacked.open = function (ctx: number) {
+        return globalThis.fullstacked.fetch("/open", {
+            method: "POST",
+            body: new Uint8Array([ctx])
+        });
+    };
+
     globalThis.fullstacked.exit = function () {
         ws.close();
 

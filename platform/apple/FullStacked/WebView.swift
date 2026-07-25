@@ -23,10 +23,6 @@ func startMain(_ providedCtx: UInt8?) -> UInt8 {
     return ctx
 }
 
-/// Generic weak-proxy for WKScriptMessageHandler.
-/// WKUserContentController retains its handlers strongly, so adding `self` directly
-/// creates a retain cycle that prevents the WebView from ever being deallocated.
-/// This proxy holds only a weak reference to the real handler and forwards messages.
 class WeakMessageHandler: NSObject, WKScriptMessageHandler {
     weak var target: (AnyObject & WKScriptMessageHandler)?
     init(_ target: AnyObject & WKScriptMessageHandler) {
@@ -37,8 +33,14 @@ class WeakMessageHandler: NSObject, WKScriptMessageHandler {
     }
 }
 
+class WebViewOpen: NSObject, WKScriptMessageHandler {
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        let ctx = UInt8(truncating: message.body as! NSNumber)
+        WebViewStore.getInstance().addWebView(WebView(ctx))
+    }
+}
+
 class WebViewCloser: NSObject, WKScriptMessageHandler {
-    /// Weak to avoid a retain cycle: WebView owns closer, closer must not own WebView.
     weak var webView: WebView?
     
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -52,6 +54,7 @@ class WebViewCloser: NSObject, WKScriptMessageHandler {
 class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WKDownloadDelegate, Codable, Identifiable, ASWebAuthenticationPresentationContextProviding {
     
     var id = UUID()
+    let open = WebViewOpen();
     let closer = WebViewCloser();
     
     public let requestHandler: RequestHandler
@@ -93,9 +96,8 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         
         self.isInspectable = true
         self.navigationDelegate = self
-        // Use WeakMessageHandler proxies so WKUserContentController does not
-        // hold strong references to self or closer, preventing retain cycles.
         userContentController.add(WeakMessageHandler(self), name: "bridge")
+        userContentController.add(WeakMessageHandler(self.open), name: "open")
         userContentController.add(WeakMessageHandler(self.closer), name: "exit")
         
         self.load(URLRequest(url: URL(string: "fs://localhost")!))

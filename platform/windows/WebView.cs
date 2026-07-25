@@ -128,19 +128,7 @@ namespace FullStacked
 
                     return;
                 } else if (pathname.StartsWith("/resize")) {
-                    var queryParams = new Dictionary<string, string>();
-                    string query = uri.Query.TrimStart('?');
-                    if (!string.IsNullOrEmpty(query))
-                    {
-                        foreach (string part in query.Split('&'))
-                        {
-                            string[] kv = part.Split('=');
-                            if (kv.Length == 2)
-                            {
-                                queryParams[kv[0]] = Uri.UnescapeDataString(kv[1]);
-                            }
-                        }
-                    }
+                    var queryParams = this.parseQueryParams(uri);
 
                     if (queryParams.TryGetValue("size", out string sizeVal) && !string.IsNullOrEmpty(sizeVal))
                     {
@@ -229,8 +217,22 @@ namespace FullStacked
                         args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
                     }
                     return;
-                } else if (pathname.StartsWith("/exit")) {
+                } else if (pathname.StartsWith("/open")) {
+                    var queryParams = this.parseQueryParams(uri);
+                    
+                    
+                    if (queryParams.TryGetValue("ctx", out string ctxVal) && !string.IsNullOrEmpty(ctxVal))
+                    {
+                        byte ctxId = byte.Parse(ctxVal);
+                        App.singleton.open(ctxId);
+                    }
+
+                    (stream, headers) = this.bufferToResponseStream(new byte[] {});
+                    args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
+                    return;
+                }else if (pathname.StartsWith("/exit")) {
                     this.DispatcherQueue.TryEnqueue(() => this.Close());
+                    return;
                 }
 
                 // static file serving
@@ -299,6 +301,24 @@ namespace FullStacked
             ];
 
             return (stream, string.Join("\r\n", headers));
+        }
+
+        private Dictionary<string, string> parseQueryParams(Uri uri)
+        {
+            var queryParams = new Dictionary<string, string>();
+            string query = uri.Query.TrimStart('?');
+            if (!string.IsNullOrEmpty(query))
+            {
+                foreach (string part in query.Split('&'))
+                {
+                    string[] kv = part.Split('=');
+                    if (kv.Length == 2)
+                    {
+                        queryParams[kv[0]] = Uri.UnescapeDataString(kv[1]);
+                    }
+                }
+            }
+            return queryParams;
         }
     }
 }

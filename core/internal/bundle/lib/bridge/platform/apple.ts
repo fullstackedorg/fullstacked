@@ -36,6 +36,9 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
         globalThis.fullstacked.exit = () =>
             globalThis.webkit.messageHandlers.exit.postMessage("");
 
+        globalThis.fullstacked.open = (ctx: number) =>
+            globalThis.webkit.messageHandlers.open.postMessage(ctx);
+
         if (globalThis.webkit.messageHandlers.clipboard) {
             const td = new TextDecoder();
             globalThis.fullstacked.clipboard.respondPaste = (

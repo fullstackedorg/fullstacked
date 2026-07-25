@@ -9,11 +9,13 @@ namespace FullStacked
     unsafe public partial class App : Application
     {
         public static Core core;
+        public static App singleton;
 
         private readonly Dictionary<byte, WebView> webviews = new();
 
         public App()
         {
+            singleton = this;
             this.InitializeComponent();
         }
 
@@ -36,7 +38,7 @@ namespace FullStacked
             this.open(mainCtx);
         }
 
-        private void open(byte ctx)
+        void open(byte ctx)
         {
             WebView webview = new(ctx);
             this.webviews.Add(ctx, webview);

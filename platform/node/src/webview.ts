@@ -32,7 +32,6 @@ export async function createWebView(
     core: Core,
     ctx: number,
     opts: {
-        openBrowser?: boolean;
         quiet?: boolean;
         didClose?: () => void;
     }
@@ -60,7 +59,7 @@ export async function createWebView(
         console.log(`Listening at http://localhost:${port}`);
     }
 
-    if (opts.openBrowser) {
+    if (!process.env.TEST) {
         open(`http://localhost:${port}`);
     }
 
@@ -103,6 +102,10 @@ function createHandler(core: Core, ctx: number) {
                 "content-length": ctxStr.length
             });
             return res.end(ctxStr);
+        } else if (pathname === "/open") {
+            const newCtx = await readBody(req);
+            globalThis.fullstacked.open(newCtx[0]);
+            return res.end();
         } else if (pathname === "/call") {
             const payload = await coreCall(core, req);
             res.writeHead(200, {

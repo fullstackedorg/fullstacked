@@ -9,11 +9,7 @@
         "allowImportingTsExtensions": true,
         "noEmit": true,
         "noUnusedLocals": true,
-        "strictNullChecks": false,
-        "paths": {
-            "@fullstacked/sass": ["./plugins/sass/index.ts"],
-            "@fullstacked/tailwindcss": ["./plugins/tailwindcss/index.ts"]
-        }
+        "strictNullChecks": false
     },
     "exclude": [
         "out",

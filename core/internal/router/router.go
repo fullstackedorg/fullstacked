@@ -152,10 +152,7 @@ func Switch(
 		root := filepath.Join(ctx.Directories.Root, data[0].Data.(string))
 
 		id := store.NewContext(root, root)
-
-		if store.OnStreamData == nil {
-			return errors.New("onStreamData not set")
-		}
+		response.Data = id
 
 		if len(data) > 1 && data[1].Type == types.OBJECT {
 			env := (map[string]string)(nil)
@@ -166,7 +163,6 @@ func Switch(
 			}
 		}
 
-		store.OnStreamData(id, 0, 0)
 		return nil
 	case Cwd:
 		response.Type = types.CoreResponseData

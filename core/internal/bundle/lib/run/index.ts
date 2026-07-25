@@ -7,7 +7,9 @@ type RunOptions = {
     env?: Record<string, string>;
 };
 
-export function run(directoryOrOptions?: string | RunOptions): Promise<void> {
+export async function run(
+    directoryOrOptions?: string | RunOptions
+): Promise<number> {
     const directory =
         typeof directoryOrOptions === "string"
             ? directoryOrOptions
@@ -19,11 +21,13 @@ export function run(directoryOrOptions?: string | RunOptions): Promise<void> {
 
     const resolved = path.resolve(directory ?? ".");
 
-    return globalThis.fullstacked.bridge({
+    const newCtx = (await globalThis.fullstacked.bridge({
         mod: Core,
         fn: Run,
         data: [resolved, env]
-    });
+    })) as number;
+
+    return newCtx;
 }
 
 export default run;

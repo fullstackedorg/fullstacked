@@ -38,10 +38,11 @@ func main() {
 	config := &tygo.Config{
 		Packages: packages,
 		TypeMappings: map[string]string{
-			"time.Time":   "number /* time.Time */",
-			"os.FileMode": "number /* os.FileMode */",
-			"[]byte":      "Uint8Array",
-			"error":       "any",
+			"time.Time":       "number /* time.Time */",
+			"os.FileMode":     "number /* os.FileMode */",
+			"[]byte":          "Uint8Array",
+			"error":           "any",
+			"esbuild.Message": "{ ID?: string; PluginName?: string; Text?: string; Location?: { File?: string; Namespace?: string; Line?: number; Column?: number; Length?: number; LineText?: string; Suggestion?: string; }; Notes?: { Text?: string; Location?: { File?: string; Namespace?: string; Line?: number; Column?: number; Length?: number; LineText?: string; Suggestion?: string; }; }[]; Detail?: any; }",
 		},
 	}
 	gen := tygo.New(config)

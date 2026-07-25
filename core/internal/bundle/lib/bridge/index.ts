@@ -45,6 +45,7 @@ type FullStacked = {
     };
 
     fetch: typeof fetch;
+    open?: (ctx: number) => void;
 };
 
 globalThis.__dirname = "/";

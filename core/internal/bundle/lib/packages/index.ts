@@ -1,5 +1,12 @@
 import { Packages } from "../@types/index.ts";
-import { Install, Progress, Audit, Uninstall } from "../@types/packages.ts";
+import {
+    Install,
+    Progress,
+    Audit,
+    Uninstall,
+    ResolvePackages,
+    AddResolveNodePath
+} from "../@types/packages.ts";
 import { Duplex } from "../bridge/duplex.ts";
 import { EventEmitter } from "../bridge/eventEmitter.ts";
 
@@ -39,10 +46,31 @@ export function audit(directory: string) {
     });
 }
 
+export function resolve(
+    moduleName: string,
+    startDir?: string
+): Promise<string> {
+    return globalThis.fullstacked.bridge({
+        mod: Packages,
+        fn: ResolvePackages,
+        data: [moduleName, startDir ?? ""]
+    });
+}
+
+export function addNodePath(inputPath: string): Promise<void> {
+    return globalThis.fullstacked.bridge({
+        mod: Packages,
+        fn: AddResolveNodePath,
+        data: [inputPath]
+    });
+}
+
 const packages = {
     install,
     uninstall,
-    audit
+    audit,
+    resolve,
+    addNodePath
 };
 
 export default packages;

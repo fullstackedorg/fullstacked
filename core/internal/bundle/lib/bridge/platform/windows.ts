@@ -37,6 +37,9 @@ export async function BridgeWindowsInit(): Promise<PlatformBridge> {
         globalThis.fullstacked.exit = () =>
             globalThis.fullstacked.fetch("/exit");
 
+        globalThis.fullstacked.open = (ctx: number) =>
+            globalThis.fullstacked.fetch(`/open?ctx=${ctx}`);
+
         globalThis.fullstacked.window.getSize = () =>
             globalThis.fullstacked.fetch("/resize").then((r) => r.text());
 

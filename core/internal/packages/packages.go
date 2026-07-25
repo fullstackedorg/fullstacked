@@ -26,9 +26,11 @@ import (
 type PackagesFn = uint8
 
 const (
-	Install   PackagesFn = 0
-	Uninstall PackagesFn = 1
-	Audit     PackagesFn = 2
+	Install            PackagesFn = 0
+	Uninstall          PackagesFn = 1
+	Audit              PackagesFn = 2
+	ResolvePackages    PackagesFn = 3
+	AddResolveNodePath PackagesFn = 4
 )
 
 type Progress struct {
@@ -144,6 +146,46 @@ func Switch(
 		}
 		response.Type = types.CoreResponseData
 		response.Data = report
+		return nil
+
+	case ResolvePackages:
+		if len(data) < 1 {
+			return errors.New("missing moduleName argument")
+		}
+		moduleName, ok := data[0].Data.(string)
+		if !ok {
+			return errors.New("moduleName must be a string")
+		}
+		startDir := ctx.Cwd
+		if len(data) > 1 {
+			if s, ok := data[1].Data.(string); ok && s != "" {
+				startDir = s
+			}
+		}
+		startDir = fspath.ResolveWithContext(ctx, startDir)
+
+		resolvedPath, err := resolveModule(ctx, moduleName, startDir)
+		if err != nil {
+			return err
+		}
+		response.Type = types.CoreResponseData
+		response.Data = resolvedPath
+		return nil
+
+	case AddResolveNodePath:
+		if len(data) < 1 {
+			return errors.New("missing path argument")
+		}
+		inputPath, ok := data[0].Data.(string)
+		if !ok {
+			return errors.New("path must be a string")
+		}
+		err := addNodePath(ctx, inputPath)
+		if err != nil {
+			return err
+		}
+		response.Type = types.CoreResponseData
+		response.Data = true
 		return nil
 	}
 
