@@ -38,7 +38,7 @@ namespace FullStacked
             this.open(mainCtx);
         }
 
-        void open(byte ctx)
+        public void open(byte ctx)
         {
             WebView webview = new(ctx);
             this.webviews.Add(ctx, webview);
