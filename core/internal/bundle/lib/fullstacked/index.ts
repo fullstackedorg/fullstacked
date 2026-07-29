@@ -183,6 +183,57 @@ function getPositionalArgs(args: string[]): string[] {
     return positionals;
 }
 
+function getExtraArgs(args: string[]): string[] {
+    const extraArgs: string[] = [];
+    const valueFlags = [
+        ["-e", "--env"],
+        ["-p", "--port"],
+        ["-p", "--plugin"],
+        ["-f", "--file"]
+    ];
+    const booleanFlags = [
+        ["-h", "--help"],
+        ["-v", "--version"],
+        ["-o", "--open"],
+        ["-n", "--no-open"],
+        ["-b", "--build"]
+    ];
+
+    for (let i = 0; i < args.length; i++) {
+        const arg = args[i];
+        if (booleanFlags.some((aliases) => aliases.includes(arg))) {
+            continue;
+        }
+
+        let isValueFlag = false;
+        for (const aliases of valueFlags) {
+            if (aliases.includes(arg)) {
+                const next = args[i + 1];
+                if (next !== undefined && !next.startsWith("-")) {
+                    i++;
+                }
+                isValueFlag = true;
+                break;
+            }
+            let matchedPrefix = false;
+            for (const alias of aliases) {
+                if (arg.startsWith(alias + "=")) {
+                    matchedPrefix = true;
+                    break;
+                }
+            }
+            if (matchedPrefix) {
+                isValueFlag = true;
+                break;
+            }
+        }
+
+        if (isValueFlag) continue;
+        extraArgs.push(arg);
+    }
+    return extraArgs;
+}
+
 interface BundleImportResult {
     module: any;
     outputFile: string;
@@ -192,7 +243,8 @@ interface BundleImportResult {
 async function bundleAndImportFile(
     file: string,
     startDir: string,
-    writeErr: (msg: any) => void
+    writeErr: (msg: any) => void,
+    extraArgs?: string[]
 ): Promise<BundleImportResult | null> {
     if (!file || file.trim() === "") {
         writeErr(formatMessage("Error: no file specified.", false));
@@ -248,8 +300,17 @@ async function bundleAndImportFile(
         await fs.promises.rm(absoluteOutputFile).catch(() => { });
     };
 
+    const searchParams = new URLSearchParams();
+    searchParams.set("t", Date.now().toString());
+    if (extraArgs && extraArgs.length > 0) {
+        for (const arg of extraArgs) {
+            searchParams.append("argv", arg);
+        }
+    }
+    const importUrl = `${absoluteOutputFile}?${searchParams.toString()}`;
+
     try {
-        const module = await import(absoluteOutputFile);
+        const module = await import(importUrl);
         return { module, outputFile: absoluteOutputFile, cleanup };
     } catch (e: any) {
         writeErr(formatMessage(e.stack || e.message || String(e), false));
@@ -260,10 +321,16 @@ async function bundleAndImportFile(
 
 async function runFile(
     file: string,
+    extraArgs: string[],
     writeOut: (msg: any) => void,
     writeErr: (msg: any) => void
 ): Promise<number> {
-    const res = await bundleAndImportFile(file, process.cwd(), writeErr);
+    const res = await bundleAndImportFile(
+        file,
+        process.cwd(),
+        writeErr,
+        extraArgs
+    );
     if (!res) return 1;
 
     await res.cleanup();
@@ -466,7 +533,8 @@ Directory:
     }
 
     if (file) {
-        return runFile(file, writeOut, writeErr);
+        const extraArgs = getExtraArgs(args);
+        return runFile(file, extraArgs, writeOut, writeErr);
     }
 
     return runDirectory(
