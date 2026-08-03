@@ -6,6 +6,83 @@ import SwiftUI
 class ResizeHelper: NSObject, WKScriptMessageHandler {
     /// Weak reference to avoid a retain cycle with the owning WebViewExtended.
     weak var webView: WebViewExtended?
+    private weak var observedWindow: NSWindow?
+
+    var lastRequestedWidth: CGFloat?
+    var lastRequestedHeight: CGFloat?
+    var isFullScreen: Bool = false
+    private var isChangingScreen: Bool = false
+
+    func observeWindow(_ window: NSWindow) {
+        if observedWindow === window { return }
+        stopObservingWindow()
+        observedWindow = window
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleScreenChange(_:)),
+            name: NSWindow.didChangeScreenNotification,
+            object: window
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleScreenChange(_:)),
+            name: NSApplication.didChangeScreenParametersNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleWindowResize(_:)),
+            name: NSWindow.didResizeNotification,
+            object: window
+        )
+    }
+
+    func stopObservingWindow() {
+        if let window = observedWindow {
+            NotificationCenter.default.removeObserver(self, name: NSWindow.didChangeScreenNotification, object: window)
+            NotificationCenter.default.removeObserver(self, name: NSApplication.didChangeScreenParametersNotification, object: nil)
+            NotificationCenter.default.removeObserver(self, name: NSWindow.didResizeNotification, object: window)
+            observedWindow = nil
+        }
+    }
+
+    deinit {
+        stopObservingWindow()
+    }
+
+    @objc func handleWindowResize(_ notification: Notification) {
+        if isChangingScreen { return }
+        guard let activeWindow = observedWindow ?? self.webView?.window else { return }
+        if !isFullScreen && !activeWindow.styleMask.contains(.fullScreen) {
+            lastRequestedWidth = activeWindow.frame.width
+            lastRequestedHeight = activeWindow.frame.height
+        }
+    }
+
+    @objc func handleScreenChange(_ notification: Notification) {
+        guard let activeWindow = self.webView?.window ?? self.observedWindow else { return }
+        let currentScreen = activeWindow.screen ?? findScreen(for: activeWindow.frame, defaultScreen: NSScreen.main)
+        guard let visibleFrame = currentScreen?.visibleFrame ?? currentScreen?.frame else { return }
+        
+        if isFullScreen {
+            if activeWindow.frame != visibleFrame {
+                activeWindow.setFrame(visibleFrame, display: true)
+            }
+            return
+        }
+        
+        let currentFrame = activeWindow.frame
+        let targetW = lastRequestedWidth ?? currentFrame.width
+        let targetH = lastRequestedHeight ?? currentFrame.height
+        
+        let frame = fitFrame(targetWidth: targetW, targetHeight: targetH, targetX: currentFrame.origin.x, targetY: currentFrame.origin.y, in: visibleFrame)
+        if activeWindow.frame != frame {
+            isChangingScreen = true
+            activeWindow.setFrame(frame, display: true)
+            isChangingScreen = false
+        }
+    }
 
     func findScreen(for rect: NSRect, defaultScreen: NSScreen?) -> NSScreen? {
         let screens = NSScreen.screens
@@ -53,6 +130,7 @@ class ResizeHelper: NSObject, WKScriptMessageHandler {
         let body = message.body as! String
         
         if let activeWindow = self.webView?.window {
+            observeWindow(activeWindow)
             let currentScreen = activeWindow.screen ?? findScreen(for: activeWindow.frame, defaultScreen: NSScreen.main)
             let visibleFrame = currentScreen?.visibleFrame ?? currentScreen?.frame ?? NSRect.zero
             
@@ -85,6 +163,9 @@ class ResizeHelper: NSObject, WKScriptMessageHandler {
             }
             
             if body == "fullscreen" {
+                isFullScreen = true
+                lastRequestedWidth = nil
+                lastRequestedHeight = nil
                 activeWindow.setFrame(visibleFrame, display: true)
                 return
             }
@@ -97,6 +178,10 @@ class ResizeHelper: NSObject, WKScriptMessageHandler {
                 let newWidth = CGFloat(width)
                 let newHeight = CGFloat(height)
                 
+                isFullScreen = false
+                lastRequestedWidth = newWidth
+                lastRequestedHeight = newHeight
+                
                 let targetX = currentFrame.origin.x + (currentFrame.size.width - newWidth) / 2.0
                 let targetY = currentFrame.origin.y + (currentFrame.size.height - newHeight) / 2.0
                 
@@ -108,11 +193,18 @@ class ResizeHelper: NSObject, WKScriptMessageHandler {
                 let x = Double(components[2])!
                 let y = Double(components[3])!
                 
-                let targetRect = NSRect(x: CGFloat(x), y: CGFloat(y), width: CGFloat(width), height: CGFloat(height))
+                let newWidth = CGFloat(width)
+                let newHeight = CGFloat(height)
+                
+                isFullScreen = false
+                lastRequestedWidth = newWidth
+                lastRequestedHeight = newHeight
+                
+                let targetRect = NSRect(x: CGFloat(x), y: CGFloat(y), width: newWidth, height: newHeight)
                 let targetScreen = findScreen(for: targetRect, defaultScreen: activeWindow.screen)
                 let targetVisibleFrame = targetScreen?.visibleFrame ?? targetScreen?.frame ?? visibleFrame
                 
-                let frame = fitFrame(targetWidth: CGFloat(width), targetHeight: CGFloat(height), targetX: CGFloat(x), targetY: CGFloat(y), in: targetVisibleFrame)
+                let frame = fitFrame(targetWidth: newWidth, targetHeight: newHeight, targetX: CGFloat(x), targetY: CGFloat(y), in: targetVisibleFrame)
                 activeWindow.setFrame(frame, display: true)
             }
         }
@@ -137,6 +229,15 @@ class WebViewExtended: WKWebView, WKUIDelegate {
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let window = self.window {
+            self.resizeHelper.observeWindow(window)
+        } else {
+            self.resizeHelper.stopObservingWindow()
+        }
+    }
     
     func openBrowserURL(_ url: URL){
         NSWorkspace.shared.open(url)
@@ -147,6 +248,7 @@ class WebViewExtended: WKWebView, WKUIDelegate {
     }
     
     func close() {
+        self.resizeHelper.stopObservingWindow()
         self.resizeHelper.webView = nil
         self.configuration.userContentController.removeScriptMessageHandler(forName: "resize")
         self.window?.close()
