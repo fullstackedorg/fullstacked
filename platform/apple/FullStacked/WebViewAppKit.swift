@@ -6,21 +6,65 @@ import SwiftUI
 class ResizeHelper: NSObject, WKScriptMessageHandler {
     /// Weak reference to avoid a retain cycle with the owning WebViewExtended.
     weak var webView: WebViewExtended?
+
+    func findScreen(for rect: NSRect, defaultScreen: NSScreen?) -> NSScreen? {
+        let screens = NSScreen.screens
+        let originPoint = NSPoint(x: rect.origin.x, y: rect.origin.y)
+        
+        // 1. Check if any connected display contains the target origin point
+        if let screen = screens.first(where: { NSPointInRect(originPoint, $0.frame) }) {
+            return screen
+        }
+        
+        // 2. Check if any connected display intersects the target frame (pick highest overlap area)
+        var bestScreen: NSScreen? = nil
+        var maxArea: CGFloat = 0
+        for screen in screens {
+            let intersection = rect.intersection(screen.frame)
+            if !intersection.isNull && intersection.width * intersection.height > maxArea {
+                maxArea = intersection.width * intersection.height
+                bestScreen = screen
+            }
+        }
+        if let bestScreen = bestScreen {
+            return bestScreen
+        }
+        
+        // 3. Target display is unavailable (e.g. disconnected monitor), fallback to default screen
+        return defaultScreen ?? NSScreen.main ?? screens.first
+    }
+
+    func fitFrame(targetWidth: CGFloat, targetHeight: CGFloat, targetX: CGFloat, targetY: CGFloat, in visibleFrame: NSRect) -> NSRect {
+        // 1. Aim as much as possible for target width/height, capped at screen bounds (never higher than screen width/height)
+        let width = min(targetWidth, visibleFrame.width)
+        let height = min(targetHeight, visibleFrame.height)
+
+        // 2. Adjust X and Y: shift towards minX/minY if needed to fit window on screen, but NEVER less than visibleFrame.minX
+        let maxX = max(visibleFrame.minX, visibleFrame.maxX - width)
+        let maxY = max(visibleFrame.minY, visibleFrame.maxY - height)
+
+        let x = max(visibleFrame.minX, min(targetX, maxX))
+        let y = max(visibleFrame.minY, min(targetY, maxY))
+
+        return NSRect(x: x, y: y, width: width, height: height)
+    }
+
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         let body = message.body as! String
         
         if let activeWindow = self.webView?.window {
-            let screenFrame = activeWindow.screen?.frame ?? NSScreen.main?.frame ?? NSRect.zero
+            let currentScreen = activeWindow.screen ?? findScreen(for: activeWindow.frame, defaultScreen: NSScreen.main)
+            let visibleFrame = currentScreen?.visibleFrame ?? currentScreen?.frame ?? NSRect.zero
             
             if body == "get" {
                 var responseStr = ""
                 let frame = activeWindow.frame
                 if activeWindow.styleMask.contains(.fullScreen) {
                     responseStr = "kiosk"
-                } else if frame.size.width == screenFrame.size.width &&
-                            frame.size.height == screenFrame.size.height &&
-                            frame.origin.x == 0 &&
-                            frame.origin.y == 0 {
+                } else if frame.size.width == visibleFrame.size.width &&
+                            frame.size.height == visibleFrame.size.height &&
+                            frame.origin.x == visibleFrame.origin.x &&
+                            frame.origin.y == visibleFrame.origin.y {
                     responseStr = "fullscreen"
                 } else {
                     responseStr = "\(frame.size.width):\(frame.size.height):\(frame.origin.x):\(frame.origin.y)"
@@ -41,8 +85,7 @@ class ResizeHelper: NSObject, WKScriptMessageHandler {
             }
             
             if body == "fullscreen" {
-                let frame = NSRect(x: 0, y: 0, width: screenFrame.size.width, height: screenFrame.size.height)
-                activeWindow.setFrame(frame, display: true)
+                activeWindow.setFrame(visibleFrame, display: true)
                 return
             }
             
@@ -54,10 +97,10 @@ class ResizeHelper: NSObject, WKScriptMessageHandler {
                 let newWidth = CGFloat(width)
                 let newHeight = CGFloat(height)
                 
-                let newX = currentFrame.origin.x + (currentFrame.size.width - newWidth) / 2.0
-                let newY = currentFrame.origin.y + (currentFrame.size.height - newHeight) / 2.0
+                let targetX = currentFrame.origin.x + (currentFrame.size.width - newWidth) / 2.0
+                let targetY = currentFrame.origin.y + (currentFrame.size.height - newHeight) / 2.0
                 
-                let frame = NSRect(x: newX, y: newY, width: newWidth, height: newHeight)
+                let frame = fitFrame(targetWidth: newWidth, targetHeight: newHeight, targetX: targetX, targetY: targetY, in: visibleFrame)
                 activeWindow.setFrame(frame, display: true)
             } else if components.count == 4 {
                 let width = Double(components[0])!
@@ -65,7 +108,11 @@ class ResizeHelper: NSObject, WKScriptMessageHandler {
                 let x = Double(components[2])!
                 let y = Double(components[3])!
                 
-                let frame = NSRect(x: CGFloat(x), y: CGFloat(y), width: CGFloat(width), height: CGFloat(height))
+                let targetRect = NSRect(x: CGFloat(x), y: CGFloat(y), width: CGFloat(width), height: CGFloat(height))
+                let targetScreen = findScreen(for: targetRect, defaultScreen: activeWindow.screen)
+                let targetVisibleFrame = targetScreen?.visibleFrame ?? targetScreen?.frame ?? visibleFrame
+                
+                let frame = fitFrame(targetWidth: CGFloat(width), targetHeight: CGFloat(height), targetX: CGFloat(x), targetY: CGFloat(y), in: targetVisibleFrame)
                 activeWindow.setFrame(frame, display: true)
             }
         }

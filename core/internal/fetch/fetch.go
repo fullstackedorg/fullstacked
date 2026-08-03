@@ -68,7 +68,9 @@ func Switch(
 		return nil
 	case ResponseBody:
 		id := int(data[0].Data.(float64))
+		fetchResponsesMutex.Lock()
 		_, ok := fetchResponses[id]
+		fetchResponsesMutex.Unlock()
 		if !ok {
 			return errors.New("cannot find response")
 		}
@@ -174,9 +176,6 @@ func FetchFnApply(id int, requestHead RequestHead, body []byte) (ResponseHead, e
 			request.Header.Set(key, value)
 		}
 	}
-
-	// infinite timeout
-	client.Timeout = 0
 
 	followRedirect := true
 	if requestHead.Redirect != nil {
