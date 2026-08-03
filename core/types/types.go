@@ -143,7 +143,7 @@ const (
 	OBJECT    SerializableDataType = 5
 )
 
-const MAX_UINT_4_BYTES = 4294967295
+const MAX_UINT_4_BYTES uint64 = 4294967295
 
 type DeserializedData struct {
 	Data           SerializableData

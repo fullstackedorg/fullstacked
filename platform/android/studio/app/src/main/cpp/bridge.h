@@ -16,11 +16,23 @@
 #define FULLSTACKED_EDITOR_EDITOR_H
 
 extern "C" {
-    JNIEXPORT void JNICALL Java_org_fullstacked_editor_MainActivity_directories
-            (JNIEnv *env, jobject jobj, jstring root, jstring config, jstring editor, jstring tmp);
+    JNIEXPORT jint JNICALL Java_org_fullstacked_editor_Instance_start
+        (JNIEnv *env, jobject thiz, jstring root, jstring build);
 
-    JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_editor_Instance_call
-        (JNIEnv *env, jobject jobj, jbyteArray payload);
+    JNIEXPORT void JNICALL Java_org_fullstacked_editor_Instance_startWithCtx
+        (JNIEnv *env, jobject thiz, jstring root, jstring build, jint ctxId);
+
+    JNIEXPORT jint JNICALL Java_org_fullstacked_editor_Instance_check
+        (JNIEnv *env, jobject thiz, jint ctxId);
+
+    JNIEXPORT void JNICALL Java_org_fullstacked_editor_Instance_stop
+        (JNIEnv *env, jobject thiz, jint ctxId);
+
+    JNIEXPORT jint JNICALL Java_org_fullstacked_editor_Instance_call
+        (JNIEnv *env, jobject thiz, jbyteArray payload);
+
+    JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_editor_Instance_getCorePayload
+        (JNIEnv *env, jobject thiz, jint ctx, jint coreType, jint id, jint size);
 
     JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved);
 

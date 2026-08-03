@@ -38,82 +38,17 @@ class MainActivity() : ComponentActivity() {
     private lateinit var editor: String
     private lateinit var tmp: String
 
-    private external fun directories(
-        root: String,
-        config: String,
-        editor: String,
-        tmp: String,
-    )
-
     private external fun addCallback(id: Int)
     private external fun removeCallback(id: Int)
 
     private val callbackId = (0..9999).random()
 
-    fun Callback(projectId: String, messageType: String, message: String) {
-        println("RECEIVED CORE MESSAGE FOR [$projectId] [$messageType]")
-
-        if(projectId == "*") {
-            this.editorWebViewComponent?.onMessage(messageType, message)
-            this.stackedProjectWebViewComponent?.onMessage(messageType, message)
-        } else if(projectId == "") {
-            if(this.editorWebViewComponent == null) return
-
-            // open project
-            if(messageType == "open") {
-                val mainLooper = Looper.getMainLooper()
-                val handler = Handler(mainLooper)
-                handler.post {
-                    val ts = System.currentTimeMillis()
-                    println("BUILD TIMESTAMP [$message] [$ts]")
-                    val sharedPreferences = this.getSharedPreferences(buildTimestampPreferenceKey, MODE_PRIVATE)
-                    val editor = sharedPreferences.edit()
-                    editor.putLong(message, ts)
-                    editor.apply()
-
-                    if(this.useMultiWindow()) {
-                        this.openProjectInAdjacentWindow(message)
-                    } else {
-                        if(stackedProjectWebViewComponent != null) {
-                            this.removeStackedProject()
-                        }
-
-                        if(editorWebViewComponent != null) {
-                            (editorWebViewComponent?.webView?.parent as ViewGroup).removeView(editorWebViewComponent?.webView)
-                        }
-
-                        stackedProjectWebViewComponent = WebViewComponent(this, Instance(message))
-                        this.setContentView(stackedProjectWebViewComponent?.webView)
-                    }
-                }
-            }
-            // pass message to editor
-            else {
-                editorWebViewComponent?.onMessage(messageType, message)
-            }
-        }
-        // for stacked project
-        else if(stackedProjectWebViewComponent?.instance?.projectId == projectId) {
-            if(messageType == "title") {
-                val mainLooper = Looper.getMainLooper()
-                val handler = Handler(mainLooper)
-                handler.post {
-                    this.title = message
-                }
-            } else {
-                stackedProjectWebViewComponent?.onMessage(messageType, message)
-            }
-        }
+    fun onStreamData(ctx: Int, id: Int, size: Int) {
+        println("RECEIVED STREAM DATA FOR [ctx: $ctx, id: $id, size: $size]")
     }
 
-
     private fun setDirectories(){
-        this.directories(
-            root,
-            config,
-            editor,
-            tmp
-        )
+        // Context initialization is now managed per Instance via start / startWithCtx
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

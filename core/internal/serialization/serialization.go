@@ -14,7 +14,7 @@ func NumberToUint4Bytes(num int) ([]byte, error) {
 		return nil, errors.New("cannot convert negative number to uint 4 bytes")
 	}
 
-	if num > types.MAX_UINT_4_BYTES {
+	if uint64(num) > types.MAX_UINT_4_BYTES {
 		return nil, errors.New("converting too high number to uint 4 bytes")
 	}
 

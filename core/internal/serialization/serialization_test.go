@@ -3,27 +3,30 @@ package serialization
 import (
 	"encoding/json"
 	"fullstackedorg/fullstacked/types"
+	"math"
 	"slices"
 	"testing"
 )
 
 func TestUint4BytesToInt(t *testing.T) {
-	testData := map[int][]byte{
-		0:                      {0, 0, 0, 0},
-		1:                      {0, 0, 0, 1},
-		256:                    {0, 0, 1, 0},
-		65536:                  {0, 1, 0, 0},
-		16777216:               {1, 0, 0, 0},
-		types.MAX_UINT_4_BYTES: {255, 255, 255, 255},
+	testData := map[uint64][]byte{
+		0:        {0, 0, 0, 0},
+		1:        {0, 0, 0, 1},
+		256:      {0, 0, 1, 0},
+		65536:    {0, 1, 0, 0},
+		16777216: {1, 0, 0, 0},
+	}
+	if uint64(math.MaxInt) >= types.MAX_UINT_4_BYTES {
+		testData[types.MAX_UINT_4_BYTES] = []byte{255, 255, 255, 255}
 	}
 
 	for v, buf := range testData {
-		serialized, err := NumberToUint4Bytes(v)
+		serialized, err := NumberToUint4Bytes(int(v))
 		if !slices.Equal(serialized, buf) || err != nil {
 			t.Errorf(`Failed Uint4BytesToInt`)
 		}
 		deserialized, err := Uint4BytesToNumber(serialized)
-		if deserialized != v || err != nil {
+		if deserialized != int(v) || err != nil {
 			t.Errorf(`Failed Uint4BytesToInt`)
 		}
 	}
@@ -40,9 +43,11 @@ func TestUint4BytesToInt(t *testing.T) {
 	if err == nil {
 		t.Errorf(`Failed Uint4BytesToInt`)
 	}
-	_, err = NumberToUint4Bytes(types.MAX_UINT_4_BYTES + 1)
-	if err == nil {
-		t.Errorf(`Failed Uint4BytesToInt`)
+	if uint64(math.MaxInt) > types.MAX_UINT_4_BYTES {
+		_, err = NumberToUint4Bytes(int(types.MAX_UINT_4_BYTES + 1))
+		if err == nil {
+			t.Errorf(`Failed Uint4BytesToInt`)
+		}
 	}
 }
 

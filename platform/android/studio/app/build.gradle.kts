@@ -1,22 +1,21 @@
 plugins {
-    id("com.android.application") version "8.10.1"
-    id("org.jetbrains.kotlin.android") version "1.9.25"
+    id("com.android.application") version "9.3.1"
+    id("org.jetbrains.kotlin.plugin.compose") version "2.4.10"
 }
 
-android {
-    namespace = "org.fullstacked.editor"
-    compileSdk = 35
+extensions.configure<com.android.build.api.dsl.ApplicationExtension> {
+    namespace = "org.fullstacked"
+    compileSdk = 37
 
     ndkVersion = "29.0.14206865"
 
     defaultConfig {
-        applicationId = "org.fullstacked.editor"
+        applicationId = "org.fullstacked"
         minSdk = 29
-        targetSdk = 35
+        targetSdk = 37
         versionCode = 1175
-        versionName = "0.12.0"
+        versionName = "1.0.0"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
         }
@@ -38,19 +37,14 @@ android {
         sourceCompatibility = JavaVersion.VERSION_20
         targetCompatibility = JavaVersion.VERSION_20
     }
-    kotlinOptions {
-        jvmTarget = "20"
-    }
     buildFeatures {
         compose = true
-    }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.15"
+        resValues = true
     }
     sourceSets {
         getByName("main") {
             assets {
-                srcDirs("../../../../out/zip")
+                directories.add("../../../../out/zip")
             }
         }
     }
@@ -59,6 +53,12 @@ android {
             path = file("src/main/cpp/CMakeLists.txt")
             version = "3.22.1"
         }
+    }
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_20)
     }
 }
 //noinspection UseTomlInstead
@@ -71,11 +71,5 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
-    debugImplementation(libs.androidx.ui.test.manifest)
 }

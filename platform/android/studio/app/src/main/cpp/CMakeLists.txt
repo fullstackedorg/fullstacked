@@ -10,7 +10,7 @@ cmake_minimum_required(VERSION 3.22.1)
 # Since this is the top level CMakeLists.txt, the project name is also accessible
 # with ${CMAKE_PROJECT_NAME} (both CMake variables are in-sync within the top level
 # build script scope).
-project(editor-core)
+project(fullstacked-android)
 
 set(core_DIR ${CMAKE_CURRENT_SOURCE_DIR}/core)
 
@@ -41,14 +41,14 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 # System.loadLibrary() and pass the name of the library defined here;
 # for GameActivity/NativeActivity derived applications, the same library name must be
 # used in the AndroidManifest.xml file.
-add_library(editor-core SHARED
+add_library(fullstacked-android SHARED
     # List C/C++ source files with relative paths to this CMakeLists.txt.
         bridge.cpp)
 
 # Specifies libraries CMake should link to your target library. You
 # can link libraries from various origins, such as libraries defined in this
 # build script, prebuilt third-party libraries, or Android system libraries.
-target_link_libraries(editor-core
+target_link_libraries(fullstacked-android
         android
         core
         log)
