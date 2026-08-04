@@ -11,8 +11,6 @@ import (
 	"runtime"
 	"slices"
 	"strings"
-
-	"github.com/djherbis/times"
 )
 
 type FsFn = uint8
@@ -183,21 +181,7 @@ func StatsFn(p string) (GoFileInfo, error) {
 		return GoFileInfo{}, err
 	}
 
-	t, _ := times.Stat(p)
-
-	mTime := t.ModTime()
-	aTime := t.AccessTime()
-
-	cTime := mTime
-	if t.HasChangeTime() {
-		cTime = t.ChangeTime()
-	}
-
-	birthTime := cTime
-	if t.HasBirthTime() {
-		birthTime = t.BirthTime()
-	}
-
+	atime, mtime, ctime, birthtime := getStatTimes(fileInfo)
 	perm := fileInfo.Mode().Perm()
 	if runtime.GOOS == "windows" {
 		perm = perm & 0666
@@ -206,10 +190,10 @@ func StatsFn(p string) (GoFileInfo, error) {
 	return GoFileInfo{
 		Name:      fileInfo.Name(),
 		Size:      fileInfo.Size(),
-		ATime:     aTime.UnixNano(),
-		MTime:     mTime.UnixNano(),
-		CTime:     cTime.UnixNano(),
-		BirthTime: birthTime.UnixNano(),
+		ATime:     atime,
+		MTime:     mtime,
+		CTime:     ctime,
+		BirthTime: birthtime,
 		IsDir:     fileInfo.IsDir(),
 		Mode:      perm,
 	}, nil

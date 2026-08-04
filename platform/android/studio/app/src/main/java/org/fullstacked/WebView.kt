@@ -16,11 +16,11 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.core.content.ContextCompat.startActivity
 import java.io.ByteArrayInputStream
+import java.io.PipedInputStream
+import java.io.PipedOutputStream
 import java.nio.charset.StandardCharsets
 import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
 class FullStackedWebView(
     val ctx: MainActivity,
@@ -30,7 +30,7 @@ class FullStackedWebView(
     var firstContact = false
     val messageToBeSent = mutableListOf<Pair<String, String>>()
 
-    private val syncAwaitersResolve = ConcurrentHashMap<Int, CountDownLatch>()
+    private val syncAwaitersResolve = ConcurrentHashMap<Int, (String) -> Unit>()
     private val syncAwaitersPayload = ConcurrentHashMap<Int, String>()
 
     init {
@@ -41,9 +41,12 @@ class FullStackedWebView(
     }
 
     fun resolveSyncAwaiter(id: Int, payloadBase64: String) {
-        syncAwaitersPayload[id] = payloadBase64
-        val latch = syncAwaitersResolve.remove(id)
-        latch?.countDown()
+        val resolve = syncAwaitersResolve.remove(id)
+        if (resolve != null) {
+            resolve(payloadBase64)
+        } else {
+            syncAwaitersPayload[id] = payloadBase64
+        }
     }
 
     @JavascriptInterface
@@ -158,51 +161,77 @@ class FullStackedWebView(
             val idStr = path.removePrefix("/sync/")
             val id = idStr.toIntOrNull()
             if (id != null) {
-                var payload = syncAwaitersPayload.remove(id)
-                if (payload == null) {
-                    val latch = CountDownLatch(1)
-                    syncAwaitersResolve[id] = latch
+                val outputStream = PipedOutputStream()
+                val inputStream = PipedInputStream(outputStream)
+
+                val sendCallback: (String) -> Unit = { payload ->
                     try {
-                        latch.await(5, TimeUnit.SECONDS)
+                        outputStream.write(payload.toByteArray(StandardCharsets.UTF_8))
+                        outputStream.flush()
+                        outputStream.close()
                     } catch (_: Exception) { }
-                    payload = syncAwaitersPayload.remove(id) ?: ""
                 }
+
+                val existingPayload = syncAwaitersPayload.remove(id)
+                if (existingPayload != null) {
+                    sendCallback(existingPayload)
+                } else {
+                    syncAwaitersResolve[id] = sendCallback
+                }
+
                 return WebResourceResponse(
                     "text/plain",
                     "UTF-8",
-                    ByteArrayInputStream(payload.toByteArray())
+                    inputStream
                 )
             }
         }
 
-        println("[FullStackedWebView] Requesting static file path: $path")
-
-        // Static file serving via Core Fn StaticFile
+        // Static file serving via Core Fn StaticFile (Async payload)
         val pathnameBytes = path.toByteArray(StandardCharsets.UTF_8)
         var payload = byteArrayOf(
             ctxId,
             0, // req id
             0, // Core Module
             0, // Fn Static File
-            0, // Sync
+            0, // Async
             DataType.STRING.type // 2
         )
         payload += numberToBytes(pathnameBytes.size)
         payload += pathnameBytes
 
         val responseData = Core.coreCall(payload)
-        if (responseData.size > 1) {
-            val argBuffer = sliceByteArray(responseData, 1, responseData.size - 1)
-            val args = deserializeArgs(argBuffer)
 
-            if (args.size >= 2 && args[0] is String && args[1] is ByteArray) {
-                val mimeType = args[0] as String
-                val fileBytes = args[1] as ByteArray
-                return WebResourceResponse(
-                    mimeType,
-                    null,
-                    ByteArrayInputStream(fileBytes)
-                )
+        if (responseData.size > 1) {
+            val outerArgBuffer = sliceByteArray(responseData, 1, responseData.size - 1)
+            val outerArgs = deserializeArgs(outerArgBuffer)
+
+            val staticFileBuffer = if (outerArgs.isNotEmpty() && outerArgs[0] is ByteArray) {
+                outerArgs[0] as ByteArray
+            } else {
+                outerArgBuffer
+            }
+
+            if (staticFileBuffer.isNotEmpty()) {
+                val args = deserializeArgs(staticFileBuffer)
+
+                if (args.size >= 2 && args[0] is String && args[1] is ByteArray) {
+                    val rawMimeType = args[0] as String
+                    val fileBytes = args[1] as ByteArray
+
+                    val cleanMimeType = rawMimeType.substringBefore(";").trim()
+                    val encoding = if (rawMimeType.contains("charset=", ignoreCase = true)) {
+                        rawMimeType.substringAfter("charset=", "").substringBefore(";").trim().ifEmpty { "UTF-8" }
+                    } else {
+                        "UTF-8"
+                    }
+
+                    return WebResourceResponse(
+                        cleanMimeType,
+                        encoding,
+                        ByteArrayInputStream(fileBytes)
+                    )
+                }
             }
         }
 
@@ -222,7 +251,7 @@ fun createWebView(delegate: FullStackedWebView): WebView {
     WebView.setWebContentsDebuggingEnabled(true)
     val webView = WebView(delegate.ctx)
 
-    webView.setBackgroundColor(Color.WHITE)
+    webView.setBackgroundColor(Color.BLACK)
     webView.webViewClient = delegate
     webView.webChromeClient = object : WebChromeClient() {
         override fun onShowFileChooser(

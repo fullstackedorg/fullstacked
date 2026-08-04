@@ -60,6 +60,8 @@ class MainActivity : ComponentActivity() {
 
         root = this.filesDir.absolutePath + "/projects"
 
+        val mainBuildDir = getMainLocation()
+
         try {
             this.addCallback(callbackId)
         } catch (e: Exception) {
@@ -92,8 +94,7 @@ class MainActivity : ComponentActivity() {
             val webView = FullStackedWebView(this, ctxId = providedCtxId.toByte())
             this.stackedWebViews.add(webView)
         } else {
-            // Create default app context using out directory from getMainLocation()
-            val mainBuildDir = getMainLocation()
+            // Create default app context using out directory from mainBuildDir
             val defaultCtxId = Core.startMain(root, mainBuildDir, null)
             val webView = FullStackedWebView(this, ctxId = defaultCtxId.toByte())
             this.stackedWebViews.add(webView)
@@ -150,7 +151,6 @@ class MainActivity : ComponentActivity() {
                 buildFileContent != currentVersion
 
         if (needsDecompression) {
-            println("[MainActivity] Decompressing main app files from out.zip to ${outDir.absolutePath} (needsDecompression=true, isDebug=$isDebug, currentVersion=$currentVersion, stashedVersion=$stashedVersion)...")
             val zipData = try {
                 resources.openRawResource(R.raw.out).use { it.readBytes() }
             } catch (e: Exception) {
