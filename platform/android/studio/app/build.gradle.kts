@@ -46,6 +46,9 @@ extensions.configure<com.android.build.api.dsl.ApplicationExtension> {
             assets {
                 directories.add("../../../../out/zip")
             }
+            jniLibs {
+                directories.add("src/main/cpp/core")
+            }
         }
     }
     externalNativeBuild {
@@ -56,11 +59,22 @@ extensions.configure<com.android.build.api.dsl.ApplicationExtension> {
     }
 }
 
+tasks.register<Zip>("zipAppOut") {
+    from("../../../../app/out")
+    archiveFileName.set("out.zip")
+    destinationDirectory.set(file("src/main/res/raw"))
+}
+
+tasks.named("preBuild") {
+    dependsOn("zipAppOut")
+}
+
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_20)
     }
 }
+
 //noinspection UseTomlInstead
 dependencies {
     implementation(libs.androidx.core.ktx)

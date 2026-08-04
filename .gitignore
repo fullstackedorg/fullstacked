@@ -19,4 +19,5 @@ test/**/test
 test/**/crash.log
 test/worker/sample/worker.ts.js
 platform/@fullstacked
+platform/android/studio/app/src/main/res/raw/out.zip
 app/user_data

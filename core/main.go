@@ -1,7 +1,7 @@
 package main
 
 /*
-// #include <android/log.h>
+#include <android/log.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -58,6 +58,8 @@ func start(
 	rootStr := C.GoString(root)
 
 	id := store.NewContext(rootStr, C.GoString(build))
+
+	fmt.Println(id)
 	return C.uint8_t(id)
 }
 
@@ -97,7 +99,7 @@ var cCallback = (unsafe.Pointer)(nil)
 func setOnStreamData(
 	cb unsafe.Pointer,
 ) {
-	// androidPrintToLogCat()
+	androidPrintToLogCat()
 
 	cCallback = cb
 
@@ -150,24 +152,24 @@ func freePtr(ptr unsafe.Pointer) {
 	C.free(ptr)
 }
 
-// func androidPrintToLogCat() {
-// 	r, w, _ := os.Pipe()
-// 	os.Stdout = w
-// 	os.Stderr = w
+func androidPrintToLogCat() {
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	os.Stderr = w
 
-// 	go func() {
-// 		for {
-// 			buffer := make([]byte, 2048)
-// 			n, _ := r.Read(buffer)
+	go func() {
+		for {
+			buffer := make([]byte, 2048)
+			n, _ := r.Read(buffer)
 
-// 			if n > 0 {
-// 				ctag := C.CString("go")
-// 				cstr := C.CString(string(buffer[0:n]))
-// 				C.__android_log_write(C.ANDROID_LOG_INFO, ctag, cstr)
-// 				C.free(unsafe.Pointer(ctag))
-// 				C.free(unsafe.Pointer(cstr))
-// 			}
+			if n > 0 {
+				ctag := C.CString("go")
+				cstr := C.CString(string(buffer[0:n]))
+				C.__android_log_write(C.ANDROID_LOG_INFO, ctag, cstr)
+				C.free(unsafe.Pointer(ctag))
+				C.free(unsafe.Pointer(cstr))
+			}
 
-// 		}
-// 	}()
-// }
+		}
+	}()
+}

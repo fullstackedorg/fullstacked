@@ -8,7 +8,7 @@
 
 extern "C" {
 
-JNIEXPORT jint JNICALL Java_org_fullstacked_editor_Instance_start
+JNIEXPORT jint JNICALL Java_org_fullstacked_Core_start
         (JNIEnv *env, jobject thiz, jstring root, jstring build) {
     const char* rootPtr = env->GetStringUTFChars(root, nullptr);
     const char* buildPtr = env->GetStringUTFChars(build, nullptr);
@@ -21,7 +21,7 @@ JNIEXPORT jint JNICALL Java_org_fullstacked_editor_Instance_start
     return static_cast<jint>(ctxId);
 }
 
-JNIEXPORT void JNICALL Java_org_fullstacked_editor_Instance_startWithCtx
+JNIEXPORT void JNICALL Java_org_fullstacked_Core_startWithCtx
         (JNIEnv *env, jobject thiz, jstring root, jstring build, jint ctxId) {
     const char* rootPtr = env->GetStringUTFChars(root, nullptr);
     const char* buildPtr = env->GetStringUTFChars(build, nullptr);
@@ -32,17 +32,17 @@ JNIEXPORT void JNICALL Java_org_fullstacked_editor_Instance_startWithCtx
     env->ReleaseStringUTFChars(build, buildPtr);
 }
 
-JNIEXPORT jint JNICALL Java_org_fullstacked_editor_Instance_check
+JNIEXPORT jint JNICALL Java_org_fullstacked_Core_check
         (JNIEnv *env, jobject thiz, jint ctxId) {
     return check(static_cast<uint8_t>(ctxId));
 }
 
-JNIEXPORT void JNICALL Java_org_fullstacked_editor_Instance_stop
+JNIEXPORT void JNICALL Java_org_fullstacked_Core_stop
         (JNIEnv *env, jobject thiz, jint ctxId) {
     stop(static_cast<uint8_t>(ctxId));
 }
 
-JNIEXPORT jint JNICALL Java_org_fullstacked_editor_Instance_call
+JNIEXPORT jint JNICALL Java_org_fullstacked_Core_call
         (JNIEnv *env, jobject thiz, jbyteArray payload) {
     int length = env->GetArrayLength(payload);
     jbyte* buffer = env->GetByteArrayElements(payload, nullptr);
@@ -54,7 +54,7 @@ JNIEXPORT jint JNICALL Java_org_fullstacked_editor_Instance_call
     return responseSize;
 }
 
-JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_editor_Instance_getCorePayload
+JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_getCorePayload
         (JNIEnv *env, jobject thiz, jint ctx, jint coreType, jint id, jint size) {
     jbyteArray response = env->NewByteArray(size);
     if (size <= 0 || response == nullptr) {
@@ -86,7 +86,7 @@ struct CallbackResponder {
 std::vector<CallbackResponder> responders = {};
 
 void streamDataCallback(uint8_t ctx, uint8_t id, int size) {
-    __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.editor.core", "streamDataCallback responders count [%zu]", responders.size());
+    __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.core", "streamDataCallback responders count [%zu]", responders.size());
 
     for (const CallbackResponder& responder : responders) {
         JNIEnv *env = nullptr;
@@ -99,29 +99,35 @@ void streamDataCallback(uint8_t ctx, uint8_t id, int size) {
     }
 }
 
+JNIEXPORT void JNICALL Java_org_fullstacked_Core_setOnStreamData
+        (JNIEnv *env, jobject thiz) {
+    __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.core", "setOnStreamData");
+    setOnStreamData(reinterpret_cast<void*>(streamDataCallback));
+}
+
 JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
-    __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.editor.core", "onLoad");
+    __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.core", "onLoad");
     javaVm = vm;
     setOnStreamData(reinterpret_cast<void*>(streamDataCallback));
     return JNI_VERSION_1_6;
 }
 
-JNIEXPORT void JNICALL Java_org_fullstacked_editor_MainActivity_addCallback
+JNIEXPORT void JNICALL Java_org_fullstacked_MainActivity_addCallback
         (JNIEnv * env, jobject thiz, jint id) {
-    __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.editor.core", "add callback");
+    __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.core", "add callback");
 
     CallbackResponder responder{
         env->NewGlobalRef(thiz),
-        (jclass)(env->NewGlobalRef(env->FindClass("org/fullstacked/editor/MainActivity"))),
+        (jclass)(env->NewGlobalRef(env->FindClass("org/fullstacked/MainActivity"))),
         id
     };
 
     responders.push_back(responder);
 }
 
-JNIEXPORT void JNICALL Java_org_fullstacked_editor_MainActivity_removeCallback
+JNIEXPORT void JNICALL Java_org_fullstacked_MainActivity_removeCallback
         (JNIEnv * env, jobject thiz, jint id) {
-    __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.editor.core", "remove callback");
+    __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.core", "remove callback");
 
     for (size_t i = 0; i < responders.size(); i++) {
         if (responders.at(i).id == id) {

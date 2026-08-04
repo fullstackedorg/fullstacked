@@ -2,6 +2,7 @@ import { BridgeNodeInit } from "./node.ts";
 import { BridgeAppleInit } from "./apple.ts";
 import { isWorker } from "../isWorker.ts";
 import { BridgeWindowsInit } from "./windows.ts";
+import { BridgeAndroidInit } from "./android.ts";
 
 export interface PlatformBridge {
     ctx: number;
@@ -75,6 +76,9 @@ else {
                     break;
                 case "windows":
                     platformBridge.bridge = await BridgeWindowsInit();
+                    break;
+                case "android":
+                    platformBridge.bridge = await BridgeAndroidInit();
                     break;
             }
 

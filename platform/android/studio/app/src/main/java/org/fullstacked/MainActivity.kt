@@ -1,42 +1,44 @@
-package org.fullstacked.editor
+package org.fullstacked
 
 import android.app.Activity
 import android.app.UiModeManager
 import android.content.Intent
-import android.content.SharedPreferences.OnSharedPreferenceChangeListener
+import android.content.pm.ApplicationInfo
 import android.content.res.Configuration
-import android.content.res.Configuration.UI_MODE_TYPE_DESK
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
+import android.view.Gravity
 import android.view.ViewGroup
 import android.webkit.ValueCallback
+import android.widget.FrameLayout
+import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import java.io.ByteArrayInputStream
 import java.io.File
+import java.util.zip.ZipInputStream
 
-val buildTimestampPreferenceKey = "project-build-ts"
+const val EXTRA_CTX_ID = "ctxId"
 
-class MainActivity() : ComponentActivity() {
+class MainActivity : ComponentActivity() {
     companion object {
         init {
-            System.loadLibrary("editor-core")
+            try {
+                System.loadLibrary("core")
+            } catch (_: Exception) { }
+            System.loadLibrary("fullstacked-android")
         }
     }
 
-    var editorWebViewComponent: WebViewComponent? = null
-    var stackedProjectWebViewComponent: WebViewComponent? = null
-    val projectsIdsInExternal = mutableListOf<String>()
+    val stackedWebViews = mutableListOf<FullStackedWebView>()
 
-    var onSharedPreferenceChangeListeners = mutableMapOf<String, OnSharedPreferenceChangeListener>()
+    lateinit var root: String
+        private set
 
-    private lateinit var root: String
-    private lateinit var config: String
-    private lateinit var editor: String
-    private lateinit var tmp: String
+    fun getRootPath(): String = root
 
     private external fun addCallback(id: Int)
     private external fun removeCallback(id: Int)
@@ -44,10 +46,12 @@ class MainActivity() : ComponentActivity() {
     private val callbackId = (0..9999).random()
 
     fun onStreamData(ctx: Int, id: Int, size: Int) {
-        println("RECEIVED STREAM DATA FOR [ctx: $ctx, id: $id, size: $size]")
+        val buffer = Core.getCorePayload(ctx, 2, id, size)
+        val targetWebView = stackedWebViews.firstOrNull { (it.ctxId.toInt() and 0xFF) == ctx }
+        targetWebView?.onStreamData(id, buffer)
     }
 
-    private fun setDirectories(){
+    private fun setDirectories() {
         // Context initialization is now managed per Instance via start / startWithCtx
     }
 
@@ -55,213 +59,228 @@ class MainActivity() : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         root = this.filesDir.absolutePath + "/projects"
-        config = this.filesDir.absolutePath + "/.config"
-        editor = this.filesDir.absolutePath + "/editor"
-        tmp = this.filesDir.absolutePath + "/.tmp"
 
-        this.addCallback(callbackId)
+        try {
+            this.addCallback(callbackId)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         this.setDirectories()
 
-        var deeplink: String? = null
-        var projectIdExternal: String? = null
-        val data: Uri? = intent?.data
-        if(data != null && data.toString().isNotEmpty()) {
-            val urlStr = data.toString()
-            if(urlStr.startsWith("fullstacked://http")) {
-                println("LAUNCH URL [$data]")
-                deeplink = urlStr
+        val providedCtxId = if (intent.hasExtra(EXTRA_CTX_ID)) {
+            intent.getIntExtra(EXTRA_CTX_ID, -1)
+        } else {
+            val data: Uri? = intent?.data
+            if (data != null && data.toString().isNotEmpty()) {
+                val urlStr = data.toString()
+                if (urlStr.startsWith("fullstacked://")) {
+                    val path = urlStr.removePrefix("fullstacked://")
+                    path.toIntOrNull()
+                } else {
+                    null
+                }
             } else {
-                projectIdExternal = urlStr.slice("fullstacked://".length..< urlStr.length)
-                println("INTENT [$projectIdExternal]")
+                null
             }
         }
 
-        // launch editor and maybe launch Url
-        if(projectIdExternal == null) {
-            val editorInstance = Instance( "", true)
+        this.fileChooserResultLauncher = this.createFileChooserResultLauncher()
 
-            // after editor update,
-            // make sure to set directories to re-run setup fn
-            if(this.extractEditorFiles(editorInstance, editor)){
-                this.setDirectories()
-            }
-
-            this.editorWebViewComponent = WebViewComponent(this, editorInstance)
-
-            this.fileChooserResultLauncher = this.createFileChooserResultLauncher()
-            this.setContentView(this.editorWebViewComponent?.webView)
-            if(deeplink != null) {
-                this.editorWebViewComponent?.onMessage("deeplink", deeplink)
-            }
-        }
-        // launch single project
-        else {
-            this.stackedProjectWebViewComponent = WebViewComponent(this, Instance(projectIdExternal))
-            this.setContentView(this.stackedProjectWebViewComponent?.webView)
-            var lastTs: Long = 0
-            this.onSharedPreferenceChangeListeners[buildTimestampPreferenceKey] = OnSharedPreferenceChangeListener { sharedPreferences, _ ->
-                val ts = sharedPreferences.getLong(projectIdExternal, 0L)
-                println("BUILD TIMESTAMP 1 [$ts]")
-                if(lastTs != ts) {
-                    this.stackedProjectWebViewComponent?.webView?.reload()
-                    lastTs = ts
-                    println("BUILD TIMESTAMP 2 [$lastTs]")
-                }
-            }
-            getSharedPreferences(buildTimestampPreferenceKey, MODE_PRIVATE).registerOnSharedPreferenceChangeListener(this.onSharedPreferenceChangeListeners[buildTimestampPreferenceKey])
+        if (providedCtxId != null && providedCtxId >= 0) {
+            // Bind to provided ctxId (multi-window intent response)
+            val webView = FullStackedWebView(this, ctxId = providedCtxId.toByte())
+            this.stackedWebViews.add(webView)
+        } else {
+            // Create default app context using out directory from getMainLocation()
+            val mainBuildDir = getMainLocation()
+            val defaultCtxId = Core.startMain(root, mainBuildDir, null)
+            val webView = FullStackedWebView(this, ctxId = defaultCtxId.toByte())
+            this.stackedWebViews.add(webView)
         }
 
+        this.updateActiveContentView()
+
+        // Comment 167: do nothing on back pressed
         this.onBackPressedDispatcher.addCallback {
-            // in external project window
-            if(editorWebViewComponent == null && stackedProjectWebViewComponent != null) {
-                stackedProjectWebViewComponent?.back { didGoBack ->
-                    if(!didGoBack) {
-                        finish()
-                    }
-                }
-            }
-            // in top window
-            else {
-                // we have a stacked project
-                if(stackedProjectWebViewComponent != null) {
-                    stackedProjectWebViewComponent?.back { didGoBack ->
-                        if(!didGoBack) {
-                            removeStackedProject()
-                        }
-                    }
-                }
-                // we're in the editor
-                else {
-                    editorWebViewComponent?.back { didGoBack ->
-                        if(!didGoBack) {
-                            moveTaskToBack(true)
-                        }
-                    }
-                }
-            }
+            // do nothing on back pressed
         }.isEnabled = true
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        removeCallback(callbackId)
-
-        this.removeStackedProject()
-
-        if(stackedProjectWebViewComponent != null) {
-            val buildTimestampPreferences = getSharedPreferences(buildTimestampPreferenceKey, MODE_PRIVATE)
-            val editor = buildTimestampPreferences.edit()
-            editor.remove(stackedProjectWebViewComponent?.instance?.projectId)
-            editor.apply()
+        try {
+            removeCallback(callbackId)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
+
+        this.removeAllStackedProjects()
     }
 
-    private fun shouldExtractEditorFromZip(editorDir: String) : Boolean {
-        val currentEditorDir = File(editorDir)
-        val currentEditorDirContents = currentEditorDir.listFiles()
-        val currentEditorBuildFile = currentEditorDirContents?.find { it.name == "build.txt" }
-
-        if(currentEditorBuildFile == null) {
-            println("EDITOR VERSION NO CURRENT BUILD FILE")
-            return true
+    fun getMainLocation(): String {
+        val outDir = File(this.filesDir, "out")
+        if (!outDir.exists()) {
+            outDir.mkdirs()
         }
 
-        val currentEditorBuildNumber = currentEditorBuildFile.readText()
-        val zipEditorBuildNumber = this.assets.open("build.txt").readBytes().decodeToString()
-
-        if(currentEditorBuildNumber == zipEditorBuildNumber) {
-            println("EDITOR VERSION SAME")
-            return false
+        val currentVersion = try {
+            val pInfo = packageManager.getPackageInfo(packageName, 0)
+            val vName = pInfo.versionName ?: "1.0.0"
+            val vCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                pInfo.longVersionCode
+            } else {
+                @Suppress("DEPRECATION")
+                pInfo.versionCode.toLong()
+            }
+            "$vName-$vCode"
+        } catch (_: Exception) {
+            "1.0.0-1"
         }
 
-        println("EDITOR VERSION DIFFERENT")
-        return true
-    }
+        val prefs = getSharedPreferences("app_version_prefs", MODE_PRIVATE)
+        val stashedVersion = prefs.getString("last_decompressed_version", null)
 
-    private fun extractEditorFiles(instanceEditor: Instance, editorDir: String) : Boolean {
-        val shouldExtract = this.shouldExtractEditorFromZip(editorDir)
+        val buildFile = File(outDir, "build.txt")
+        val buildFileContent = if (buildFile.exists()) buildFile.readText().trim() else null
 
-        if(!shouldExtract) {
-            println("UNZIP SKIPPED !")
-            return false
-        }
+        val isDebug = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        val needsDecompression = isDebug ||
+                stashedVersion != currentVersion ||
+                buildFileContent != currentVersion
 
-        val destination = editorDir.toByteArray()
-        val zipData = this.assets.open("build.zip").readBytes()
-
-        var payload = byteArrayOf(
-            30, // UNZIP_BIN_TO_FILE
-        )
-
-        // ENTRY
-        payload += byteArrayOf(
-            4 // BUFFER
-        )
-        payload += numberToBytes(zipData.size)
-        payload += zipData
-
-        // OUT
-        payload += byteArrayOf(
-            2 // STRING
-        )
-        payload += numberToBytes(destination.size)
-        payload += destination
-
-        // use absolute path to unzip to
-        payload += byteArrayOf(
-            1 // BOOLEAN
-        )
-        payload += numberToBytes(1)
-        payload += byteArrayOf(
-            1 // true
-        )
-
-        val unzipped = deserializeArgs(instanceEditor.callLib(payload))[0] as Boolean
-        if(unzipped) {
-            println("UNZIPPED !")
-            File("$editorDir/build.txt").writeBytes(this.assets.open("build.txt").readBytes())
-            return true
-        }
-
-        println("FAILED TO UNZIPPED")
-        return false
-    }
-
-    fun removeStackedProject(){
-        if(stackedProjectWebViewComponent != null) {
-            (stackedProjectWebViewComponent?.webView?.parent as ViewGroup).removeView(stackedProjectWebViewComponent?.webView)
-            stackedProjectWebViewComponent?.webView?.destroy()
-            stackedProjectWebViewComponent = null
-        }
-
-        if(editorWebViewComponent != null) {
-            this.setContentView(editorWebViewComponent?.webView)
-        }
-    }
-
-    fun openProjectInAdjacentWindow(projectId: String) {
-        val intent = Intent(Intent.ACTION_VIEW)
-        intent.data = Uri.parse("fullstacked://$projectId")
-        intent.addFlags(Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT)
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        startActivity(intent)
-
-        if(!this.projectsIdsInExternal.contains(projectId)) {
-            this.projectsIdsInExternal.add(projectId)
-
-            if(stackedProjectWebViewComponent?.instance?.projectId == projectId) {
-                removeStackedProject()
+        if (needsDecompression) {
+            println("[MainActivity] Decompressing main app files from out.zip to ${outDir.absolutePath} (needsDecompression=true, isDebug=$isDebug, currentVersion=$currentVersion, stashedVersion=$stashedVersion)...")
+            val zipData = try {
+                resources.openRawResource(R.raw.out).use { it.readBytes() }
+            } catch (e: Exception) {
+                null
             }
 
-            this.onSharedPreferenceChangeListeners[projectId] = OnSharedPreferenceChangeListener { sharedPreferences, _ ->
-                if(!sharedPreferences.contains(projectId)) {
-                    this.projectsIdsInExternal.remove(projectId)
-                    this.onSharedPreferenceChangeListeners.remove(projectId)
+            if (zipData != null) {
+                val unzipped = try {
+                    val zis = ZipInputStream(ByteArrayInputStream(zipData))
+                    var entry = zis.nextEntry
+                    while (entry != null) {
+                        val file = File(outDir, entry.name)
+                        if (entry.isDirectory) {
+                            file.mkdirs()
+                        } else {
+                            file.parentFile?.mkdirs()
+                            file.outputStream().use { zis.copyTo(it) }
+                        }
+                        zis.closeEntry()
+                        entry = zis.nextEntry
+                    }
+                    zis.close()
+                    true
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    false
+                }
+
+                if (unzipped) {
+                    prefs.edit().putString("last_decompressed_version", currentVersion).apply()
+                    try {
+                        buildFile.writeText(currentVersion)
+                    } catch (_: Exception) { }
+                }
+            }
+        }
+
+        return outDir.absolutePath
+    }
+
+    fun updateActiveContentView() {
+        val currentWebView = stackedWebViews.lastOrNull()
+        if (currentWebView == null) {
+            finish()
+            return
+        }
+
+        val frameLayout = FrameLayout(this).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+
+        (currentWebView.webView.parent as? ViewGroup)?.removeView(currentWebView.webView)
+
+        frameLayout.addView(
+            currentWebView.webView,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
+
+        if (stackedWebViews.size > 1) {
+            val closeButton = TextView(this).apply {
+                text = "✕"
+                textSize = 20f
+                setTextColor(Color.WHITE)
+                setBackgroundColor(Color.parseColor("#80000000"))
+                gravity = Gravity.CENTER
+                setPadding(32, 16, 32, 16)
+                setOnClickListener {
+                    removeStackedProject(currentWebView)
                 }
             }
 
-            getSharedPreferences(buildTimestampPreferenceKey, MODE_PRIVATE).registerOnSharedPreferenceChangeListener(this.onSharedPreferenceChangeListeners[projectId])
+            val btnParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.TOP or Gravity.END
+                topMargin = 32
+                rightMargin = 32
+            }
+
+            frameLayout.addView(closeButton, btnParams)
+        }
+
+        setContentView(frameLayout)
+    }
+
+    fun openContextWindow(targetCtxId: Int) {
+        if (useMultiWindow()) {
+            val intent = Intent(this, MainActivity::class.java).apply {
+                action = Intent.ACTION_VIEW
+                data = Uri.parse("fullstacked://$targetCtxId")
+                putExtra(EXTRA_CTX_ID, targetCtxId)
+                addFlags(Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+            }
+            startActivity(intent)
+        } else {
+            val stacked = FullStackedWebView(this, ctxId = targetCtxId.toByte())
+            addStackedProject(stacked)
+        }
+    }
+
+    fun addStackedProject(stackedWebView: FullStackedWebView) {
+        this.stackedWebViews.add(stackedWebView)
+        this.updateActiveContentView()
+    }
+
+    fun removeStackedProject(target: FullStackedWebView? = null) {
+        val viewToRemove = target ?: this.stackedWebViews.lastOrNull()
+        if (viewToRemove != null) {
+            this.stackedWebViews.remove(viewToRemove)
+            viewToRemove.destroyView()
+        }
+
+        this.updateActiveContentView()
+    }
+
+    fun removeAllStackedProjects() {
+        val iterator = this.stackedWebViews.iterator()
+        while (iterator.hasNext()) {
+            val stacked = iterator.next()
+            stacked.destroyView()
+            iterator.remove()
         }
     }
 
@@ -277,9 +296,7 @@ class MainActivity() : ComponentActivity() {
         }
     }
 
-    private fun useMultiWindow(): Boolean {
-        // Samsung DeX
-        // source: https://developer.samsung.com/samsung-dex/modify-optimizing.html
+    fun useMultiWindow(): Boolean {
         val enabled: Boolean
         val config = this.resources.configuration
         try {
@@ -287,26 +304,20 @@ class MainActivity() : ComponentActivity() {
             enabled = (configClass.getField("SEM_DESKTOP_MODE_ENABLED").getInt(configClass)
                     == configClass.getField("semDesktopModeEnabled").getInt(config))
             return enabled
-        } catch (_: NoSuchFieldException) {
-        } catch (_: IllegalAccessException) {
-        } catch (_: IllegalArgumentException) {
+        } catch (_: Exception) {
         }
 
-        // ChromeOS
-        // source: https://www.b4x.com/android/forum/threads/check-if-the-application-is-running-on-a-chromebook.145496/
-        if(this.packageManager.hasSystemFeature("org.chromium.arc") ||
-            this.packageManager.hasSystemFeature("org.chromium.arc.device_management")) {
+        if (this.packageManager.hasSystemFeature("org.chromium.arc") ||
+            this.packageManager.hasSystemFeature("org.chromium.arc.device_management")
+        ) {
             return true
         }
 
-        // Check if the UI is in DESK mode
         val uim = this.getSystemService(UI_MODE_SERVICE) as UiModeManager
-        if(uim.currentModeType == UI_MODE_TYPE_DESK) {
+        if (uim.currentModeType == Configuration.UI_MODE_TYPE_DESK) {
             return true
         }
 
-        // use multi-window if larger thant normal screen size layout
-        // source: https://stackoverflow.com/a/19256468
         var screenLayout: Int = this.resources.configuration.screenLayout
         screenLayout = screenLayout and Configuration.SCREENLAYOUT_SIZE_MASK
         return screenLayout > Configuration.SCREENLAYOUT_SIZE_NORMAL
