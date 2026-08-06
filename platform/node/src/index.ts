@@ -55,7 +55,7 @@ globalThis.fullstacked.open = (ctx: number) => {
 
 const code = await fullstacked.execute(process.argv);
 
-const argsThatExits = ["-b", "--build", "-f", "--file", "-h", "--help"];
+const argsThatExits = ["-b", "--build", "-f", "--file", "-h", "--help", "-v", "--version"];
 const shouldExit = !!process.argv.find((arg) =>
     argsThatExits.find((exitArg) => arg.startsWith(exitArg))
 );
