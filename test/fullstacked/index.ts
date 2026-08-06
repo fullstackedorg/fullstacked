@@ -64,11 +64,17 @@ if (!process.argv.includes("--debug")) {
 }`
         );
         try {
-            const codeArgs1 = await execute(["fullstacked", "-f", testFile1, "--debug"]);
+            const codeArgs1 = await execute([
+                "fullstacked",
+                "-f",
+                testFile1,
+                "--debug"
+            ]);
             assert.strictEqual(codeArgs1, 0);
         } finally {
             if (nodeFs.existsSync(testFile1)) nodeFs.unlinkSync(testFile1);
-            if (nodeFs.existsSync(testFile1 + ".js")) nodeFs.unlinkSync(testFile1 + ".js");
+            if (nodeFs.existsSync(testFile1 + ".js"))
+                nodeFs.unlinkSync(testFile1 + ".js");
         }
     });
 
@@ -82,11 +88,19 @@ if (!process.argv.includes("--debug") || !process.argv.includes("foo") || !proce
 }`
         );
         try {
-            const codeArgs2 = await execute(["fullstacked", "-f", testFile2, "--debug", "foo", "--bar=123"]);
+            const codeArgs2 = await execute([
+                "fullstacked",
+                "-f",
+                testFile2,
+                "--debug",
+                "foo",
+                "--bar=123"
+            ]);
             assert.strictEqual(codeArgs2, 0);
         } finally {
             if (nodeFs.existsSync(testFile2)) nodeFs.unlinkSync(testFile2);
-            if (nodeFs.existsSync(testFile2 + ".js")) nodeFs.unlinkSync(testFile2 + ".js");
+            if (nodeFs.existsSync(testFile2 + ".js"))
+                nodeFs.unlinkSync(testFile2 + ".js");
         }
     });
 
@@ -104,7 +118,8 @@ if (process.argv.length !== 0) {
             assert.strictEqual(codeArgs3, 0);
         } finally {
             if (nodeFs.existsSync(testFile3)) nodeFs.unlinkSync(testFile3);
-            if (nodeFs.existsSync(testFile3 + ".js")) nodeFs.unlinkSync(testFile3 + ".js");
+            if (nodeFs.existsSync(testFile3 + ".js"))
+                nodeFs.unlinkSync(testFile3 + ".js");
         }
     });
 
@@ -126,11 +141,8 @@ if (process.argv.length !== 0) {
         } finally {
             delete (globalThis as any).__runCount;
             if (nodeFs.existsSync(testFile4)) nodeFs.unlinkSync(testFile4);
-            if (nodeFs.existsSync(testFile4 + ".js")) nodeFs.unlinkSync(testFile4 + ".js");
+            if (nodeFs.existsSync(testFile4 + ".js"))
+                nodeFs.unlinkSync(testFile4 + ".js");
         }
     });
 });
-
-
-
-

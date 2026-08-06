@@ -1,16 +1,11 @@
 import test, { suite } from "node:test";
 import assert from "node:assert";
-import core from "../core.ts";
-import { coreStaticFile } from "../../platform/node/src/webview.ts";
 import fs from "node:fs";
+import { staticFileResolve } from "../../platform/node/src/index.ts";
 
 suite("static-file - e2e", () => {
     test("index.html", () => {
-        const staticFile = coreStaticFile(
-            core.instance,
-            0,
-            "test/static-file/sample"
-        );
+        const staticFile = staticFileResolve(0, "test/static-file/sample");
         assert.deepEqual(staticFile, {
             found: true,
             mimeType: "text/html; charset=utf-8",
@@ -18,8 +13,7 @@ suite("static-file - e2e", () => {
         });
     });
     test("index.ts", () => {
-        const staticFile = coreStaticFile(
-            core.instance,
+        const staticFile = staticFileResolve(
             0,
             "test/static-file/sample/out/index.ts.js"
         );

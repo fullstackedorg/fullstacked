@@ -1,17 +1,12 @@
 import puppeteer from "puppeteer";
-import { createWebView } from "../platform/node/src/webview.ts";
-import core from "./core.ts";
-import path from "node:path";
+import run from "../core/internal/bundle/lib/run/index.ts";
+import { createWebView } from "../platform/node/src/index.ts";
 
 export type Browser = Awaited<ReturnType<typeof createBrowser>>;
 
 export async function createBrowser(directory: string) {
-    directory = path.resolve(directory);
-    const ctx = core.instance.start(directory, directory);
-    const webview = await createWebView(core.instance, ctx, {
-        quiet: true
-    });
-    core.callbackListeners.add(webview.callback);
+    const ctx = await run(directory);
+    const webview = await createWebView(ctx, { quiet: true });
 
     const browser = await puppeteer.launch({
         headless: !process.argv.includes("--show-browser"),
@@ -90,8 +85,6 @@ export async function createBrowser(directory: string) {
         webview,
         sleep: (ms: number) => new Promise((res) => setTimeout(res, ms)),
         end() {
-            core.callbackListeners.delete(webview.callback);
-            core.instance.stop(ctx);
             webview.close();
             return browser.close();
         },

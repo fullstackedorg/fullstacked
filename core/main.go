@@ -21,40 +21,16 @@ import (
 	"fmt"
 	"fullstackedorg/fullstacked/internal/router"
 	"fullstackedorg/fullstacked/internal/store"
-	"os"
-	"path"
-	"runtime/debug"
-	"time"
 	"unsafe"
 )
 
 func main() {}
-
-func handlePanic() {
-	if r := recover(); r != nil {
-		writeCrashLogAndPanic(r)
-	}
-}
-
-func writeCrashLogAndPanic(r interface{}) {
-	if store.CrashLogDir == "" {
-		store.CrashLogDir = "."
-	}
-	f, err := os.OpenFile(path.Join(store.CrashLogDir, "crash.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-	if err == nil {
-		f.WriteString(fmt.Sprintf("--- Crash Log Session Started: %s ---\n", time.Now().Format("2006-01-02 15:04:05")))
-		debug.SetCrashOutput(f, debug.CrashOptions{})
-		f.Close()
-	}
-	panic(r)
-}
 
 //export start
 func start(
 	root *C.char,
 	build *C.char,
 ) C.uint8_t {
-	defer handlePanic()
 	rootStr := C.GoString(root)
 
 	id := store.NewContext(rootStr, C.GoString(build))
@@ -67,7 +43,6 @@ func startWithCtx(
 	build *C.char,
 	ctxId C.uint8_t,
 ) {
-	defer handlePanic()
 	rootStr := C.GoString(root)
 
 	store.NewContextWithCtxId(uint8(ctxId), rootStr, C.GoString(build))
@@ -119,7 +94,6 @@ func getCorePayload(
 	ptr unsafe.Pointer,
 	size C.int,
 ) {
-	defer handlePanic()
 	response, err := store.GetCorePayload(uint8(ctx), uint8(coreType), uint8(id), int(size))
 
 	if err != nil {
@@ -134,7 +108,6 @@ func getCorePayload(
 
 //export call
 func call(buffer unsafe.Pointer, length C.int) C.int {
-	defer handlePanic()
 	size, err := router.Call(C.GoBytes(buffer, length))
 
 	if err != nil {

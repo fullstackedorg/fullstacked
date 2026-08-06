@@ -89,7 +89,7 @@ fs.renameSync(
 );
 
 esbuild.buildSync({
-    entryPoints: [`${currentDirectory}/src/index.ts`],
+    entryPoints: [`${currentDirectory}/index.ts`],
     outfile: `${currentDirectory}/index.js`,
     bundle: true,
     format: "esm",

@@ -1,25 +1,19 @@
-#!/usr/bin/env node
-import fullstacked from "../../../core/internal/bundle/lib/fullstacked/index.ts";
+import "../../../core/internal/bundle/lib/fullstacked/index.ts";
 import { load } from "./core.ts";
-import { createWebView } from "./webview.ts";
-
-const end = (code: number) => {
-    core.end();
-    process.exit(code);
-};
-
-["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) =>
-    process.on(signal, () => end(0))
-);
+import {
+    CreateWebViewOpts,
+    createWebViewWithCore,
+    staticFileWithCore
+} from "./webview.ts";
 
 const webviews: Map<
     number,
-    Awaited<ReturnType<typeof createWebView>>
+    Awaited<ReturnType<typeof createWebViewWithCore>>
 > = new Map();
 
 const core = await load(
     (ctx: number, streamId: number, buffer: ArrayBuffer) => {
-        if (ctx === mainCtx) {
+        if (ctx === globalThis.bridge.ctxId) {
             globalThis.fullstacked.onStreamData(streamId, buffer);
             return;
         }
@@ -34,32 +28,38 @@ const core = await load(
     }
 );
 
-const mainCtx = core.start(process.cwd(), process.cwd());
+const forcefullyExit = () => {
+    core.end();
+    process.exit();
+};
+["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => {
+    process.on(signal, forcefullyExit);
+});
 
-globalThis.ctxId = mainCtx;
-globalThis.bridges = {
-    ctxId: mainCtx,
+globalThis.bridge = {
+    ctxId: core.start(process.cwd(), process.cwd()),
     Sync: (payload: ArrayBuffer) => core.call(payload),
     Async: async (payload: ArrayBuffer) => core.call(payload)
 };
 
-globalThis.fullstacked.open = (ctx: number) => {
-    createWebView(core, ctx, {
+export async function createWebView(ctx: number, opts?: CreateWebViewOpts) {
+    const webview = await createWebViewWithCore(core, ctx, {
+        ...opts,
         didClose: () => {
+            opts?.didClose?.();
             webviews.delete(ctx);
         }
-    }).then((webview) => {
-        webviews.set(ctx, webview);
     });
-};
+    webviews.set(ctx, webview);
+    return webview;
+}
 
-const code = await fullstacked.execute(process.argv);
+export function staticFileResolve(ctx: number, pathname: string) {
+    return staticFileWithCore(core, ctx, pathname);
+}
 
-const argsThatExits = ["-b", "--build", "-f", "--file", "-h", "--help", "-v", "--version"];
-const shouldExit = !!process.argv.find((arg) =>
-    argsThatExits.find((exitArg) => arg.startsWith(exitArg))
-);
+globalThis.fullstacked.open = createWebView;
 
-if ((typeof code === "number" && code !== 0) || shouldExit) {
-    end(code);
+export function stop() {
+    core.end();
 }

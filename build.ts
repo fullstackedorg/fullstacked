@@ -4,6 +4,9 @@ import path from "node:path";
 import fs from "node:fs";
 import esbuild from "esbuild";
 import version from "./version.ts";
+import url from "node:url";
+
+const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
 
 // shims
 
@@ -71,43 +74,58 @@ const packagesToBundle = [
     }
 ];
 
-packagesToBundle.forEach(({ entryPoint, outfile }) =>
+const alias = {
+    // source: https://soatok.blog/2025/11/19/moving-beyond-the-npm-elliptic-package/
+    // elliptic: "@soatok/elliptic-to-noble",
+
+    randombytes: "randombytes/browser",
+    "create-ecdh": "create-ecdh/browser",
+    "create-hash/md5": "create-hash/md5",
+    "create-hash": "create-hash/browser",
+    "create-hmac": "create-hmac/browser",
+    "browserify-cipher": "browserify-cipher/browser",
+    "browserify-sign": "browserify-sign/browser",
+    "browserify-sign/algos": "browserify-sign/algos"
+    // "browserify-aes": "browserify-aes/browser",
+};
+Object.keys(alias).forEach(
+    (key) =>
+        (alias[key] = path.join(currentDirectory, "node_modules", alias[key]))
+);
+
+packagesToBundle.forEach(({ entryPoint, outfile }) => {
+    entryPoint = path.join(currentDirectory, entryPoint);
+    outfile = path.join(currentDirectory, outfile);
+
     entryPoint.endsWith(".json")
         ? fs.cpSync(entryPoint, outfile, { recursive: true })
         : esbuild.buildSync({
-            entryPoints: [entryPoint],
-            outfile,
-            bundle: true,
-            // format: "esm",
-            platform: "node",
-            define: {
-                "process.versions.node": '"0.0.0"'
-            },
-            external: ["process/", "create-hash/browser/md5"],
-            alias: {
-                // source: https://soatok.blog/2025/11/19/moving-beyond-the-npm-elliptic-package/
-                // elliptic: "@soatok/elliptic-to-noble",
-
-                randombytes: "randombytes/browser",
-                "create-ecdh": "create-ecdh/browser",
-                "create-hash": "create-hash/browser",
-                "create-hmac": "create-hmac/browser",
-                "browserify-cipher": "browserify-cipher/browser",
-                "browserify-sign": "browserify-sign/browser",
-                "browserify-sign/algos": "browserify-sign/algos"
-                // "browserify-aes": "browserify-aes/browser",
-            }
-        })
-);
+              entryPoints: [entryPoint],
+              outfile,
+              bundle: true,
+              // format: "esm",
+              platform: "node",
+              define: {
+                  "process.versions.node": '"0.0.0"'
+              },
+              external: ["process/", "create-hash/browser/md5"],
+              alias
+          });
+});
 
 // types
 
-child_process.execSync("go run ./generate.go", { cwd: "types" });
+child_process.execSync("go run ./generate.go", {
+    cwd: path.join(currentDirectory, "types")
+});
 
 // version
 
 fs.writeFileSync(
-    "core/internal/bundle/lib/process/version.json",
+    path.join(
+        currentDirectory,
+        "core/internal/bundle/lib/process/version.json"
+    ),
     JSON.stringify(version)
 );
 
@@ -119,22 +137,24 @@ const arch = os.arch();
 if (platform === "win32") {
     child_process.execSync(`call ./windows.bat ${arch}`, {
         stdio: "inherit",
-        cwd: "core/build"
+        cwd: path.join(currentDirectory, "core/build")
     });
 } else {
     const target_name = platform + "-" + arch + "-shared";
     child_process.execSync(`make ${target_name}`, {
         stdio: "inherit",
-        cwd: "core/build"
+        cwd: path.join(currentDirectory, "core/build")
     });
 }
 
 // plugins
 
-const pluginsDir = "plugins";
+const pluginsDir = path.join(currentDirectory, "plugins");
 
 async function copyPlugin(plugin: string) {
     const pluginPath = path.join(pluginsDir, plugin);
+
+    if (!fs.existsSync(path.join(pluginPath, "package.json"))) return;
 
     child_process.execSync("npm run build", {
         cwd: pluginPath,
@@ -167,8 +187,8 @@ await Promise.all(plugins.map(copyPlugin));
 
 console.log(
     `\nBuilt FullStacked v${version.major}.${version.minor}.${version.patch}\n` +
-    `\tbuild: ${version.build}\n` +
-    `\tbranch: ${version.branch}\n` +
-    `\thash: ${version.hash.slice(0, 8)}\n` +
-    `\tplatform: ${platform}-${arch}\n`
+        `\tbuild: ${version.build}\n` +
+        `\tbranch: ${version.branch}\n` +
+        `\thash: ${version.hash.slice(0, 8)}\n` +
+        `\tplatform: ${platform}-${arch}\n`
 );

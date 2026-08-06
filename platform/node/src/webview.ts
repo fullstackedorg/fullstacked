@@ -28,13 +28,15 @@ if (portIndex !== -1 && args[portIndex + 1]) {
 
 const te = new TextEncoder();
 
-export async function createWebView(
+export type CreateWebViewOpts = {
+    quiet?: boolean;
+    didClose?: () => void;
+};
+
+export async function createWebViewWithCore(
     core: Core,
     ctx: number,
-    opts: {
-        quiet?: boolean;
-        didClose?: () => void;
-    }
+    opts?: CreateWebViewOpts
 ) {
     const port = await getNextAvailablePort(mainPort);
     const server = http.createServer(createHandler(core, ctx));
@@ -125,7 +127,7 @@ function createHandler(core: Core, ctx: number) {
             return res.end(b64);
         }
 
-        const staticFile = coreStaticFile(core, ctx, pathname);
+        const staticFile = staticFileWithCore(core, ctx, pathname);
 
         res.writeHead(staticFile.found ? 200 : 400, {
             "content-type": staticFile.mimeType,
@@ -136,7 +138,7 @@ function createHandler(core: Core, ctx: number) {
     };
 }
 
-export function coreStaticFile(
+export function staticFileWithCore(
     core: Core,
     ctx: number,
     pathname: string

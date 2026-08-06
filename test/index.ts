@@ -1,11 +1,9 @@
 import "../core/internal/bundle/lib/fullstacked/index.ts";
-import core from "./core.ts";
-import { after, before } from "node:test";
+import { after } from "node:test";
 import { URL } from "node:url";
+import { stop } from "../platform/node/src/index.ts";
 
 process.env.TEST = "1";
-
-before(core.start);
 
 let tests = [
     "./serialization/index.ts",
@@ -25,7 +23,6 @@ let tests = [
     "./git/index.ts",
     "./packages/index.ts",
     "./worker/index.ts",
-    "./crash-log/index.ts",
     "./fullstacked/index.ts"
 ];
 
@@ -42,4 +39,4 @@ for (const test of tests) {
 }
 
 // hangs if C++ callback not released
-after(core.instance.end);
+after(stop);

@@ -16,7 +16,6 @@ test/**/_index.ts.css
 test/**/_index.ts.tailwind.css
 test/**/output.css
 test/**/test
-test/**/crash.log
 test/worker/sample/worker.ts.js
 platform/@fullstacked
 platform/android/studio/app/src/main/res/raw/out.zip

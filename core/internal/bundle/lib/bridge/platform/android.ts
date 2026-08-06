@@ -39,8 +39,7 @@ export async function BridgeAndroidInit(): Promise<PlatformBridge> {
             asyncResponsePromises.delete(id);
         };
     } else {
-        globalThis.fullstacked.exit = () =>
-            globalThis.android?.exit?.();
+        globalThis.fullstacked.exit = () => globalThis.android?.exit?.();
 
         globalThis.fullstacked.open = (ctx: number) =>
             globalThis.android?.open?.(ctx);
@@ -77,7 +76,8 @@ export async function BridgeAndroidInit(): Promise<PlatformBridge> {
                 return toByteArray(response).buffer;
             } else {
                 const base64 = fromByteArray(uint8array);
-                const responseBase64 = globalThis.android?.coreCall?.(base64) || "";
+                const responseBase64 =
+                    globalThis.android?.coreCall?.(base64) || "";
                 return toByteArray(responseBase64).buffer;
             }
         }

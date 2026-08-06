@@ -263,7 +263,7 @@ async function bundleAndImportFile(
     try {
         await fs.promises.stat(targetFilePath);
         fileExists = true;
-    } catch { }
+    } catch {}
 
     if (!fileExists) {
         writeErr(formatMessage(`Error: file not found: ${file}`, false));
@@ -292,12 +292,13 @@ async function bundleAndImportFile(
         // to forward slash
         absoluteOutputFile = absoluteOutputFile.replaceAll("\\", "/");
         // remove drive letter
-        absoluteOutputFile = absoluteOutputFile.at(1) === ":"
-            ? absoluteOutputFile.slice(2)
-            : absoluteOutputFile;
+        absoluteOutputFile =
+            absoluteOutputFile.at(1) === ":"
+                ? absoluteOutputFile.slice(2)
+                : absoluteOutputFile;
     }
     const cleanup = async () => {
-        await fs.promises.rm(absoluteOutputFile).catch(() => { });
+        await fs.promises.rm(absoluteOutputFile).catch(() => {});
     };
 
     const searchParams = new URLSearchParams();
@@ -355,12 +356,12 @@ async function runDirectory(
         for (const bp of buildPlugins) {
             try {
                 await bp.unregister();
-            } catch { }
+            } catch {}
         }
         for (const tempFile of tempPluginFiles) {
             try {
-                await fs.promises.rm(tempFile).catch(() => { });
-            } catch { }
+                await fs.promises.rm(tempFile).catch(() => {});
+            } catch {}
         }
     };
 
