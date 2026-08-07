@@ -11,7 +11,7 @@ import {
     LookupResult
 } from "../@types/dns.ts";
 
-export async function resolve(hostname: string, rrtype: string) { }
+export async function resolve(hostname: string, rrtype: string) {}
 
 export function resolve4(hostname: string, rrtype?: string): Promise<string[]> {
     return globalThis.fullstacked.bridge({
@@ -86,7 +86,9 @@ export async function lookup(hostname: string, options?: any) {
         data: [hostname]
     });
 
-    const filtered = (results || []).filter((r) => family === 0 || r.family === family);
+    const filtered = (results || []).filter(
+        (r) => family === 0 || r.family === family
+    );
 
     if (filtered.length === 0) {
         throw new Error(`ENOTFOUND ${hostname}`);

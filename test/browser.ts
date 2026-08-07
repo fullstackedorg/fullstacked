@@ -6,17 +6,21 @@ export type Browser = Awaited<ReturnType<typeof createBrowser>>;
 
 let createWebView: typeof CreateWebViewType;
 
-export async function createBrowser(directory: string, env?: Record<string, string>) {
-
+export async function createBrowser(
+    directory: string,
+    env?: Record<string, string>
+) {
     // this assures user he can import platform/node build before this tries to load the core
     if (!createWebView) {
-        createWebView = (await import("../platform/node/src/index.ts")).createWebView
+        createWebView = (await import("../platform/node/src/index.ts"))
+            .createWebView;
     }
 
     const ctx = await run({ directory, env });
     const webview = await createWebView(ctx, { quiet: true });
 
-    const showBrowser = (process.argv.includes("--show-browser") || !!process.env.SHOW_BROWSER)
+    const showBrowser =
+        process.argv.includes("--show-browser") || !!process.env.SHOW_BROWSER;
 
     const browser = await puppeteer.launch({
         headless: !showBrowser,

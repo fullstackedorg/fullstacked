@@ -105,17 +105,17 @@ packagesToBundle.forEach(({ entryPoint, outfile }) => {
     entryPoint.endsWith(".json")
         ? fs.cpSync(entryPoint, outfile, { recursive: true })
         : esbuild.buildSync({
-            entryPoints: [entryPoint],
-            outfile,
-            bundle: true,
-            // format: "esm",
-            platform: "node",
-            define: {
-                "process.versions.node": '"0.0.0"'
-            },
-            external: ["process/", "create-hash/browser/md5"],
-            alias
-        });
+              entryPoints: [entryPoint],
+              outfile,
+              bundle: true,
+              // format: "esm",
+              platform: "node",
+              define: {
+                  "process.versions.node": '"0.0.0"'
+              },
+              external: ["process/", "create-hash/browser/md5"],
+              alias
+          });
 });
 
 // types
@@ -192,8 +192,8 @@ await Promise.all(plugins.map(copyPlugin));
 
 console.log(
     `\nBuilt FullStacked v${version.major}.${version.minor}.${version.patch}\n` +
-    `\tbuild: ${version.build}\n` +
-    `\tbranch: ${version.branch}\n` +
-    `\thash: ${version.hash.slice(0, 8)}\n` +
-    `\tplatform: ${platform}-${arch}\n`
+        `\tbuild: ${version.build}\n` +
+        `\tbranch: ${version.branch}\n` +
+        `\thash: ${version.hash.slice(0, 8)}\n` +
+        `\tplatform: ${platform}-${arch}\n`
 );

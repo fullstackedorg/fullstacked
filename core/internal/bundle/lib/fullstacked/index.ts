@@ -263,7 +263,7 @@ async function bundleAndImportFile(
     try {
         await fs.promises.stat(targetFilePath);
         fileExists = true;
-    } catch { }
+    } catch {}
 
     if (!fileExists) {
         writeErr(formatMessage(`Error: file not found: ${file}`, false));
@@ -354,12 +354,12 @@ async function runDirectory(
         for (const bp of buildPlugins) {
             try {
                 await bp.unregister();
-            } catch { }
+            } catch {}
         }
         for (const tempFile of tempPluginFiles) {
             try {
-                await fs.promises.rm(tempFile).catch(() => { });
-            } catch { }
+                await fs.promises.rm(tempFile).catch(() => {});
+            } catch {}
         }
     };
 

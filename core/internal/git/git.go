@@ -205,7 +205,6 @@ func Switch(
 			tunnel = data[2].Data.(string)
 		}
 
-
 		if len(data) > 3 && data[3].Type == types.OBJECT {
 			proxy = &GitProxy{}
 			json.Unmarshal(data[3].Data.(types.DeserializedRawObject).Data, proxy)
