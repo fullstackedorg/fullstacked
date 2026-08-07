@@ -7,7 +7,7 @@
         "fmt": "sh ./fmt.sh",
         "typecheck": "tsc --noEmit",
         "pretest": "npm run build && npm run build -w platform/node",
-        "test": "node --experimental-test-coverage --test-coverage-exclude='**/*.js' --test-coverage-exclude='test/**/*' -r @nitrogql/esbuild-register test"
+        "test": "node --experimental-test-coverage --test-coverage-exclude='**/*.js' --test-coverage-exclude='**/*.cjs' --test-coverage-exclude='test/**/*' -r @nitrogql/esbuild-register test"
     },
     "workspaces": [
         "app/*",
@@ -29,6 +29,7 @@
         "@tailwindcss/cli": "^4.3.3",
         "@types/node": "^26.1.1",
         "@types/pg": "^8.20.0",
+        "@xmldom/xmldom": "^0.9.10",
         "assert": "^2.1.0",
         "audit": "^0.0.6",
         "browserify-zlib": "^0.2.0",

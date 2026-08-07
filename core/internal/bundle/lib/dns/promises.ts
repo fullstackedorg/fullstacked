@@ -7,10 +7,11 @@ import {
     ResolveNS,
     ResolveSRV,
     ResolveTXT,
-    Lookup
+    Lookup,
+    LookupResult
 } from "../@types/dns.ts";
 
-export async function resolve(hostname: string, rrtype: string) {}
+export async function resolve(hostname: string, rrtype: string) { }
 
 export function resolve4(hostname: string, rrtype?: string): Promise<string[]> {
     return globalThis.fullstacked.bridge({
@@ -79,13 +80,13 @@ export async function lookup(hostname: string, options?: any) {
         all = options.all || false;
     }
 
-    const results: any[] = await globalThis.fullstacked.bridge({
+    const results: LookupResult[] = await globalThis.fullstacked.bridge({
         mod: Dns,
         fn: Lookup,
         data: [hostname]
     });
 
-    const filtered = results.filter((r) => family === 0 || r.family === family);
+    const filtered = (results || []).filter((r) => family === 0 || r.family === family);
 
     if (filtered.length === 0) {
         throw new Error(`ENOTFOUND ${hostname}`);

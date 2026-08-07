@@ -22,6 +22,7 @@ const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
 // diagnostics_channel : https://www.npmjs.com/package/dc-polyfill
 // constants : https://www.npmjs.com/package/constants-browserify
 // perf_hooks: https://www.npmjs.com/package/just-performance
+// DOMParser : https://www.npmjs.com/package/@xmldom/xmldom
 
 const packagesToBundle = [
     {
@@ -71,6 +72,10 @@ const packagesToBundle = [
     {
         entryPoint: "node_modules/constants-browserify/constants.json",
         outfile: "core/internal/bundle/lib/constants/index.json"
+    },
+    {
+        entryPoint: "node_modules/@xmldom/xmldom/lib/index.js",
+        outfile: "core/internal/bundle/lib/DOMParser/index.cjs"
     }
 ];
 
@@ -100,17 +105,17 @@ packagesToBundle.forEach(({ entryPoint, outfile }) => {
     entryPoint.endsWith(".json")
         ? fs.cpSync(entryPoint, outfile, { recursive: true })
         : esbuild.buildSync({
-              entryPoints: [entryPoint],
-              outfile,
-              bundle: true,
-              // format: "esm",
-              platform: "node",
-              define: {
-                  "process.versions.node": '"0.0.0"'
-              },
-              external: ["process/", "create-hash/browser/md5"],
-              alias
-          });
+            entryPoints: [entryPoint],
+            outfile,
+            bundle: true,
+            // format: "esm",
+            platform: "node",
+            define: {
+                "process.versions.node": '"0.0.0"'
+            },
+            external: ["process/", "create-hash/browser/md5"],
+            alias
+        });
 });
 
 // types
@@ -187,8 +192,8 @@ await Promise.all(plugins.map(copyPlugin));
 
 console.log(
     `\nBuilt FullStacked v${version.major}.${version.minor}.${version.patch}\n` +
-        `\tbuild: ${version.build}\n` +
-        `\tbranch: ${version.branch}\n` +
-        `\thash: ${version.hash.slice(0, 8)}\n` +
-        `\tplatform: ${platform}-${arch}\n`
+    `\tbuild: ${version.build}\n` +
+    `\tbranch: ${version.branch}\n` +
+    `\thash: ${version.hash.slice(0, 8)}\n` +
+    `\tplatform: ${platform}-${arch}\n`
 );

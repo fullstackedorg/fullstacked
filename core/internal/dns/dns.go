@@ -3,6 +3,7 @@ package dns
 import (
 	"context"
 	"errors"
+	"fullstackedorg/fullstacked/internal/tunnel"
 	"fullstackedorg/fullstacked/types"
 	"net"
 	"strings"
@@ -47,51 +48,40 @@ func Switch(
 	response *types.CoreCallResponse,
 ) error {
 	err := (error)(nil)
+	resData := (types.SerializableData)(nil)
+
+	host := data[0].Data.(string)
+	if t := tunnel.FindTunnel(host); t != nil {
+		host = t.Host
+	}
+
 	switch header.Fn {
 	case Resolve4:
-		ipv4, err := resolve4(data[0].Data.(string))
-		if err == nil {
-			response.Data = ipv4
-		}
+		resData, err = resolve4(host)
 	case Resolve6:
-		ipv6, err := resolve6(data[0].Data.(string))
-		if err == nil {
-			response.Data = ipv6
-		}
+		resData, err = resolve6(host)
 	case ResolveCNAME:
-		cname, err := getResolver().LookupCNAME(context.Background(), data[0].Data.(string))
-		if err == nil {
-			response.Data = []string{strings.TrimSuffix(cname, ".")}
-		}
+		cname, err2 := getResolver().LookupCNAME(context.Background(), host)
+		resData = []string{strings.TrimSuffix(cname, ".")}
+		err = err2
 	case ResolveMX:
-		mx, err := resolveMx(data[0].Data.(string))
-		if err == nil {
-			response.Data = mx
-		}
+		resData, err = resolveMx(host)
 	case ResolveNS:
-		ns, err := getResolver().LookupNS(context.Background(), data[0].Data.(string))
-		if err == nil {
-			nss := []string{}
-			for _, r := range ns {
-				nss = append(nss, strings.TrimSuffix(r.Host, "."))
-			}
-			response.Data = nss
+		ns, err2 := getResolver().LookupNS(context.Background(), host)
+		nss := []string{}
+		for _, r := range ns {
+			nss = append(nss, strings.TrimSuffix(r.Host, "."))
 		}
+		resData = nss
+		err = err2
 	case ResolveSRV:
-		srv, err := resolveSrv(data[0].Data.(string))
-		if err == nil {
-			response.Data = srv
-		}
+		resData, err = resolveSrv(host)
 	case ResolveTXT:
-		txt, err := getResolver().LookupTXT(context.Background(), data[0].Data.(string))
-		if err == nil {
-			response.Data = [][]string{txt}
-		}
+		txt, err2 := getResolver().LookupTXT(context.Background(), host)
+		resData = [][]string{txt}
+		err = err2
 	case Lookup:
-		res, err := lookup(data[0].Data.(string))
-		if err == nil {
-			response.Data = res
-		}
+		resData, err = lookup(host)
 	default:
 		err = errors.New("unknown dns function")
 	}
@@ -101,6 +91,7 @@ func Switch(
 	}
 
 	response.Type = types.CoreResponseData
+	response.Data = resData
 	return err
 }
 

@@ -33,6 +33,8 @@ export type CreateWebViewOpts = {
     didClose?: () => void;
 };
 
+const activeServers = new Set<http.Server>();
+
 export async function createWebViewWithCore(
     core: Core,
     ctx: number,
@@ -40,11 +42,12 @@ export async function createWebViewWithCore(
 ) {
     const port = await getNextAvailablePort(mainPort);
     const server = http.createServer(createHandler(core, ctx));
+    activeServers.add(server);
 
     const close = () => {
         core.stop(ctx);
         server.close();
-        opts.didClose?.();
+        activeServers.delete(server);
     };
 
     const webSockets = createWebSocketServer(core, ctx, server, close);
@@ -205,6 +208,11 @@ function getNextAvailablePort(
     port: number = 9000,
     host = "0.0.0.0"
 ): Promise<number> {
+    for (const s of activeServers) {
+        if ((s.address() as net.AddressInfo).port === port) {
+            return getNextAvailablePort(++port);
+        }
+    }
     return new Promise((resolve, reject) => {
         const socket = new net.Socket();
 

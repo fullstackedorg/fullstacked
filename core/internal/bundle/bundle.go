@@ -59,6 +59,7 @@ var libModules = map[string]string{
 	"querystring":         "/lib/querystring/index.ts",
 	"run":                 "/lib/run/index.ts",
 	"stream":              "/lib/stream/index.js",
+	"stream/web":          "/lib/unavailable/index.js",
 	"string_decoder":      "/lib/string_decoder/index.js",
 	"sqlite":              "/lib/unavailable/index.js",
 	"timers":              "/lib/timers/index.ts",

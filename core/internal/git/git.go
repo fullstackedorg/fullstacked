@@ -197,9 +197,15 @@ func Switch(
 		response.Type = types.CoreResponseStream
 		tunnel := ""
 		proxy := (*GitProxy)(nil)
+
+		// we need to pass the tunnel as param
+		// tunnel name (host) can be generated randomly at runtime
+		// we don't want to store the remote as a generated string (ie https://abshdj/repo/url.git)
 		if len(data) > 2 && data[2].Type == types.STRING {
 			tunnel = data[2].Data.(string)
 		}
+
+
 		if len(data) > 3 && data[3].Type == types.OBJECT {
 			proxy = &GitProxy{}
 			json.Unmarshal(data[3].Data.(types.DeserializedRawObject).Data, proxy)

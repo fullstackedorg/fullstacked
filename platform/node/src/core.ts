@@ -42,6 +42,7 @@ function verifyVersion(binLocation: string) {
         );
         return packageJsonBin.version === packageJson.version;
     } catch (e) {
+        console.log(e)
         return false;
     }
 }

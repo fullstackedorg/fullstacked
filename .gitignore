@@ -10,6 +10,7 @@ out
 fullstacked_modules/@types
 core/internal/bundle/lib/@types
 core/internal/bundle/lib/**/*.js
+core/internal/bundle/lib/**/*.cjs
 core/internal/bundle/lib/**/*.json
 test/**/_index.ts.js
 test/**/_index.ts.css

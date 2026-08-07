@@ -32,9 +32,9 @@ function urlOrStringToUrl(url: URL | string) {
     return url instanceof URL
         ? url
         : new URL(
-              url,
-              url.startsWith("/") ? globalThis?.location?.host : undefined
-          );
+            url,
+            url.startsWith("/") ? globalThis?.location?.host : undefined
+        );
 }
 
 function getAbortError() {
@@ -45,12 +45,17 @@ async function fetchCore(
     request: string | URL | Request,
     init?: RequestInit
 ): Promise<Response> {
+    if (!globalThis.DOMParser) {
+        const xmldom = await import("../DOMParser/index");
+        Object.entries(xmldom).forEach(([key, fn]) => globalThis[key] = fn);
+    }
+
     const requestUrl =
         request instanceof Request
             ? request.url
             : request instanceof URL
-              ? request.href
-              : request;
+                ? request.href
+                : request;
     if (typeof requestUrl === "string" && requestUrl.startsWith("data:")) {
         try {
             const parts = requestUrl.split(",");
@@ -107,9 +112,9 @@ async function fetchCore(
             : await bodyInitToBuffer(init?.body);
 
     let responseHeadEE: EventEmitter<{
-            response: [ResponseHead];
-            error: [string];
-        }>,
+        response: [ResponseHead];
+        error: [string];
+    }>,
         responseHead: ResponseHead,
         responseBodyStream: Duplex;
 
