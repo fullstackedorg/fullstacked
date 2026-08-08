@@ -6,6 +6,8 @@ export type Browser = Awaited<ReturnType<typeof createBrowser>>;
 
 let createWebView: typeof CreateWebViewType;
 
+const activeBrowser = new Set<Browser>();
+
 export async function createBrowser(
     directory: string,
     env?: Record<string, string>
@@ -94,14 +96,27 @@ export async function createBrowser(
         };
     };
 
-    return {
+    const b = {
         browser,
         webview,
         sleep: (ms: number) => new Promise((res) => setTimeout(res, ms)),
         end() {
+            activeBrowser.delete(b);
             webview.close();
             return browser.close();
         },
         createPage
     };
+
+    activeBrowser.add(b);
+
+    return b
+}
+
+export function stopAllBrowsers() {
+    const promises = [];
+    for (const b of activeBrowser) {
+        promises.push(b.end());
+    }
+    return Promise.all(promises);
 }
