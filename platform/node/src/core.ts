@@ -4,7 +4,7 @@ import {
     binBasename,
     bindingBasename,
     binLocations,
-    packageJson
+    getPackageJson
 } from "../utils.ts";
 import fs from "node:fs";
 
@@ -40,7 +40,7 @@ function verifyVersion(binLocation: string) {
         const packageJsonBin = JSON.parse(
             fs.readFileSync(packageJsonFileBin, { encoding: "utf-8" })
         );
-        return packageJsonBin.version === packageJson.version;
+        return packageJsonBin.version === getPackageJson().version;
     } catch (e) {
         console.log(e);
         return false;

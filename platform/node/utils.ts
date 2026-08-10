@@ -21,9 +21,10 @@ export const currentDirectory = path.dirname(
     url.fileURLToPath(import.meta.url)
 );
 
-export const packageJson = JSON.parse(
-    fs.readFileSync(path.resolve(currentDirectory, "package.json"), "utf-8")
-);
+export const getPackageJson = () =>
+    JSON.parse(
+        fs.readFileSync(path.resolve(currentDirectory, "package.json"), "utf-8")
+    );
 
 export const binLocations = [
     // flattened dependencies when installed in project
