@@ -76,6 +76,8 @@ JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_getCorePayload
     return response;
 }
 
+#include <mutex>
+
 JavaVM* javaVm;
 
 struct CallbackResponder {
@@ -84,11 +86,18 @@ struct CallbackResponder {
     jint id;
 };
 std::vector<CallbackResponder> responders = {};
+std::mutex respondersMutex;
 
 void streamDataCallback(uint8_t ctx, uint8_t id, int size) {
-    __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.core", "streamDataCallback responders count [%zu]", responders.size());
+    std::vector<CallbackResponder> respondersCopy;
+    {
+        std::lock_guard<std::mutex> lock(respondersMutex);
+        respondersCopy = responders;
+    }
 
-    for (const CallbackResponder& responder : responders) {
+    __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.core", "streamDataCallback responders count [%zu]", respondersCopy.size());
+
+    for (const CallbackResponder& responder : respondersCopy) {
         JNIEnv *env = nullptr;
         if (javaVm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
             jmethodID methodid = env->GetMethodID(responder.cls, "onStreamData", "(III)V");
@@ -122,6 +131,7 @@ JNIEXPORT void JNICALL Java_org_fullstacked_MainActivity_addCallback
         id
     };
 
+    std::lock_guard<std::mutex> lock(respondersMutex);
     responders.push_back(responder);
 }
 
@@ -129,6 +139,7 @@ JNIEXPORT void JNICALL Java_org_fullstacked_MainActivity_removeCallback
         (JNIEnv * env, jobject thiz, jint id) {
     __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.core", "remove callback");
 
+    std::lock_guard<std::mutex> lock(respondersMutex);
     for (size_t i = 0; i < responders.size(); i++) {
         if (responders.at(i).id == id) {
             env->DeleteGlobalRef(responders.at(i).activity);

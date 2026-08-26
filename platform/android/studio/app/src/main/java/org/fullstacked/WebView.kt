@@ -84,7 +84,20 @@ class FullStackedWebView(
 
     @JavascriptInterface
     fun open(targetCtxId: Int) {
-        ctx.openContextWindow(targetCtxId)
+        val mainLooper = Looper.getMainLooper()
+        val handler = Handler(mainLooper)
+        handler.post {
+            ctx.openContextWindow(targetCtxId)
+        }
+    }
+
+    @JavascriptInterface
+    fun openUrl(url: String) {
+        val mainLooper = Looper.getMainLooper()
+        val handler = Handler(mainLooper)
+        handler.post {
+            ctx.openUrl(this, url)
+        }
     }
 
     @JavascriptInterface
@@ -128,11 +141,11 @@ class FullStackedWebView(
     }
 
     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-        if (request?.url?.host == "localhost") {
+        val url = request?.url ?: return super.shouldOverrideUrlLoading(view, request)
+        if (url.host == "localhost") {
             return super.shouldOverrideUrlLoading(view, request)
         }
-        val intent = Intent(Intent.ACTION_VIEW, request?.url)
-        startActivity(this.ctx, intent, null)
+        ctx.openUrl(this, url.toString())
         return true
     }
 
@@ -265,13 +278,38 @@ fun createWebView(delegate: FullStackedWebView): WebView {
             } catch (_: Exception) { }
             return true
         }
+
+        override fun onCreateWindow(
+            view: WebView?,
+            isDialog: Boolean,
+            isUserGesture: Boolean,
+            resultMsg: android.os.Message?
+        ): Boolean {
+            val transport = resultMsg?.obj as? WebView.WebViewTransport
+            val tempWebView = WebView(delegate.ctx)
+            tempWebView.webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                    val url = request?.url?.toString()
+                    if (url != null) {
+                        delegate.ctx.openUrl(delegate, url)
+                    }
+                    return true
+                }
+            }
+            transport?.webView = tempWebView
+            resultMsg?.sendToTarget()
+            return true
+        }
     }
+    webView.isFocusable = true
+    webView.isFocusableInTouchMode = true
     webView.settings.javaScriptEnabled = true
+    webView.settings.javaScriptCanOpenWindowsAutomatically = true
+    webView.settings.setSupportMultipleWindows(true)
+    webView.settings.domStorageEnabled = true
+    webView.settings.databaseEnabled = true
     webView.loadUrl("http://localhost")
     webView.addJavascriptInterface(delegate, "android")
-    webView.addJavascriptInterface(delegate, "bridge")
-    webView.addJavascriptInterface(delegate, "open")
-    webView.addJavascriptInterface(delegate, "exit")
 
     return webView
 }

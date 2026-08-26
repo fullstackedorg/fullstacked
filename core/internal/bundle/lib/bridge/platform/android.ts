@@ -7,6 +7,7 @@ declare global {
         coreCall?: (payloadBase64: string) => string;
         open?: (ctx: number) => void;
         exit?: () => void;
+        openUrl?: (url: string) => void;
     };
 }
 
@@ -43,6 +44,12 @@ export async function BridgeAndroidInit(): Promise<PlatformBridge> {
 
         globalThis.fullstacked.open = (ctx: number) =>
             globalThis.android?.open?.(ctx);
+
+
+        globalThis.open = (url: string | URL) => {
+            globalThis.android?.openUrl?.(url.toString());
+            return null;
+        };
     }
 
     return {

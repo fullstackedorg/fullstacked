@@ -280,6 +280,11 @@ func getCorePayloadStream(ctx *types.Context, id uint8, size int) ([]byte, error
 		headerByte = 1
 	}
 
+	if size <= 0 || len(stream.Buffer) < size-1 {
+		ctx.StreamsMutex.Unlock()
+		return nil, errors.New("stream buffer too small")
+	}
+
 	buffer, err := serialization.MergeBuffers([]byte{headerByte}, stream.Buffer[0:size-1])
 
 	if err != nil {

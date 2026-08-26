@@ -1,5 +1,5 @@
 plugins {
-    id("com.android.application") version "9.3.1"
+    id("com.android.application") version "9.3.2"
     id("org.jetbrains.kotlin.plugin.compose") version "2.4.10"
 }
 
@@ -13,7 +13,7 @@ extensions.configure<com.android.build.api.dsl.ApplicationExtension> {
         applicationId = "org.fullstacked"
         minSdk = 29
         targetSdk = 37
-        versionCode = 1175
+        versionCode = 1768
         versionName = "1.0.0"
 
         vectorDrawables {
@@ -85,5 +85,6 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.browser)
     debugImplementation(libs.androidx.ui.tooling)
 }
