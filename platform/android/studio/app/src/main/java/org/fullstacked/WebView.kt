@@ -26,7 +26,6 @@ class FullStackedWebView(
     val ctx: MainActivity,
     val ctxId: Byte = 0
 ) : WebViewClient() {
-    val webView: WebView = createWebView(this)
     var firstContact = false
     val messageToBeSent = mutableListOf<Pair<String, String>>()
 
@@ -39,6 +38,8 @@ class FullStackedWebView(
             Core.startMain(ctx.getRootPath(), ctx.getMainLocation(), c)
         }
     }
+
+    val webView: WebView = createWebView(this)
 
     fun resolveSyncAwaiter(id: Int, payloadBase64: String) {
         val resolve = syncAwaitersResolve.remove(id)
@@ -134,6 +135,7 @@ class FullStackedWebView(
     }
 
     fun destroyView() {
+        AuthManager.clearAuthSession(ctx, this)
         val c = ctxId.toInt() and 0xFF
         Core.stop(c)
         (webView.parent as? ViewGroup)?.removeView(webView)
@@ -293,6 +295,7 @@ fun createWebView(delegate: FullStackedWebView): WebView {
                     if (url != null) {
                         delegate.ctx.openUrl(delegate, url)
                     }
+                    tempWebView.destroy()
                     return true
                 }
             }
@@ -308,8 +311,8 @@ fun createWebView(delegate: FullStackedWebView): WebView {
     webView.settings.setSupportMultipleWindows(true)
     webView.settings.domStorageEnabled = true
     webView.settings.databaseEnabled = true
-    webView.loadUrl("http://localhost")
     webView.addJavascriptInterface(delegate, "android")
+    webView.loadUrl("http://localhost")
 
     return webView
 }

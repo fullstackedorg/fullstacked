@@ -8,6 +8,8 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.ViewGroup
 import android.webkit.ValueCallback
@@ -77,14 +79,16 @@ class MainActivity : ComponentActivity() {
         this.setDirectories()
 
         val providedCtxId = if (intent.hasExtra(EXTRA_CTX_ID)) {
-            intent.getIntExtra(EXTRA_CTX_ID, -1)
+            val id = intent.getIntExtra(EXTRA_CTX_ID, -1)
+            if (id >= 0) id else null
         } else {
             val data: Uri? = intent?.data
             if (data != null && data.toString().isNotEmpty()) {
                 val urlStr = data.toString()
-                if (urlStr.startsWith("fullstacked://")) {
-                    val path = urlStr.removePrefix("fullstacked://")
-                    path.toIntOrNull()
+                if (urlStr.startsWith("fullstacked-ctx://") || urlStr.startsWith("fullstacked-ctx:")) {
+                    val path = urlStr.removePrefix("fullstacked-ctx://").removePrefix("fullstacked-ctx:")
+                    val candidate = path.substringBefore('?').substringBefore('#').trimStart('/')
+                    candidate.toIntOrNull()
                 } else {
                     null
                 }
@@ -106,6 +110,8 @@ class MainActivity : ComponentActivity() {
             this.stackedWebViews.add(webView)
         }
 
+        AuthManager.registerActivity(this)
+
         this.updateActiveContentView()
         this.handleIntent(intent)
 
@@ -114,58 +120,68 @@ class MainActivity : ComponentActivity() {
         }.isEnabled = true
     }
 
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var pendingCancelRunnable: Runnable? = null
+
+    override fun onResume() {
+        super.onResume()
+        pendingCancelRunnable?.let { mainHandler.removeCallbacks(it) }
+        val r = Runnable {
+            AuthManager.cancelAuthSessionIfPending(this)
+        }
+        pendingCancelRunnable = r
+        mainHandler.postDelayed(r, 600)
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        pendingCancelRunnable?.let { mainHandler.removeCallbacks(it) }
         setIntent(intent)
         handleIntent(intent)
     }
 
     private fun handleIntent(intent: Intent?) {
         val data: Uri = intent?.data ?: return
-        val urlStr = data.toString()
-        if (!urlStr.startsWith("fullstacked://")) return
+        if (AuthManager.isAuthRedirect(data)) {
+            AuthManager.handleAuthRedirect(data)
+            return
+        }
 
-        val path = urlStr.removePrefix("fullstacked://")
-        val ctxId = path.toIntOrNull() ?: if (intent.hasExtra(EXTRA_CTX_ID)) intent.getIntExtra(EXTRA_CTX_ID, -1) else null
+        val urlStr = data.toString()
+        if (!urlStr.startsWith("fullstacked-ctx://") && !urlStr.startsWith("fullstacked-ctx:")) return
+
+        val pathWithoutScheme = urlStr.removePrefix("fullstacked-ctx://").removePrefix("fullstacked-ctx:")
+        val candidate = pathWithoutScheme.substringBefore('?').substringBefore('#').trimStart('/')
+        val ctxId = candidate.toIntOrNull() ?: if (intent.hasExtra(EXTRA_CTX_ID)) intent.getIntExtra(EXTRA_CTX_ID, -1) else null
         if (ctxId != null && ctxId >= 0) {
             val exists = stackedWebViews.any { (it.ctxId.toInt() and 0xFF) == ctxId }
             if (!exists) {
                 val webView = FullStackedWebView(this, ctxId = ctxId.toByte())
                 addStackedProject(webView)
             }
-            return
-        }
-
-        val targetWebView = activeAuthWebView ?: stackedWebViews.lastOrNull() ?: return
-        activeAuthWebView = null
-
-        val query = data.query ?: data.fragment ?: ""
-        val error = data.getQueryParameter("error")
-
-        if (error != null) {
-            val escapedError = error.replace("\\", "\\\\").replace("`", "\\`")
-            targetWebView.webView.evaluateJavascript(
-                "window.postMessage(new Error(`$escapedError`), \"*\")",
-                null
-            )
-        } else {
-            val escapedQuery = query.replace("\\", "\\\\").replace("`", "\\`")
-            targetWebView.webView.evaluateJavascript(
-                "window.postMessage(Object.fromEntries(new URLSearchParams(`$escapedQuery`)), \"*\")",
-                null
-            )
         }
     }
 
+    private var lastOpenUrlTime: Long = 0L
+    private var lastOpenUrl: String? = null
+    private var lastAuthOpenTime: Long = 0L
+
     fun openAuthSession(originatingWebView: FullStackedWebView, uri: Uri) {
+        val now = System.currentTimeMillis()
+        if (now - lastAuthOpenTime < 1000L) {
+            return
+        }
+        lastAuthOpenTime = now
+
         activeAuthWebView = originatingWebView
+        AuthManager.registerAuthSession(this, originatingWebView)
 
         var builder = uri.buildUpon()
         if (uri.getQueryParameter("auth") == null) {
             builder = builder.appendQueryParameter("auth", "1")
         }
-        if (uri.getQueryParameter("apple") == null) {
-            builder = builder.appendQueryParameter("apple", "1")
+        if (uri.getQueryParameter("android") == null) {
+            builder = builder.appendQueryParameter("android", "1")
         }
         val authUri = builder.build()
 
@@ -183,7 +199,25 @@ class MainActivity : ComponentActivity() {
 
     fun openUrl(originatingWebView: FullStackedWebView? = null, url: String) {
         runOnUiThread {
+            val now = System.currentTimeMillis()
+            if (url == lastOpenUrl && now - lastOpenUrlTime < 1000L) {
+                return@runOnUiThread
+            }
+            lastOpenUrl = url
+            lastOpenUrlTime = now
+
             val uri = Uri.parse(url)
+            val scheme = uri.scheme?.lowercase()
+            if (scheme == "fullstacked-ctx") {
+                val pathWithoutScheme = url.removePrefix("fullstacked-ctx://").removePrefix("fullstacked-ctx:")
+                val candidate = pathWithoutScheme.substringBefore('?').substringBefore('#').trimStart('/')
+                val targetCtx = candidate.toIntOrNull()
+                if (targetCtx != null && targetCtx >= 0) {
+                    openContextWindow(targetCtx)
+                    return@runOnUiThread
+                }
+            }
+
             val isAuthRequest = uri.getQueryParameter("auth") != null
             val targetWebView = originatingWebView ?: stackedWebViews.lastOrNull()
 
@@ -198,6 +232,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        AuthManager.unregisterActivity(this)
         try {
             removeCallback(callbackId)
         } catch (e: Exception) {
@@ -282,7 +317,11 @@ class MainActivity : ComponentActivity() {
     fun updateActiveContentView() {
         val currentWebView = stackedWebViews.lastOrNull()
         if (currentWebView == null) {
-            finish()
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                finishAndRemoveTask()
+            } else {
+                finish()
+            }
             return
         }
 
@@ -370,13 +409,31 @@ class MainActivity : ComponentActivity() {
             if (useMultiWindow()) {
                 val intent = Intent(this, MainActivity::class.java).apply {
                     action = Intent.ACTION_VIEW
-                    data = Uri.parse("fullstacked://$targetCtxId")
+                    data = Uri.parse("fullstacked-ctx://$targetCtxId")
                     putExtra(EXTRA_CTX_ID, targetCtxId)
-                    addFlags(Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT)
                     addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT)
                 }
-                startActivity(intent)
+
+                val options = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    val currentDisplayId = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                        this.display?.displayId ?: android.view.Display.DEFAULT_DISPLAY
+                    } else {
+                        @Suppress("DEPRECATION")
+                        windowManager.defaultDisplay.displayId
+                    }
+                    android.app.ActivityOptions.makeBasic().apply {
+                        setLaunchDisplayId(currentDisplayId)
+                    }.toBundle()
+                } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                    android.app.ActivityOptions.makeBasic().toBundle()
+                } else {
+                    null
+                }
+
+                startActivity(intent, options)
             } else {
                 val stacked = FullStackedWebView(this, ctxId = targetCtxId.toByte())
                 addStackedProject(stacked)
@@ -387,6 +444,18 @@ class MainActivity : ComponentActivity() {
     fun addStackedProject(stackedWebView: FullStackedWebView) {
         this.stackedWebViews.add(stackedWebView)
         this.updateActiveContentView()
+    }
+
+    fun bringStackedProjectToFront(target: FullStackedWebView) {
+        runOnUiThread {
+            if (stackedWebViews.contains(target)) {
+                if (stackedWebViews.lastOrNull() != target) {
+                    stackedWebViews.remove(target)
+                    stackedWebViews.add(target)
+                    updateActiveContentView()
+                }
+            }
+        }
     }
 
     fun removeStackedProject(target: FullStackedWebView? = null) {
@@ -419,33 +488,131 @@ class MainActivity : ComponentActivity() {
     }
 
     fun useMultiWindow(): Boolean {
-        val config = this.resources.configuration
-        try {
-            val configClass: Class<*> = config.javaClass
-            val enabled = (configClass.getField("SEM_DESKTOP_MODE_ENABLED").getInt(configClass)
-                    == configClass.getField("semDesktopModeEnabled").getInt(config))
-            if (enabled) {
-                return true
-            }
-        } catch (_: Exception) {
-        }
+        return isChromebook() || isSamsungDexActive()
+    }
 
+    private fun isChromebook(): Boolean {
         if (this.packageManager.hasSystemFeature("org.chromium.arc") ||
-            this.packageManager.hasSystemFeature("org.chromium.arc.device_management")
+            this.packageManager.hasSystemFeature("org.chromium.arc.device_management") ||
+            this.packageManager.hasSystemFeature("org.chromium.arc.intent_helper")
         ) {
             return true
         }
+        val brand = android.os.Build.BRAND ?: ""
+        val manufacturer = android.os.Build.MANUFACTURER ?: ""
+        val device = android.os.Build.DEVICE ?: ""
+        if (device.contains("cheets", ignoreCase = true) ||
+            brand.equals("chromium", ignoreCase = true) ||
+            manufacturer.equals("Chromium", ignoreCase = true) ||
+            (brand.equals("google", ignoreCase = true) && device.contains("chrome", ignoreCase = true))
+        ) {
+            return true
+        }
+        return false
+    }
 
+    private fun isSamsungDexActive(): Boolean {
+        val config = this.resources.configuration
+
+        // 1. Desk UI Mode on Configuration or UiModeManager (Samsung DeX sets UI_MODE_TYPE_DESK)
+        if ((config.uiMode and Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_DESK) {
+            return true
+        }
         val uim = this.getSystemService(UI_MODE_SERVICE) as? UiModeManager
         if (uim?.currentModeType == Configuration.UI_MODE_TYPE_DESK) {
             return true
         }
 
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N && this.isInMultiWindowMode) {
-            return true
-        }
+        // 2. Samsung DeX Mode check via semDesktopModeEnabled (1 = standalone, 2 = dual/external)
+        try {
+            val configClass: Class<*> = config.javaClass
+            val field = configClass.getDeclaredField("semDesktopModeEnabled")
+            field.isAccessible = true
+            val value = field.getInt(config)
+            if (value == 1 || value == 2) {
+                return true
+            }
+        } catch (_: Exception) { }
 
-        val screenLayout = this.resources.configuration.screenLayout and Configuration.SCREENLAYOUT_SIZE_MASK
-        return screenLayout > Configuration.SCREENLAYOUT_SIZE_NORMAL
+        // 3. Samsung DeX via semIsDesktopMode() method
+        try {
+            val method = config.javaClass.getDeclaredMethod("semIsDesktopMode")
+            method.isAccessible = true
+            val result = method.invoke(config) as? Boolean
+            if (result == true) {
+                return true
+            }
+        } catch (_: Exception) { }
+
+        // 4. Samsung DesktopModeManager service state
+        try {
+            val desktopModeManager = getSystemService("desktopmode")
+            if (desktopModeManager != null) {
+                val method = desktopModeManager.javaClass.getMethod("getDesktopModeState")
+                val state = method.invoke(desktopModeManager)
+                if (state != null) {
+                    val stateStr = state.toString().uppercase()
+                    val getEnabledMethod = state.javaClass.getMethod("getEnabled")
+                    val enabled = getEnabledMethod.invoke(state) as? Int
+                    val isEnabledVal = enabled != null && enabled != 0 && enabled != -1
+                    if (isEnabledVal && (stateStr.contains("ENABLE") || stateStr.contains("DUAL") || stateStr.contains("STANDALONE") || stateStr.contains("DEX"))) {
+                        return true
+                    }
+                }
+            }
+        } catch (_: Exception) { }
+
+        // 5. Configuration string containing active desktop flags
+        try {
+            val configLower = config.toString().lowercase()
+            if (configLower.contains("desktop/e") ||
+                configLower.contains("semdesktopmodeenabled=1") ||
+                configLower.contains("semdesktopmodeenabled=2") ||
+                configLower.contains("dexmode=1") ||
+                configLower.contains("dexmode=2") ||
+                configLower.contains("dexmode=3")
+            ) {
+                return true
+            }
+        } catch (_: Exception) { }
+
+        // 6. Active Samsung DeX System / Global / Secure settings
+        try {
+            if (android.provider.Settings.System.getInt(contentResolver, "sem_desktop_mode_enabled", 0) in 1..2) return true
+            if (android.provider.Settings.Global.getInt(contentResolver, "sem_desktop_mode_enabled", 0) in 1..2) return true
+            if (android.provider.Settings.Secure.getInt(contentResolver, "sem_desktop_mode_enabled", 0) in 1..2) return true
+            if (android.provider.Settings.System.getInt(contentResolver, "desktop_mode", 0) in 1..2) return true
+            if (android.provider.Settings.Global.getInt(contentResolver, "desktop_mode", 0) in 1..2) return true
+            if (android.provider.Settings.Secure.getInt(contentResolver, "desktop_mode", 0) in 1..2) return true
+        } catch (_: Exception) { }
+
+        // 7. Samsung System Properties via reflection
+        try {
+            val systemProperties = Class.forName("android.os.SystemProperties")
+            val getProp = systemProperties.getMethod("get", String::class.java)
+            val dexProp = (getProp.invoke(null, "sys.desktop.mode") as? String)?.lowercase()
+            if (dexProp == "1" || dexProp == "true" || dexProp == "dual" || dexProp == "standalone" || dexProp == "dex") {
+                return true
+            }
+        } catch (_: Exception) { }
+
+        // 8. Secondary display check on Samsung devices (external monitor / wireless DeX)
+        try {
+            val isSamsung = android.os.Build.MANUFACTURER?.contains("samsung", ignoreCase = true) == true ||
+                android.os.Build.BRAND?.contains("samsung", ignoreCase = true) == true
+            if (isSamsung) {
+                val display = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    this.display
+                } else {
+                    @Suppress("DEPRECATION")
+                    windowManager.defaultDisplay
+                }
+                if (display != null && display.displayId != android.view.Display.DEFAULT_DISPLAY) {
+                    return true
+                }
+            }
+        } catch (_: Exception) { }
+
+        return false
     }
 }
