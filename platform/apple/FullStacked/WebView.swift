@@ -131,11 +131,11 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         if let url = navigationAction.request.url {
             var urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: false)
             if (urlComponents?.queryItems?.first(where: { $0.name == "auth" })?.value) != nil {
-                urlComponents?.queryItems?.append(URLQueryItem(name: "apple", value: "1"))
+                urlComponents?.queryItems?.append(URLQueryItem(name: "native", value: "1"))
 
-                let appleUrl = urlComponents?.url!
+                let authUrl = urlComponents?.url!
                 // Initialize the session.
-                let session = ASWebAuthenticationSession(url: appleUrl!, callbackURLScheme: "fullstacked")
+                let session = ASWebAuthenticationSession(url: authUrl!, callbackURLScheme: "fullstacked")
                 { callbackURL, error in
                     DispatchQueue.main.async {
                         if(error != nil) {

@@ -180,8 +180,8 @@ class MainActivity : ComponentActivity() {
         if (uri.getQueryParameter("auth") == null) {
             builder = builder.appendQueryParameter("auth", "1")
         }
-        if (uri.getQueryParameter("android") == null) {
-            builder = builder.appendQueryParameter("android", "1")
+        if (uri.getQueryParameter("native") == null) {
+            builder = builder.appendQueryParameter("native", "1")
         }
         val authUri = builder.build()
 
