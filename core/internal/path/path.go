@@ -122,7 +122,7 @@ func ResolveWithContext(ctx *types.Context, paths ...string) string {
 
 	if ctx != nil && rootDir != "" {
 		rel, err := filepath.Rel(rootDir, resolved)
-		if err != nil || strings.HasPrefix(rel, "..") {
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || strings.HasPrefix(rel, "../") {
 			return rootDir
 		}
 	}
@@ -139,21 +139,52 @@ func DataToStringSlice(data ...types.DeserializedData) []string {
 }
 
 func ParsePath(path string) ParsedPath {
-	path = strings.TrimRight(path, "/")
+	isAbs := filepath.IsAbs(path) || strings.HasPrefix(path, "/") || strings.HasPrefix(path, "\\")
+	trimmed := strings.TrimRight(path, "/\\")
 
 	parsed := ParsedPath{
 		Root: "",
 		Dir:  "",
+		Base: "",
+		Name: "",
+		Ext:  "",
 	}
-	parsed.Base = filepath.Base(path)
-	if len(path) > len(parsed.Base) {
-		parsed.Dir = path[:len(path)-len(parsed.Base)-1]
-	}
-	parsed.Ext = filepath.Ext(path)
-	parsed.Name = strings.TrimSuffix(parsed.Base, parsed.Ext)
 
-	if filepath.IsAbs(path) || strings.HasPrefix(path, "/") {
+	if isAbs {
 		parsed.Root = "/"
 	}
+
+	if trimmed == "" {
+		if isAbs {
+			parsed.Dir = "/"
+		}
+		return parsed
+	}
+
+	parsed.Base = filepath.Base(trimmed)
+	if len(trimmed) > len(parsed.Base) {
+		dir := strings.TrimRight(trimmed[:len(trimmed)-len(parsed.Base)], "/\\")
+		if dir == "" && isAbs {
+			dir = "/"
+		}
+		parsed.Dir = dir
+	} else if isAbs {
+		parsed.Dir = "/"
+	}
+
+	if parsed.Base == "." || parsed.Base == ".." {
+		parsed.Name = parsed.Base
+		parsed.Ext = ""
+	} else {
+		idx := strings.LastIndex(parsed.Base, ".")
+		if idx <= 0 {
+			parsed.Name = parsed.Base
+			parsed.Ext = ""
+		} else {
+			parsed.Ext = parsed.Base[idx:]
+			parsed.Name = parsed.Base[:idx]
+		}
+	}
+
 	return parsed
 }

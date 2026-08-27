@@ -87,7 +87,10 @@ export function extname(path: string) {
 }
 
 export function dirname(path: string) {
-    return parse(path).dir;
+    const parsed = parse(path);
+    if (parsed.dir) return parsed.dir;
+    if (parsed.root) return parsed.root;
+    return ".";
 }
 
 export function basename(path: string, suffix?: string) {

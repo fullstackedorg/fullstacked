@@ -13,7 +13,7 @@ extensions.configure<com.android.build.api.dsl.ApplicationExtension> {
         applicationId = "org.fullstacked"
         minSdk = 29
         targetSdk = 37
-        versionCode = 1768
+        versionCode = 1774
         versionName = "1.0.0"
 
         vectorDrawables {

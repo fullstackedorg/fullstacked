@@ -39,6 +39,22 @@ suite("path - e2e", () => {
             path.parse("platform/.././node/package.json"),
             nodePath.parse("platform/.././node/package.json")
         );
+        assert.deepEqual(
+            path.parse("/"),
+            nodePath.posix.parse("/")
+        );
+        assert.deepEqual(
+            path.parse(""),
+            nodePath.posix.parse("")
+        );
+        assert.deepEqual(
+            path.parse("/foo"),
+            nodePath.posix.parse("/foo")
+        );
+        assert.deepEqual(
+            path.parse("foo"),
+            nodePath.posix.parse("foo")
+        );
     });
 
     test("extname", () => {
@@ -56,12 +72,30 @@ suite("path - e2e", () => {
             path.extname(".index.md"),
             nodePath.extname(".index.md")
         );
+        assert.deepEqual(path.extname("/"), nodePath.posix.extname("/"));
+        assert.deepEqual(path.extname(""), nodePath.posix.extname(""));
     });
 
     test("dirname", () => {
         assert.deepEqual(
             path.dirname("/foo/bar/baz/asdf/quux"),
             nodePath.dirname("/foo/bar/baz/asdf/quux")
+        );
+        assert.deepEqual(
+            path.dirname("/foo"),
+            nodePath.posix.dirname("/foo")
+        );
+        assert.deepEqual(
+            path.dirname("/"),
+            nodePath.posix.dirname("/")
+        );
+        assert.deepEqual(
+            path.dirname(""),
+            nodePath.posix.dirname("")
+        );
+        assert.deepEqual(
+            path.dirname("foo"),
+            nodePath.posix.dirname("foo")
         );
     });
 
@@ -73,6 +107,18 @@ suite("path - e2e", () => {
         assert.deepEqual(
             path.basename("/foo/bar/baz/asdf/quux.html", ".html"),
             nodePath.basename("/foo/bar/baz/asdf/quux.html", ".html")
+        );
+        assert.deepEqual(
+            path.basename("/"),
+            nodePath.posix.basename("/")
+        );
+        assert.deepEqual(
+            path.basename(""),
+            nodePath.posix.basename("")
+        );
+        assert.deepEqual(
+            path.basename("/foo/bar/"),
+            nodePath.posix.basename("/foo/bar/")
         );
     });
 
