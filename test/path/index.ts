@@ -130,5 +130,17 @@ suite("path - e2e", () => {
                 "/data/orandea/impl/bbb"
             )
         );
+        if (process.platform === "win32") {
+            assert.deepEqual(
+                path.relative(
+                    "C:\\Users\\lepag\\fullstackedorg\\fullstacked",
+                    "/C:/Users/lepag/fullstackedorg/fullstacked/node_modules/@fullstacked/tailwindcss/index.js.js"
+                ),
+                nodePath.relative(
+                    "C:\\Users\\lepag\\fullstackedorg\\fullstacked",
+                    "C:/Users/lepag/fullstackedorg/fullstacked/node_modules/@fullstacked/tailwindcss/index.js.js"
+                )
+            );
+        }
     });
 });

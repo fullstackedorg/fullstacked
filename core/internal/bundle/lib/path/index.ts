@@ -25,7 +25,13 @@ const constants = {
     }
 };
 
+function cleanPath(p: string): string {
+    if (typeof p !== "string") return p;
+    return p.replace(/^[/\\]+(?=[a-zA-Z]:)/, "");
+}
+
 export function isAbsolute(path: string) {
+    path = cleanPath(path);
     return (
         path.startsWith("/") ||
         path.startsWith("\\") ||
@@ -34,6 +40,7 @@ export function isAbsolute(path: string) {
 }
 
 export function resolve(...paths: string[]): string {
+    paths = paths.map(cleanPath);
     if (paths[0].startsWith("build:")) {
         return paths.join(constants.sep);
     } else if (!isAbsolute(paths[0])) {
@@ -54,7 +61,7 @@ export function join(...paths: string[]): string {
         {
             mod: Path,
             fn: Join,
-            data: paths
+            data: paths.map(cleanPath)
         },
         true
     );
@@ -65,7 +72,7 @@ export function normalize(path: string): string {
         {
             mod: Path,
             fn: Normalize,
-            data: [path]
+            data: [cleanPath(path)]
         },
         true
     );
@@ -76,7 +83,7 @@ export function parse(path: string): ParsedPath {
         {
             mod: Path,
             fn: Parse,
-            data: [path]
+            data: [cleanPath(path)]
         },
         true
     );
@@ -108,7 +115,7 @@ export function relative(from: string, to: string) {
         {
             mod: Path,
             fn: Relative,
-            data: [from, to]
+            data: [cleanPath(from), cleanPath(to)]
         },
         true
     );
