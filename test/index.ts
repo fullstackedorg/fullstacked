@@ -23,6 +23,7 @@ let tests = [
     "./git/index.ts",
     "./packages/index.ts",
     "./worker/index.ts",
+    "./readline/index.ts",
     "./fullstacked/index.ts"
 ];
 

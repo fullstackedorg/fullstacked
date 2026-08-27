@@ -57,6 +57,8 @@ var libModules = map[string]string{
 	"plugin":              "/lib/plugin/index.ts",
 	"process":             "/lib/process/index.ts",
 	"querystring":         "/lib/querystring/index.ts",
+	"readline":            "/lib/readline/index.ts",
+	"readline/promises":   "/lib/readline/promises.ts",
 	"run":                 "/lib/run/index.ts",
 	"stream":              "/lib/stream/index.js",
 	"stream/web":          "/lib/unavailable/index.js",

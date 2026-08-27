@@ -3,8 +3,10 @@ package os
 import (
 	"encoding/binary"
 	"errors"
+	"fullstackedorg/fullstacked/internal/path"
 	"fullstackedorg/fullstacked/types"
 	"os"
+	"path/filepath"
 	"runtime"
 )
 
@@ -16,6 +18,7 @@ const (
 	Endieness OsFn = 2
 	Uname     OsFn = 3
 	Hostname  OsFn = 4
+	Tmpdir    OsFn = 5
 )
 
 func Switch(
@@ -56,6 +59,23 @@ func Switch(
 		}
 		response.Type = types.CoreResponseData
 		response.Data = hostname
+		return nil
+	case Tmpdir:
+		rootDir := "."
+		if ctx != nil && ctx.Directories.Root != "" {
+			rootDir = ctx.Directories.Root
+		}
+		tmpDir := filepath.Join(rootDir, ".tmp")
+		err := os.MkdirAll(tmpDir, 0755)
+		if err != nil {
+			return err
+		}
+		response.Type = types.CoreResponseData
+		if ctx != nil && ctx.Directories.Root != "" {
+			response.Data = path.RelativeToRoot(ctx, tmpDir)
+		} else {
+			response.Data = ".tmp"
+		}
 		return nil
 	}
 

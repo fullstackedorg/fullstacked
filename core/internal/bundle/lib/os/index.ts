@@ -6,6 +6,7 @@ import {
     Endieness,
     Hostname,
     Platform,
+    Tmpdir,
     Uname,
     UnameInfo
 } from "../@types/os.ts";
@@ -92,11 +93,23 @@ export function hostname(): string {
     return cache.hostname;
 }
 
+export function tmpdir(): string {
+    return globalThis.fullstacked.bridge(
+        {
+            mod: Os,
+            fn: Tmpdir
+        },
+        true
+    );
+}
+
 export default {
     platform,
     arch,
     endianness,
     release,
     type,
-    hostname
+    hostname,
+    tmpdir
 };
+

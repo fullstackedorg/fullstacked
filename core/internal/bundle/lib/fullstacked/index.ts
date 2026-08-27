@@ -7,6 +7,7 @@ import path from "../path/index.ts";
 import fs from "../fs/index.ts";
 import version from "../process/version.json" with { type: "json" };
 import os from "../os/index.ts";
+import { getActiveInterfaces, waitForInterfaces } from "../readline/interface.ts";
 
 export interface ExecuteOptions {
     stdio?: any[];
@@ -332,7 +333,11 @@ async function runFile(
     );
     if (!res) return 1;
 
-    await res.cleanup();
+    try {
+        await waitForInterfaces();
+    } finally {
+        await res.cleanup();
+    }
     return 0;
 }
 
@@ -499,7 +504,7 @@ Description:
 
 Options:
   -v, --version Display the current version
-  -p, --port    Define the main starting port (defaults to 9000)
+  --port        Define the main starting port (defaults to 9000)
   -p, --plugin  Specify a plugin for the build process (can be used multiple times)
   -e, --env     Define environment variables in KEY=VALUE format (can be used multiple times)
   -o, --open    Directly open the browser
@@ -547,9 +552,13 @@ Directory:
     );
 }
 
+export { getActiveInterfaces, waitForInterfaces } from "../readline/interface.ts";
+
 const fullstacked = {
     execute,
-    validateCommand
+    validateCommand,
+    getActiveInterfaces,
+    waitForInterfaces
 };
 
 export default fullstacked;

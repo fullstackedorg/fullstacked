@@ -206,12 +206,43 @@ export function umask() {
     return 0;
 }
 
-export const stdout = {
-    isTTY: false
+const defaultStdout = {
+    isTTY: false,
+    write(chunk: any, encoding?: any, cb?: any) {
+        if (typeof encoding === "function") cb = encoding;
+        if (typeof chunk === "string") console.log(chunk);
+        if (cb) cb();
+        return true;
+    }
 };
-export const stderr = {
-    isTTY: false
+
+const defaultStderr = {
+    isTTY: false,
+    write(chunk: any, encoding?: any, cb?: any) {
+        if (typeof encoding === "function") cb = encoding;
+        if (typeof chunk === "string") console.error(chunk);
+        if (cb) cb();
+        return true;
+    }
 };
+
+const defaultStdin = {
+    isTTY: false,
+    on: noop,
+    addListener: noop,
+    once: noop,
+    off: noop,
+    removeListener: noop,
+    removeAllListeners: noop,
+    emit: noop,
+    pause: noop,
+    resume: noop
+};
+
+const gProcess = (globalThis as any).process;
+export const stdout = gProcess?.stdout || defaultStdout;
+export const stderr = gProcess?.stderr || defaultStderr;
+export const stdin = gProcess?.stdin || defaultStdin;
 
 export const on = noop;
 export const addListener = noop;
@@ -258,6 +289,7 @@ export const process = {
     umask,
     hrtime,
     exit,
+    stdin,
     stdout,
     stderr
 };
