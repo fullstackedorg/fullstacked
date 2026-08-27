@@ -19,6 +19,7 @@ namespace FullStacked
 
         private static byte[] notFoundPayload = Encoding.UTF8.GetBytes("Not Found");
 
+        private readonly object syncLock = new();
         private Dictionary<byte, TaskCompletionSource<byte[]>> syncAwaitersResolve = [];
         private Dictionary<byte, byte[]> syncAwaitersPayload = [];
         public WebView(byte ctx)
@@ -49,13 +50,16 @@ namespace FullStacked
                 // Sync
                 if (data[4] == 1)
                 {
-                    if (this.syncAwaitersResolve.ContainsKey(id))
+                    lock (this.syncLock)
                     {
-                        this.syncAwaitersResolve[id].SetResult(response);
-                    }
-                    else
-                    {
-                        this.syncAwaitersPayload.Add(id, response);
+                        if (this.syncAwaitersResolve.ContainsKey(id))
+                        {
+                            this.syncAwaitersResolve[id].SetResult(response);
+                        }
+                        else
+                        {
+                            this.syncAwaitersPayload[id] = response;
+                        }
                     }
                 }
                 // Async
@@ -109,19 +113,37 @@ namespace FullStacked
                     };
 
 
-                    if (this.syncAwaitersPayload.ContainsKey(id))
+                    byte[] cachedPayload = null;
+                    lock (this.syncLock)
                     {
-                        sendCallback(this.syncAwaitersPayload[id]);
-                        this.syncAwaitersPayload.Remove(id);
+                        if (this.syncAwaitersPayload.ContainsKey(id))
+                        {
+                            cachedPayload = this.syncAwaitersPayload[id];
+                            this.syncAwaitersPayload.Remove(id);
+                        }
+                    }
+
+                    if (cachedPayload != null)
+                    {
+                        sendCallback(cachedPayload);
                     }
                     else
                     {
                         using (args.GetDeferral())
                         {
-                            TaskCompletionSource<byte[]> resolve = new();
-                            this.syncAwaitersResolve.Add(id, resolve);
+                            TaskCompletionSource<byte[]> resolve = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                            lock (this.syncLock)
+                            {
+                                this.syncAwaitersResolve[id] = resolve;
+                            }
+
                             byte[] awaitedPayload = await resolve.Task;
-                            this.syncAwaitersResolve.Remove(id);
+
+                            lock (this.syncLock)
+                            {
+                                this.syncAwaitersResolve.Remove(id);
+                            }
+
                             sendCallback(awaitedPayload);
                         }
                     }
@@ -130,90 +152,106 @@ namespace FullStacked
                 } else if (pathname.StartsWith("/resize")) {
                     var queryParams = this.parseQueryParams(uri);
 
-                    if (queryParams.TryGetValue("size", out string sizeVal) && !string.IsNullOrEmpty(sizeVal))
+                    using (args.GetDeferral())
                     {
-                        if (sizeVal == "kiosk")
-                        {
-                            this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen);
-                            (stream, headers) = this.bufferToResponseStream([]);
-                            args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
-                        }
-                        else if (sizeVal == "fullscreen")
-                        {
-                            this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Default);
-                            var overlappedPresenter = this.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
-                            if (overlappedPresenter != null)
-                            {
-                                overlappedPresenter.Maximize();
-                            }
-                            (stream, headers) = this.bufferToResponseStream([]);
-                            args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
-                        }
-                        else
-                        {
-                            string[] parts = sizeVal.Split(':');
-                            if (parts.Length >= 2)
-                            {
-                                int w = int.Parse(parts[0]);
-                                int h = int.Parse(parts[1]);
+                        TaskCompletionSource<byte[]> resizeTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                        byte[] responseBuffer = [];
 
-                                if (this.AppWindow.Presenter.Kind == Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen)
+                        this.DispatcherQueue.TryEnqueue(() =>
+                        {
+                            try
+                            {
+                                if (queryParams.TryGetValue("size", out string sizeVal) && !string.IsNullOrEmpty(sizeVal))
                                 {
-                                    this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Default);
-                                }
-                                var overlappedPresenter = this.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
-                                if (overlappedPresenter != null && overlappedPresenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Maximized)
-                                {
-                                    overlappedPresenter.Restore();
-                                }
+                                    if (sizeVal == "kiosk")
+                                    {
+                                        this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen);
+                                    }
+                                    else if (sizeVal == "fullscreen")
+                                    {
+                                        this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Default);
+                                        var overlappedPresenter = this.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
+                                        if (overlappedPresenter != null)
+                                        {
+                                            overlappedPresenter.Maximize();
+                                        }
+                                    }
+                                    else
+                                    {
+                                        string[] parts = sizeVal.Split(':');
+                                        if (parts.Length >= 2)
+                                        {
+                                            int w = int.Parse(parts[0]);
+                                            int h = int.Parse(parts[1]);
 
-                                if (parts.Length == 4)
-                                {
-                                    int x = int.Parse(parts[2]);
-                                    int y = int.Parse(parts[3]);
-                                    this.AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(x, y, w, h));
+                                            if (this.AppWindow.Presenter.Kind == Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen)
+                                            {
+                                                this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Default);
+                                            }
+                                            var overlappedPresenter = this.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
+                                            if (overlappedPresenter != null && overlappedPresenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Maximized)
+                                            {
+                                                overlappedPresenter.Restore();
+                                            }
+
+                                            if (parts.Length == 4)
+                                            {
+                                                int x = int.Parse(parts[2]);
+                                                int y = int.Parse(parts[3]);
+                                                this.AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(x, y, w, h));
+                                            }
+                                            else
+                                            {
+                                                int currentW = this.AppWindow.Size.Width;
+                                                int currentH = this.AppWindow.Size.Height;
+                                                int currentX = this.AppWindow.Position.X;
+                                                int currentY = this.AppWindow.Position.Y;
+
+                                                int newX = currentX + (currentW - w) / 2;
+                                                int newY = currentY + (currentH - h) / 2;
+
+                                                this.AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(newX, newY, w, h));
+                                            }
+                                        }
+                                    }
+                                    responseBuffer = [];
                                 }
                                 else
                                 {
-                                    int currentW = this.AppWindow.Size.Width;
-                                    int currentH = this.AppWindow.Size.Height;
-                                    int currentX = this.AppWindow.Position.X;
-                                    int currentY = this.AppWindow.Position.Y;
+                                    string responseStr = "";
+                                    var overlappedPresenter = this.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
+                                    if (this.AppWindow.Presenter.Kind == Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen)
+                                    {
+                                        responseStr = "kiosk";
+                                    }
+                                    else if (overlappedPresenter != null && overlappedPresenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Maximized)
+                                    {
+                                        responseStr = "fullscreen";
+                                    }
+                                    else
+                                    {
+                                        int width = this.AppWindow.Size.Width;
+                                        int height = this.AppWindow.Size.Height;
+                                        int x = this.AppWindow.Position.X;
+                                        int y = this.AppWindow.Position.Y;
+                                        responseStr = $"{width}:{height}:{x}:{y}";
+                                    }
 
-                                    int newX = currentX + (currentW - w) / 2;
-                                    int newY = currentY + (currentH - h) / 2;
-
-                                    this.AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(newX, newY, w, h));
+                                    responseBuffer = Encoding.UTF8.GetBytes(responseStr);
                                 }
                             }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"Error during resize operation: {ex}");
+                            }
+                            finally
+                            {
+                                resizeTcs.SetResult(responseBuffer);
+                            }
+                        });
 
-                            (stream, headers) = this.bufferToResponseStream([]);
-                            args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
-                        }
-                    }
-                    else
-                    {
-                        string responseStr = "";
-                        var overlappedPresenter = this.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
-                        if (this.AppWindow.Presenter.Kind == Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen)
-                        {
-                            responseStr = "kiosk";
-                        }
-                        else if (overlappedPresenter != null && overlappedPresenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Maximized)
-                        {
-                            responseStr = "fullscreen";
-                        }
-                        else
-                        {
-                            int width = this.AppWindow.Size.Width;
-                            int height = this.AppWindow.Size.Height;
-                            int x = this.AppWindow.Position.X;
-                            int y = this.AppWindow.Position.Y;
-                            responseStr = $"{width}:{height}:{x}:{y}";
-                        }
-
-                        byte[] responseBuffer = Encoding.UTF8.GetBytes(responseStr);
-                        (stream, headers) = this.bufferToResponseStream(responseBuffer);
+                        byte[] resData = await resizeTcs.Task;
+                        (stream, headers) = this.bufferToResponseStream(resData);
                         args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
                     }
                     return;
@@ -284,9 +322,12 @@ namespace FullStacked
 
         public void onStreamData(byte streamId, byte[] data)
         {
-            this.webview.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.High, () =>
+            this.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.High, () =>
             {
-                _ = this.webview.CoreWebView2.ExecuteScriptAsync("window.fullstacked.onStreamData(" + streamId + ", `" + Convert.ToBase64String(data) + "`)");
+                if (this.webview?.CoreWebView2 != null)
+                {
+                    _ = this.webview.CoreWebView2.ExecuteScriptAsync("window.fullstacked.onStreamData(" + streamId + ", `" + Convert.ToBase64String(data) + "`)");
+                }
             });
         }
 

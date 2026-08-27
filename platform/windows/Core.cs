@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -21,6 +21,7 @@ namespace FullStacked
         public static byte[] platform = Encoding.UTF8.GetBytes("windows");
         CoreImplementation lib;
         CoreCallbackDelegate onStreamData;
+        private static CoreImplementation.CoreOnStreamData staticOnStreamDataDelegate;
 
         public Core(CoreCallbackDelegate onStreamData)
         {
@@ -38,7 +39,8 @@ namespace FullStacked
                     throw new Exception("Unsupported arch");
             }
 
-            this.lib.setOnStreamDataCore(onStreamDataCore);
+            staticOnStreamDataDelegate = onStreamDataCore;
+            this.lib.setOnStreamDataCore(staticOnStreamDataDelegate);
         }
 
         private byte[] strToBufferUTF8(string str) {
@@ -66,14 +68,21 @@ namespace FullStacked
 
         private static void onStreamDataCore(byte ctx, byte streamId, int size)
         {
-            byte[] data = new byte[size];
-
-            fixed (byte* ptr = data)
+            try
             {
-                App.core.lib.getCorePayloadCore(ctx, 2, streamId, ptr, size);
-            }
+                byte[] data = new byte[size];
 
-            App.core.onStreamData(ctx, streamId, data);
+                fixed (byte* ptr = data)
+                {
+                    App.core?.lib?.getCorePayloadCore(ctx, 2, streamId, ptr, size);
+                }
+
+                App.core?.onStreamData(ctx, streamId, data);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error in onStreamDataCore: {ex}");
+            }
         }
         public byte[] call(byte[] payload)
         {
@@ -94,3 +103,4 @@ namespace FullStacked
 
     }
 }
+
