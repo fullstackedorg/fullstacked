@@ -3,6 +3,7 @@ import test, { suite } from "node:test";
 import * as os from "../../core/internal/bundle/lib/os/index.ts";
 import nodeOs from "node:os";
 import nodeFs from "node:fs";
+import nodePath from "node:path";
 
 suite("os - e2e", () => {
     test("platform", () => {
@@ -24,9 +25,9 @@ suite("os - e2e", () => {
 
     test("tmpdir", () => {
         const tmp = os.tmpdir();
-        assert.strictEqual(tmp, ".tmp", "tmpdir should be relative to context root directory");
-        assert.ok(nodeFs.existsSync(tmp), ".tmp directory should exist");
-        assert.ok(nodeFs.statSync(tmp).isDirectory(), ".tmp should be a directory");
+        assert.strictEqual(tmp, "/.tmp", "tmpdir should be relative to context root directory");
+        assert.ok(nodeFs.existsSync(nodePath.join(process.cwd(), tmp)), ".tmp directory should exist");
+        assert.ok(nodeFs.statSync(nodePath.join(process.cwd(), tmp)).isDirectory(), ".tmp should be a directory");
     });
 });
 

@@ -6,10 +6,10 @@ import {
     Endieness,
     Hostname,
     Platform,
-    Tmpdir,
     Uname,
     UnameInfo
 } from "../@types/os.ts";
+import fs from "../fs/index.ts";
 
 const cache = {
     platform: null,
@@ -93,14 +93,12 @@ export function hostname(): string {
     return cache.hostname;
 }
 
+const tmpDirectory = "/.tmp";
 export function tmpdir(): string {
-    return globalThis.fullstacked.bridge(
-        {
-            mod: Os,
-            fn: Tmpdir
-        },
-        true
-    );
+    if (!fs.existsSync(tmpDirectory)) {
+        fs.mkdirSync(tmpDirectory);
+    }
+    return tmpDirectory;
 }
 
 export default {
