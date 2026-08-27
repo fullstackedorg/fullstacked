@@ -51,7 +51,14 @@ struct FullStackedApp: App {
 
     var body: some Scene {
         WindowGroup(id: "FullStacked", for: WebView.ID.self) { $id in
+            #if os(iOS)
+            let isFull = isFullScreen(size: self.windowSize, windowScene: self.webViewStore.getScene(for: id))
+            #else
+            let isFull = true
+            #endif
+            
             (self.webViewStore.webViewsMeta[id]?.1 ?? Color(hex: 0))
+                .ignoresSafeArea()
                 .navigationTitle(self.webViewStore.webViewsMeta[id]?.0 ?? "FullStacked")
             
                 .onGeometryChange(for: CGSize.self) { proxy in
@@ -63,8 +70,15 @@ struct FullStackedApp: App {
                 .overlay {
                     NavigationStack {
                         ZStack {
-                            WebViewRepresentable(self.webViewStore.getOrCreate(id))
+                            (self.webViewStore.webViewsMeta[id]?.1 ?? Color(hex: 0))
                                 .ignoresSafeArea()
+                            
+                            WebViewRepresentable(self.webViewStore.getOrCreate(id))
+                                #if os(iOS)
+                                .ignoresSafeArea(edges: .bottom)
+                                #else
+                                .ignoresSafeArea()
+                                #endif
                                 .background(self.webViewStore.webViewsMeta[id]?.1)
                                 .navigationTitle(self.webViewStore.webViewsMeta[id]?.0 ?? "FullStacked")
                             
@@ -80,8 +94,9 @@ struct FullStackedApp: App {
                                                       ? getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[id]?.1)
                                                       : nil)
                                 .toolbar(
-                                    isIPadOS && !isFullScreen(size: self.windowSize) ? .visible : .hidden,
+                                    isIPadOS && !isFull ? .visible : .hidden,
                                     for: .navigationBar)
+                                .toolbarBackground(self.webViewStore.webViewsMeta[id]?.1 ?? Color(hex: 0), for: .navigationBar)
                                 .navigationBarTitleDisplayMode(.inline)
                             #endif
                                 
@@ -128,7 +143,11 @@ struct FullStackedApp: App {
                                         }
                                         
                                         WebViewRepresentable(webView)
+                                            #if os(iOS)
+                                            .ignoresSafeArea(edges: .bottom)
+                                            #else
                                             .ignoresSafeArea()
+                                            #endif
                                             
                                     }
                                     .background(self.webViewStore.webViewsMeta[webView.id]?.1 ?? Color(.black))
@@ -187,6 +206,9 @@ class WebViewStore: ObservableObject {
     // removeWebView can close the scene even if called before webView.window is set.
     private var cachedScenes: [UUID: UIWindowScene] = [:]
     func cacheScene(_ scene: UIWindowScene, for id: UUID) { cachedScenes[id] = scene }
+    func getScene(for id: UUID) -> UIWindowScene? {
+        return self.webViews.first(where: { $0.id == id })?.window?.windowScene ?? self.cachedScenes[id]
+    }
     #endif
     
     func addWebView(_ webView: WebView) {

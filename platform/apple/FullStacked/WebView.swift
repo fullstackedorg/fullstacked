@@ -183,7 +183,12 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         }
     }
     
-    func webView(_ webView:WKWebView, didFinish didFinishNavigation: WKNavigation){
+    func webView(_ webView: WKWebView, didFinish didFinishNavigation: WKNavigation) {
+        var title = webView.title
+        if(title == nil || title!.isEmpty) {
+            title = "FullStacked"
+        }
+        WebViewStore.getInstance().webViewsMeta[self.id] = (title!, self.getBackgroundColor())
     }
     
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
