@@ -181,7 +181,7 @@ func StatsFn(p string) (GoFileInfo, error) {
 		return GoFileInfo{}, err
 	}
 
-	atime, mtime, ctime, birthtime := getStatTimes(fileInfo)
+	atime, mtime, ctime, birthtime := getStatTimes(p, fileInfo)
 	perm := fileInfo.Mode().Perm()
 	if runtime.GOOS == "windows" {
 		perm = perm & 0666

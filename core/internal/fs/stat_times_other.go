@@ -4,7 +4,7 @@ package fs
 
 import "os"
 
-func getStatTimes(fi os.FileInfo) (atime, mtime, ctime, birthtime int64) {
+func getStatTimes(p string, fi os.FileInfo) (atime, mtime, ctime, birthtime int64) {
 	mtime = fi.ModTime().UnixNano()
 	return mtime, mtime, mtime, mtime
 }

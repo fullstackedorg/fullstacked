@@ -7,7 +7,7 @@ import (
 	"syscall"
 )
 
-func getStatTimes(fi os.FileInfo) (atime, mtime, ctime, birthtime int64) {
+func getStatTimes(p string, fi os.FileInfo) (atime, mtime, ctime, birthtime int64) {
 	mtime = fi.ModTime().UnixNano()
 	atime = mtime
 	ctime = mtime
