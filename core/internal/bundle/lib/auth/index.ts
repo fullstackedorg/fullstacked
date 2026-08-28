@@ -23,16 +23,21 @@ export function authenticate(
     );
 
     return new Promise<string>((resolve, reject) => {
-        const timer = setInterval(() => {
-            if (authWin?.closed) {
-                clearInterval(timer);
-                reject(new Error("Authentication cancelled"));
-                window.removeEventListener("message", onmessage);
-            }
-        }, 500);
+        let timer: any = null;
+        if (!globalThis.fullstacked && authWin) {
+            timer = setInterval(() => {
+                try {
+                    if (authWin.closed) {
+                        clearInterval(timer);
+                        reject(new Error("Authentication cancelled"));
+                        window.removeEventListener("message", onmessage);
+                    }
+                } catch {}
+            }, 500);
+        }
 
         const onmessage = (event: MessageEvent) => {
-            clearInterval(timer);
+            if (timer) clearInterval(timer);
 
             if (event.data instanceof Error) {
                 reject(event.data);

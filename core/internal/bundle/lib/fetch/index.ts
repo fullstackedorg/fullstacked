@@ -33,7 +33,11 @@ function urlOrStringToUrl(url: URL | string) {
         ? url
         : new URL(
               url,
-              url.startsWith("/") ? globalThis?.location?.host : undefined
+              url.startsWith("/")
+                  ? globalThis?.location?.origin ||
+                    globalThis?.location?.href ||
+                    "http://localhost"
+                  : undefined
           );
 }
 
@@ -68,6 +72,16 @@ async function fetchCore(
             return new Response(uint8.buffer);
         } catch (e) {
             // fallback
+        }
+    }
+
+    if (
+        typeof requestUrl === "string" &&
+        (requestUrl.startsWith("/") || requestUrl.startsWith("fs://"))
+    ) {
+        const nativeFetch = globalThis.fullstacked?.fetch || window.fetch;
+        if (nativeFetch && nativeFetch !== fetchCore) {
+            return nativeFetch(request, init);
         }
     }
 

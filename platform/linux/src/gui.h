@@ -1,47 +1,32 @@
 #ifndef GUI_H_
 #define GUI_H_
 
+#include <cstdint>
 #include <functional>
 #include <string>
-
-struct Response {
-        std::string type;
-        std::vector<unsigned char> data;
-};
+#include <vector>
 
 class Window {
-    public:
-        virtual ~Window() = default;
+public:
+    uint8_t ctx = 0;
+    virtual ~Window() = default;
 
-        std::function<Response(std::string)> onRequest = nullptr;
-        std::function<std::string(std::string)> onBridge = nullptr;
-
-        virtual void onMessage(std::string type, std::string message) {};
-
-        virtual void close() {};
-
-        virtual void bringToFront(bool reload) {};
-
-        virtual void setFullscreen() {};
-
-        virtual void setTitle(std::string title) {};
+    virtual void onStreamData(uint8_t streamId, const std::vector<uint8_t> &data) = 0;
+    virtual void bringToFront(bool reload) = 0;
+    virtual void setFullscreen() = 0;
+    virtual void setTitle(const std::string &title) = 0;
+    virtual void evaluateJavaScript(const std::string &script) = 0;
+    virtual std::string getSize() = 0;
+    virtual void resize(const std::string &size) = 0;
+    virtual void close() = 0;
 };
 
 class GUI {
-    public:
-        virtual ~GUI() = default;
+public:
+    virtual ~GUI() = default;
 
-        virtual void createApp() {};
-
-        virtual int run(int &argc, char **argv, std::function<void()> onReady) {
-            return 0;
-        };
-
-        virtual Window *
-        createWindow(std::function<Response(std::string)> onRequest,
-                     std::function<std::string(std::string)> onBridge) {
-            return nullptr;
-        };
+    virtual int run(int &argc, char **argv, std::function<void()> onReady) = 0;
+    virtual Window *createWindow(uint8_t ctx) = 0;
 };
 
 #endif

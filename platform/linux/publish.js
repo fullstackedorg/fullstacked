@@ -4,7 +4,7 @@ import child_process from "node:child_process";
 import os from "node:os";
 import url from "node:url";
 import dotenv from "dotenv";
-import version from "../../version.js";
+import version from "../../version.ts";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));

@@ -1,8 +1,11 @@
 #ifndef APP_H
 #define APP_H
 
-#include "./instance.h"
+#include "./gui.h"
+#include <cstdint>
 #include <map>
+#include <memory>
+#include <string>
 
 #ifdef GTK
 #include "./gtk/gtk.h"
@@ -11,26 +14,29 @@
 #endif
 
 class App {
-    private:
+private:
 #ifdef GTK
-        GUI *gui = new WebkitGTKGUI();
+    GUI *gui = new WebkitGTKGUI();
 #else
-        GUI *gui = new QtGUI();
+    GUI *gui = new QtGUI();
 #endif
 
-    public:
-        inline static App *instance;
-        std::map<std::string, Instance *> activeWindows;
-        std::string deeplink;
-        bool kiosk = false;
+public:
+    inline static App *instance = nullptr;
+    std::map<uint8_t, Window *> activeWindows;
+    std::string rootDir;
+    std::string buildDir;
+    std::string deeplink;
+    bool kiosk = false;
 
-        App();
+    App();
+    ~App();
 
-        void onMessage(char *projectId, char *type, std::string message);
+    void open(uint8_t ctx);
+    void close(uint8_t ctx);
+    void onStreamData(uint8_t ctx, uint8_t streamId, const std::vector<uint8_t> &data);
 
-        void open(std::string projectId, bool isEditor);
-
-        int run(int argc, char *argv[], std::string startupId);
+    int run(int argc, char *argv[]);
 };
 
 #endif

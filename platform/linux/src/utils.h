@@ -1,52 +1,38 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <cstdint>
 #include <string>
 #include <vector>
+#include <utility>
 
-void numberToCharPtr(int number, char *ptr);
-
-unsigned bytesToNumber(unsigned char *bytes, int size);
-
-int deserializeNumber(char *bytes, int size);
-
-void printBuffer(char *buffer, int size);
-
-int combineBuffers(char *buf1, int lgt1, char *buf2, int lgt2, char *result);
-
-class DataValue {
-    public:
-        bool boolean;
-        std::string str;
-        int number;
-        std::vector<unsigned char> buffer;
-};
-
-enum DataType {
+enum SerializableDataType : uint8_t {
     UNDEFINED = 0,
     BOOLEAN = 1,
     STRING = 2,
     NUMBER = 3,
-    BUFFER = 4
+    BUFFER = 4,
+    OBJECT = 5
 };
 
-std::vector<DataValue> deserializeArgs(std::vector<unsigned char> data);
+struct DataValue {
+    SerializableDataType type = UNDEFINED;
+    bool boolean = false;
+    double number = 0;
+    std::string str;
+    std::vector<uint8_t> buffer;
+};
 
+uint32_t uint4BytesToNumber(const uint8_t *bytes);
+void numberToUint4Bytes(uint32_t num, uint8_t *bytes);
+
+std::pair<DataValue, int> deserialize(const std::vector<uint8_t> &buffer, size_t index);
+std::vector<DataValue> deserializeAll(const std::vector<uint8_t> &buffer);
+std::vector<uint8_t> mergeBuffers(const std::vector<std::vector<uint8_t>> &buffers);
+
+std::string getExePath();
+std::string getEditorDir();
+void registerDesktopApp();
 std::string gen_random(const int len);
-
-std::string uri_decode(std::string str);
-
-struct URL {
-    public:
-        URL(const std::string &url_s) {
-            this->parse(url_s);
-        }
-        std::string protocol, host, path, query;
-
-        std::string str();
-
-    private:
-        void parse(const std::string &url_s);
-};
 
 #endif

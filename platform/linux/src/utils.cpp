@@ -1,170 +1,229 @@
-
 #include "./utils.h"
-#include "utils.h"
 #include <algorithm>
-#include <cctype>
-#include <functional>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
-#include <string.h>
-#include <string>
+#include <limits.h>
+#include <unistd.h>
 
-void numberToCharPtr(int number, char *ptr) {
-    ptr[0] = ((number & 0xff000000) >> 24);
-    ptr[1] = ((number & 0x00ff0000) >> 16);
-    ptr[2] = ((number & 0x0000ff00) >> 8);
-    ptr[3] = ((number & 0x000000ff) >> 0);
+uint32_t uint4BytesToNumber(const uint8_t *bytes) {
+    return (static_cast<uint32_t>(bytes[0]) << 24) |
+           (static_cast<uint32_t>(bytes[1]) << 16) |
+           (static_cast<uint32_t>(bytes[2]) << 8) |
+           static_cast<uint32_t>(bytes[3]);
 }
 
-unsigned bytesToNumber(unsigned char *bytes, int size) {
-    unsigned value = 0;
-    for (int i = 0; i < size; i++) {
-        value = value << 8;
-        value = value | (unsigned)bytes[i];
-    }
-    return value;
+void numberToUint4Bytes(uint32_t num, uint8_t *bytes) {
+    bytes[0] = static_cast<uint8_t>((num >> 24) & 0xff);
+    bytes[1] = static_cast<uint8_t>((num >> 16) & 0xff);
+    bytes[2] = static_cast<uint8_t>((num >> 8) & 0xff);
+    bytes[3] = static_cast<uint8_t>(num & 0xff);
 }
 
-int deserializeNumber(char *bytes, int size) {
-    bool negative = bytes[0] == 1;
-
-    unsigned n = 0;
-    int i = 1;
-    while (i <= size) {
-        n += ((unsigned)bytes[i]) << ((i - 1) * 8);
-        i += 1;
+std::pair<DataValue, int> deserialize(const std::vector<uint8_t> &buffer, size_t index) {
+    DataValue val;
+    if (index >= buffer.size()) {
+        return {val, 0};
     }
 
-    int value = (int)n;
+    uint8_t typeByte = buffer[index];
+    val.type = static_cast<SerializableDataType>(typeByte);
 
-    if (negative) {
-        return 0 - value;
-    }
+    switch (val.type) {
+    case UNDEFINED:
+        return {val, 1};
 
-    return value;
-}
-
-void printBuffer(char *buffer, int size) {
-    for (int i = 0; i < size; i++) {
-        std::cout << (unsigned)buffer[i] << " ";
-    }
-    std::cout << std::endl;
-}
-
-int combineBuffers(char *buf1, int lgt1, char *buf2, int lgt2, char *result) {
-    int combinedLength = lgt1 + lgt2;
-    char *combined = new char[combinedLength];
-    for (int i = 0; i < lgt1; i++) {
-        combined[i] = buf1[i];
-    }
-    for (int i = 0; i < lgt2; i++) {
-        combined[i + lgt1] = buf2[i];
-    }
-    memcpy(result, combined, combinedLength);
-    delete[] combined;
-    return combinedLength;
-}
-
-std::vector<DataValue> deserializeArgs(std::vector<unsigned char> data) {
-    std::vector<DataValue> args;
-
-    int cursor = 0;
-
-    while (cursor < data.size()) {
-        DataType type = (DataType)data.at(cursor);
-
-        cursor++;
-        std::vector<unsigned char> lengthData(data.begin() + cursor,
-                                              data.begin() + cursor + 4);
-        int length = bytesToNumber(
-            reinterpret_cast<unsigned char *>(lengthData.data()), 4);
-
-        cursor += 4;
-        std::vector<unsigned char> arg(data.begin() + cursor,
-                                       data.begin() + cursor + length);
-        cursor += length;
-
-        DataValue v = *(new DataValue());
-        switch (type) {
-        case UNDEFINED:
-            break;
-        case BOOLEAN:
-            v.boolean = arg.at(0) == 1 ? true : false;
-            break;
-        case NUMBER:
-            v.number =
-                deserializeNumber(reinterpret_cast<char *>(arg.data()), length);
-            break;
-        case STRING:
-            v.str = std::string(reinterpret_cast<char *>(arg.data()), length);
-            break;
-        case BUFFER:
-            v.buffer = arg;
-            break;
-        default:
-            break;
+    case BOOLEAN:
+        if (index + 1 < buffer.size()) {
+            val.boolean = (buffer[index + 1] == 1);
         }
-        args.push_back(v);
+        return {val, 2};
+
+    case STRING: {
+        if (index + 5 > buffer.size()) {
+            return {val, static_cast<int>(buffer.size() - index)};
+        }
+        uint32_t size = uint4BytesToNumber(&buffer[index + 1]);
+        size_t start = index + 5;
+        size_t end = std::min(start + size, buffer.size());
+        val.str = std::string(reinterpret_cast<const char *>(&buffer[start]), end - start);
+        return {val, static_cast<int>(5 + size)};
     }
 
-    return args;
+    case NUMBER: {
+        if (index + 9 > buffer.size()) {
+            return {val, static_cast<int>(buffer.size() - index)};
+        }
+        uint64_t bits = 0;
+        for (int i = 0; i < 8; i++) {
+            bits = (bits << 8) | buffer[index + 1 + i];
+        }
+        double d;
+        std::memcpy(&d, &bits, sizeof(double));
+        val.number = d;
+        return {val, 9};
+    }
+
+    case BUFFER: {
+        if (index + 5 > buffer.size()) {
+            return {val, static_cast<int>(buffer.size() - index)};
+        }
+        uint32_t size = uint4BytesToNumber(&buffer[index + 1]);
+        size_t start = index + 5;
+        size_t end = std::min(start + size, buffer.size());
+        val.buffer = std::vector<uint8_t>(buffer.begin() + start, buffer.begin() + end);
+        return {val, static_cast<int>(5 + size)};
+    }
+
+    case OBJECT: {
+        if (index + 5 > buffer.size()) {
+            return {val, static_cast<int>(buffer.size() - index)};
+        }
+        uint32_t size = uint4BytesToNumber(&buffer[index + 1]);
+        size_t start = index + 5;
+        size_t end = std::min(start + size, buffer.size());
+        val.str = std::string(reinterpret_cast<const char *>(&buffer[start]), end - start);
+        return {val, static_cast<int>(5 + size)};
+    }
+
+    default:
+        return {val, 1};
+    }
+}
+
+std::vector<DataValue> deserializeAll(const std::vector<uint8_t> &buffer) {
+    std::vector<DataValue> data;
+    size_t index = 0;
+    while (index < buffer.size()) {
+        auto [val, size] = deserialize(buffer, index);
+        if (size <= 0) break;
+        data.push_back(val);
+        index += size;
+    }
+    return data;
+}
+
+std::vector<uint8_t> mergeBuffers(const std::vector<std::vector<uint8_t>> &buffers) {
+    size_t total = 0;
+    for (const auto &b : buffers) {
+        total += b.size();
+    }
+    std::vector<uint8_t> result;
+    result.reserve(total);
+    for (const auto &b : buffers) {
+        result.insert(result.end(), b.begin(), b.end());
+    }
+    return result;
+}
+
+std::string getExePath() {
+    char result[PATH_MAX];
+    ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
+    return std::string(result, (count > 0) ? count : 0);
+}
+
+std::string getEditorDir() {
+    std::string path = getExePath();
+    size_t pos = path.find_last_of("/");
+    std::string dir = (pos != std::string::npos) ? path.substr(0, pos) : "";
+    pos = dir.find_last_of("/");
+    std::string parentDir = (pos != std::string::npos) ? dir.substr(0, pos) : dir;
+
+    std::string appDir = parentDir + "/share/fullstacked/app";
+    if (std::filesystem::exists(appDir)) {
+        return appDir;
+    }
+
+    std::string editorDir = parentDir + "/share/fullstacked/editor";
+    if (std::filesystem::exists(editorDir)) {
+        return editorDir;
+    }
+
+    // Check development path fallbacks
+    std::error_code ec;
+    std::string devPath = dir + "/../../../../app/out";
+    if (std::filesystem::exists(devPath, ec)) {
+        return std::filesystem::canonical(devPath, ec).string();
+    }
+
+    std::string devPath2 = dir + "/../../app/out";
+    if (std::filesystem::exists(devPath2, ec)) {
+        return std::filesystem::canonical(devPath2, ec).string();
+    }
+
+    return appDir;
+}
+
+void replaceAll(std::string &str, const std::string &from, const std::string &to) {
+    if (from.empty()) return;
+    size_t start_pos = 0;
+    while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
+        str.replace(start_pos, from.length(), to);
+        start_pos += to.length();
+    }
+}
+
+void registerDesktopApp() {
+    const char *homeEnv = getenv("HOME");
+    if (!homeEnv) return;
+    std::string home = homeEnv;
+
+    std::string localIconsDir = home + "/.local/share/icons";
+    std::error_code ec;
+    std::filesystem::create_directories(localIconsDir, ec);
+
+    std::string editorDir = getEditorDir();
+    std::string iconFound = "";
+    if (std::filesystem::exists(editorDir, ec)) {
+        for (const auto &entry : std::filesystem::directory_iterator(editorDir, ec)) {
+            if (entry.path().filename().string().find("app-icon") != std::string::npos && entry.path().extension() == ".png") {
+                iconFound = entry.path().string();
+                break;
+            }
+        }
+    }
+    if (iconFound.empty() && std::filesystem::exists(editorDir + "/assets/icon.png", ec)) {
+        iconFound = editorDir + "/assets/icon.png";
+    }
+    if (!iconFound.empty()) {
+        std::filesystem::copy_file(
+            iconFound, localIconsDir + "/fullstacked.png",
+            std::filesystem::copy_options::overwrite_existing, ec);
+    }
+
+    std::string localAppsDir = home + "/.local/share/applications";
+    std::filesystem::create_directories(localAppsDir, ec);
+
+    std::ofstream localAppFile(localAppsDir + "/fullstacked.desktop");
+    if (localAppFile.is_open()) {
+        std::string contents = "[Desktop Entry]\n"
+                               "Name=FullStacked\n"
+                               "Exec=" +
+                               getExePath() +
+                               " %u\n"
+                               "Terminal=false\n"
+                               "Type=Application\n"
+                               "MimeType=x-scheme-handler/fullstacked;\n"
+                               "Icon=fullstacked\n"
+                               "Categories=Development;Utility;\n";
+        localAppFile << contents;
+        localAppFile.close();
+
+        replaceAll(localAppsDir, "\\", "\\\\");
+        replaceAll(localAppsDir, "'", "\\'");
+
+        std::string command = "update-desktop-database '" + localAppsDir + "' 2>/dev/null";
+        system(command.c_str());
+    }
 }
 
 std::string gen_random(const int len) {
     static const char alphanum[] = "abcdefghijklmnopqrstuvwxyz";
     std::string tmp_s;
     tmp_s.reserve(len);
-
     for (int i = 0; i < len; ++i) {
         tmp_s += alphanum[rand() % (sizeof(alphanum) - 1)];
     }
-
     return tmp_s;
-}
-
-// source: https://stackoverflow.com/a/4823686
-std::string uri_decode(std::string str) {
-    std::string ret;
-    char ch;
-    int i, ii;
-    for (i = 0; i < str.length(); i++) {
-        if (str[i] == '%') {
-            sscanf(str.substr(i + 1, 2).c_str(), "%x", &ii);
-            ch = static_cast<char>(ii);
-            ret += ch;
-            i = i + 2;
-        } else {
-            ret += str[i];
-        }
-    }
-    return (ret);
-}
-
-// source: https://gist.github.com/RedCarrottt/c7a056695e6951415a0368a87ad1e493
-void URL::parse(const std::string &url_s) {
-    const std::string prot_end("://");
-    std::string::const_iterator prot_i = std::search(
-        url_s.begin(), url_s.end(), prot_end.begin(), prot_end.end());
-    protocol.reserve(distance(url_s.begin(), prot_i));
-    std::transform(url_s.begin(), prot_i, std::back_inserter(protocol),
-                   std::function(tolower)); // protocol is icase
-    if (prot_i == url_s.end()) return;
-    std::advance(prot_i, prot_end.length());
-    std::string::const_iterator path_i = std::find(prot_i, url_s.end(), '/');
-    host.reserve(distance(prot_i, path_i));
-    std::transform(prot_i, path_i, std::back_inserter(host),
-                   std::function(tolower)); // host is icase
-    std::string::const_iterator query_i = find(path_i, url_s.end(), '?');
-    path.assign(path_i, query_i);
-    if (query_i != url_s.end()) ++query_i;
-    query.assign(query_i, url_s.end());
-}
-
-std::string URL::str() {
-    std::string str = protocol + "://" + host + path;
-
-    if (!query.empty()) {
-        str += "?" + query;
-    }
-
-    return str;
 }

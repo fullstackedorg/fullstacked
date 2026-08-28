@@ -3,6 +3,7 @@ import { BridgeAppleInit } from "./apple.ts";
 import { isWorker } from "../isWorker.ts";
 import { BridgeWindowsInit } from "./windows.ts";
 import { BridgeAndroidInit } from "./android.ts";
+import { BridgeLinuxInit } from "./linux.ts";
 
 export interface PlatformBridge {
     ctx: number;
@@ -73,6 +74,9 @@ else {
                     break;
                 case "android":
                     platformBridge.bridge = await BridgeAndroidInit();
+                    break;
+                case "linux":
+                    platformBridge.bridge = await BridgeLinuxInit();
                     break;
             }
 

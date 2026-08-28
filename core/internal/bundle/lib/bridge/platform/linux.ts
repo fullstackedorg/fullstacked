@@ -1,0 +1,112 @@
+import { PlatformBridge } from "./index.ts";
+import { fromByteArray, toByteArray } from "../base64.ts";
+import { isWorker } from "../isWorker.ts";
+
+const asyncResponsePromises = new Map<
+    number,
+    (response: ArrayBuffer) => void
+>();
+
+declare global {
+    var webkit: any;
+    var chrome: any;
+    var qt: any;
+    var bridge: any;
+}
+
+export async function BridgeLinuxInit(): Promise<PlatformBridge> {
+    globalThis.fullstacked.respond = (id: number, responseBase64: string) => {
+        const promise = asyncResponsePromises.get(id);
+        promise?.(toByteArray(responseBase64).buffer);
+        asyncResponsePromises.delete(id);
+    };
+
+    const ctx = await (await fetch("/ctx")).json();
+
+    if (isWorker) {
+        globalThis.onmessage = (event) => {
+            if (!(event.data instanceof ArrayBuffer)) {
+                return;
+            }
+            const buffer: ArrayBuffer = event.data;
+            const dataView = new DataView(buffer);
+            const id = dataView.getUint8(0);
+            const response = new Uint8Array(buffer.byteLength - 1);
+            response.set(new Uint8Array(buffer, 1));
+            const promise = asyncResponsePromises.get(id);
+            promise?.(response.buffer);
+            asyncResponsePromises.delete(id);
+        };
+    } else {
+        globalThis.fullstacked.exit = () => {
+            if (globalThis.webkit?.messageHandlers?.exit) {
+                globalThis.webkit.messageHandlers.exit.postMessage("");
+            } else {
+                (globalThis.fullstacked.fetch || fetch)("/exit");
+            }
+        };
+
+        globalThis.fullstacked.open = (ctx: number) => {
+            if (globalThis.webkit?.messageHandlers?.open) {
+                globalThis.webkit.messageHandlers.open.postMessage(ctx);
+            } else {
+                (globalThis.fullstacked.fetch || fetch)(`/open?ctx=${ctx}`);
+            }
+        };
+
+        globalThis.fullstacked.window = globalThis.fullstacked.window || {};
+
+        globalThis.fullstacked.window.getSize = () =>
+            (globalThis.fullstacked.fetch || fetch)("/resize").then((r) => r.text());
+
+        globalThis.fullstacked.window.resize = function (size: string) {
+            (globalThis.fullstacked.fetch || fetch)(`/resize?size=${size}`);
+        };
+    }
+
+    const postBridgeMessage = (base64: string) => {
+        if (globalThis.webkit?.messageHandlers?.bridge) {
+            globalThis.webkit.messageHandlers.bridge.postMessage(base64);
+        } else if (globalThis.bridge?.postMessage) {
+            globalThis.bridge.postMessage(base64);
+        } else if (globalThis.chrome?.webview) {
+            globalThis.chrome.webview.postMessage(base64);
+        }
+    };
+
+    return {
+        ctx,
+        async Async(payload) {
+            const dataView = new DataView(payload);
+            const id = dataView.getUint8(1);
+            return new Promise<ArrayBuffer>((resolve) => {
+                asyncResponsePromises.set(id, resolve);
+                if (isWorker) {
+                    globalThis.postMessage(payload, {
+                        targetOrigin: "bridge"
+                    });
+                } else {
+                    const base64 = fromByteArray(new Uint8Array(payload));
+                    postBridgeMessage(base64);
+                }
+            });
+        },
+        Sync(payload) {
+            const uint8array = new Uint8Array(payload);
+            const id = uint8array[1];
+            if (isWorker) {
+                globalThis.postMessage(payload, {
+                    targetOrigin: "bridge"
+                });
+            } else {
+                const base64 = fromByteArray(uint8array);
+                postBridgeMessage(base64);
+            }
+            const xmlHttpRequest = new XMLHttpRequest();
+            xmlHttpRequest.open("POST", `/sync/${id}`, false);
+            xmlHttpRequest.send();
+            const response = xmlHttpRequest.response;
+            return toByteArray(response).buffer;
+        }
+    };
+}
