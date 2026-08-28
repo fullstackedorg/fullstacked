@@ -123,25 +123,34 @@ std::string getExePath() {
     return std::string(result, (count > 0) ? count : 0);
 }
 
-std::string getEditorDir() {
+std::string getAppDir() {
     std::string path = getExePath();
     size_t pos = path.find_last_of("/");
     std::string dir = (pos != std::string::npos) ? path.substr(0, pos) : "";
     pos = dir.find_last_of("/");
     std::string parentDir = (pos != std::string::npos) ? dir.substr(0, pos) : dir;
 
+    std::error_code ec;
+
+    // 1. Portable: dir/app (e.g. tarball extracted with app folder next to executable)
+    std::string portableAppDir = dir + "/app";
+    if (std::filesystem::exists(portableAppDir, ec)) {
+        return portableAppDir;
+    }
+
+    // 2. Portable: dir/share/fullstacked/app
+    std::string portableShareAppDir = dir + "/share/fullstacked/app";
+    if (std::filesystem::exists(portableShareAppDir, ec)) {
+        return portableShareAppDir;
+    }
+
+    // 3. FHS standard (e.g. /usr/bin/fullstacked -> /usr/share/fullstacked/app, or bin/fullstacked -> share/fullstacked/app)
     std::string appDir = parentDir + "/share/fullstacked/app";
-    if (std::filesystem::exists(appDir)) {
+    if (std::filesystem::exists(appDir, ec)) {
         return appDir;
     }
 
-    std::string editorDir = parentDir + "/share/fullstacked/editor";
-    if (std::filesystem::exists(editorDir)) {
-        return editorDir;
-    }
-
-    // Check development path fallbacks
-    std::error_code ec;
+    // 4. Check development path fallbacks
     std::string devPath = dir + "/../../../../app/out";
     if (std::filesystem::exists(devPath, ec)) {
         return std::filesystem::canonical(devPath, ec).string();
@@ -173,18 +182,18 @@ void registerDesktopApp() {
     std::error_code ec;
     std::filesystem::create_directories(localIconsDir, ec);
 
-    std::string editorDir = getEditorDir();
+    std::string appDir = getAppDir();
     std::string iconFound = "";
-    if (std::filesystem::exists(editorDir, ec)) {
-        for (const auto &entry : std::filesystem::directory_iterator(editorDir, ec)) {
+    if (std::filesystem::exists(appDir, ec)) {
+        for (const auto &entry : std::filesystem::directory_iterator(appDir, ec)) {
             if (entry.path().filename().string().find("app-icon") != std::string::npos && entry.path().extension() == ".png") {
                 iconFound = entry.path().string();
                 break;
             }
         }
     }
-    if (iconFound.empty() && std::filesystem::exists(editorDir + "/assets/icon.png", ec)) {
-        iconFound = editorDir + "/assets/icon.png";
+    if (iconFound.empty() && std::filesystem::exists(appDir + "/assets/icon.png", ec)) {
+        iconFound = appDir + "/assets/icon.png";
     }
     if (!iconFound.empty()) {
         std::filesystem::copy_file(

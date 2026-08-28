@@ -53,7 +53,7 @@ int App::run(int argc, char *argv[]) {
 
     const char *homeEnv = getenv("HOME");
     rootDir = (homeEnv ? std::string(homeEnv) : "/tmp") + "/FullStacked";
-    buildDir = getEditorDir();
+    buildDir = getAppDir();
 
     return gui->run(argc, argv, [this]() {
         uint8_t mainCtx = Core::start(rootDir, buildDir);

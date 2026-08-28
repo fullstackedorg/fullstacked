@@ -14,8 +14,27 @@ fi
 
 sh ./prebuild.sh $ARCH gtk
 
-g++ -std=c++20 -DGTK=1 \
-    $(pkg-config gtkmm-4.0 webkitgtk-6.0 --cflags) \
+CXX="g++"
+PKG_CONFIG="pkg-config"
+
+if [ "$ARCH" = "x64" ] && [ "$(uname -m)" != "x86_64" ]; then
+    CXX="x86_64-linux-gnu-g++"
+    if command -v x86_64-linux-gnu-pkg-config >/dev/null 2>&1; then
+        PKG_CONFIG="x86_64-linux-gnu-pkg-config"
+    else
+        export PKG_CONFIG_LIBDIR="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig"
+    fi
+elif [ "$ARCH" = "arm64" ] && [ "$(uname -m)" = "x86_64" ]; then
+    CXX="aarch64-linux-gnu-g++"
+    if command -v aarch64-linux-gnu-pkg-config >/dev/null 2>&1; then
+        PKG_CONFIG="aarch64-linux-gnu-pkg-config"
+    else
+        export PKG_CONFIG_LIBDIR="/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig"
+    fi
+fi
+
+$CXX -std=c++20 -DGTK=1 \
+    $($PKG_CONFIG gtkmm-4.0 webkitgtk-6.0 --cflags) \
     src/utils.cpp \
     src/core.cpp \
     src/gtk/gtk.cpp \
@@ -23,6 +42,6 @@ g++ -std=c++20 -DGTK=1 \
     src/main.cpp \
     src/base64.cpp \
     bin/linux-$ARCH.a \
-    $(pkg-config gtkmm-4.0 webkitgtk-6.0 --libs) \
+    $($PKG_CONFIG gtkmm-4.0 webkitgtk-6.0 --libs) \
     -lpthread -ldl \
     -o out/usr/bin/fullstacked

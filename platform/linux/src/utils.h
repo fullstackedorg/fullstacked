@@ -31,7 +31,7 @@ std::vector<DataValue> deserializeAll(const std::vector<uint8_t> &buffer);
 std::vector<uint8_t> mergeBuffers(const std::vector<std::vector<uint8_t>> &buffers);
 
 std::string getExePath();
-std::string getEditorDir();
+std::string getAppDir();
 void registerDesktopApp();
 std::string gen_random(const int len);
 
