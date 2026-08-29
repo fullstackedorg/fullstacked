@@ -65,7 +65,7 @@ android-arm:
 	GOOS=android \
 	GOARCH=arm \
 	CGO_LDFLAGS="-Wl,-soname,libcore.so" \
-	CC=~/Library/Android/sdk/ndk/$(NDK_VERSION)/toolchains/llvm/prebuilt/darwin-x86_64/bin/armv7a-linux-androideabi34-clang \
+	CC=~/Library/Android/sdk/ndk/$(NDK_VERSION)/toolchains/llvm/prebuilt/darwin-x86_64/bin/armv7a-linux-androideabi35-clang \
 	go build -buildmode=c-shared -o $(ANDROID_OUT)/armeabi-v7a/libcore.so -v ..
 
 android-arm64:
@@ -74,7 +74,7 @@ android-arm64:
 	GOOS=android \
 	GOARCH=arm64 \
 	CGO_LDFLAGS="-Wl,-soname,libcore.so" \
-	CC=~/Library/Android/sdk/ndk/${NDK_VERSION}/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android34-clang \
+	CC=~/Library/Android/sdk/ndk/${NDK_VERSION}/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android35-clang \
 	go build -buildmode=c-shared -o $(ANDROID_OUT)/arm64-v8a/libcore.so -v .. 
 
 android-x64:
@@ -83,7 +83,7 @@ android-x64:
 	GOOS=android \
 	GOARCH=amd64 \
 	CGO_LDFLAGS="-Wl,-soname,libcore.so" \
-	CC=~/Library/Android/sdk/ndk/${NDK_VERSION}/toolchains/llvm/prebuilt/darwin-x86_64/bin/x86_64-linux-android34-clang \
+	CC=~/Library/Android/sdk/ndk/${NDK_VERSION}/toolchains/llvm/prebuilt/darwin-x86_64/bin/x86_64-linux-android35-clang \
 	go build -buildmode=c-shared -o $(ANDROID_OUT)/x86_64/libcore.so -v .. 
 
 android: android-arm android-arm64 android-x64
