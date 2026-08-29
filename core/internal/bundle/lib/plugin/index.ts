@@ -33,7 +33,12 @@ export interface JSPlugin {
     callback: (...args: any[]) => Promise<any | any[]> | any | any[];
 }
 
-const plugins = new Map<number, JSPlugin>();
+if (!globalThis.fullstacked) {
+    globalThis.fullstacked = {};
+}
+if (!globalThis.fullstacked.plugins) {
+    globalThis.fullstacked.plugins = new Map<number, JSPlugin>();
+}
 let duplexStream: Duplex | null = null;
 let eventEmitter: EventEmitter<{
     // pluginId, requestId, ...data
@@ -85,7 +90,8 @@ async function connect(): Promise<void> {
             let result: any = null;
             let errorMsg: string | null = null;
             try {
-                const registeredPlugin = plugins.get(pluginId);
+                const registeredPlugin =
+                    globalThis.fullstacked.plugins.get(pluginId);
 
                 if (registeredPlugin) {
                     result = await registeredPlugin.callback(...args);
@@ -148,11 +154,14 @@ export async function register<T extends keyof PluginRegistry>(
         data: [type, name || "plugin-" + type, pluginData]
     });
 
-    plugins.set(id, { type: type as string, callback: plugin.callback });
+    globalThis.fullstacked.plugins.set(id, {
+        type: type as string,
+        callback: plugin.callback
+    });
 
     return {
         unregister: async () => {
-            plugins.delete(id);
+            globalThis.fullstacked.plugins.delete(id);
             await globalThis.fullstacked.bridge({
                 mod: PluginModule,
                 fn: Unregister,

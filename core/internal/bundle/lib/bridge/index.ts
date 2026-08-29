@@ -12,6 +12,8 @@ import type platformBridgeType from "./platform/index.ts";
 import fetchCore from "../fetch/index.ts";
 import parentWindow from "../parentWindow/index.ts";
 
+import type { JSPlugin } from "../plugin/index.ts";
+
 declare global {
     var fullstacked: Partial<FullStacked>;
     var __dirname: string;
@@ -26,6 +28,8 @@ type FullStacked = {
     onStreamData: (id: number, payload: ArrayBuffer | string) => void;
 
     workerStreams: Map<number, any>;
+
+    plugins: Map<number, JSPlugin>;
 
     exit: () => void;
 
@@ -64,15 +68,17 @@ type BridgeSync<T extends boolean> = (
 type Bridge = BridgeSync<boolean> & BridgeAsync;
 
 async function init() {
-    if (globalThis.fullstacked) {
+    if (globalThis.fullstacked?.bridge) {
         return;
     }
 
-    globalThis.fullstacked = {
-        clipboard: {},
-        window: {},
-        workerStreams: new Map()
-    };
+    globalThis.fullstacked = globalThis.fullstacked || {};
+    globalThis.fullstacked.clipboard = globalThis.fullstacked.clipboard || {};
+    globalThis.fullstacked.plugins =
+        globalThis.fullstacked.plugins || new Map();
+    globalThis.fullstacked.window = globalThis.fullstacked.window || {};
+    globalThis.fullstacked.workerStreams =
+        globalThis.fullstacked.workerStreams || new Map();
 
     const platformBridge = (await import("./platform/index.ts")).default;
     try {

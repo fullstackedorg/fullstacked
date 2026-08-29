@@ -420,10 +420,10 @@ async function runDirectory(
     }
 
     const newCtx = await run({ directory: targetDirectory, env });
+    await cleanupPlugins();
     if (!noOpen && typeof newCtx === "number") {
         globalThis.fullstacked.open?.(newCtx);
     }
-    await cleanupPlugins();
     return 0;
 }
 
