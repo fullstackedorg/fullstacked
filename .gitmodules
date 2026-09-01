@@ -10,3 +10,6 @@
 [submodule "plugins/sass"]
 	path = plugins/sass
 	url = https://github.com/fullstackedorg/sass.git
+[submodule "app/expected-keyboard"]
+	path = app/expected-keyboard
+	url = https://github.com/fullstackedorg/expected-keyboard
