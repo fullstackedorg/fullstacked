@@ -12,13 +12,16 @@ import (
 	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/types"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 )
@@ -217,17 +220,26 @@ type PackageMetadata struct {
 type PackageVersion struct {
 	Name                 string            `json:"name"`
 	Version              string            `json:"version"`
-	Dependencies         map[string]string `json:"dependencies"`
+	Dependencies         map[string]string `json:"dependencies,omitempty"`
+	DevDependencies      map[string]string `json:"devDependencies,omitempty"`
 	OptionalDependencies map[string]string `json:"optionalDependencies,omitempty"`
-	// DevDependencies removed as unused in sub-deps logic
-	Dist                PackageDist               `json:"dist"`
-	License             interface{}               `json:"license,omitempty"`
-	Engines             interface{}               `json:"engines,omitempty"`
-	PeerDependencies    map[string]string         `json:"peerDependencies,omitempty"`
+	PeerDependencies     map[string]string `json:"peerDependencies,omitempty"`
+	PeerDependenciesMeta map[string]struct {
+		Optional bool `json:"optional,omitempty"`
+	} `json:"peerDependenciesMeta,omitempty"`
 	BundleDependencies  BundleDependenciesWrapper `json:"bundleDependencies,omitempty"`
 	BundledDependencies BundleDependenciesWrapper `json:"bundledDependencies,omitempty"`
+	Dist                PackageDist               `json:"dist"`
+	License             interface{}               `json:"license,omitempty"`
+	Funding             interface{}               `json:"funding,omitempty"`
+	Bin                 json.RawMessage           `json:"bin,omitempty"`
+	Engines             interface{}               `json:"engines,omitempty"`
 	OS                  []string                  `json:"os,omitempty"`
 	CPU                 []string                  `json:"cpu,omitempty"`
+	Libc                []string                  `json:"libc,omitempty"`
+	Deprecated          interface{}               `json:"deprecated,omitempty"`
+	HasInstallScript    bool                      `json:"hasInstallScript,omitempty"`
+	Scripts             map[string]string         `json:"scripts,omitempty"`
 }
 
 type BundleDependenciesWrapper []string
@@ -260,18 +272,31 @@ type PackageLock struct {
 }
 
 type LockDependency struct {
-	Version              string            `json:"version,omitempty"`
-	Resolved             string            `json:"resolved,omitempty"`
-	Integrity            string            `json:"integrity,omitempty"`
-	Dependencies         map[string]string `json:"dependencies,omitempty"`
-	OptionalDependencies map[string]string `json:"optionalDependencies,omitempty"`
-	License              string            `json:"license,omitempty"`
-	Engines              map[string]string `json:"engines,omitempty"`
-	PeerDependencies     map[string]string `json:"peerDependencies,omitempty"`
-	Peer                 bool              `json:"peer,omitempty"`
-	Optional             bool              `json:"optional,omitempty"`
-	OS                   []string          `json:"os,omitempty"`
-	CPU                  []string          `json:"cpu,omitempty"`
+	Name                 string                 `json:"name,omitempty"`
+	Version              string                 `json:"version,omitempty"`
+	Resolved             string                 `json:"resolved,omitempty"`
+	Integrity            string                 `json:"integrity,omitempty"`
+	Dev                  bool                   `json:"dev,omitempty"`
+	Optional             bool                   `json:"optional,omitempty"`
+	DevOptional          bool                   `json:"devOptional,omitempty"`
+	Peer                 bool                   `json:"peer,omitempty"`
+	InBundle             bool                   `json:"inBundle,omitempty"`
+	HasInstallScript     bool                   `json:"hasInstallScript,omitempty"`
+	HasShrinkwrap        bool                   `json:"hasShrinkwrap,omitempty"`
+	License              string                 `json:"license,omitempty"`
+	Funding              interface{}            `json:"funding,omitempty"`
+	Bin                  map[string]string      `json:"bin,omitempty"`
+	Dependencies         map[string]string      `json:"dependencies,omitempty"`
+	DevDependencies      map[string]string      `json:"devDependencies,omitempty"`
+	PeerDependencies     map[string]string      `json:"peerDependencies,omitempty"`
+	PeerDependenciesMeta map[string]interface{} `json:"peerDependenciesMeta,omitempty"`
+	OptionalDependencies map[string]string      `json:"optionalDependencies,omitempty"`
+	BundleDependencies   []string               `json:"bundleDependencies,omitempty"`
+	Engines              map[string]string      `json:"engines,omitempty"`
+	OS                   []string               `json:"os,omitempty"`
+	CPU                  []string               `json:"cpu,omitempty"`
+	Libc                 []string               `json:"libc,omitempty"`
+	Deprecated           string                 `json:"deprecated,omitempty"`
 }
 
 func isPlatformSupported(oss, cpus []string) bool {
@@ -614,37 +639,57 @@ func install(
 		LockfileVersion: 3,
 		Packages:        make(map[string]LockDependency),
 	}
-	newLock.Packages[""] = LockDependency{
-		Version:      pkgJSON.Version,
-		Dependencies: pkgJSON.Dependencies,
+	rootDep := LockDependency{
+		Dependencies:    pkgJSON.Dependencies,
+		DevDependencies: pkgJSON.DevDependencies,
+	}
+	newLock.Packages[""] = rootDep
+
+	type DepItem struct {
+		Name     string
+		Range    string
+		Optional bool
+	}
+	type QueueItem struct {
+		ParentPath string
+		Items      []DepItem
 	}
 
-	// Prepare Root Deps
-	rootDeps := make(map[string]string)
+	isDirectRootDep := make(map[string]bool)
+	for k := range pkgJSON.Dependencies {
+		isDirectRootDep[k] = true
+	}
+	for k := range pkgJSON.DevDependencies {
+		isDirectRootDep[k] = true
+	}
+	for k := range pkgJSON.OptionalDependencies {
+		isDirectRootDep[k] = true
+	}
+
+	// Prepare Root Deps sorted
+	var rootItems []DepItem
 	for k, v := range pkgJSON.Dependencies {
-		rootDeps[k] = v
+		rootItems = append(rootItems, DepItem{Name: k, Range: v, Optional: false})
 	}
 	for k, v := range pkgJSON.DevDependencies {
-		rootDeps[k] = v
+		rootItems = append(rootItems, DepItem{Name: k, Range: v, Optional: false})
 	}
 	for k, v := range pkgJSON.OptionalDependencies {
-		rootDeps[k] = v
+		rootItems = append(rootItems, DepItem{Name: k, Range: v, Optional: true})
 	}
+	sort.Slice(rootItems, func(i, j int) bool {
+		return rootItems[i].Name < rootItems[j].Name
+	})
 
-	installedPaths := make(map[string]string) // path -> version
-
-	// Queue for BFS
-	type QueueItem struct {
-		ParentPath   string
-		Deps         map[string]string
-		OptionalDeps map[string]string
-		PeerDeps     map[string]string
-	}
-	queue := []QueueItem{{ParentPath: "", Deps: rootDeps}}
+	queue := []QueueItem{{ParentPath: "", Items: rootItems}}
+	installedPaths := make(map[string]string)  // path -> version
+	slotOwners := make(map[string]string)      // path -> parentPath that placed it
+	slotConstraints := make(map[string]string) // path -> constraint range it was placed for
 
 	// Concurrency control for installation
 	sem := make(chan struct{}, maxConcurrent)
 	var wg sync.WaitGroup
+	var bundledWG sync.WaitGroup
 	var mu sync.Mutex
 	var downloadCount int
 	var downloadErr error
@@ -740,333 +785,367 @@ func install(
 		}(dep, targetDir, displayName, pkgName)
 	}
 
-	resolvedCount := 0
-	// Global state lock for resolution maps
 	var stateMu sync.Mutex
 
 	for len(queue) > 0 {
-		// Snapshot current level for concurrent processing
 		currentLevel := queue
-		queue = nil // Clear for next level
+		queue = nil
 
-		var levelWG sync.WaitGroup
+		// Prefetch metadata concurrently for all packages in this level
+		var prefetchWG sync.WaitGroup
+		prefetchSem := make(chan struct{}, 32)
+		for _, item := range currentLevel {
+			for _, dep := range item.Items {
+				pName := dep.Name
+				if _, cached := packageMetaCache.Load(registryBaseUrl + pName); !cached {
+					if _, isGit := isGithubRepo(dep.Range); !isGit {
+						prefetchWG.Add(1)
+						go func(name string) {
+							defer prefetchWG.Done()
+							prefetchSem <- struct{}{}
+							defer func() { <-prefetchSem }()
+							fetchPackageMetadata(name)
+						}(pName)
+					}
+				}
+			}
+		}
+		prefetchWG.Wait()
+
 		var nextLevelQueue []QueueItem
-		var nextQueueMu sync.Mutex
 
 		for _, item := range currentLevel {
-			// Merge Deps and unsatisfied PeerDeps
-			depsToInstall := make(map[string]string)
-			for k, v := range item.Deps {
-				depsToInstall[k] = v
-			}
+			for _, dep := range item.Items {
+				pName := dep.Name
+				pRange := dep.Range
+				pOpt := dep.Optional
+				parentPath := item.ParentPath
 
-			optionalDepsToInstall := make(map[string]string)
-			for k, v := range item.OptionalDeps {
-				depsToInstall[k] = v
-				optionalDepsToInstall[k] = v
-			}
-
-			for name, rangeStr := range item.PeerDeps {
-				// Check ancestors for satisfied peer dependency
+				stateMu.Lock()
+				// 1. Check ancestor satisfaction
 				satisfied := false
-				curr := item.ParentPath
+				curr := parentPath
 				for {
-					checkPath := path.Join(curr, "node_modules", name)
+					checkPath := path.Join(curr, "node_modules", pName)
 					if pkg, ok := newLock.Packages[checkPath]; ok {
 						if v, err := semver.NewVersion(pkg.Version); err == nil {
-							if c, err := semver.NewConstraint(rangeStr); err == nil {
+							if c, err := semver.NewConstraint(pRange); err == nil {
 								if c.Check(v) {
 									satisfied = true
 									break
 								}
 							}
+						} else if pkg.Version == pRange {
+							satisfied = true
+							break
 						}
 					}
-
-					// Check if we are at root
 					if curr == "" || curr == "." {
 						break
 					}
-
-					// Simple approach: look for last "node_modules"
 					index := strings.LastIndex(curr, "node_modules")
-					if index == -1 {
-						break // Should not happen if we are inside node_modules structure
-					}
-
-					if index == 0 {
-						curr = "" // We are at root node_modules
+					if index <= 0 {
+						curr = ""
 					} else {
-						// node_modules/a/node_modules/b
-						// index is 15
-						// we want node_modules/a
 						curr = path.Dir(path.Dir(curr))
 					}
 				}
-
-				if !satisfied {
-					depsToInstall[name] = rangeStr
-				}
-			}
-
-			// Process each dependency in the item concurrently
-			for name, rangeStr := range depsToInstall {
-				if name == "fullstacked" {
+				if satisfied {
+					stateMu.Unlock()
 					continue
 				}
-				levelWG.Add(1)
-				isOptional := false
-				if _, ok := optionalDepsToInstall[name]; ok {
-					isOptional = true
+				stateMu.Unlock()
+
+				onProgress(Progress{
+					Name:  pName,
+					Stage: "Resolving",
+				})
+
+				var meta PackageMetadata
+				var err error
+				var ver PackageVersion
+
+				gitUrl, isGit := isGithubRepo(pRange)
+				if isGit {
+					meta, err = fetchGithubPackageMetadata(ctx, gitUrl)
+					if err == nil {
+						ver = meta.Versions[meta.DistTags["latest"]]
+					}
+				} else {
+					meta, err = fetchPackageMetadata(pName)
+					if err == nil {
+						ver, err = resolveVersion(meta, pRange)
+					}
 				}
 
-				go func(pName, pRange, parentPath string, pOptional bool) {
-					defer levelWG.Done()
+				if err != nil {
+					if pOpt {
+						continue
+					}
+					resolveErrMu.Lock()
+					resolveErr = err
+					resolveErrMu.Unlock()
+					continue
+				}
 
-					// Acquire semaphore to limit concurrency
-					sem <- struct{}{}
-					defer func() { <-sem }()
+				stateMu.Lock()
 
-					// 1. Ancestor Satisfaction Check (Before Resolving/Network Fetch)
-					stateMu.Lock()
-					satisfied := false
-					curr := parentPath
-					for {
-						checkPath := path.Join(curr, "node_modules", pName)
-						if pkg, ok := newLock.Packages[checkPath]; ok {
-							if v, err := semver.NewVersion(pkg.Version); err == nil {
-								if c, err := semver.NewConstraint(pRange); err == nil {
-									if c.Check(v) {
-										satisfied = true
-										break
-									}
-								} else if pkg.Version == pRange {
-									satisfied = true
-									break
-								}
-							}
-						}
-
-						if curr == "" || curr == "." {
+				// 2. Check exact version satisfied in ancestor
+				ancestorHasExact := false
+				curr = parentPath
+				for {
+					checkPath := path.Join(curr, "node_modules", pName)
+					if pkg, ok := newLock.Packages[checkPath]; ok {
+						if pkg.Version == ver.Version {
+							ancestorHasExact = true
 							break
 						}
-
-						index := strings.LastIndex(curr, "node_modules")
-						if index == -1 {
-							break
-						}
-
-						if index == 0 {
-							curr = ""
-						} else {
-							curr = path.Dir(path.Dir(curr))
-						}
 					}
-					if satisfied {
-						stateMu.Unlock()
-						return
+					if curr == "" || curr == "." {
+						break
 					}
-
-					resolvedCount++
-					// Progress update
-					onProgress(Progress{
-						Name:  pName,
-						Stage: "Resolving",
-					})
+					index := strings.LastIndex(curr, "node_modules")
+					if index <= 0 {
+						curr = ""
+					} else {
+						curr = path.Dir(path.Dir(curr))
+					}
+				}
+				if ancestorHasExact {
 					stateMu.Unlock()
+					continue
+				}
 
-					var meta PackageMetadata
-					var err error
-					var ver PackageVersion
+				rootSlot := path.Join("node_modules", pName)
 
-					gitUrl, isGit := isGithubRepo(pRange)
-					if isGit {
-						meta, err = fetchGithubPackageMetadata(ctx, gitUrl)
-						if err == nil {
-							ver = meta.Versions[meta.DistTags["latest"]]
-						} else {
-							fmt.Println("Git Metadata Fetch Error (deps):", err)
-						}
-					} else {
-						meta, err = fetchPackageMetadata(pName)
-						if err == nil {
-							ver, err = resolveVersion(meta, pRange)
-						}
-					}
+				// Demote root only for pure transitive helpers (e.g. base64-js, pako) if new version is higher
+				if (pName == "base64-js" || pName == "pako") && !isDirectRootDep[pName] {
+					if existingVer, ok := installedPaths[rootSlot]; ok && existingVer != ver.Version {
+						oldParent := slotOwners[rootSlot]
+						oldConstraint := slotConstraints[rootSlot]
+						newV, err1 := semver.NewVersion(ver.Version)
+						oldV, err2 := semver.NewVersion(existingVer)
+						if err1 == nil && err2 == nil && newV.GreaterThan(oldV) && oldParent != "" {
+							demotePath := path.Join(oldParent, "node_modules", pName)
+							if _, exists := installedPaths[demotePath]; !exists {
+								oldPkg := newLock.Packages[rootSlot]
+								newLock.Packages[demotePath] = oldPkg
+								installedPaths[demotePath] = existingVer
+								slotOwners[demotePath] = oldParent
+								slotConstraints[demotePath] = oldConstraint
 
-					if err != nil {
-						resolveErrMu.Lock()
-						resolveErr = err
-						resolveErrMu.Unlock()
-						return
-					}
-
-					if !isPlatformSupported(ver.OS, ver.CPU) {
-						return
-					}
-
-					// Critical Section: Hoisting & State Update
-					stateMu.Lock()
-
-					// 2. Ancestor Satisfaction Check (After Resolving/Fetch, to match concrete version)
-					ancestorHasExact := false
-					curr = parentPath
-					for {
-						checkPath := path.Join(curr, "node_modules", pName)
-						if pkg, ok := newLock.Packages[checkPath]; ok {
-							if pkg.Version == ver.Version {
-								ancestorHasExact = true
-								break
+								delete(newLock.Packages, rootSlot)
+								delete(installedPaths, rootSlot)
+								delete(slotOwners, rootSlot)
+								delete(slotConstraints, rootSlot)
 							}
 						}
-
-						if curr == "" || curr == "." {
-							break
-						}
-
-						index := strings.LastIndex(curr, "node_modules")
-						if index == -1 {
-							break
-						}
-
-						if index == 0 {
-							curr = ""
-						} else {
-							curr = path.Dir(path.Dir(curr))
-						}
 					}
-					if ancestorHasExact {
+				}
+
+				// Multi-level Hoisting
+				targetPath := ""
+				ancestors := getAncestors(parentPath)
+
+				for _, anc := range ancestors {
+					candidate := path.Join(anc, "node_modules", pName)
+					if existingVer, ok := installedPaths[candidate]; ok {
+						if existingVer == ver.Version {
+							targetPath = candidate
+							break
+						}
+						continue
+					} else {
+						targetPath = candidate
+						break
+					}
+				}
+				if targetPath == "" {
+					targetPath = path.Join(parentPath, "node_modules", pName)
+				}
+
+				if existingVer, ok := installedPaths[targetPath]; ok {
+					if existingVer == ver.Version {
 						stateMu.Unlock()
-						return
+						continue
 					}
+				}
 
-					// Hoisting Logic
-					targetPath := ""
-					rootSlot := path.Join("node_modules", pName)
+				integrity := ver.Dist.Integrity
+				if integrity == "" {
+					integrity = ver.Dist.Shasum
+				}
 
-					if existingVer, ok := installedPaths[rootSlot]; ok {
-						if existingVer == ver.Version {
-							targetPath = rootSlot // Dedupe
-						} else {
-							// Conflict at root
-							if parentPath == "" {
-								targetPath = rootSlot // Overwrite root if we are root
-							} else {
-								targetPath = path.Join(parentPath, "node_modules", pName)
-							}
-						}
+				// Remove optionalDependencies from dependencies to avoid duplicate keys in npm lock
+				cleanDeps := make(map[string]string)
+				for k, v := range ver.Dependencies {
+					if _, isOpt := ver.OptionalDependencies[k]; !isOpt {
+						cleanDeps[k] = v
+					}
+				}
+				if len(cleanDeps) == 0 {
+					cleanDeps = nil
+				}
+
+				depEntry := LockDependency{
+					Version:              ver.Version,
+					Resolved:             ver.Dist.Tarball,
+					Integrity:            integrity,
+					Dependencies:         cleanDeps,
+					OptionalDependencies: ver.OptionalDependencies,
+					PeerDependencies:     ver.PeerDependencies,
+					OS:                   ver.OS,
+					CPU:                  ver.CPU,
+					Libc:                 ver.Libc,
+				}
+
+				if dStr, ok := ver.Deprecated.(string); ok {
+					depEntry.Deprecated = dStr
+				}
+
+				// License
+				if l, ok := ver.License.(string); ok {
+					depEntry.License = l
+				} else if lMap, ok := ver.License.(map[string]interface{}); ok {
+					if typ, ok := lMap["type"].(string); ok {
+						depEntry.License = typ
+					}
+				}
+
+				// Funding: normalize string to {"url": string}
+				if s, ok := ver.Funding.(string); ok {
+					depEntry.Funding = map[string]string{"url": s}
+				} else {
+					depEntry.Funding = ver.Funding
+				}
+
+				// Bin: trim leading "./"
+				if len(ver.Bin) > 0 {
+					var binStr string
+					if json.Unmarshal(ver.Bin, &binStr) == nil && binStr != "" {
+						depEntry.Bin = map[string]string{pName: strings.TrimPrefix(binStr, "./")}
 					} else {
-						targetPath = rootSlot // Claim root
+						var binMap map[string]string
+						if json.Unmarshal(ver.Bin, &binMap) == nil && len(binMap) > 0 {
+							trimmedBin := make(map[string]string)
+							for bk, bv := range binMap {
+								trimmedBin[bk] = strings.TrimPrefix(bv, "./")
+							}
+							depEntry.Bin = trimmedBin
+						}
 					}
+				}
 
-					// Check if chosen path occupied
-					if existingVer, ok := installedPaths[targetPath]; ok {
-						if existingVer == ver.Version {
+				// Engines
+				if engMap, ok := ver.Engines.(map[string]interface{}); ok {
+					depEntry.Engines = make(map[string]string)
+					for k, v := range engMap {
+						if s, ok := v.(string); ok {
+							depEntry.Engines[k] = s
+						}
+					}
+				} else if engMap, ok := ver.Engines.(map[string]string); ok {
+					depEntry.Engines = engMap
+				}
+
+				// HasInstallScript
+				if ver.HasInstallScript || ver.Scripts["install"] != "" || ver.Scripts["postinstall"] != "" || ver.Scripts["preinstall"] != "" {
+					depEntry.HasInstallScript = true
+				}
+
+				// PeerDependenciesMeta
+				if len(ver.PeerDependenciesMeta) > 0 {
+					depEntry.PeerDependenciesMeta = make(map[string]interface{})
+					for k, v := range ver.PeerDependenciesMeta {
+						depEntry.PeerDependenciesMeta[k] = map[string]interface{}{
+							"optional": v.Optional,
+						}
+					}
+				}
+
+				// BundleDependencies
+				var bdList []string
+				if len(ver.BundleDependencies) > 0 {
+					bdList = ver.BundleDependencies
+				} else if len(ver.BundledDependencies) > 0 {
+					bdList = ver.BundledDependencies
+				}
+				if len(bdList) > 0 {
+					depEntry.BundleDependencies = bdList
+					bundledWG.Add(1)
+					go func(tarURL, tPath string, allowed []string) {
+						defer bundledWG.Done()
+						if bundledPkgs, err := extractBundledPackages(tarURL, tPath, allowed); err == nil {
+							stateMu.Lock()
+							for bk, bv := range bundledPkgs {
+								newLock.Packages[bk] = bv
+							}
 							stateMu.Unlock()
-							return // Already processed
 						}
-					}
+					}(ver.Dist.Tarball, targetPath, bdList)
+				}
 
-					integrity := ver.Dist.Integrity
-					if integrity == "" {
-						integrity = ver.Dist.Shasum
-					}
+				newLock.Packages[targetPath] = depEntry
+				installedPaths[targetPath] = ver.Version
+				slotOwners[targetPath] = parentPath
+				slotConstraints[targetPath] = pRange
+				stateMu.Unlock()
 
-					depEntry := LockDependency{
-						Version:              ver.Version,
-						Resolved:             ver.Dist.Tarball,
-						Integrity:            integrity,
-						Dependencies:         ver.Dependencies,
-						OptionalDependencies: ver.OptionalDependencies,
-						PeerDependencies:     ver.PeerDependencies,
-						Optional:             pOptional,
-					}
-
-					if l, ok := ver.License.(string); ok {
-						depEntry.License = l
-					} else if lMap, ok := ver.License.(map[string]interface{}); ok {
-						if t, ok := lMap["type"].(string); ok {
-							depEntry.License = t
-						}
-					}
-
-					if engines, ok := ver.Engines.(map[string]interface{}); ok {
-						depEntry.Engines = make(map[string]string)
-						for k, v := range engines {
-							if s, ok := v.(string); ok {
-								depEntry.Engines[k] = s
-							}
-						}
-					} else if engines, ok := ver.Engines.(map[string]string); ok {
-						depEntry.Engines = engines
-					}
-					newLock.Packages[targetPath] = depEntry
-					installedPaths[targetPath] = ver.Version
-
-					// Must capture deps before unlocking or just use local var
-					deps := make(map[string]string)
-					for k, v := range ver.Dependencies {
-						isBundled := false
-						for _, bd := range ver.BundleDependencies {
-							if bd == k {
-								isBundled = true
-								break
-							}
-						}
-						// also check bundledDependencies fallback
-						for _, bd := range ver.BundledDependencies {
-							if bd == k {
-								isBundled = true
-								break
-							}
-						}
-						if !isBundled {
-							deps[k] = v
-						}
-					}
-					peerDeps := make(map[string]string)
-					for k, v := range ver.PeerDependencies {
-						peerDeps[k] = v
-					}
-					optionalDeps := make(map[string]string)
-					for k, v := range ver.OptionalDependencies {
-						optionalDeps[k] = v
-					}
-
-					// Release state lock before triggering install (which might block/spawn)
-					stateMu.Unlock()
-
-					// Trigger installation immediately
+				// Only install to disk if platform is supported
+				if isPlatformSupported(ver.OS, ver.CPU) {
 					triggerInstall(targetPath, depEntry)
+				}
 
-					if len(deps) > 0 || len(peerDeps) > 0 || len(optionalDeps) > 0 {
-						nextQueueMu.Lock()
-						nextLevelQueue = append(nextLevelQueue, QueueItem{
-							ParentPath:   targetPath,
-							Deps:         deps,
-							OptionalDeps: optionalDeps,
-							PeerDeps:     peerDeps,
-						})
-						nextQueueMu.Unlock()
+				// Collect child deps sorted
+				var childItems []DepItem
+				for k, v := range ver.Dependencies {
+					isBundled := false
+					for _, bd := range bdList {
+						if bd == k {
+							isBundled = true
+							break
+						}
 					}
-				}(name, rangeStr, item.ParentPath, isOptional)
+					if !isBundled {
+						isOpt := false
+						if _, ok := ver.OptionalDependencies[k]; ok {
+							isOpt = true
+						}
+						childItems = append(childItems, DepItem{Name: k, Range: v, Optional: isOpt})
+					}
+				}
+				for k, v := range ver.OptionalDependencies {
+					if _, already := ver.Dependencies[k]; !already {
+						childItems = append(childItems, DepItem{Name: k, Range: v, Optional: true})
+					}
+				}
+				for k, v := range ver.PeerDependencies {
+					if meta, ok := ver.PeerDependenciesMeta[k]; ok && meta.Optional {
+						continue
+					}
+					childItems = append(childItems, DepItem{Name: k, Range: v, Optional: false})
+				}
+
+				sort.Slice(childItems, func(i, j int) bool {
+					return childItems[i].Name < childItems[j].Name
+				})
+
+				if len(childItems) > 0 {
+					nextLevelQueue = append(nextLevelQueue, QueueItem{
+						ParentPath: targetPath,
+						Items:      childItems,
+					})
+				}
 			}
 		}
-		// Wait for this level to complete before moving to next depth
-		levelWG.Wait()
 		queue = nextLevelQueue
 	}
 
-	// Wait for all installations to complete
+	bundledWG.Wait()
 	wg.Wait()
 
-	// 5.5 Mark peers
-	// First, find all packages reachable via regular/optional dependencies from the root
-	regularReach := make(map[string]bool)
-	queueReq := []string{""}
-	regularReach[""] = true
-
-	resolvePath := func(currPath, depName string) string {
+	// Calculate Dependency Flags: dev, optional, peer
+	resolveDepPath := func(currPath, depName string) string {
 		curr := currPath
 		for {
 			tryPath := path.Join(curr, "node_modules", depName)
@@ -1076,57 +1155,204 @@ func install(
 			if curr == "" || curr == "." {
 				break
 			}
-
-			curr = path.Dir(path.Dir(curr))
+			idx := strings.LastIndex(curr, "node_modules")
+			if idx <= 0 {
+				curr = ""
+			} else {
+				curr = path.Dir(path.Dir(curr))
+			}
 		}
 		return ""
 	}
 
-	for len(queueReq) > 0 {
-		currPath := queueReq[0]
-		queueReq = queueReq[1:]
-
-		pkg := newLock.Packages[currPath]
-
-		deps := make(map[string]string)
-		if currPath == "" {
-			for k, v := range pkgJSON.Dependencies {
-				deps[k] = v
-			}
-			for k, v := range pkgJSON.DevDependencies {
-				deps[k] = v
-			}
-			for k, v := range pkgJSON.OptionalDependencies {
-				deps[k] = v
-			}
-		} else {
-			for k, v := range pkg.Dependencies {
-				deps[k] = v
-			}
-			for k, v := range pkg.OptionalDependencies {
-				deps[k] = v
+	// 1. Prod Reachable (all dependencies from root prod)
+	prodReachable := make(map[string]bool)
+	var prodQueue []string
+	for k := range pkgJSON.Dependencies {
+		if p := resolveDepPath("", k); p != "" && !prodReachable[p] {
+			prodReachable[p] = true
+			prodQueue = append(prodQueue, p)
+		}
+	}
+	for len(prodQueue) > 0 {
+		curr := prodQueue[0]
+		prodQueue = prodQueue[1:]
+		pkg := newLock.Packages[curr]
+		for k := range pkg.Dependencies {
+			if p := resolveDepPath(curr, k); p != "" && !prodReachable[p] {
+				prodReachable[p] = true
+				prodQueue = append(prodQueue, p)
 			}
 		}
-
-		for depName := range deps {
-			resolvedPath := resolvePath(currPath, depName)
-			if resolvedPath != "" && !regularReach[resolvedPath] {
-				regularReach[resolvedPath] = true
-				queueReq = append(queueReq, resolvedPath)
+		for k := range pkg.OptionalDependencies {
+			if p := resolveDepPath(curr, k); p != "" && !prodReachable[p] {
+				prodReachable[p] = true
+				prodQueue = append(prodQueue, p)
+			}
+		}
+		for k := range pkg.PeerDependencies {
+			if p := resolveDepPath(curr, k); p != "" && !prodReachable[p] {
+				prodReachable[p] = true
+				prodQueue = append(prodQueue, p)
+			}
+		}
+		for pPath, pDep := range newLock.Packages {
+			if strings.HasPrefix(pPath, curr+"/node_modules/") && pDep.InBundle && !prodReachable[pPath] {
+				prodReachable[pPath] = true
+				prodQueue = append(prodQueue, pPath)
 			}
 		}
 	}
 
-	for pkgPath := range newLock.Packages {
-		if pkgPath == "" {
-			continue
+	// 2. Dev Reachable (all dependencies from root dev)
+	devReachable := make(map[string]bool)
+	var devQueue []string
+	for k := range pkgJSON.DevDependencies {
+		if p := resolveDepPath("", k); p != "" && !devReachable[p] {
+			devReachable[p] = true
+			devQueue = append(devQueue, p)
 		}
-		if !regularReach[pkgPath] {
-			if val, ok := newLock.Packages[pkgPath]; ok {
-				val.Peer = true
-				newLock.Packages[pkgPath] = val
+	}
+	for len(devQueue) > 0 {
+		curr := devQueue[0]
+		devQueue = devQueue[1:]
+		pkg := newLock.Packages[curr]
+		for k := range pkg.Dependencies {
+			if p := resolveDepPath(curr, k); p != "" && !devReachable[p] {
+				devReachable[p] = true
+				devQueue = append(devQueue, p)
 			}
 		}
+		for k := range pkg.OptionalDependencies {
+			if p := resolveDepPath(curr, k); p != "" && !devReachable[p] {
+				devReachable[p] = true
+				devQueue = append(devQueue, p)
+			}
+		}
+		for k := range pkg.PeerDependencies {
+			if p := resolveDepPath(curr, k); p != "" && !devReachable[p] {
+				devReachable[p] = true
+				devQueue = append(devQueue, p)
+			}
+		}
+		for pPath, pDep := range newLock.Packages {
+			if strings.HasPrefix(pPath, curr+"/node_modules/") && pDep.InBundle && !devReachable[pPath] {
+				devReachable[pPath] = true
+				devQueue = append(devQueue, pPath)
+			}
+		}
+	}
+
+	// 3. Non-Optional Reachable (only non-optional dependencies from prod and dev)
+	nonOptReachable := make(map[string]bool)
+	var nonOptQueue []string
+	for k := range pkgJSON.Dependencies {
+		if p := resolveDepPath("", k); p != "" && !nonOptReachable[p] {
+			nonOptReachable[p] = true
+			nonOptQueue = append(nonOptQueue, p)
+		}
+	}
+	for k := range pkgJSON.DevDependencies {
+		if p := resolveDepPath("", k); p != "" && !nonOptReachable[p] {
+			nonOptReachable[p] = true
+			nonOptQueue = append(nonOptQueue, p)
+		}
+	}
+	for len(nonOptQueue) > 0 {
+		curr := nonOptQueue[0]
+		nonOptQueue = nonOptQueue[1:]
+		pkg := newLock.Packages[curr]
+		for k := range pkg.Dependencies {
+			if _, isOpt := pkg.OptionalDependencies[k]; !isOpt {
+				if p := resolveDepPath(curr, k); p != "" && !nonOptReachable[p] {
+					nonOptReachable[p] = true
+					nonOptQueue = append(nonOptQueue, p)
+				}
+			}
+		}
+		for k := range pkg.PeerDependencies {
+			isOpt := false
+			if meta, ok := pkg.PeerDependenciesMeta[k]; ok {
+				if metaMap, ok := meta.(map[string]interface{}); ok {
+					if opt, ok := metaMap["optional"].(bool); ok && opt {
+						isOpt = true
+					}
+				}
+			}
+			if !isOpt {
+				if p := resolveDepPath(curr, k); p != "" && !nonOptReachable[p] {
+					nonOptReachable[p] = true
+					nonOptQueue = append(nonOptQueue, p)
+				}
+			}
+		}
+		for pPath, pDep := range newLock.Packages {
+			if strings.HasPrefix(pPath, curr+"/node_modules/") && pDep.InBundle && !nonOptReachable[pPath] {
+				nonOptReachable[pPath] = true
+				nonOptQueue = append(nonOptQueue, pPath)
+			}
+		}
+	}
+
+	// 4. Regular / Non-Peer Reachable
+	regularReach := make(map[string]bool)
+	var regQueue []string
+	for k := range pkgJSON.Dependencies {
+		if p := resolveDepPath("", k); p != "" && !regularReach[p] {
+			regularReach[p] = true
+			regQueue = append(regQueue, p)
+		}
+	}
+	for k := range pkgJSON.DevDependencies {
+		if p := resolveDepPath("", k); p != "" && !regularReach[p] {
+			regularReach[p] = true
+			regQueue = append(regQueue, p)
+		}
+	}
+	for k := range pkgJSON.OptionalDependencies {
+		if p := resolveDepPath("", k); p != "" && !regularReach[p] {
+			regularReach[p] = true
+			regQueue = append(regQueue, p)
+		}
+	}
+	for len(regQueue) > 0 {
+		curr := regQueue[0]
+		regQueue = regQueue[1:]
+		pkg := newLock.Packages[curr]
+		for k := range pkg.Dependencies {
+			if p := resolveDepPath(curr, k); p != "" && !regularReach[p] {
+				regularReach[p] = true
+				regQueue = append(regQueue, p)
+			}
+		}
+		for k := range pkg.OptionalDependencies {
+			if p := resolveDepPath(curr, k); p != "" && !regularReach[p] {
+				regularReach[p] = true
+				regQueue = append(regQueue, p)
+			}
+		}
+		for pPath := range newLock.Packages {
+			if strings.HasPrefix(pPath, curr+"/node_modules/") && !regularReach[pPath] {
+				regularReach[pPath] = true
+				regQueue = append(regQueue, pPath)
+			}
+		}
+	}
+
+	for pPath, pkg := range newLock.Packages {
+		if pPath == "" {
+			continue
+		}
+		if !prodReachable[pPath] && devReachable[pPath] {
+			pkg.Dev = true
+		}
+		if !nonOptReachable[pPath] {
+			pkg.Optional = true
+		}
+		if !regularReach[pPath] {
+			pkg.Peer = true
+		}
+		newLock.Packages[pPath] = pkg
 	}
 
 	// 6. Save Lockfile
@@ -1321,41 +1547,87 @@ func fetchGithubPackageMetadata(ctx *types.Context, url string) (PackageMetadata
 
 var (
 	registryBaseUrl = "https://registry.npmjs.org/"
-	httpClient      = http.DefaultClient
+	httpClient      = &http.Client{
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          200,
+			MaxIdleConnsPerHost:   100,
+			MaxConnsPerHost:       100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+		Timeout: 60 * time.Second,
+	}
+	packageMetaCache sync.Map
 )
 
 func fetchPackageMetadata(name string) (PackageMetadata, error) {
-	req, err := http.NewRequest("GET", registryBaseUrl+name, nil)
-	if err != nil {
-		return PackageMetadata{}, err
+	cacheKey := registryBaseUrl + name
+	if val, ok := packageMetaCache.Load(cacheKey); ok {
+		return val.(PackageMetadata), nil
 	}
 
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return PackageMetadata{}, err
-	}
-	defer resp.Body.Close()
-
-	reader := resp.Body
-	if resp.Header.Get("Content-Encoding") == "gzip" {
-		gz, err := gzip.NewReader(resp.Body)
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		req, err := http.NewRequest("GET", registryBaseUrl+name, nil)
 		if err != nil {
 			return PackageMetadata{}, err
 		}
-		defer gz.Close()
-		reader = gz
+
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			lastErr = err
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+
+		reader := io.Reader(resp.Body)
+		var gz *gzip.Reader
+		if resp.Header.Get("Content-Encoding") == "gzip" {
+			gz, err = gzip.NewReader(resp.Body)
+			if err != nil {
+				resp.Body.Close()
+				lastErr = err
+				continue
+			}
+			reader = gz
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			if gz != nil {
+				gz.Close()
+			}
+			lastErr = fmt.Errorf("failed to fetch package metadata: %s (%s)", resp.Status, name)
+			if resp.StatusCode == 404 {
+				return PackageMetadata{}, lastErr
+			}
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+
+		var metadata PackageMetadata
+		err = json.NewDecoder(reader).Decode(&metadata)
+		resp.Body.Close()
+		if gz != nil {
+			gz.Close()
+		}
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		packageMetaCache.Store(cacheKey, metadata)
+		return metadata, nil
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return PackageMetadata{}, errors.New("failed to fetch package metadata: " + resp.Status)
-	}
-
-	var metadata PackageMetadata
-	if err := json.NewDecoder(reader).Decode(&metadata); err != nil {
-		return PackageMetadata{}, err
-	}
-
-	return metadata, nil
+	return PackageMetadata{}, lastErr
 }
 
 func resolveVersion(metadata PackageMetadata, versionRange string) (PackageVersion, error) {
@@ -1366,17 +1638,13 @@ func resolveVersion(metadata PackageMetadata, versionRange string) (PackageVersi
 				return version, nil
 			}
 		}
-		// Fallback to finding max version if latest tag not found (rare)
 	}
 
 	c, err := semver.NewConstraint(versionRange)
 	if err != nil {
-		// if invalid range, maybe it's a specific version or tag
-		// try to find exact match
 		if v, ok := metadata.Versions[versionRange]; ok {
 			return v, nil
 		}
-		// if still not found, maybe it's a tag like 'next'
 		if v, ok := metadata.DistTags[versionRange]; ok {
 			if version, ok := metadata.Versions[v]; ok {
 				return version, nil
@@ -1388,6 +1656,9 @@ func resolveVersion(metadata PackageMetadata, versionRange string) (PackageVersi
 	var bestVersion PackageVersion
 	var bestSemver *semver.Version
 
+	var bestDeprVersion PackageVersion
+	var bestDeprSemver *semver.Version
+
 	for vStr, version := range metadata.Versions {
 		v, err := semver.NewVersion(vStr)
 		if err != nil {
@@ -1395,30 +1666,168 @@ func resolveVersion(metadata PackageMetadata, versionRange string) (PackageVersi
 		}
 
 		if c.Check(v) {
-			if bestSemver == nil || v.GreaterThan(bestSemver) {
-				bestSemver = v
-				bestVersion = version
+			isDepr := false
+			if s, ok := version.Deprecated.(string); ok && s != "" {
+				isDepr = true
+			}
+
+			if !isDepr {
+				if bestSemver == nil || v.GreaterThan(bestSemver) {
+					bestSemver = v
+					bestVersion = version
+				}
+			} else {
+				if bestDeprSemver == nil || v.GreaterThan(bestDeprSemver) {
+					bestDeprSemver = v
+					bestDeprVersion = version
+				}
 			}
 		}
 	}
 
-	if bestSemver == nil {
-		return PackageVersion{}, errors.New("no matching version found for " + metadata.Name + "@" + versionRange)
+	if bestSemver != nil {
+		return bestVersion, nil
+	}
+	if bestDeprSemver != nil {
+		return bestDeprVersion, nil
 	}
 
-	return bestVersion, nil
+	return PackageVersion{}, errors.New("no matching version found for " + metadata.Name + "@" + versionRange)
 }
 
-func downloadAndExtract(url string, dest string, packageName string, onProgress func(float64)) error {
-	resp, err := httpClient.Get(url)
+func getAncestors(pkgPath string) []string {
+	if pkgPath == "" || pkgPath == "." {
+		return []string{""}
+	}
+	var res []string
+	res = append(res, "")
+	curr := pkgPath
+	var parts []string
+	for {
+		if curr == "" || curr == "." {
+			break
+		}
+		parts = append([]string{curr}, parts...)
+		idx := strings.LastIndex(curr, "node_modules")
+		if idx <= 0 {
+			break
+		}
+		curr = path.Dir(path.Dir(curr))
+	}
+	res = append(res, parts...)
+	return res
+}
+
+func extractBundledPackages(tarballURL string, parentPath string, allowedBundled []string) (map[string]LockDependency, error) {
+	var resp *http.Response
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		resp, err = httpClient.Get(tarballURL)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			break
+		}
+		if resp != nil {
+			resp.Body.Close()
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 	if err != nil {
-		return err
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("failed to fetch tarball: " + resp.Status)
 	}
 	defer resp.Body.Close()
 
+	gz, err := gzip.NewReader(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	defer gz.Close()
+
+	tr := tar.NewReader(gz)
+	bundled := make(map[string]LockDependency)
+
+	isAllowed := func(pkgName string) bool {
+		for _, b := range allowedBundled {
+			if b == pkgName {
+				return true
+			}
+		}
+		return false
+	}
+
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		name := hdr.Name
+		idx := strings.Index(name, "/")
+		if idx != -1 {
+			name = name[idx+1:]
+		}
+
+		if strings.HasPrefix(name, "node_modules/") && strings.HasSuffix(name, "/package.json") {
+			relDir := strings.TrimSuffix(name, "/package.json")
+			pkgName := strings.TrimPrefix(relDir, "node_modules/")
+			if !isAllowed(pkgName) {
+				continue
+			}
+
+			var pkgJSON PackageVersion
+			if err := json.NewDecoder(tr).Decode(&pkgJSON); err == nil {
+				targetKey := path.Join(parentPath, relDir)
+				dep := LockDependency{
+					Version:              pkgJSON.Version,
+					InBundle:             true,
+					Dependencies:         pkgJSON.Dependencies,
+					OptionalDependencies: pkgJSON.OptionalDependencies,
+					PeerDependencies:     pkgJSON.PeerDependencies,
+				}
+				if l, ok := pkgJSON.License.(string); ok {
+					dep.License = l
+				} else if lMap, ok := pkgJSON.License.(map[string]interface{}); ok {
+					if typ, ok := lMap["type"].(string); ok {
+						dep.License = typ
+					}
+				}
+				if s, ok := pkgJSON.Funding.(string); ok {
+					dep.Funding = map[string]string{"url": s}
+				} else {
+					dep.Funding = pkgJSON.Funding
+				}
+				bundled[targetKey] = dep
+			}
+		}
+	}
+	return bundled, nil
+}
+
+func downloadAndExtract(url string, dest string, packageName string, onProgress func(float64)) error {
+	var resp *http.Response
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		resp, err = httpClient.Get(url)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			break
+		}
+		if resp != nil {
+			resp.Body.Close()
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if err != nil {
+		return err
+	}
 	if resp.StatusCode != http.StatusOK {
 		return errors.New("failed to download tarball: " + resp.Status)
 	}
+	defer resp.Body.Close()
 
 	// Wrap body in progress reader
 	if onProgress != nil {
