@@ -1,4 +1,8 @@
-import { DeserializedData, SerializableData, Test } from "../@types/index.ts";
+import {
+    type DeserializedData,
+    type SerializableData,
+    Test
+} from "../@types/index.ts";
 import {
     EventEmitter as EventEmitterFn,
     Hello,
@@ -8,8 +12,8 @@ import {
     StreamWrite,
     Panic
 } from "../@types/test.ts";
-import { Duplex } from "../bridge/duplex.ts";
-import { EventEmitter } from "../bridge/eventEmitter.ts";
+import type { Duplex } from "../bridge/duplex.ts";
+import type { EventEmitter } from "../bridge/eventEmitter.ts";
 
 function hello(): string {
     return globalThis.fullstacked.bridge(

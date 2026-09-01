@@ -1,17 +1,17 @@
 import {
     convertGoFileInfo,
     decodeStringData,
-    Dirent,
+    type Dirent,
     fileInfoToStat,
     formatPathLike,
-    PathLike,
-    ReadDirOpts,
-    ReadFileOpts,
-    StatOpts,
-    Stats as StatsInterface
+    type PathLike,
+    type ReadDirOpts,
+    type ReadFileOpts,
+    type StatOpts,
+    type Stats as StatsInterface
 } from "./common.ts";
 import {
-    GoFileInfo,
+    type GoFileInfo,
     ReadDir,
     ReadFile,
     Stats,

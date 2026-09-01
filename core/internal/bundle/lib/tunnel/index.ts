@@ -1,5 +1,5 @@
 import { Tunnel as TunnelMod } from "../@types/index.ts";
-import { Register, Tunnel } from "../@types/tunnel.ts";
+import { Register, type Tunnel } from "../@types/tunnel.ts";
 
 export function register(tunnel: Tunnel): Promise<string> {
     return globalThis.fullstacked.bridge({

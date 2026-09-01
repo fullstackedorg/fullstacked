@@ -4,7 +4,7 @@ import {
     Copy,
     CreateWriteStream,
     Exists,
-    GoFileInfo,
+    type GoFileInfo,
     Mkdir,
     ReadDir,
     ReadFile,
@@ -16,18 +16,18 @@ import {
 } from "../@types/fs.ts";
 import { Fs } from "../@types/index.ts";
 import { Writable } from "stream";
-import { Duplex } from "../bridge/duplex.ts";
+import type { Duplex } from "../bridge/duplex.ts";
 import {
     convertGoFileInfo,
     decodeStringData,
-    Dirent,
+    type Dirent,
     fileInfoToStat,
     formatPathLike,
-    PathLike,
-    ReadDirOpts,
-    ReadFileOpts,
-    StatOpts,
-    Stats as StatsInterface
+    type PathLike,
+    type ReadDirOpts,
+    type ReadFileOpts,
+    type StatOpts,
+    type Stats as StatsInterface
 } from "./common.ts";
 import promises from "./promises.ts";
 import { resolve } from "../path/index.ts";

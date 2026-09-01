@@ -1,12 +1,12 @@
 import { Bundle } from "../@types/index.ts";
 import {
     EsbuildVersion,
-    EsbuildResult,
+    type EsbuildResult,
     BundleDir,
     BundleFile
 } from "../@types/bundle.ts";
 import path from "../path/index.ts";
-import { Duplex } from "../bridge/duplex.ts";
+import type { Duplex } from "../bridge/duplex.ts";
 
 export function esbuildVersion(): Promise<string> {
     return globalThis.fullstacked.bridge({

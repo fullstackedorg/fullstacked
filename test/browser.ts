@@ -110,7 +110,7 @@ export async function createBrowser(
 
     activeBrowser.add(b);
 
-    return b
+    return b;
 }
 
 export function stopAllBrowsers() {

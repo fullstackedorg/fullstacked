@@ -7,7 +7,10 @@ import path from "../path/index.ts";
 import fs from "../fs/index.ts";
 import version from "../process/version.json" with { type: "json" };
 import os from "../os/index.ts";
-import { getActiveInterfaces, waitForInterfaces } from "../readline/interface.ts";
+import {
+    getActiveInterfaces,
+    waitForInterfaces
+} from "../readline/interface.ts";
 
 export interface ExecuteOptions {
     stdio?: any[];
@@ -552,7 +555,10 @@ Directory:
     );
 }
 
-export { getActiveInterfaces, waitForInterfaces } from "../readline/interface.ts";
+export {
+    getActiveInterfaces,
+    waitForInterfaces
+} from "../readline/interface.ts";
 
 const fullstacked = {
     execute,

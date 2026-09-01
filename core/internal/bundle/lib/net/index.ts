@@ -3,7 +3,7 @@
 import "buffer";
 import { Net } from "../@types/index.ts";
 import { Connect } from "../@types/net.ts";
-import { Duplex } from "../bridge/duplex.ts";
+import type { Duplex } from "../bridge/duplex.ts";
 import { Duplex as RealDuplex } from "stream";
 
 function parseOptions(

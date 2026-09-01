@@ -4,8 +4,8 @@ import {
     MAX_UINT_4_BYTES,
     NUMBER,
     OBJECT,
-    SerializableData,
-    SerializableDataType,
+    type SerializableData,
+    type SerializableDataType,
     STRING,
     UNDEFINED
 } from "../@types/index.ts";

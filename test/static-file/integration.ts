@@ -1,5 +1,5 @@
 import test, { before, suite, after } from "node:test";
-import { Browser, createBrowser } from "../browser.ts";
+import { type Browser, createBrowser } from "../browser.ts";
 import assert from "node:assert";
 import { HTTPResponse } from "puppeteer";
 import fs from "../../core/internal/bundle/lib/fs/index.ts";

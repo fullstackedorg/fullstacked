@@ -1,13 +1,13 @@
 {
     "version": "1.0.0-alpha",
     "scripts": {
-        "generate-types": "node -r @nitrogql/esbuild-register generate-types",
-        "build": "node -r @nitrogql/esbuild-register build",
-        "start": "node -r @nitrogql/esbuild-register index",
+        "generate-types": "node generate-types.ts",
+        "build": "node build.ts",
+        "start": "node index.ts",
         "fmt": "sh ./fmt.sh",
         "typecheck": "tsc --noEmit",
         "pretest": "npm run build && npm run build -w platform/node",
-        "test": "node --experimental-test-coverage --test-coverage-exclude='**/*.js' --test-coverage-exclude='**/*.cjs' --test-coverage-exclude='test/**/*' -r @nitrogql/esbuild-register test"
+        "test": "node --experimental-test-coverage --test-coverage-exclude='**/*.js' --test-coverage-exclude='**/*.cjs' --test-coverage-exclude='test/**/*' test/index.ts"
     },
     "workspaces": [
         "app/*",
@@ -25,7 +25,6 @@
     },
     "dependencies": {
         "@aws-sdk/client-s3": "^3.1091.0",
-        "@nitrogql/esbuild-register": "^1.7.2",
         "@tailwindcss/cli": "^4.3.3",
         "@types/node": "^26.1.1",
         "@types/pg": "^8.20.0",

@@ -1,7 +1,7 @@
 import test, { after, before, suite } from "node:test";
 import assert from "node:assert";
 import { Worker } from "node:worker_threads";
-import { Browser, createBrowser } from "../browser.ts";
+import { type Browser, createBrowser } from "../browser.ts";
 import bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 import tunnelGo from "../../core/internal/bundle/lib/tunnel/index.ts";
 import { startServer } from "../net/server.ts";

@@ -2,13 +2,13 @@ import { Fetch } from "../@types/index.ts";
 import {
     Cancel,
     Fetch as FetchFn,
-    RequestHead,
+    type RequestHead,
     ResponseBody,
-    ResponseHead
+    type ResponseHead
 } from "../@types/fetch.ts";
 import { mergeUint8Arrays } from "../bridge/serialization.ts";
-import { Duplex } from "../bridge/duplex.ts";
-import { EventEmitter } from "../bridge/eventEmitter.ts";
+import type { Duplex } from "../bridge/duplex.ts";
+import type { EventEmitter } from "../bridge/eventEmitter.ts";
 
 function headersToObj(headers: HeadersInit) {
     if (headers === null) return {};
@@ -35,8 +35,8 @@ function urlOrStringToUrl(url: URL | string) {
               url,
               url.startsWith("/")
                   ? globalThis?.location?.origin ||
-                    globalThis?.location?.href ||
-                    "http://localhost"
+                        globalThis?.location?.href ||
+                        "http://localhost"
                   : undefined
           );
 }
@@ -50,7 +50,7 @@ async function fetchCore(
     init?: RequestInit
 ): Promise<Response> {
     if (!globalThis.DOMParser) {
-        const xmldom = await import("../DOMParser/index");
+        const xmldom = await import("../DOMParser/index.ts");
         Object.entries(xmldom).forEach(([key, fn]) => (globalThis[key] = fn));
     }
 

@@ -1,4 +1,4 @@
-import { PlatformBridge } from "./index.ts";
+import type { PlatformBridge } from "./index.ts";
 import { fromByteArray, toByteArray } from "../base64.ts";
 import { isWorker } from "../isWorker.ts";
 
@@ -57,7 +57,9 @@ export async function BridgeLinuxInit(): Promise<PlatformBridge> {
         globalThis.fullstacked.window = globalThis.fullstacked.window || {};
 
         globalThis.fullstacked.window.getSize = () =>
-            (globalThis.fullstacked.fetch || fetch)("/resize").then((r) => r.text());
+            (globalThis.fullstacked.fetch || fetch)("/resize").then((r) =>
+                r.text()
+            );
 
         globalThis.fullstacked.window.resize = function (size: string) {
             (globalThis.fullstacked.fetch || fetch)(`/resize?size=${size}`);

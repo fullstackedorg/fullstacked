@@ -1,13 +1,13 @@
 import {
     Plugin as PluginModule,
-    GitAuth,
+    type GitAuth,
     PluginTypeGitAuth,
     PluginTypeBuild
 } from "../@types/index.ts";
 import { StartPluginStream, Register, Unregister } from "../@types/plugin.ts";
-import { Duplex } from "../bridge/duplex.ts";
-import { EventEmitter } from "../bridge/eventEmitter.ts";
-import { PluginBuildData, PluginParams } from "../@types/bundle.ts";
+import type { Duplex } from "../bridge/duplex.ts";
+import type { EventEmitter } from "../bridge/eventEmitter.ts";
+import type { PluginBuildData, PluginParams } from "../@types/bundle.ts";
 
 type CommonPluginData = {
     name?: string;

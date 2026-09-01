@@ -1,11 +1,11 @@
 import { deserialize, mergeUint8Arrays, serialize } from "./serialization.ts";
 import {
-    CoreCallResponseType,
-    CoreModule,
+    type CoreCallResponseType,
+    type CoreModule,
     CoreResponseData,
     CoreResponseError,
     CoreResponseStream,
-    SerializableData
+    type SerializableData
 } from "../@types/index.ts";
 import onStreamData, { createDuplex } from "./duplex.ts";
 import type platformBridgeType from "./platform/index.ts";

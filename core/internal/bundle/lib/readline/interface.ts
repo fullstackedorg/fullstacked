@@ -42,7 +42,10 @@ export interface ReadLineOptions {
 
 const KEYPRESS_DECODER = Symbol.for("KEYPRESS_DECODER");
 
-export function emitKeypressEvents(stream: any, readlineInterface?: Interface): void {
+export function emitKeypressEvents(
+    stream: any,
+    readlineInterface?: Interface
+): void {
     if (!stream || stream[KEYPRESS_DECODER]) return;
     stream[KEYPRESS_DECODER] = true;
 
@@ -66,7 +69,16 @@ function* parseKeys(s: string): Generator<[string, Key]> {
 
         if (ch === "\x1b") {
             if (i + 1 >= s.length) {
-                yield ["\x1b", { sequence: "\x1b", name: "escape", ctrl: false, meta: false, shift: false }];
+                yield [
+                    "\x1b",
+                    {
+                        sequence: "\x1b",
+                        name: "escape",
+                        ctrl: false,
+                        meta: false,
+                        shift: false
+                    }
+                ];
                 i++;
                 continue;
             }
@@ -77,7 +89,11 @@ function* parseKeys(s: string): Generator<[string, Key]> {
                 let seqEnd = i + 2;
                 while (seqEnd < s.length) {
                     const c = s[seqEnd];
-                    if ((c >= "A" && c <= "Z") || (c >= "a" && c <= "z") || c === "~") {
+                    if (
+                        (c >= "A" && c <= "Z") ||
+                        (c >= "a" && c <= "z") ||
+                        c === "~"
+                    ) {
                         seqEnd++;
                         break;
                     }
@@ -92,7 +108,16 @@ function* parseKeys(s: string): Generator<[string, Key]> {
             }
 
             if (next === "\x1b") {
-                yield ["\x1b", { sequence: "\x1b\x1b", name: "escape", ctrl: false, meta: true, shift: false }];
+                yield [
+                    "\x1b",
+                    {
+                        sequence: "\x1b\x1b",
+                        name: "escape",
+                        ctrl: false,
+                        meta: true,
+                        shift: false
+                    }
+                ];
                 i += 2;
                 continue;
             }
@@ -114,25 +139,61 @@ function* parseKeys(s: string): Generator<[string, Key]> {
         }
 
         if (ch === "\r") {
-            yield ["\r", { sequence: "\r", name: "return", ctrl: false, meta: false, shift: false }];
+            yield [
+                "\r",
+                {
+                    sequence: "\r",
+                    name: "return",
+                    ctrl: false,
+                    meta: false,
+                    shift: false
+                }
+            ];
             i++;
             continue;
         }
 
         if (ch === "\n") {
-            yield ["\n", { sequence: "\n", name: "enter", ctrl: false, meta: false, shift: false }];
+            yield [
+                "\n",
+                {
+                    sequence: "\n",
+                    name: "enter",
+                    ctrl: false,
+                    meta: false,
+                    shift: false
+                }
+            ];
             i++;
             continue;
         }
 
         if (ch === "\t") {
-            yield ["\t", { sequence: "\t", name: "tab", ctrl: false, meta: false, shift: false }];
+            yield [
+                "\t",
+                {
+                    sequence: "\t",
+                    name: "tab",
+                    ctrl: false,
+                    meta: false,
+                    shift: false
+                }
+            ];
             i++;
             continue;
         }
 
         if (ch === "\x08" || ch === "\x7f") {
-            yield ["\x7f", { sequence: ch, name: "backspace", ctrl: false, meta: false, shift: false }];
+            yield [
+                "\x7f",
+                {
+                    sequence: ch,
+                    name: "backspace",
+                    ctrl: false,
+                    meta: false,
+                    shift: false
+                }
+            ];
             i++;
             continue;
         }
@@ -181,17 +242,39 @@ function parseCsiOrSs3(seq: string): Key {
     if (seq.startsWith("\x1bO")) {
         const cmd = seq.slice(2);
         switch (cmd) {
-            case "A": key.name = "up"; break;
-            case "B": key.name = "down"; break;
-            case "C": key.name = "right"; break;
-            case "D": key.name = "left"; break;
-            case "E": key.name = "clear"; break;
-            case "F": key.name = "end"; break;
-            case "H": key.name = "home"; break;
-            case "P": key.name = "f1"; break;
-            case "Q": key.name = "f2"; break;
-            case "R": key.name = "f3"; break;
-            case "S": key.name = "f4"; break;
+            case "A":
+                key.name = "up";
+                break;
+            case "B":
+                key.name = "down";
+                break;
+            case "C":
+                key.name = "right";
+                break;
+            case "D":
+                key.name = "left";
+                break;
+            case "E":
+                key.name = "clear";
+                break;
+            case "F":
+                key.name = "end";
+                break;
+            case "H":
+                key.name = "home";
+                break;
+            case "P":
+                key.name = "f1";
+                break;
+            case "Q":
+                key.name = "f2";
+                break;
+            case "R":
+                key.name = "f3";
+                break;
+            case "S":
+                key.name = "f4";
+                break;
         }
         return key;
     }
@@ -218,37 +301,94 @@ function parseCsiOrSs3(seq: string): Key {
         if (lastChar === "~") {
             const codeNum = parseInt(params[0], 10);
             switch (codeNum) {
-                case 1: key.name = "home"; break;
-                case 2: key.name = "insert"; break;
-                case 3: key.name = "delete"; break;
-                case 4: key.name = "end"; break;
-                case 5: key.name = "pageup"; break;
-                case 6: key.name = "pagedown"; break;
-                case 7: key.name = "home"; break;
-                case 8: key.name = "end"; break;
-                case 11: key.name = "f1"; break;
-                case 12: key.name = "f2"; break;
-                case 13: key.name = "f3"; break;
-                case 14: key.name = "f4"; break;
-                case 15: key.name = "f5"; break;
-                case 17: key.name = "f6"; break;
-                case 18: key.name = "f7"; break;
-                case 19: key.name = "f8"; break;
-                case 20: key.name = "f9"; break;
-                case 21: key.name = "f10"; break;
-                case 23: key.name = "f11"; break;
-                case 24: key.name = "f12"; break;
+                case 1:
+                    key.name = "home";
+                    break;
+                case 2:
+                    key.name = "insert";
+                    break;
+                case 3:
+                    key.name = "delete";
+                    break;
+                case 4:
+                    key.name = "end";
+                    break;
+                case 5:
+                    key.name = "pageup";
+                    break;
+                case 6:
+                    key.name = "pagedown";
+                    break;
+                case 7:
+                    key.name = "home";
+                    break;
+                case 8:
+                    key.name = "end";
+                    break;
+                case 11:
+                    key.name = "f1";
+                    break;
+                case 12:
+                    key.name = "f2";
+                    break;
+                case 13:
+                    key.name = "f3";
+                    break;
+                case 14:
+                    key.name = "f4";
+                    break;
+                case 15:
+                    key.name = "f5";
+                    break;
+                case 17:
+                    key.name = "f6";
+                    break;
+                case 18:
+                    key.name = "f7";
+                    break;
+                case 19:
+                    key.name = "f8";
+                    break;
+                case 20:
+                    key.name = "f9";
+                    break;
+                case 21:
+                    key.name = "f10";
+                    break;
+                case 23:
+                    key.name = "f11";
+                    break;
+                case 24:
+                    key.name = "f12";
+                    break;
             }
         } else {
             switch (lastChar) {
-                case "A": key.name = "up"; break;
-                case "B": key.name = "down"; break;
-                case "C": key.name = "right"; break;
-                case "D": key.name = "left"; break;
-                case "E": key.name = "clear"; break;
-                case "F": key.name = "end"; break;
-                case "H": key.name = "home"; break;
-                case "Z": key.name = "tab"; key.shift = true; break;
+                case "A":
+                    key.name = "up";
+                    break;
+                case "B":
+                    key.name = "down";
+                    break;
+                case "C":
+                    key.name = "right";
+                    break;
+                case "D":
+                    key.name = "left";
+                    break;
+                case "E":
+                    key.name = "clear";
+                    break;
+                case "F":
+                    key.name = "end";
+                    break;
+                case "H":
+                    key.name = "home";
+                    break;
+                case "Z":
+                    key.name = "tab";
+                    key.shift = true;
+                    break;
             }
         }
     }
@@ -256,7 +396,11 @@ function parseCsiOrSs3(seq: string): Key {
     return key;
 }
 
-export function clearLine(stream: any, dir: Direction, callback?: () => void): boolean {
+export function clearLine(
+    stream: any,
+    dir: Direction,
+    callback?: () => void
+): boolean {
     if (!stream) return true;
     let code = "\x1b[2K";
     if (dir < 0) {
@@ -276,7 +420,12 @@ export function clearScreenDown(stream: any, callback?: () => void): boolean {
     return ret;
 }
 
-export function cursorTo(stream: any, x: number, y?: number | (() => void), callback?: () => void): boolean {
+export function cursorTo(
+    stream: any,
+    x: number,
+    y?: number | (() => void),
+    callback?: () => void
+): boolean {
     if (!stream) return true;
     let cb = callback;
     let posY = y;
@@ -297,7 +446,12 @@ export function cursorTo(stream: any, x: number, y?: number | (() => void), call
     return ret;
 }
 
-export function moveCursor(stream: any, dx: number, dy?: number | (() => void), callback?: () => void): boolean {
+export function moveCursor(
+    stream: any,
+    dx: number,
+    dy?: number | (() => void),
+    callback?: () => void
+): boolean {
     if (!stream) return true;
     let cb = callback;
     let deltaY = typeof dy === "number" ? dy : 0;
@@ -375,9 +529,17 @@ export class Interface extends EventEmitter {
     private _crlfTimer: any = null;
     private _lineBuffer: string = "";
     private _decoder: StringDecoder;
-    private _asyncQueue: Array<{ value: string; done: false } | { value: undefined; done: true }> = [];
-    private _asyncResolvers: Array<(item: { value: any; done: boolean }) => void> = [];
-    private _pendingQuestion: { query: string; cb: (answer: string) => void; cleanUp?: () => void } | null = null;
+    private _asyncQueue: Array<
+        { value: string; done: false } | { value: undefined; done: true }
+    > = [];
+    private _asyncResolvers: Array<
+        (item: { value: any; done: boolean }) => void
+    > = [];
+    private _pendingQuestion: {
+        query: string;
+        cb: (answer: string) => void;
+        cleanUp?: () => void;
+    } | null = null;
     private _oldRawMode: boolean = false;
 
     private _onDataListener: (chunk: any) => void;
@@ -414,20 +576,30 @@ export class Interface extends EventEmitter {
 
         const globalProcess = (globalThis as any).process;
         this.input = opts.input || globalProcess?.stdin || new EventEmitter();
-        this.output = opts.output || (opts.output === null ? undefined : globalProcess?.stdout);
-        this.terminal = opts.terminal !== undefined
-            ? Boolean(opts.terminal)
-            : Boolean(this.output && this.output.isTTY);
+        this.output =
+            opts.output ||
+            (opts.output === null ? undefined : globalProcess?.stdout);
+        this.terminal =
+            opts.terminal !== undefined
+                ? Boolean(opts.terminal)
+                : Boolean(this.output && this.output.isTTY);
 
         if (opts.completer) this.completer = opts.completer;
         if (opts.history) this.history = [...opts.history];
-        if (typeof opts.historySize === "number") this.historySize = opts.historySize;
-        if (opts.removeHistoryDuplicates !== undefined) this.removeHistoryDuplicates = Boolean(opts.removeHistoryDuplicates);
+        if (typeof opts.historySize === "number")
+            this.historySize = opts.historySize;
+        if (opts.removeHistoryDuplicates !== undefined)
+            this.removeHistoryDuplicates = Boolean(
+                opts.removeHistoryDuplicates
+            );
         if (opts.prompt !== undefined) this._prompt = String(opts.prompt);
-        if (typeof opts.crlfDelay === "number") this.crlfDelay = Math.max(100, opts.crlfDelay);
+        if (typeof opts.crlfDelay === "number")
+            this.crlfDelay = Math.max(100, opts.crlfDelay);
         if (opts.crlfDelay === Infinity) this.crlfDelay = Infinity;
-        if (typeof opts.escapeCodeTimeout === "number") this.escapeCodeTimeout = opts.escapeCodeTimeout;
-        if (typeof opts.tabSize === "number") this.tabSize = Math.max(1, opts.tabSize);
+        if (typeof opts.escapeCodeTimeout === "number")
+            this.escapeCodeTimeout = opts.escapeCodeTimeout;
+        if (typeof opts.tabSize === "number")
+            this.tabSize = Math.max(1, opts.tabSize);
 
         this._decoder = new StringDecoder("utf8");
 
@@ -435,11 +607,15 @@ export class Interface extends EventEmitter {
         this._onEndListener = () => this._onEnd();
         this._onCloseListener = () => this.close();
         this._onErrorListener = (err: any) => this.emit("error", err);
-        this._onKeypressListener = (char: string, key: Key) => this._onKeypress(char, key);
+        this._onKeypressListener = (char: string, key: Key) =>
+            this._onKeypress(char, key);
 
         if (this.terminal) {
             emitKeypressEvents(this.input, this);
-            if (this.input?.isTTY && typeof this.input.setRawMode === "function") {
+            if (
+                this.input?.isTTY &&
+                typeof this.input.setRawMode === "function"
+            ) {
                 this._oldRawMode = Boolean(this.input.isRaw);
                 this.input.setRawMode(true);
             }
@@ -457,7 +633,9 @@ export class Interface extends EventEmitter {
             if (opts.signal.aborted) {
                 this.close();
             } else {
-                opts.signal.addEventListener("abort", () => this.close(), { once: true });
+                opts.signal.addEventListener("abort", () => this.close(), {
+                    once: true
+                });
             }
         }
     }
@@ -486,8 +664,16 @@ export class Interface extends EventEmitter {
     }
 
     question(query: string, callback: (answer: string) => void): void;
-    question(query: string, options: { signal?: AbortSignal }, callback: (answer: string) => void): void;
-    question(query: string, optionsOrCallback: any, callback?: (answer: string) => void): void {
+    question(
+        query: string,
+        options: { signal?: AbortSignal },
+        callback: (answer: string) => void
+    ): void;
+    question(
+        query: string,
+        optionsOrCallback: any,
+        callback?: (answer: string) => void
+    ): void {
         if (this.closed) {
             throw new Error("readline: Interface is closed");
         }
@@ -545,7 +731,11 @@ export class Interface extends EventEmitter {
     pause(): this {
         if (!this.paused) {
             this.paused = true;
-            if (this.terminal && this.input?.isTTY && typeof this.input.setRawMode === "function") {
+            if (
+                this.terminal &&
+                this.input?.isTTY &&
+                typeof this.input.setRawMode === "function"
+            ) {
                 this.input.setRawMode(false);
             }
             this.input?.pause?.();
@@ -557,7 +747,11 @@ export class Interface extends EventEmitter {
     resume(): this {
         if (this.paused) {
             this.paused = false;
-            if (this.terminal && this.input?.isTTY && typeof this.input.setRawMode === "function") {
+            if (
+                this.terminal &&
+                this.input?.isTTY &&
+                typeof this.input.setRawMode === "function"
+            ) {
                 this.input.setRawMode(true);
             }
             this.input?.resume?.();
@@ -576,7 +770,11 @@ export class Interface extends EventEmitter {
             this._crlfTimer = null;
         }
 
-        if (this.terminal && this.input && typeof this.input.setRawMode === "function") {
+        if (
+            this.terminal &&
+            this.input &&
+            typeof this.input.setRawMode === "function"
+        ) {
             this.input.setRawMode(Boolean(this._oldRawMode));
         }
 
@@ -607,14 +805,19 @@ export class Interface extends EventEmitter {
         this.resume();
 
         if (key) {
-            const str = data ? (typeof data === "string" ? data : data.toString("utf8")) : "";
+            const str = data
+                ? typeof data === "string"
+                    ? data
+                    : data.toString("utf8")
+                : "";
             this._onKeypress(str, key);
             return;
         }
 
         if (data !== undefined && data !== null) {
             if (this.terminal) {
-                const str = typeof data === "string" ? data : data.toString("utf8");
+                const str =
+                    typeof data === "string" ? data : data.toString("utf8");
                 for (const char of str) {
                     if (char === "\r" || char === "\n") {
                         this._onKeypress("\r", { name: "return" });
@@ -630,7 +833,7 @@ export class Interface extends EventEmitter {
 
     getCursorPos(): CursorPos {
         const promptLen = this._prompt ? this._prompt.length : 0;
-        const cols = (this.output?.columns) || 80;
+        const cols = this.output?.columns || 80;
         const totalPos = promptLen + this.cursor;
         return {
             cols: totalPos % cols,
@@ -683,7 +886,8 @@ export class Interface extends EventEmitter {
 
     private _onData(chunk: any) {
         if (this.closed) return;
-        const str = typeof chunk === "string" ? chunk : this._decoder.write(chunk);
+        const str =
+            typeof chunk === "string" ? chunk : this._decoder.write(chunk);
         if (!str) return;
 
         let start = 0;
@@ -713,7 +917,8 @@ export class Interface extends EventEmitter {
             } else if (ch === "\n") {
                 if (
                     this._sawReturnAt &&
-                    (this.crlfDelay === Infinity || Date.now() - this._sawReturnAt <= this.crlfDelay)
+                    (this.crlfDelay === Infinity ||
+                        Date.now() - this._sawReturnAt <= this.crlfDelay)
                 ) {
                     this._sawReturnAt = 0;
                     if (this._crlfTimer) {
@@ -777,7 +982,9 @@ export class Interface extends EventEmitter {
                 return;
             }
             if (this.cursor < this.line.length) {
-                this.line = this.line.slice(0, this.cursor) + this.line.slice(this.cursor + 1);
+                this.line =
+                    this.line.slice(0, this.cursor) +
+                    this.line.slice(this.cursor + 1);
                 this._refreshLine();
             }
             return;
@@ -797,7 +1004,9 @@ export class Interface extends EventEmitter {
 
         if (key.name === "backspace") {
             if (this.cursor > 0) {
-                this.line = this.line.slice(0, this.cursor - 1) + this.line.slice(this.cursor);
+                this.line =
+                    this.line.slice(0, this.cursor - 1) +
+                    this.line.slice(this.cursor);
                 this.cursor--;
                 this._refreshLine();
             }
@@ -806,7 +1015,9 @@ export class Interface extends EventEmitter {
 
         if (key.name === "delete") {
             if (this.cursor < this.line.length) {
-                this.line = this.line.slice(0, this.cursor) + this.line.slice(this.cursor + 1);
+                this.line =
+                    this.line.slice(0, this.cursor) +
+                    this.line.slice(this.cursor + 1);
                 this._refreshLine();
             }
             return;
@@ -885,7 +1096,8 @@ export class Interface extends EventEmitter {
                 let idx = this.cursor - 1;
                 while (idx > 0 && this.line[idx] === " ") idx--;
                 while (idx > 0 && this.line[idx - 1] !== " ") idx--;
-                this.line = this.line.slice(0, idx) + this.line.slice(this.cursor);
+                this.line =
+                    this.line.slice(0, idx) + this.line.slice(this.cursor);
                 this.cursor = idx;
                 this._refreshLine();
             }
@@ -900,7 +1112,10 @@ export class Interface extends EventEmitter {
         }
 
         if (char && !key.ctrl && !key.meta) {
-            this.line = this.line.slice(0, this.cursor) + char + this.line.slice(this.cursor);
+            this.line =
+                this.line.slice(0, this.cursor) +
+                char +
+                this.line.slice(this.cursor);
             this.cursor += char.length;
             this._refreshLine();
         }
@@ -915,7 +1130,11 @@ export class Interface extends EventEmitter {
     }
 
     private _addHistory() {
-        if (!this.terminal || this.historySize === 0 || this.line.length === 0) {
+        if (
+            !this.terminal ||
+            this.historySize === 0 ||
+            this.line.length === 0
+        ) {
             return;
         }
 
@@ -947,7 +1166,10 @@ export class Interface extends EventEmitter {
             if (completions.length === 1) {
                 const completion = completions[0];
                 const suffix = completion.slice(match.length);
-                this.line = this.line.slice(0, this.cursor) + suffix + this.line.slice(this.cursor);
+                this.line =
+                    this.line.slice(0, this.cursor) +
+                    suffix +
+                    this.line.slice(this.cursor);
                 this.cursor += suffix.length;
                 this._refreshLine();
             } else {
@@ -955,7 +1177,11 @@ export class Interface extends EventEmitter {
                 for (let i = 1; i < completions.length; i++) {
                     const c = completions[i];
                     let j = 0;
-                    while (j < prefix.length && j < c.length && prefix[j] === c[j]) {
+                    while (
+                        j < prefix.length &&
+                        j < c.length &&
+                        prefix[j] === c[j]
+                    ) {
                         j++;
                     }
                     prefix = prefix.slice(0, j);
@@ -963,7 +1189,10 @@ export class Interface extends EventEmitter {
 
                 if (prefix.length > match.length) {
                     const suffix = prefix.slice(match.length);
-                    this.line = this.line.slice(0, this.cursor) + suffix + this.line.slice(this.cursor);
+                    this.line =
+                        this.line.slice(0, this.cursor) +
+                        suffix +
+                        this.line.slice(this.cursor);
                     this.cursor += suffix.length;
                     this._refreshLine();
                 } else if (this.output) {

@@ -201,10 +201,7 @@ for (const target of targets) {
         path.resolve(currentDirectory, "out", "usr", "bin", "fullstacked"),
         path.resolve(stagingDir, "fullstacked", "fullstacked")
     );
-    fs.chmodSync(
-        path.resolve(stagingDir, "fullstacked", "fullstacked"),
-        0o755
-    );
+    fs.chmodSync(path.resolve(stagingDir, "fullstacked", "fullstacked"), 0o755);
 
     fs.cpSync(
         path.resolve(

@@ -1,4 +1,4 @@
-import { PlatformBridge } from "./index.ts";
+import type { PlatformBridge } from "./index.ts";
 import { fromByteArray, toByteArray } from "../base64.ts";
 import { isWorker } from "../isWorker.ts";
 

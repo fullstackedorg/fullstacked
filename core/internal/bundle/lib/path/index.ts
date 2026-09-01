@@ -5,7 +5,7 @@ import {
     Join,
     Normalize,
     Parse,
-    ParsedPath,
+    type ParsedPath,
     Relative,
     Resolve
 } from "../@types/path.ts";

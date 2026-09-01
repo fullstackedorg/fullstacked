@@ -7,7 +7,7 @@ import {
     Hostname,
     Platform,
     Uname,
-    UnameInfo
+    type UnameInfo
 } from "../@types/os.ts";
 import fs from "../fs/index.ts";
 
@@ -110,4 +110,3 @@ export default {
     hostname,
     tmpdir
 };
-

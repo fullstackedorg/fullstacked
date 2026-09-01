@@ -1,12 +1,12 @@
 {
     "name": "fullstacked",
-    "version": "1.0.0-alpha.1782",
+    "version": "1.0.0-alpha.1783",
     "bin": {
         "fullstacked": "index.js"
     },
     "type": "module",
     "scripts": {
-        "build": "node -r @nitrogql/esbuild-register build",
+        "build": "node build.ts",
         "prepack": "npm run build"
     },
     "dependencies": {
@@ -14,18 +14,17 @@
         "ws": "^8.21.1"
     },
     "devDependencies": {
-        "@nitrogql/esbuild-register": "^1.7.2",
         "@types/ws": "^8.18.1",
         "esbuild": "^0.28.1",
         "node-addon-api": "^8.9.0"
     },
     "optionalDependencies": {
-        "@fullstacked/darwin-arm64": "1.0.0-alpha.1782",
-        "@fullstacked/darwin-x64": "1.0.0-alpha.1782",
-        "@fullstacked/linux-arm64": "1.0.0-alpha.1782",
-        "@fullstacked/linux-x64": "1.0.0-alpha.1782",
-        "@fullstacked/win32-arm64": "1.0.0-alpha.1782",
-        "@fullstacked/win32-x64": "1.0.0-alpha.1782"
+        "@fullstacked/darwin-arm64": "1.0.0-alpha.1783",
+        "@fullstacked/darwin-x64": "1.0.0-alpha.1783",
+        "@fullstacked/linux-arm64": "1.0.0-alpha.1783",
+        "@fullstacked/linux-x64": "1.0.0-alpha.1783",
+        "@fullstacked/win32-arm64": "1.0.0-alpha.1783",
+        "@fullstacked/win32-x64": "1.0.0-alpha.1783"
     },
     "author": "FullStacked",
     "license": "MIT",

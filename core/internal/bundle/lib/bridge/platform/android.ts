@@ -1,4 +1,4 @@
-import { PlatformBridge } from "./index.ts";
+import type { PlatformBridge } from "./index.ts";
 import { fromByteArray, toByteArray } from "../base64.ts";
 import { isWorker } from "../isWorker.ts";
 
@@ -44,7 +44,6 @@ export async function BridgeAndroidInit(): Promise<PlatformBridge> {
 
         globalThis.fullstacked.open = (ctx: number) =>
             globalThis.android?.open?.(ctx);
-
 
         globalThis.open = (url: string | URL) => {
             globalThis.android?.openUrl?.(url.toString());

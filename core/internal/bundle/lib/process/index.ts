@@ -6,10 +6,12 @@ import { setTimeout, clearTimeout } from "../timers/index.ts";
 
 // Shims from process.browser.js
 class Item {
-    constructor(
-        public fun: Function,
-        public array: any[]
-    ) {}
+    fun: Function;
+    array: any[];
+    constructor(fun: Function, array: any[]) {
+        this.fun = fun;
+        this.array = array;
+    }
     run() {
         this.fun.apply(null, this.array);
     }

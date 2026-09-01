@@ -1,5 +1,5 @@
 import test, { after, before, suite, afterEach } from "node:test";
-import { Browser, createBrowser } from "../browser.ts";
+import { type Browser, createBrowser } from "../browser.ts";
 import bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 import assert from "node:assert";
 import fs from "node:fs";

@@ -25,10 +25,18 @@ suite("os - e2e", () => {
 
     test("tmpdir", () => {
         const tmp = os.tmpdir();
-        assert.strictEqual(tmp, "/.tmp", "tmpdir should be relative to context root directory");
-        assert.ok(nodeFs.existsSync(nodePath.join(process.cwd(), tmp)), ".tmp directory should exist");
-        assert.ok(nodeFs.statSync(nodePath.join(process.cwd(), tmp)).isDirectory(), ".tmp should be a directory");
+        assert.strictEqual(
+            tmp,
+            "/.tmp",
+            "tmpdir should be relative to context root directory"
+        );
+        assert.ok(
+            nodeFs.existsSync(nodePath.join(process.cwd(), tmp)),
+            ".tmp directory should exist"
+        );
+        assert.ok(
+            nodeFs.statSync(nodePath.join(process.cwd(), tmp)).isDirectory(),
+            ".tmp should be a directory"
+        );
     });
 });
-
-

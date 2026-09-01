@@ -1,6 +1,6 @@
 import test, { after, suite } from "node:test";
 import assert from "node:assert";
-import { Browser, createBrowser } from "../browser.ts";
+import { type Browser, createBrowser } from "../browser.ts";
 import bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 
 suite("stream - integration", () => {

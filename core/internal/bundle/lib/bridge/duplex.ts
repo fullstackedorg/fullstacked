@@ -1,5 +1,5 @@
 import { toByteArray } from "./base64.ts";
-import { SerializableData, Stream } from "../@types/index.ts";
+import { type SerializableData, Stream } from "../@types/index.ts";
 import { Close, Open, Write, WriteEvent } from "../@types/stream.ts";
 import { mergeUint8Arrays } from "./serialization.ts";
 import { createEventEmitter } from "./eventEmitter.ts";

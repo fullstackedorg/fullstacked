@@ -1,14 +1,14 @@
 import { Packages } from "../@types/index.ts";
 import {
     Install,
-    Progress,
+    type Progress,
     Audit,
     Uninstall,
     ResolvePackages,
     AddResolveNodePath
 } from "../@types/packages.ts";
-import { Duplex } from "../bridge/duplex.ts";
-import { EventEmitter } from "../bridge/eventEmitter.ts";
+import type { Duplex } from "../bridge/duplex.ts";
+import type { EventEmitter } from "../bridge/eventEmitter.ts";
 
 export async function install(
     directory: string,

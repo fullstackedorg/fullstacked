@@ -31,7 +31,14 @@ const definedTests = process.argv
     .slice(2)
     .filter((arg) => !arg.startsWith("--") && arg !== "test");
 if (definedTests.length > 0) {
-    tests = definedTests.map((test) => "." + test.replace("test", ""));
+    tests = definedTests.map((test) => {
+        let t = "." + test.replace(/^test/, "");
+        if (!t.endsWith(".ts")) {
+            if (!t.endsWith("/")) t += "/";
+            t += "index.ts";
+        }
+        return t;
+    });
 }
 
 for (const test of tests) {

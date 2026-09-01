@@ -1,8 +1,8 @@
 import test, { after, before, suite } from "node:test";
-import { startServer } from "./server";
+import { startServer } from "./server.ts";
 import { Worker } from "node:worker_threads";
 import assert from "node:assert";
-import { Browser, createBrowser } from "../browser.ts";
+import { type Browser, createBrowser } from "../browser.ts";
 import bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 
 suite("fetch - integration", () => {

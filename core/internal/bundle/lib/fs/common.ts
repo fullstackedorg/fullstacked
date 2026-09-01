@@ -1,5 +1,5 @@
 import path from "../path/index.ts";
-import { GoFileInfo } from "../@types/fs";
+import type { GoFileInfo } from "../@types/fs.ts";
 import { fromByteArray } from "../bridge/base64.ts";
 
 export type PathLike = string | URL | Buffer;

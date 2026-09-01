@@ -2,7 +2,7 @@ import { EventEmitter } from "events";
 import { Buffer } from "buffer";
 import { Dgram } from "../@types/index.ts";
 import { CreateSocket } from "../@types/dgram.ts";
-import { Duplex } from "../bridge/duplex.ts";
+import type { Duplex } from "../bridge/duplex.ts";
 
 type RemoteInfo = {
     address: string;

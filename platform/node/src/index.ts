@@ -1,7 +1,7 @@
 import "../../../core/internal/bundle/lib/fullstacked/index.ts";
 import { load } from "./core.ts";
 import {
-    CreateWebViewOpts,
+    type CreateWebViewOpts,
     createWebViewWithCore,
     staticFileWithCore
 } from "./webview.ts";

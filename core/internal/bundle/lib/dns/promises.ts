@@ -8,7 +8,7 @@ import {
     ResolveSRV,
     ResolveTXT,
     Lookup,
-    LookupResult
+    type LookupResult
 } from "../@types/dns.ts";
 
 export async function resolve(hostname: string, rrtype: string) {}

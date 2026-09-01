@@ -4,11 +4,14 @@ import {
     clearScreenDown as _clearScreenDown,
     cursorTo as _cursorTo,
     moveCursor as _moveCursor,
-    Direction
+    type Direction
 } from "./interface.ts";
 
 export class Interface extends _Interface {
-    override question(query: string, options?: { signal?: AbortSignal }): Promise<string>;
+    override question(
+        query: string,
+        options?: { signal?: AbortSignal }
+    ): Promise<string>;
     override question(query: string, callback: (answer: string) => void): void;
     override question(
         query: string,
@@ -20,7 +23,10 @@ export class Interface extends _Interface {
         optionsOrCallback?: any,
         callback?: (answer: string) => void
     ): any {
-        if (typeof optionsOrCallback === "function" || typeof callback === "function") {
+        if (
+            typeof optionsOrCallback === "function" ||
+            typeof callback === "function"
+        ) {
             return super.question(query, optionsOrCallback, callback!);
         }
 
@@ -30,7 +36,9 @@ export class Interface extends _Interface {
 
         const signal = optionsOrCallback?.signal;
         if (signal?.aborted) {
-            const reason = (signal as any).reason || new Error("The operation was aborted");
+            const reason =
+                (signal as any).reason ||
+                new Error("The operation was aborted");
             return Promise.reject(reason);
         }
 
@@ -39,7 +47,9 @@ export class Interface extends _Interface {
 
             if (signal) {
                 onAbort = () => {
-                    const reason = (signal as any).reason || new Error("The operation was aborted");
+                    const reason =
+                        (signal as any).reason ||
+                        new Error("The operation was aborted");
                     reject(reason);
                 };
                 signal.addEventListener("abort", onAbort, { once: true });

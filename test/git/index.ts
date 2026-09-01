@@ -424,9 +424,7 @@ suite("git - e2e", () => {
         let headerChecked = false;
         let port: number | null = null;
 
-        const proxyProcess = fork(proxyPath, [], {
-            execArgv: ["-r", "@nitrogql/esbuild-register"]
-        });
+        const proxyProcess = fork(proxyPath, []);
 
         await new Promise<void>((resolve) => {
             proxyProcess.on("message", (msg: string) => {

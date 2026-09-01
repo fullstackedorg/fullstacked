@@ -406,7 +406,10 @@ console.log(typeof createInterface);
         assert.strictEqual(result.Errors, null);
         assert.ok(result.OutputFiles.length > 0);
 
-        const bundledContent = await fs.promises.readFile(result.OutputFiles[0], "utf-8");
+        const bundledContent = await fs.promises.readFile(
+            result.OutputFiles[0],
+            "utf-8"
+        );
         assert.ok(bundledContent.includes("Interface"));
 
         await fs.promises.rm(sampleDir, { recursive: true, force: true });
@@ -426,8 +429,10 @@ console.log(typeof createInterface);
 
         class TerminalWriteStream extends EventEmitter {
             isTTY = true;
-            constructor(private term: any) {
+            private term: any;
+            constructor(term: any) {
                 super();
+                this.term = term;
             }
             get columns() {
                 return this.term.cols;
@@ -436,8 +441,14 @@ console.log(typeof createInterface);
                 return this.term.rows;
             }
             write(chunk: any, encodingOrCallback?: any, callback?: any) {
-                const cb = typeof encodingOrCallback === "function" ? encodingOrCallback : callback;
-                const str = typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk);
+                const cb =
+                    typeof encodingOrCallback === "function"
+                        ? encodingOrCallback
+                        : callback;
+                const str =
+                    typeof chunk === "string"
+                        ? chunk
+                        : new TextDecoder().decode(chunk);
                 this.term.write(str, cb);
                 return true;
             }
@@ -540,8 +551,14 @@ console.log(typeof createInterface);
                 return this;
             }
             write(data: any, encodingOrCallback?: any, callback?: any) {
-                const cb = typeof encodingOrCallback === "function" ? encodingOrCallback : callback;
-                const str = typeof data === "string" ? data : new TextDecoder().decode(data);
+                const cb =
+                    typeof encodingOrCallback === "function"
+                        ? encodingOrCallback
+                        : callback;
+                const str =
+                    typeof data === "string"
+                        ? data
+                        : new TextDecoder().decode(data);
                 mockTerminal.write(str, cb);
                 return true;
             }
