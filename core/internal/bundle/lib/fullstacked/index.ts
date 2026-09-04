@@ -11,6 +11,7 @@ import {
     getActiveInterfaces,
     waitForInterfaces
 } from "../readline/interface.ts";
+import WebSocketCore from "../websocket/index.ts";
 
 export interface ExecuteOptions {
     stdio?: any[];
@@ -328,20 +329,40 @@ async function runFile(
     writeOut: (msg: any) => void,
     writeErr: (msg: any) => void
 ): Promise<number> {
-    const res = await bundleAndImportFile(
-        file,
-        process.cwd(),
-        writeErr,
-        extraArgs
-    );
-    if (!res) return 1;
+    const originalWebSocket = globalThis.WebSocket;
+    if (!globalThis.fullstacked) {
+        globalThis.fullstacked = {} as any;
+    }
+    if (originalWebSocket && !globalThis.fullstacked.WebSocket) {
+        globalThis.fullstacked.WebSocket = originalWebSocket;
+    }
+    globalThis.WebSocket = WebSocketCore as any;
+    if (typeof (globalThis as any).window === "undefined") {
+        (globalThis as any).window = globalThis;
+    }
 
     try {
-        await waitForInterfaces();
+        const res = await bundleAndImportFile(
+            file,
+            process.cwd(),
+            writeErr,
+            extraArgs
+        );
+        if (!res) return 1;
+
+        try {
+            await waitForInterfaces();
+        } finally {
+            await res.cleanup();
+        }
+        return 0;
     } finally {
-        await res.cleanup();
+        if (originalWebSocket) {
+            globalThis.WebSocket = originalWebSocket;
+        } else {
+            delete (globalThis as any).WebSocket;
+        }
     }
-    return 0;
 }
 
 async function runDirectory(

@@ -2,6 +2,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { pathToFileURL } from "node:url";
 import { bundleFile } from "../../../../core/internal/bundle/lib/bundle/index.ts";
+import WebSocketCore from "../../../../core/internal/bundle/lib/websocket/index.ts";
 
 export async function runFile(
     positionalArgs: string[],
@@ -60,12 +61,30 @@ export async function runFile(
             ...positionalArgs.slice(1)
         ];
 
+        const originalWebSocket = globalThis.WebSocket;
+        if (!globalThis.fullstacked) {
+            globalThis.fullstacked = {} as any;
+        }
+        if (originalWebSocket && !globalThis.fullstacked.WebSocket) {
+            globalThis.fullstacked.WebSocket = originalWebSocket;
+        }
+        globalThis.WebSocket = WebSocketCore as any;
+        if (typeof (globalThis as any).window === "undefined") {
+            (globalThis as any).window = globalThis;
+        }
+
         try {
             await import(pathToFileURL(absoluteOutputFile).href);
         } catch (e: any) {
             console.error(e.stack || e.message || String(e));
             await cleanup();
             end(1);
+        } finally {
+            if (originalWebSocket) {
+                globalThis.WebSocket = originalWebSocket;
+            } else {
+                delete (globalThis as any).WebSocket;
+            }
         }
 
         await cleanup();

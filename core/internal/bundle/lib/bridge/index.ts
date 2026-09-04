@@ -10,6 +10,7 @@ import {
 import onStreamData, { createDuplex } from "./duplex.ts";
 import type platformBridgeType from "./platform/index.ts";
 import fetchCore from "../fetch/index.ts";
+import WebSocketCore from "../websocket/index.ts";
 import parentWindow from "../parentWindow/index.ts";
 
 import type { JSPlugin } from "../plugin/index.ts";
@@ -49,6 +50,7 @@ type FullStacked = {
     };
 
     fetch: typeof fetch;
+    WebSocket: typeof WebSocket;
     open?: (ctx: number) => void;
 };
 
@@ -138,9 +140,16 @@ async function init() {
     globalThis.fullstacked.platformBridge = platformBridge;
     globalThis.fullstacked.bridge = bridge;
     globalThis.fullstacked.fetch = fetch.bind(globalThis);
+    if (typeof WebSocket !== "undefined") {
+        globalThis.fullstacked.WebSocket = WebSocket;
+    }
     globalThis.fullstacked.onStreamData = onStreamData;
 
     globalThis.fetch = fetchCore;
+
+    if (typeof window !== "undefined" || !globalThis.process?.versions?.node) {
+        globalThis.WebSocket = WebSocketCore as any;
+    }
 
     await Promise.all([import("timers"), import("buffer")]);
 

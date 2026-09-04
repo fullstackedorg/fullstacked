@@ -19,6 +19,7 @@ import (
 	"fullstackedorg/fullstacked/internal/stream"
 	"fullstackedorg/fullstacked/internal/test"
 	"fullstackedorg/fullstacked/internal/tunnel"
+	"fullstackedorg/fullstacked/internal/websocket"
 	"fullstackedorg/fullstacked/types"
 	"path/filepath"
 	"strconv"
@@ -102,21 +103,22 @@ func Call(payload []byte) (int, error) {
 }
 
 var modules = map[types.CoreModule]types.ModuleSwitch{
-	types.Core:     Switch,
-	types.Stream:   stream.Switch,
-	types.Path:     path.Switch,
-	types.Fs:       fs.Switch,
-	types.Os:       os.Switch,
-	types.Fetch:    fetch.Switch,
-	types.Bundle:   bundle.Switch,
-	types.Net:      net.Switch,
-	types.Tunnel:   tunnel.Switch,
-	types.Dns:      dns.Switch,
-	types.Git:      git.Switch,
-	types.Packages: packages.Switch,
-	types.Dgram:    dgram.Switch,
-	types.Test:     test.Switch,
-	types.Plugin:   plugin.Switch,
+	types.Core:      Switch,
+	types.Stream:    stream.Switch,
+	types.Path:      path.Switch,
+	types.Fs:        fs.Switch,
+	types.Os:        os.Switch,
+	types.Fetch:     fetch.Switch,
+	types.Bundle:    bundle.Switch,
+	types.Net:       net.Switch,
+	types.Tunnel:    tunnel.Switch,
+	types.Dns:       dns.Switch,
+	types.Git:       git.Switch,
+	types.Packages:  packages.Switch,
+	types.Dgram:     dgram.Switch,
+	types.Test:      test.Switch,
+	types.Plugin:    plugin.Switch,
+	types.WebSocket: websocket.Switch,
 }
 
 func callProcess(

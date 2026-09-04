@@ -21,9 +21,8 @@ const openTerminal = async () => {
     const initShell = (await import("./shell/init")).default;
 
     if (isExpectedKeyboard) {
-        const { ExpectedKeyboard, LAYOUT_QWERTY } = await import(
-            "./expected-keyboard/src"
-        );
+        const { ExpectedKeyboard, LAYOUT_QWERTY } =
+            await import("./expected-keyboard/src");
 
         let shellInstance: any = null;
         let fitAddonInstance: any = null;

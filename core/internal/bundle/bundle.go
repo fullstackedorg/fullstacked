@@ -75,6 +75,7 @@ var libModules = map[string]string{
 	"vm":                  "/lib/unavailable/index.ts",
 	"v8":                  "/lib/unavailable/index.ts",
 	"worker_threads":      "/lib/worker_threads/index.ts",
+	"websocket":           "/lib/websocket/index.ts",
 	"zlib":                "/lib/zlib/index.ts",
 
 	"test": "/lib/test/index.ts",

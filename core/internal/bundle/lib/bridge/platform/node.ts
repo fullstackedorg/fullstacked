@@ -56,8 +56,9 @@ export async function BridgeNodeInit(): Promise<PlatformBridge> {
     const ctx = await (await fetch("/ctx")).json();
 
     let ws: WebSocket;
+    const NativeWebSocket = globalThis.fullstacked?.WebSocket || WebSocket;
     const webSocketForCallback = new Promise((res) => {
-        ws = new WebSocket(webSocketUrl);
+        ws = new NativeWebSocket(webSocketUrl);
         ws.binaryType = "arraybuffer";
         ws.onmessage = (e: { data: ArrayBuffer }) => {
             globalThis.fullstacked.onStreamData(
