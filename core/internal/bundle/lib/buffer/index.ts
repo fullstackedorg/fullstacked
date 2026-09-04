@@ -1,6 +1,8 @@
 // @ts-ignore
 import b from "./index.js";
-globalThis.Buffer = b.Buffer;
+if (!globalThis.Buffer) {
+    globalThis.Buffer = b.Buffer;
+}
 
 b.Buffer.prototype.latin1Slice = function (start: number, end: number) {
     return this.toString("latin1", start, end);

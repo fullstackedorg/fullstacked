@@ -330,6 +330,12 @@ async function runFile(
     writeErr: (msg: any) => void
 ): Promise<number> {
     const originalWebSocket = globalThis.WebSocket;
+    const hasOriginalWindow = "window" in globalThis;
+    const hasOriginalBuffer = "Buffer" in globalThis;
+    const originalBuffer = globalThis.Buffer;
+    const hasOriginalFullstacked = "fullstacked" in globalThis;
+    const originalFullstackedWebSocket = globalThis.fullstacked?.WebSocket;
+
     if (!globalThis.fullstacked) {
         globalThis.fullstacked = {} as any;
     }
@@ -337,7 +343,7 @@ async function runFile(
         globalThis.fullstacked.WebSocket = originalWebSocket;
     }
     globalThis.WebSocket = WebSocketCore as any;
-    if (typeof (globalThis as any).window === "undefined") {
+    if (!hasOriginalWindow) {
         (globalThis as any).window = globalThis;
     }
 
@@ -361,6 +367,21 @@ async function runFile(
             globalThis.WebSocket = originalWebSocket;
         } else {
             delete (globalThis as any).WebSocket;
+        }
+        if (!hasOriginalWindow) {
+            delete (globalThis as any).window;
+        }
+        if (!hasOriginalBuffer) {
+            delete (globalThis as any).Buffer;
+        } else {
+            globalThis.Buffer = originalBuffer;
+        }
+        if (!hasOriginalFullstacked) {
+            delete (globalThis as any).fullstacked;
+        } else if (originalFullstackedWebSocket) {
+            globalThis.fullstacked.WebSocket = originalFullstackedWebSocket;
+        } else {
+            delete (globalThis as any).fullstacked.WebSocket;
         }
     }
 }
