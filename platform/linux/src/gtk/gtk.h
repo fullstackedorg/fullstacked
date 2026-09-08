@@ -48,10 +48,10 @@ private:
     void closeAuthWindow(bool canceled = false);
     bool checkAuthUri(const std::string &uri);
 
-public:
+    bool skipInitialDir = false;
     static void webKitURISchemeRequestCallback(WebKitURISchemeRequest *request, gpointer userData);
 
-    WebkitGTKWindow(uint8_t ctx, Glib::RefPtr<Gtk::Application> app);
+    WebkitGTKWindow(uint8_t ctx, Glib::RefPtr<Gtk::Application> app, bool skipInitialDir = false);
     ~WebkitGTKWindow() override;
 
     void onStreamData(uint8_t streamId, const std::vector<uint8_t> &data) override;
@@ -67,7 +67,7 @@ public:
 class WebkitGTKGUI : public GUI {
 public:
     int run(int &argc, char **argv, std::function<void()> onReady) override;
-    Window *createWindow(uint8_t ctx) override;
+    Window *createWindow(uint8_t ctx, bool skipInitialDir = false) override;
 
 private:
     Glib::RefPtr<Gtk::Application> app;

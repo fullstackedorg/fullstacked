@@ -31,6 +31,7 @@ class ClipboardHelper: NSObject, WKScriptMessageHandler {
 
 class WebViewExtended: WKWebView, WKUIDelegate  {
     let clipboardHelper: ClipboardHelper;
+    var ctxId: UInt8?
     
     override var safeAreaInsets: UIEdgeInsets {
         return .zero
@@ -58,6 +59,17 @@ class WebViewExtended: WKWebView, WKUIDelegate  {
         }
         
         self.uiDelegate = self
+        
+        let panicGesture = UILongPressGestureRecognizer(target: self, action: #selector(handlePanicGesture(_:)))
+        panicGesture.numberOfTouchesRequired = 3
+        panicGesture.minimumPressDuration = 1.5
+        self.addGestureRecognizer(panicGesture)
+    }
+    
+    @objc func handlePanicGesture(_ gesture: UILongPressGestureRecognizer) {
+        if gesture.state == .began {
+            WebViewStore.getInstance().panicRecovery()
+        }
     }
     
     required init?(coder: NSCoder) {

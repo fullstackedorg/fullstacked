@@ -9,7 +9,9 @@
 #include <QCoreApplication>
 #include <QDesktopServices>
 #include <QGuiApplication>
+#include <QKeySequence>
 #include <QScreen>
+#include <QShortcut>
 #include <QUrl>
 #include <QUrlQuery>
 #include <QWebChannel>
@@ -239,12 +241,13 @@ int QtGUI::run(int &argc, char **argv, std::function<void()> onReady) {
     return app->exec();
 }
 
-Window *QtGUI::createWindow(uint8_t ctx) {
-    return new QtWindow(ctx);
+Window *QtGUI::createWindow(uint8_t ctx, bool skipInitialDir) {
+    return new QtWindow(ctx, skipInitialDir);
 }
 
-QtWindow::QtWindow(uint8_t pCtx) {
+QtWindow::QtWindow(uint8_t pCtx, bool pSkipInitialDir) {
     ctx = pCtx;
+    skipInitialDir = pSkipInitialDir;
     init();
 }
 
@@ -383,8 +386,15 @@ void QtWindow::init() {
         close();
     });
 
-    QUrl url = QUrl(QString("fs://ctx-%1/index.html").arg(ctx));
+    QUrl url = QUrl(QString("fs://ctx-%1/index.html%2").arg(ctx).arg(skipInitialDir ? "?skipInitialDir=true" : ""));
     webEngineView->load(url);
+
+    auto *panicShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Escape), windowQt);
+    QObject::connect(panicShortcut, &QShortcut::activated, []() {
+        if (App::instance) {
+            App::instance->panicRecovery();
+        }
+    });
 
     windowQt->setCentralWidget(webEngineView);
     windowQt->show();

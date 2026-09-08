@@ -25,7 +25,8 @@ let tests = [
     "./packages/index.ts",
     "./worker/index.ts",
     "./readline/index.ts",
-    "./fullstacked/index.ts"
+    "./fullstacked/index.ts",
+    "./config/index.ts"
 ];
 
 const definedTests = process.argv

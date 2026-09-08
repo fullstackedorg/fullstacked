@@ -63,3 +63,5 @@ globalThis.fullstacked.open = createWebView;
 export function stop() {
     core.end();
 }
+
+export { core };

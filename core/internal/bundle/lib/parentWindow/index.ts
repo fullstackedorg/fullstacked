@@ -1,4 +1,4 @@
-import fs from "../fs/index.ts";
+import { getConfig, setConfig } from "../config/index.ts";
 
 let isAutoResizeDisabled = false;
 
@@ -8,9 +8,7 @@ export function disableAutoWindowSize() {
 
 async function loadSavedSize() {
     try {
-        const savedData = await fs.promises.readFile("/.git/window-size.txt", {
-            encoding: "utf-8"
-        });
+        const savedData = await getConfig("windowSize");
         if (savedData) {
             const savedSize = savedData.trim();
             if (
@@ -45,13 +43,7 @@ function onResize() {
                     sizeStr === "fullscreen" ||
                     sizeStr === "kiosk")
             ) {
-                try {
-                    await fs.promises.mkdir("/.git");
-                } catch {}
-                await fs.promises.writeFile(
-                    "/.git/window-size.txt",
-                    sizeStr.trim()
-                );
+                await setConfig("windowSize", sizeStr.trim());
             }
         } catch {}
     }, 200);
@@ -64,7 +56,9 @@ export async function setup() {
 
     let defaultSize = process.env.WINDOW_SIZE;
 
-    globalThis.addEventListener("resize", onResize);
+    if (typeof globalThis.addEventListener === "function") {
+        globalThis.addEventListener("resize", onResize);
+    }
 
     if (isAutoResizeDisabled) {
         return;

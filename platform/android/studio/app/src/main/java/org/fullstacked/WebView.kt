@@ -24,7 +24,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 class FullStackedWebView(
     val ctx: MainActivity,
-    val ctxId: Byte = 0
+    val ctxId: Byte = 0,
+    val skipInitialDir: Boolean = false
 ) : WebViewClient() {
     var firstContact = false
     val messageToBeSent = mutableListOf<Pair<String, String>>()
@@ -312,7 +313,8 @@ fun createWebView(delegate: FullStackedWebView): WebView {
     webView.settings.domStorageEnabled = true
     webView.settings.databaseEnabled = true
     webView.addJavascriptInterface(delegate, "android")
-    webView.loadUrl("http://localhost")
+    val url = if (delegate.skipInitialDir) "http://localhost?skipInitialDir=true" else "http://localhost"
+    webView.loadUrl(url)
 
     return webView
 }

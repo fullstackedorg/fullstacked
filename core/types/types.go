@@ -21,6 +21,7 @@ const (
 	Dgram     CoreModule = 13
 	Plugin    CoreModule = 14
 	WebSocket CoreModule = 15
+	Config    CoreModule = 16
 )
 
 type ModuleSwitch = func(*Context, CoreCallHeader, []DeserializedData, *CoreCallResponse) error

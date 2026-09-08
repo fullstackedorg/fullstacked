@@ -24,6 +24,6 @@
         "core/internal/bundle/lib/plugin/index.ts",
         "core/internal/bundle/lib/run/index.ts",
         "core/internal/bundle/lib/tunnel/index.ts",
-        "core/internal/bundle/lib/fullstacked/index.ts"
-    ]
+        "core/internal/bundle/lib/fullstacked/index.ts",
+        "core/internal/bundle/lib/config/index.ts"    ]
 }

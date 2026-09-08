@@ -32,8 +32,11 @@ public:
     App();
     ~App();
 
-    void open(uint8_t ctx);
+    std::string getConfig(uint8_t ctx, const std::string &key);
+    uint8_t startMain(const std::string &root, const std::string &build, bool skipInitialDir = false);
+    void open(uint8_t ctx, bool skipInitialDir = false);
     void close(uint8_t ctx);
+    void panicRecovery();
     void onStreamData(uint8_t ctx, uint8_t streamId, const std::vector<uint8_t> &data);
 
     int run(int argc, char *argv[]);

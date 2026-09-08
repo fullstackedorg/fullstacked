@@ -81,7 +81,8 @@ private:
     void init();
 
 public:
-    QtWindow(uint8_t ctx);
+    bool skipInitialDir = false;
+    QtWindow(uint8_t ctx, bool skipInitialDir = false);
     ~QtWindow() override;
 
     void onStreamData(uint8_t streamId, const std::vector<uint8_t> &data) override;
@@ -111,7 +112,7 @@ public slots:
 class QtGUI : public GUI {
 public:
     int run(int &argc, char **argv, std::function<void()> onReady) override;
-    Window *createWindow(uint8_t ctx) override;
+    Window *createWindow(uint8_t ctx, bool skipInitialDir = false) override;
 
 private:
     QApplication *app = nullptr;

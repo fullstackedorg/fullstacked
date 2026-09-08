@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, protocol } from "electron";
+import { app, BrowserWindow, ipcMain, protocol, globalShortcut } from "electron";
 import { createInstance } from "../node/src/instance";
 import {
     deserializeArgs,
@@ -7,7 +7,25 @@ import {
 import { load, setDirectories, CoreCallbackListeners } from "../node/src/call";
 import path from "node:path";
 import os from "node:os";
+import fs from "node:fs";
 import { getLibPath } from "../node/src/lib";
+
+function getLaunchDirectory(baseDir: string, skipInitialDir = false) {
+    if (skipInitialDir) return baseDir;
+    const configFile = path.resolve(baseDir, ".git", "config.json");
+    if (!fs.existsSync(configFile)) return baseDir;
+    try {
+        const config = JSON.parse(fs.readFileSync(configFile, "utf-8"));
+        if (config?.initialDirectory && typeof config.initialDirectory === "string") {
+            const initialDir = config.initialDirectory.trim();
+            if (initialDir) {
+                const subPath = initialDir.startsWith("/") ? initialDir.slice(1) : initialDir;
+                return path.resolve(baseDir, subPath);
+            }
+        }
+    } catch {}
+    return baseDir;
+}
 
 app.whenReady().then(init);
 app.on("window-all-closed", () => app.quit());
@@ -37,6 +55,44 @@ async function init() {
     CoreCallbackListeners.add(cb);
 
     const root = path.resolve(os.homedir(), "FullStacked");
+    const launchRoot = getLaunchDirectory(root, false);
+    const editorDirectory = path.resolve(
+        process.cwd(),
+        "..",
+        "..",
+        "out",
+        "build"
+    );
+    setDirectories({
+        root: launchRoot,
+        config: path.resolve(os.homedir(), ".config", "fullstacked"),
+        editor: launchRoot !== root ? launchRoot : editorDirectory,
+        tmp: path.resolve(root, ".tmp")
+    });
+
+    const kioskFlagIndex = process.argv.findIndex((arg) => arg === "--kiosk");
+    if (kioskFlagIndex !== -1) {
+        const initId = process.argv.at(kioskFlagIndex + 1);
+        createView(initId);
+        instances.get(initId).window.setFullScreen(true);
+    } else {
+        createView("");
+    }
+
+    globalShortcut.register("CommandOrControl+Shift+Escape", () => {
+        panicRecovery();
+    });
+}
+
+function panicRecovery() {
+    for (const item of instances.values()) {
+        try {
+            item.window.close();
+        } catch {}
+    }
+    instances.clear();
+
+    const root = path.resolve(os.homedir(), "FullStacked");
     const editorDirectory = path.resolve(
         process.cwd(),
         "..",
@@ -50,15 +106,7 @@ async function init() {
         editor: editorDirectory,
         tmp: path.resolve(root, ".tmp")
     });
-
-    const kioskFlagIndex = process.argv.findIndex((arg) => arg === "--kiosk");
-    if (kioskFlagIndex !== -1) {
-        const initId = process.argv.at(kioskFlagIndex + 1);
-        createView(initId);
-        instances.get(initId).window.setFullScreen(true);
-    } else {
-        createView("");
-    }
+    createView("", true);
 }
 
 const instances = new Map<
@@ -73,7 +121,7 @@ function getInstance(url: URL) {
     return instances.get(host);
 }
 
-function createView(id: string) {
+function createView(id: string, skipInitialDir = false) {
     const instance = createInstance(id, id === "");
     const window = new BrowserWindow({
         webPreferences: {
@@ -82,7 +130,8 @@ function createView(id: string) {
     });
     window.setMenu(null);
     instances.set(id, { window, instance });
-    window.loadURL(id ? `http://${id}.localhost` : "http://localhost");
+    const baseUrl = id ? `http://${id}.localhost` : "http://localhost";
+    window.loadURL(skipInitialDir ? `${baseUrl}?skipInitialDir=true` : baseUrl);
 }
 
 ipcMain.handle("bridge", async (event, payload) => {

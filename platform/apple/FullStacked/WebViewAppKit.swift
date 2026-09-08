@@ -151,68 +151,78 @@ class ResizeHelper: NSObject, WKScriptMessageHandler {
                 return
             }
             
-            if body == "kiosk" {
-                if !activeWindow.styleMask.contains(.fullScreen) {
-                    activeWindow.toggleFullScreen(nil)
-                }
-                return
-            }
-            
-            if activeWindow.styleMask.contains(.fullScreen) {
+            applySize(body, to: activeWindow)
+        }
+    }
+
+    func applySize(_ body: String, to activeWindow: NSWindow) {
+        observeWindow(activeWindow)
+        let currentScreen = activeWindow.screen ?? findScreen(for: activeWindow.frame, defaultScreen: NSScreen.main)
+        let visibleFrame = currentScreen?.visibleFrame ?? currentScreen?.frame ?? NSRect.zero
+        
+        if body == "kiosk" {
+            if !activeWindow.styleMask.contains(.fullScreen) {
                 activeWindow.toggleFullScreen(nil)
             }
+            return
+        }
+        
+        if activeWindow.styleMask.contains(.fullScreen) {
+            activeWindow.toggleFullScreen(nil)
+        }
+        
+        if body == "fullscreen" {
+            isFullScreen = true
+            lastRequestedWidth = nil
+            lastRequestedHeight = nil
+            activeWindow.setFrame(visibleFrame, display: true)
+            return
+        }
+        
+        let components = body.split(separator: ":")
+        if components.count == 2 {
+            guard let width = Double(components[0]),
+                  let height = Double(components[1]) else { return }
+            let currentFrame = activeWindow.frame
+            let newWidth = CGFloat(width)
+            let newHeight = CGFloat(height)
             
-            if body == "fullscreen" {
-                isFullScreen = true
-                lastRequestedWidth = nil
-                lastRequestedHeight = nil
-                activeWindow.setFrame(visibleFrame, display: true)
-                return
-            }
+            isFullScreen = false
+            lastRequestedWidth = newWidth
+            lastRequestedHeight = newHeight
             
-            let components = body.split(separator: ":")
-            if components.count == 2 {
-                let width = Double(components[0])!
-                let height = Double(components[1])!
-                let currentFrame = activeWindow.frame
-                let newWidth = CGFloat(width)
-                let newHeight = CGFloat(height)
-                
-                isFullScreen = false
-                lastRequestedWidth = newWidth
-                lastRequestedHeight = newHeight
-                
-                let targetX = currentFrame.origin.x + (currentFrame.size.width - newWidth) / 2.0
-                let targetY = currentFrame.origin.y + (currentFrame.size.height - newHeight) / 2.0
-                
-                let frame = fitFrame(targetWidth: newWidth, targetHeight: newHeight, targetX: targetX, targetY: targetY, in: visibleFrame)
-                activeWindow.setFrame(frame, display: true)
-            } else if components.count == 4 {
-                let width = Double(components[0])!
-                let height = Double(components[1])!
-                let x = Double(components[2])!
-                let y = Double(components[3])!
-                
-                let newWidth = CGFloat(width)
-                let newHeight = CGFloat(height)
-                
-                isFullScreen = false
-                lastRequestedWidth = newWidth
-                lastRequestedHeight = newHeight
-                
-                let targetRect = NSRect(x: CGFloat(x), y: CGFloat(y), width: newWidth, height: newHeight)
-                let targetScreen = findScreen(for: targetRect, defaultScreen: activeWindow.screen)
-                let targetVisibleFrame = targetScreen?.visibleFrame ?? targetScreen?.frame ?? visibleFrame
-                
-                let frame = fitFrame(targetWidth: newWidth, targetHeight: newHeight, targetX: CGFloat(x), targetY: CGFloat(y), in: targetVisibleFrame)
-                activeWindow.setFrame(frame, display: true)
-            }
+            let targetX = currentFrame.origin.x + (currentFrame.size.width - newWidth) / 2.0
+            let targetY = currentFrame.origin.y + (currentFrame.size.height - newHeight) / 2.0
+            
+            let frame = fitFrame(targetWidth: newWidth, targetHeight: newHeight, targetX: targetX, targetY: targetY, in: visibleFrame)
+            activeWindow.setFrame(frame, display: true)
+        } else if components.count == 4 {
+            guard let width = Double(components[0]),
+                  let height = Double(components[1]),
+                  let x = Double(components[2]),
+                  let y = Double(components[3]) else { return }
+            
+            let newWidth = CGFloat(width)
+            let newHeight = CGFloat(height)
+            
+            isFullScreen = false
+            lastRequestedWidth = newWidth
+            lastRequestedHeight = newHeight
+            
+            let targetRect = NSRect(x: CGFloat(x), y: CGFloat(y), width: newWidth, height: newHeight)
+            let targetScreen = findScreen(for: targetRect, defaultScreen: activeWindow.screen)
+            let targetVisibleFrame = targetScreen?.visibleFrame ?? targetScreen?.frame ?? visibleFrame
+            
+            let frame = fitFrame(targetWidth: newWidth, targetHeight: newHeight, targetX: CGFloat(x), targetY: CGFloat(y), in: targetVisibleFrame)
+            activeWindow.setFrame(frame, display: true)
         }
     }
 }
 
 class WebViewExtended: WKWebView, WKUIDelegate {
     let resizeHelper: ResizeHelper
+    var ctxId: UInt8?
+    private var hasAppliedInitialSize: Bool = false
     
     override init(frame: CGRect, configuration: WKWebViewConfiguration){
         self.resizeHelper = ResizeHelper()
@@ -234,6 +244,19 @@ class WebViewExtended: WKWebView, WKUIDelegate {
         super.viewDidMoveToWindow()
         if let window = self.window {
             self.resizeHelper.observeWindow(window)
+            if !hasAppliedInitialSize {
+                hasAppliedInitialSize = true
+                if let webView = self as? WebView {
+                    if webView.isInitialDirectoryApp {
+                        let c = self.ctxId ?? webView.requestHandler.ctx
+                        if let savedSize = getConfig(ctx: c, key: "windowSize") {
+                            self.resizeHelper.applySize(savedSize, to: window)
+                        }
+                    } else {
+                        self.resizeHelper.applySize("700:550", to: window)
+                    }
+                }
+            }
         } else {
             self.resizeHelper.stopObservingWindow()
         }
@@ -272,7 +295,40 @@ class WebViewExtended: WKWebView, WKUIDelegate {
 // source: https://stackoverflow.com/a/69858444
 class KeyView: NSView {
     override var acceptsFirstResponder: Bool { true }
-    override func keyDown(with event: NSEvent) {}
+    private static var monitorInstalled = false
+    
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        KeyView.installPanicMonitor()
+    }
+    
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        KeyView.installPanicMonitor()
+    }
+    
+    static func installPanicMonitor() {
+        guard !monitorInstalled else { return }
+        monitorInstalled = true
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let isCmdOrCtrl = event.modifierFlags.contains(.command) || event.modifierFlags.contains(.control)
+            let isShift = event.modifierFlags.contains(.shift)
+            if isCmdOrCtrl && isShift && event.keyCode == 53 {
+                WebViewStore.getInstance().panicRecovery()
+                return nil
+            }
+            return event
+        }
+    }
+    
+    override func keyDown(with event: NSEvent) {
+        let isCmdOrCtrl = event.modifierFlags.contains(.command) || event.modifierFlags.contains(.control)
+        let isShift = event.modifierFlags.contains(.shift)
+        if isCmdOrCtrl && isShift && event.keyCode == 53 {
+            WebViewStore.getInstance().panicRecovery()
+            return
+        }
+    }
 }
 
 struct WebViewRepresentable: NSViewRepresentable {

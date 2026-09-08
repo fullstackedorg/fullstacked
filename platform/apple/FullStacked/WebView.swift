@@ -5,7 +5,52 @@ import AuthenticationServices
 let platform = "apple"
 let downloadDirectory = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first! + "/downloads";
 
-func startMain(_ providedCtx: UInt8?) -> UInt8 {
+func getConfig(ctx: UInt8, key: String) -> String? {
+    let keyData = key.data(using: .utf8)!
+    var payload = Data([
+        ctx,
+        0, // id
+        16, // Config Module
+        0, // Get
+        1, // Sync
+        SerializableDataType.STRING.rawValue
+    ])
+    payload.append(NumberToUint4Bytes(num: keyData.count))
+    payload.append(keyData)
+    
+    let responseData = coreCall(payload: payload)
+    if responseData.count > 1 && responseData[responseData.startIndex] == 1 {
+        let (deserialized, _) = Deserialize(buffer: responseData, index: 1)
+        if let str = deserialized as? String {
+            let trimmed = str.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                return trimmed
+            }
+        }
+    }
+    
+    return nil
+}
+
+func parseWindowSize(_ sizeStr: String?) -> CGSize? {
+    guard let sizeStr = sizeStr else { return nil }
+    let trimmed = sizeStr.trimmingCharacters(in: .whitespacesAndNewlines)
+    #if os(macOS)
+    if (trimmed == "fullscreen" || trimmed == "kiosk"), let screen = NSScreen.main {
+        return screen.visibleFrame.size
+    }
+    #endif
+    let parts = trimmed.split(separator: ":")
+    if parts.count >= 2,
+       let w = Double(parts[0]),
+       let h = Double(parts[1]),
+       w > 0, h > 0 {
+        return CGSize(width: CGFloat(w), height: CGFloat(h))
+    }
+    return nil
+}
+
+func startMain(_ providedCtx: UInt8?, skipInitialDir: Bool = false) -> (ctx: UInt8, isInitialDir: Bool) {
     let rootPtr = root.ptr()
     let buildPtr = build.ptr()
     
@@ -20,7 +65,33 @@ func startMain(_ providedCtx: UInt8?) -> UInt8 {
     rootPtr?.deallocate()
     buildPtr?.deallocate()
     
-    return ctx
+    if providedCtx != nil || skipInitialDir {
+        return (ctx, false)
+    }
+    
+    // Call getConfig("initialDirectory") using core.call([ctx, id, mod, fn, ...]) and serialize/deserialize
+    if let initialDir = getConfig(ctx: ctx, key: "initialDirectory") {
+        let trimmed = initialDir.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            // Close main ctx
+            stop(ctx)
+            
+            // Resolve path relative to root
+            let subPath = trimmed.hasPrefix("/") ? String(trimmed.dropFirst()) : trimmed
+            let targetDir = (root as NSString).appendingPathComponent(subPath)
+            
+            // Create new ctx with initialDirectory value overriding root and build
+            let targetDirPtr = targetDir.ptr()
+            let targetBuildPtr = targetDir.ptr()
+            let newCtx = start(targetDirPtr, targetBuildPtr)
+            targetDirPtr?.deallocate()
+            targetBuildPtr?.deallocate()
+            
+            return (newCtx, true)
+        }
+    }
+    
+    return (ctx, false)
 }
 
 class WeakMessageHandler: NSObject, WKScriptMessageHandler {
@@ -59,6 +130,9 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     
     public let requestHandler: RequestHandler
     public var main = false
+    public var isInitialDirectoryApp = false
+    public var skipInitialDir = false
+    public var windowSize: CGSize = CGSize(width: 700, height: 550)
     
     required init(from decoder: any Decoder) throws {
         fatalError("init(coder:) has not been implemented")
@@ -67,19 +141,39 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         
     }
     
-    init(_ providedCtx: UInt8?) {
+    init(_ providedCtx: UInt8?, skipInitialDir: Bool = false) {
+        self.skipInitialDir = skipInitialDir
         if(providedCtx == nil) {
             self.main = true
         }
         
-        let ctx = providedCtx ?? startMain(nil)
+        let startResult: (ctx: UInt8, isInitialDir: Bool)
+        if let p = providedCtx {
+            startResult = (p, false)
+        } else {
+            startResult = startMain(nil, skipInitialDir: skipInitialDir)
+        }
+        
+        var ctx = startResult.ctx
+        self.isInitialDirectoryApp = startResult.isInitialDir
         
         if check(ctx) == 0 {
             self.main = true
-            _ = startMain(ctx)
+            let retryResult = startMain(ctx, skipInitialDir: skipInitialDir)
+            ctx = retryResult.ctx
+            self.isInitialDirectoryApp = retryResult.isInitialDir
         }
         
         self.requestHandler = RequestHandler(ctx: ctx)
+        
+        if self.isInitialDirectoryApp {
+            if let savedSize = getConfig(ctx: ctx, key: "windowSize"),
+               let parsed = parseWindowSize(savedSize) {
+                self.windowSize = parsed
+            }
+        } else {
+            self.windowSize = CGSize(width: 700, height: 550)
+        }
         
         // inspector / debug console
         let wkWebViewConfig = WKWebViewConfiguration()
@@ -91,6 +185,7 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         wkWebViewConfig.setURLSchemeHandler(self.requestHandler, forURLScheme: "fs")
         
         super.init(frame: CGRect(), configuration: wkWebViewConfig)
+        self.ctxId = ctx
         
         self.closer.webView = self
         
@@ -100,7 +195,8 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         userContentController.add(WeakMessageHandler(self.open), name: "open")
         userContentController.add(WeakMessageHandler(self.closer), name: "exit")
         
-        self.load(URLRequest(url: URL(string: "fs://localhost")!))
+        let urlStr = skipInitialDir ? "fs://localhost?skipInitialDir=true" : "fs://localhost"
+        self.load(URLRequest(url: URL(string: urlStr)!))
     }
     
     override func close(){
@@ -184,11 +280,7 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     }
     
     func webView(_ webView: WKWebView, didFinish didFinishNavigation: WKNavigation) {
-        var title = webView.title
-        if(title == nil || title!.isEmpty) {
-            title = "FullStacked"
-        }
-        WebViewStore.getInstance().webViewsMeta[self.id] = (title!, self.getBackgroundColor())
+        WebViewStore.getInstance().updateMeta(for: self)
     }
     
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {

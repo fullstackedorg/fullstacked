@@ -51,145 +51,186 @@ struct FullStackedApp: App {
 
     var body: some Scene {
         WindowGroup(id: "FullStacked", for: WebView.ID.self) { $id in
-            #if os(iOS)
-            let isFull = isFullScreen(size: self.windowSize, windowScene: self.webViewStore.getScene(for: id))
-            #else
-            let isFull = true
-            #endif
-            
-            (self.webViewStore.webViewsMeta[id]?.1 ?? Color(hex: 0))
-                .ignoresSafeArea()
-                .navigationTitle(self.webViewStore.webViewsMeta[id]?.0 ?? "FullStacked")
-            
-                .onGeometryChange(for: CGSize.self) { proxy in
-                    proxy.size
-                } action: { newSize in
-                    self.windowSize = newSize
-                }
-            
-                .overlay {
-                    NavigationStack {
-                        ZStack {
-                            (self.webViewStore.webViewsMeta[id]?.1 ?? Color(hex: 0))
-                                .ignoresSafeArea()
-                            
-                            WebViewRepresentable(self.webViewStore.getOrCreate(id))
-                                #if os(iOS)
-                                .ignoresSafeArea(edges: .bottom)
-                                #else
-                                .ignoresSafeArea()
-                                #endif
-                                .background(self.webViewStore.webViewsMeta[id]?.1)
-                                .navigationTitle(self.webViewStore.webViewsMeta[id]?.0 ?? "FullStacked")
-                            
-                            #if os(macOS)
-                                .preferredColorScheme(getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[id]?.1))
-                                .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0))
-                                .toolbar{
-                                    Spacer()
-                                }
-                                .toolbarBackground(self.webViewStore.webViewsMeta[id]?.1 ?? Color(red: 0, green: 0, blue: 0, opacity: 0))
-                            #else
-                                .preferredColorScheme(isIPadOS
-                                                      ? getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[id]?.1)
-                                                      : nil)
-                                .toolbar(
-                                    isIPadOS && !isFull ? .visible : .hidden,
-                                    for: .navigationBar)
-                                .toolbarBackground(self.webViewStore.webViewsMeta[id]?.1 ?? Color(hex: 0), for: .navigationBar)
-                                .navigationBarTitleDisplayMode(.inline)
-                            #endif
+            if let webView = self.webViewStore.get(id) {
+                let meta = self.webViewStore.webViewsMeta[id]
+                let winWidth = webView.windowSize.width
+                let winHeight = webView.windowSize.height
+                
+                #if os(iOS)
+                let isFull = isFullScreen(size: self.windowSize, windowScene: self.webViewStore.getScene(for: id))
+                #else
+                let isFull = true
+                #endif
+                
+                (meta?.color ?? Color(hex: 0))
+                    .ignoresSafeArea()
+                    .navigationTitle(meta?.title ?? "FullStacked")
+                    #if os(macOS)
+                    .frame(minWidth: 100, idealWidth: winWidth, maxWidth: .infinity,
+                           minHeight: 100, idealHeight: winHeight, maxHeight: .infinity)
+                    #endif
+                
+                    .onGeometryChange(for: CGSize.self) { proxy in
+                        proxy.size
+                    } action: { newSize in
+                        self.windowSize = newSize
+                    }
+                
+                    .overlay {
+                        NavigationStack {
+                            ZStack {
+                                (meta?.color ?? Color(hex: 0))
+                                    .ignoresSafeArea()
                                 
-                                .onAppear{
-                                    if(self.supportsMultipleWindows) {
-                                        self.webViewStore.openWindow = self.openWindow
-                                        self.webViewStore.dismissWindow = self.dismissWindow
-                                        #if os(iOS)
-                                        // Cache the scene while the view is in the hierarchy.
-                                        // removeWebView may race ahead of webView.window being set.
-                                        if let scene = self.webViewStore.getOrCreate(id).window?.windowScene {
-                                            self.webViewStore.cacheScene(scene, for: id)
-                                        }
-                                        #endif
-                                    } else {
-                                        self.webViewStore.addWebView(self.webViewStore.getOrCreate(id))
+                                WebViewRepresentable(webView)
+                                    #if os(iOS)
+                                    .ignoresSafeArea(edges: .bottom)
+                                    #else
+                                    .ignoresSafeArea()
+                                    #endif
+                                    .background(meta?.color)
+                                    .navigationTitle(meta?.title ?? "FullStacked")
+                                
+                                #if os(macOS)
+                                    .preferredColorScheme(getBestSuitedColorScheme(color: meta?.color))
+                                    .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0))
+                                    .toolbar{
+                                        Spacer()
                                     }
-                                }
-                                .onDisappear{
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                                        self.webViewStore.removeWebView(id)
-                                   }
-                                }
-                            
-                            if(self.webViewStore.getOrCreate(id).main) {
-                                ForEach(self.webViewStore.webViewsPublished, id: \.self) { webView in
-                                    VStack {
-                                        if self.webViewStore.webViewsPublished.count > 1 {
-                                            HStack(alignment: .center) {
-                                                Button {
-                                                    self.webViewStore.removeWebView(webView.id)
-                                                } label: {
-                                                    Image(systemName: "xmark")
-                                                        .tint(getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[webView.id]?.1) == .dark
-                                                              ? .white
-                                                              : .black)
-                                                }
-                                                .frame(maxWidth: .infinity, alignment: .trailing)
-                                                .padding(windowSize.width > windowSize.height
-                                                         ? EdgeInsets(top: 10, leading: 0, bottom: 2, trailing: 10)
-                                                         : EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 10))
-                                                    
-                                            }
-                                        }
-                                        
-                                        WebViewRepresentable(webView)
+                                    .toolbarBackground(meta?.color ?? Color(red: 0, green: 0, blue: 0, opacity: 0))
+                                #else
+                                    .preferredColorScheme(isIPadOS
+                                                          ? getBestSuitedColorScheme(color: meta?.color)
+                                                          : nil)
+                                    .toolbar(
+                                        isIPadOS && !isFull ? .visible : .hidden,
+                                        for: .navigationBar)
+                                    .toolbarBackground(meta?.color ?? Color(hex: 0), for: .navigationBar)
+                                    .navigationBarTitleDisplayMode(.inline)
+                                #endif
+                                    
+                                    .onAppear{
+                                        if(self.supportsMultipleWindows) {
+                                            self.webViewStore.openWindow = self.openWindow
+                                            self.webViewStore.dismissWindow = self.dismissWindow
                                             #if os(iOS)
-                                            .ignoresSafeArea(edges: .bottom)
-                                            #else
-                                            .ignoresSafeArea()
+                                            // Cache the scene while the view is in the hierarchy.
+                                            // removeWebView may race ahead of webView.window being set.
+                                            if let scene = webView.window?.windowScene {
+                                                self.webViewStore.cacheScene(scene, for: id)
+                                            }
                                             #endif
-                                            
+                                        } else {
+                                            self.webViewStore.addWebView(webView)
+                                        }
                                     }
-                                    .background(self.webViewStore.webViewsMeta[webView.id]?.1 ?? Color(.black))
-                                    .preferredColorScheme(getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[webView.id]?.1))
+                                    .onDisappear{
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                            self.webViewStore.removeWebView(id)
+                                        }
+                                    }
+                                
+                                if(webView.main) {
+                                    ForEach(self.webViewStore.webViewsPublished, id: \.self) { publishedWebView in
+                                        VStack {
+                                            if self.webViewStore.webViewsPublished.count > 1 {
+                                                HStack(alignment: .center) {
+                                                    Button {
+                                                        self.webViewStore.removeWebView(publishedWebView.id)
+                                                    } label: {
+                                                        Image(systemName: "xmark")
+                                                            .tint(getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[publishedWebView.id]?.color) == .dark
+                                                                  ? .white
+                                                                  : .black)
+                                                    }
+                                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                                                    .padding(EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 10))
+                                                }
+                                            }
+                                            
+                                            WebViewRepresentable(publishedWebView)
+                                                #if os(iOS)
+                                                .ignoresSafeArea(edges: .bottom)
+                                                #else
+                                                .ignoresSafeArea()
+                                                #endif
+                                                
+                                        }
+                                        .background(self.webViewStore.webViewsMeta[publishedWebView.id]?.color ?? Color(.black))
+                                        .preferredColorScheme(getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[publishedWebView.id]?.color))
+                                    }
                                 }
                             }
                         }
                     }
-                }
+            } else {
+                Color.clear
+            }
         } defaultValue: {
-            UUID()
+            self.webViewStore.createOrGetDefaultId()
         }
         #if os(macOS)
-            .defaultSize(width: 700, height: 550)
+            .defaultSize(
+                width: self.webViewStore.defaultWindowSize.width,
+                height: self.webViewStore.defaultWindowSize.height
+            )
             .restorationBehavior(.disabled)
         #endif
     }
 }
 
 class WebViewStore: ObservableObject {
-    static private var singleton: WebViewStore?;
+    static private var singleton: WebViewStore?
     static func getInstance() -> WebViewStore {
         if(self.singleton == nil) {
+            coreInit()
             self.singleton = WebViewStore()
         }
         
         return self.singleton!
     }
     
+    static func getExistingInstance() -> WebViewStore? {
+        return self.singleton
+    }
+    
+    private var hasPresentedFirstWindow = false
+    
+    func createOrGetDefaultId() -> UUID {
+        if !hasPresentedFirstWindow, let first = self.webViews.first {
+            hasPresentedFirstWindow = true
+            return first.id
+        }
+        let shouldSkip = self.webViews.first?.skipInitialDir ?? false
+        let webView = WebView(nil, skipInitialDir: shouldSkip)
+        if !self.webViews.contains(where: { $0.id == webView.id }) {
+            self.webViews.append(webView)
+        }
+        DispatchQueue.main.async { [weak self] in
+            self?.updateMeta(for: webView)
+        }
+        return webView.id
+    }
+    
     init() {
+        WebViewStore.singleton = self
         Timer.scheduledTimer(withTimeInterval: 1, repeats: true, block: { [weak self] _ in
             guard let self = self else { return }
             self.webViews.forEach { webView in
-                var title = webView.title
-                if(title == nil || title!.isEmpty) {
-                    title = "FullStacked"
-                }
-                
-                self.webViewsMeta[webView.id] =
-                    (title!, webView.getBackgroundColor())
+                self.updateMeta(for: webView)
             }
         })
+        
+        let main = WebView(nil)
+        self.webViews.append(main)
+        self.updateMeta(for: main)
+    }
+    
+    var defaultWindowSize: CGSize {
+        if let mainView = self.webViews.first(where: { $0.main }) ?? self.webViews.first {
+            return mainView.windowSize
+        }
+        return CGSize(width: 700, height: 550)
     }
     
     var openWindow: OpenWindowAction?
@@ -198,7 +239,7 @@ class WebViewStore: ObservableObject {
     var webViews: [WebView] = []
     @Published var webViewsPublished: [WebView] = []
     // title, bgColor
-    @Published var webViewsMeta: [UUID:(String, Color)] = [:]
+    @Published var webViewsMeta: [UUID: (title: String, color: Color)] = [:]
     // IDs that have been explicitly closed — getOrCreate must not resurrect them
     private var closedIDs: Set<UUID> = []
     #if os(iOS)
@@ -211,13 +252,38 @@ class WebViewStore: ObservableObject {
     }
     #endif
     
+    func updateMeta(for webView: WebView) {
+        var title = webView.title
+        if(title == nil || title!.isEmpty) {
+            title = "FullStacked"
+        }
+        
+        let newColor = webView.getBackgroundColor()
+        if let current = self.webViewsMeta[webView.id],
+           current.title == title!,
+           current.color == newColor {
+            return
+        }
+        
+        self.webViewsMeta[webView.id] = (title: title!, color: newColor)
+    }
+    
     func addWebView(_ webView: WebView) {
-        self.webViews.append(webView)
+        if !self.webViews.contains(where: { $0.id == webView.id }) {
+            self.webViews.append(webView)
+        }
+        DispatchQueue.main.async { [weak self] in
+            self?.updateMeta(for: webView)
+        }
         if let openWindow = self.openWindow {
             openWindow(id: "FullStacked", value: webView.id)
-        } else {
+        } else if !self.webViewsPublished.contains(where: { $0.id == webView.id }) {
             self.webViewsPublished.append(webView)
         }
+    }
+    
+    func get(_ id: UUID) -> WebView? {
+        return self.webViews.first(where: { $0.id == id })
     }
     
     func getOrCreate(_ id: UUID) -> WebView {
@@ -225,17 +291,13 @@ class WebViewStore: ObservableObject {
             return webView
         }
         
-        // Don't resurrect a WebView that was intentionally closed.
-        // SwiftUI re-renders the WindowGroup body after @Published changes, which
-        // calls getOrCreate again for the same UUID — without this guard it would
-        // silently create a fresh WebView(nil) and spawn a second app instance.
-        if self.closedIDs.contains(id), let existing = self.webViews.first {
-            return existing
-        }
-        
-        let webView = WebView(nil)
+        let shouldSkip = self.webViews.first?.skipInitialDir ?? false
+        let webView = WebView(nil, skipInitialDir: shouldSkip)
         webView.id = id
         self.webViews.append(webView)
+        DispatchQueue.main.async { [weak self] in
+            self?.updateMeta(for: webView)
+        }
         return webView
     }
     
@@ -271,6 +333,22 @@ class WebViewStore: ObservableObject {
         if(self.webViewsPublished.isEmpty && self.openWindow == nil) {
             self.addWebView(WebView(nil))
         }
+    }
+    
+    func panicRecovery() {
+        let allViews = self.webViews
+        for webView in allViews {
+            webView.close()
+        }
+        self.webViews.removeAll()
+        self.webViewsPublished.removeAll()
+        self.webViewsMeta.removeAll()
+        self.closedIDs.removeAll()
+        self.hasPresentedFirstWindow = true
+        
+        let rootWebView = WebView(nil, skipInitialDir: true)
+        self.updateMeta(for: rootWebView)
+        self.addWebView(rootWebView)
     }
 }
 

@@ -9,8 +9,8 @@
 #include <iostream>
 #include <sstream>
 
-Window *WebkitGTKGUI::createWindow(uint8_t ctx) {
-    return new WebkitGTKWindow(ctx, app);
+Window *WebkitGTKGUI::createWindow(uint8_t ctx, bool skipInitialDir) {
+    return new WebkitGTKWindow(ctx, app, skipInitialDir);
 }
 
 int WebkitGTKGUI::run(int &argc, char **argv, std::function<void()> onReady) {
@@ -23,9 +23,10 @@ int WebkitGTKGUI::run(int &argc, char **argv, std::function<void()> onReady) {
     return app->run();
 }
 
-WebkitGTKWindow::WebkitGTKWindow(uint8_t pCtx, Glib::RefPtr<Gtk::Application> pApp) {
+WebkitGTKWindow::WebkitGTKWindow(uint8_t pCtx, Glib::RefPtr<Gtk::Application> pApp, bool pSkipInitialDir) {
     ctx = pCtx;
     app = pApp;
+    skipInitialDir = pSkipInitialDir;
     initWindow();
 }
 
@@ -323,7 +324,22 @@ void WebkitGTKWindow::initWindow() {
     g_signal_connect(webviewWidget, "decide-policy", G_CALLBACK(WebkitGTKWindow::navigationDecidePolicy), this);
     g_signal_connect(webviewWidget, "create", G_CALLBACK(WebkitGTKWindow::onCreateWebView), this);
 
-    webkit_web_view_load_uri(webview, "fs://localhost");
+    GtkEventController *keyController = gtk_event_controller_key_new();
+    g_signal_connect(keyController, "key-pressed", G_CALLBACK(+[](GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, gpointer data) -> gboolean {
+        bool isCtrl = (state & GDK_CONTROL_MASK) != 0;
+        bool isShift = (state & GDK_SHIFT_MASK) != 0;
+        if (isCtrl && isShift && keyval == GDK_KEY_Escape) {
+            if (App::instance) {
+                App::instance->panicRecovery();
+                return TRUE;
+            }
+        }
+        return FALSE;
+    }), this);
+    gtk_widget_add_controller(GTK_WIDGET(windowGTK->gobj()), keyController);
+
+    std::string uri = skipInitialDir ? "fs://localhost?skipInitialDir=true" : "fs://localhost";
+    webkit_web_view_load_uri(webview, uri.c_str());
 }
 
 void WebkitGTKWindow::handleBridgeMessage(const std::string &payloadB64) {

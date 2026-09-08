@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.ViewGroup
 import android.webkit.ValueCallback
 import android.widget.FrameLayout
@@ -614,5 +615,55 @@ class MainActivity : ComponentActivity() {
         } catch (_: Exception) { }
 
         return false
+    }
+
+    private val panicHandler = Handler(Looper.getMainLooper())
+    private var panicRunnable: Runnable? = null
+    private var isThreeFingerActive = false
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                if (ev.pointerCount == 3 && !isThreeFingerActive) {
+                    isThreeFingerActive = true
+                    panicRunnable = Runnable {
+                        panicRecovery()
+                    }
+                    panicHandler.postDelayed(panicRunnable!!, 1500)
+                } else if (ev.pointerCount > 3) {
+                    cancelPanicDetection()
+                }
+            }
+            MotionEvent.ACTION_POINTER_UP -> {
+                if (ev.pointerCount <= 3) {
+                    cancelPanicDetection()
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                cancelPanicDetection()
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
+    private fun cancelPanicDetection() {
+        isThreeFingerActive = false
+        panicRunnable?.let { panicHandler.removeCallbacks(it) }
+        panicRunnable = null
+    }
+
+    fun panicRecovery() {
+        runOnUiThread {
+            cancelPanicDetection()
+            for (wv in stackedWebViews) {
+                wv.destroyView()
+            }
+            stackedWebViews.clear()
+
+            val rootCtx = Core.startMain(root, getMainLocation(), null, skipInitialDir = true)
+            val newWv = FullStackedWebView(this, ctxId = rootCtx.toByte(), skipInitialDir = true)
+            stackedWebViews.add(newWv)
+            updateActiveContentView()
+        }
     }
 }

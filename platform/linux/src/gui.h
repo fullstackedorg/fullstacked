@@ -26,7 +26,7 @@ public:
     virtual ~GUI() = default;
 
     virtual int run(int &argc, char **argv, std::function<void()> onReady) = 0;
-    virtual Window *createWindow(uint8_t ctx) = 0;
+    virtual Window *createWindow(uint8_t ctx, bool skipInitialDir = false) = 0;
 };
 
 #endif

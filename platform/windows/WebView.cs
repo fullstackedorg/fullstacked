@@ -22,17 +22,94 @@ namespace FullStacked
         private readonly object syncLock = new();
         private Dictionary<byte, TaskCompletionSource<byte[]>> syncAwaitersResolve = [];
         private Dictionary<byte, byte[]> syncAwaitersPayload = [];
-        public WebView(byte ctx)
+        private bool skipInitialDir = false;
+
+        public WebView(byte ctx, bool isInitialDir = false, bool skipInitialDir = false)
         {
             this.ctx = ctx;
+            this.skipInitialDir = skipInitialDir;
 
             this.Title = "FullStacked";
             this.AppWindow.SetIcon("Assets/Window-Icon.ico");
+
+            if (isInitialDir)
+            {
+                string savedSize = App.singleton?.GetConfig(ctx, "windowSize");
+                if (!string.IsNullOrWhiteSpace(savedSize))
+                {
+                    this.ApplyWindowSize(savedSize);
+                }
+            }
+            else
+            {
+                this.ApplyWindowSize("700:550");
+            }
 
             this.InitWebView();
 
             this.Content = this.webview;
             this.Activate();
+        }
+
+        public void ApplyWindowSize(string sizeVal)
+        {
+            if (string.IsNullOrWhiteSpace(sizeVal))
+            {
+                return;
+            }
+
+            sizeVal = sizeVal.Trim();
+            if (sizeVal == "kiosk")
+            {
+                this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen);
+            }
+            else if (sizeVal == "fullscreen")
+            {
+                this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Default);
+                var overlappedPresenter = this.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
+                if (overlappedPresenter != null)
+                {
+                    overlappedPresenter.Maximize();
+                }
+            }
+            else
+            {
+                string[] parts = sizeVal.Split(':');
+                if (parts.Length >= 2)
+                {
+                    int w = int.Parse(parts[0]);
+                    int h = int.Parse(parts[1]);
+
+                    if (this.AppWindow.Presenter.Kind == Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen)
+                    {
+                        this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Default);
+                    }
+                    var overlappedPresenter = this.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
+                    if (overlappedPresenter != null && overlappedPresenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Maximized)
+                    {
+                        overlappedPresenter.Restore();
+                    }
+
+                    if (parts.Length == 4)
+                    {
+                        int x = int.Parse(parts[2]);
+                        int y = int.Parse(parts[3]);
+                        this.AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(x, y, w, h));
+                    }
+                    else
+                    {
+                        int currentW = this.AppWindow.Size.Width;
+                        int currentH = this.AppWindow.Size.Height;
+                        int currentX = this.AppWindow.Position.X;
+                        int currentY = this.AppWindow.Position.Y;
+
+                        int newX = currentX + (currentW - w) / 2;
+                        int newY = currentY + (currentH - h) / 2;
+
+                        this.AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(newX, newY, w, h));
+                    }
+                }
+            }
         }
 
         async public void InitWebView()
@@ -163,57 +240,7 @@ namespace FullStacked
                             {
                                 if (queryParams.TryGetValue("size", out string sizeVal) && !string.IsNullOrEmpty(sizeVal))
                                 {
-                                    if (sizeVal == "kiosk")
-                                    {
-                                        this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen);
-                                    }
-                                    else if (sizeVal == "fullscreen")
-                                    {
-                                        this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Default);
-                                        var overlappedPresenter = this.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
-                                        if (overlappedPresenter != null)
-                                        {
-                                            overlappedPresenter.Maximize();
-                                        }
-                                    }
-                                    else
-                                    {
-                                        string[] parts = sizeVal.Split(':');
-                                        if (parts.Length >= 2)
-                                        {
-                                            int w = int.Parse(parts[0]);
-                                            int h = int.Parse(parts[1]);
-
-                                            if (this.AppWindow.Presenter.Kind == Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen)
-                                            {
-                                                this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Default);
-                                            }
-                                            var overlappedPresenter = this.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
-                                            if (overlappedPresenter != null && overlappedPresenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Maximized)
-                                            {
-                                                overlappedPresenter.Restore();
-                                            }
-
-                                            if (parts.Length == 4)
-                                            {
-                                                int x = int.Parse(parts[2]);
-                                                int y = int.Parse(parts[3]);
-                                                this.AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(x, y, w, h));
-                                            }
-                                            else
-                                            {
-                                                int currentW = this.AppWindow.Size.Width;
-                                                int currentH = this.AppWindow.Size.Height;
-                                                int currentX = this.AppWindow.Position.X;
-                                                int currentY = this.AppWindow.Position.Y;
-
-                                                int newX = currentX + (currentW - w) / 2;
-                                                int newY = currentY + (currentH - h) / 2;
-
-                                                this.AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(newX, newY, w, h));
-                                            }
-                                        }
-                                    }
+                                    this.ApplyWindowSize(sizeVal);
                                     responseBuffer = [];
                                 }
                                 else
@@ -317,7 +344,23 @@ namespace FullStacked
                 _ = Windows.System.Launcher.LaunchUriAsync(url);
             };
 
-            this.webview.Source = new Uri("http://localhost");
+            this.webview.CoreWebView2.AcceleratorKeyPressed += delegate (CoreWebView2 sender, CoreWebView2AcceleratorKeyPressedEventArgs args)
+            {
+                if (args.VirtualKey == Windows.System.VirtualKey.Escape)
+                {
+                    var ctrlState = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control);
+                    var shiftState = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Shift);
+                    bool isCtrl = (ctrlState & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
+                    bool isShift = (shiftState & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
+                    if (isCtrl && isShift)
+                    {
+                        args.Handled = true;
+                        App.singleton.PanicRecovery();
+                    }
+                }
+            };
+
+            this.webview.Source = new Uri(this.skipInitialDir ? "http://localhost?skipInitialDir=true" : "http://localhost");
         }
 
         public void onStreamData(byte streamId, byte[] data)
