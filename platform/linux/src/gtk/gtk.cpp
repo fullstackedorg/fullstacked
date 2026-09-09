@@ -4,6 +4,7 @@
 #include "../core.h"
 #include "../utils.h"
 #include <gio/gio.h>
+#include <glibmm/main.h>
 #include <gobject/gsignal.h>
 #include <gtk/gtkwidget.h>
 #include <iostream>
@@ -14,6 +15,9 @@ Window *WebkitGTKGUI::createWindow(uint8_t ctx, bool skipInitialDir) {
 }
 
 int WebkitGTKGUI::run(int &argc, char **argv, std::function<void()> onReady) {
+    if (!g_getenv("WEBKIT_DISABLE_DMABUF_RENDERER")) {
+        g_setenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1", FALSE);
+    }
     app = Gtk::Application::create("org.fullstacked");
     WebKitWebContext *context = webkit_web_context_get_default();
     webkit_web_context_register_uri_scheme(context, "fs",
@@ -50,11 +54,15 @@ void WebkitGTKWindow::webKitURISchemeRequestCallback(WebKitURISchemeRequest *req
     if (wv) {
         win = static_cast<WebkitGTKWindow *>(g_object_get_data(G_OBJECT(wv), "fullstacked_window"));
     }
-    if (!win && App::instance && !App::instance->activeWindows.empty()) {
+    if (!win && !wv && App::instance && !App::instance->activeWindows.empty()) {
         win = static_cast<WebkitGTKWindow *>(App::instance->activeWindows.begin()->second);
     }
     if (win) {
         win->handleSchemeRequest(request);
+    } else {
+        GError *error = g_error_new(G_IO_ERROR, G_IO_ERROR_CANCELLED, "Window closed");
+        webkit_uri_scheme_request_finish_error(request, error);
+        g_error_free(error);
     }
 }
 
@@ -169,6 +177,10 @@ GtkWidget *WebkitGTKWindow::createAuthWebView(WebKitNavigationAction *navigation
     WebKitSettings *settings = webkit_web_view_get_settings(authWebview);
     webkit_settings_set_enable_developer_extras(settings, true);
     webkit_settings_set_javascript_can_open_windows_automatically(settings, true);
+    webkit_settings_set_hardware_acceleration_policy(settings, WEBKIT_HARDWARE_ACCELERATION_POLICY_ALWAYS);
+    webkit_settings_set_enable_webgl(settings, true);
+    webkit_settings_set_enable_2d_canvas_acceleration(settings, true);
+    webkit_settings_set_enable_smooth_scrolling(settings, true);
 
     WebKitUserContentManager *ucm = webkit_web_view_get_user_content_manager(authWebview);
     webkit_user_content_manager_register_script_message_handler(ucm, "auth", NULL);
@@ -312,6 +324,10 @@ void WebkitGTKWindow::initWindow() {
     WebKitSettings *settings = webkit_web_view_get_settings(webview);
     webkit_settings_set_enable_developer_extras(settings, true);
     webkit_settings_set_javascript_can_open_windows_automatically(settings, true);
+    webkit_settings_set_hardware_acceleration_policy(settings, WEBKIT_HARDWARE_ACCELERATION_POLICY_ALWAYS);
+    webkit_settings_set_enable_webgl(settings, true);
+    webkit_settings_set_enable_2d_canvas_acceleration(settings, true);
+    webkit_settings_set_enable_smooth_scrolling(settings, true);
 
     WebKitUserContentManager *ucm = webkit_web_view_get_user_content_manager(webview);
     webkit_user_content_manager_register_script_message_handler(ucm, "bridge", NULL);
@@ -330,7 +346,11 @@ void WebkitGTKWindow::initWindow() {
         bool isShift = (state & GDK_SHIFT_MASK) != 0;
         if (isCtrl && isShift && keyval == GDK_KEY_Escape) {
             if (App::instance) {
-                App::instance->panicRecovery();
+                Glib::signal_idle().connect_once([]() {
+                    if (App::instance) {
+                        App::instance->panicRecovery();
+                    }
+                });
                 return TRUE;
             }
         }
@@ -491,18 +511,22 @@ void WebkitGTKWindow::handleSchemeRequest(WebKitURISchemeRequest *request) {
 }
 
 struct GtkStreamDataPayload {
-    WebKitWebView *webview;
+    GWeakRef webviewRef;
     uint8_t streamId;
     std::string b64;
 };
 
 static gboolean dispatchStreamDataGtk(gpointer userData) {
     auto *payload = static_cast<GtkStreamDataPayload *>(userData);
-    if (payload->webview && WEBKIT_IS_WEB_VIEW(payload->webview)) {
+    GObject *obj = static_cast<GObject *>(g_weak_ref_get(&payload->webviewRef));
+    if (obj) {
+        auto *wv = WEBKIT_WEB_VIEW(obj);
         std::string script = "if (window.fullstacked && window.fullstacked.onStreamData) { window.fullstacked.onStreamData(" +
                              std::to_string(payload->streamId) + ", `" + payload->b64 + "`); }";
-        webkit_web_view_evaluate_javascript(payload->webview, script.c_str(), static_cast<gssize>(script.size()), nullptr, nullptr, nullptr, nullptr, nullptr);
+        webkit_web_view_evaluate_javascript(wv, script.c_str(), static_cast<gssize>(script.size()), nullptr, nullptr, nullptr, nullptr, nullptr);
+        g_object_unref(obj);
     }
+    g_weak_ref_clear(&payload->webviewRef);
     delete payload;
     return G_SOURCE_REMOVE;
 }
@@ -510,22 +534,26 @@ static gboolean dispatchStreamDataGtk(gpointer userData) {
 void WebkitGTKWindow::onStreamData(uint8_t streamId, const std::vector<uint8_t> &data) {
     if (!webview) return;
     auto *payload = new GtkStreamDataPayload();
-    payload->webview = webview;
+    g_weak_ref_init(&payload->webviewRef, G_OBJECT(webview));
     payload->streamId = streamId;
     payload->b64 = base64_encode(data.data(), data.size());
     g_idle_add(dispatchStreamDataGtk, payload);
 }
 
 struct GtkEvalScriptPayload {
-    WebKitWebView *webview;
+    GWeakRef webviewRef;
     std::string script;
 };
 
 static gboolean dispatchEvalScriptGtk(gpointer userData) {
     auto *payload = static_cast<GtkEvalScriptPayload *>(userData);
-    if (payload->webview && WEBKIT_IS_WEB_VIEW(payload->webview)) {
-        webkit_web_view_evaluate_javascript(payload->webview, payload->script.c_str(), static_cast<gssize>(payload->script.size()), nullptr, nullptr, nullptr, nullptr, nullptr);
+    GObject *obj = static_cast<GObject *>(g_weak_ref_get(&payload->webviewRef));
+    if (obj) {
+        auto *wv = WEBKIT_WEB_VIEW(obj);
+        webkit_web_view_evaluate_javascript(wv, payload->script.c_str(), static_cast<gssize>(payload->script.size()), nullptr, nullptr, nullptr, nullptr, nullptr);
+        g_object_unref(obj);
     }
+    g_weak_ref_clear(&payload->webviewRef);
     delete payload;
     return G_SOURCE_REMOVE;
 }
@@ -533,7 +561,7 @@ static gboolean dispatchEvalScriptGtk(gpointer userData) {
 void WebkitGTKWindow::evaluateJavaScript(const std::string &script) {
     if (!webview) return;
     auto *payload = new GtkEvalScriptPayload();
-    payload->webview = webview;
+    g_weak_ref_init(&payload->webviewRef, G_OBJECT(webview));
     payload->script = script;
     g_idle_add(dispatchEvalScriptGtk, payload);
 }
@@ -615,8 +643,25 @@ void WebkitGTKWindow::close() {
         Gtk::Window *win = windowGTK;
         windowGTK = nullptr;
         if (webview) {
+            g_signal_handlers_disconnect_by_data(webview, this);
+            WebKitUserContentManager *ucm = webkit_web_view_get_user_content_manager(webview);
+            if (ucm) {
+                g_signal_handlers_disconnect_by_data(ucm, this);
+                webkit_user_content_manager_unregister_script_message_handler(ucm, "bridge", NULL);
+                webkit_user_content_manager_unregister_script_message_handler(ucm, "open", NULL);
+                webkit_user_content_manager_unregister_script_message_handler(ucm, "exit", NULL);
+            }
+            webkit_web_view_stop_loading(webview);
             g_object_set_data(G_OBJECT(webview), "fullstacked_window", nullptr);
             webview = nullptr;
+        }
+        {
+            std::lock_guard<std::mutex> lock(syncMutex);
+            for (auto &[id, req] : syncAwaitersResolve) {
+                g_object_unref(req);
+            }
+            syncAwaitersResolve.clear();
+            syncAwaitersPayload.clear();
         }
         App::instance->close(ctx);
         delete win;

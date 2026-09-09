@@ -75,6 +75,9 @@ QtWebEnginePage::QtWebEnginePage(QWebEngineProfile *profile, QObject *parent, Qt
 
 QWebEnginePage *QtWebEnginePage::createWindow(WebWindowType type) {
     auto *authWin = new AuthWindow(window, window ? window->getQMainWindow() : nullptr);
+    if (window) {
+        window->authWindow = authWin;
+    }
     authWin->show();
     return authWin->authView->page();
 }
@@ -392,7 +395,11 @@ void QtWindow::init() {
     auto *panicShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Escape), windowQt);
     QObject::connect(panicShortcut, &QShortcut::activated, []() {
         if (App::instance) {
-            App::instance->panicRecovery();
+            QTimer::singleShot(0, []() {
+                if (App::instance) {
+                    App::instance->panicRecovery();
+                }
+            });
         }
     });
 
@@ -567,20 +574,22 @@ void QtWindow::resolveSyncAwaiter(uint8_t id, const std::vector<uint8_t> &payloa
 void QtWindow::onStreamData(uint8_t streamId, const std::vector<uint8_t> &data) {
     if (!webEngineView) return;
     std::string b64 = base64_encode(data.data(), data.size());
-    QMetaObject::invokeMethod(webEngineView, [this, streamId, b64]() {
-        if (!webEngineView || !webEngineView->page()) return;
+    QPointer<QWebEngineView> view = webEngineView;
+    QMetaObject::invokeMethod(webEngineView, [view, streamId, b64]() {
+        if (!view || !view->page()) return;
         QString script = QString("if (window.fullstacked && window.fullstacked.onStreamData) { window.fullstacked.onStreamData(%1, `%2`); }")
             .arg(streamId)
             .arg(QString::fromStdString(b64));
-        webEngineView->page()->runJavaScript(script);
+        view->page()->runJavaScript(script);
     }, Qt::QueuedConnection);
 }
 
 void QtWindow::evaluateJavaScript(const std::string &script) {
     if (!webEngineView) return;
-    QMetaObject::invokeMethod(webEngineView, [this, script]() {
-        if (webEngineView && webEngineView->page()) {
-            webEngineView->page()->runJavaScript(QString::fromStdString(script));
+    QPointer<QWebEngineView> view = webEngineView;
+    QMetaObject::invokeMethod(webEngineView, [view, script]() {
+        if (view && view->page()) {
+            view->page()->runJavaScript(QString::fromStdString(script));
         }
     }, Qt::QueuedConnection);
 }
@@ -672,7 +681,22 @@ void QtWindow::close() {
         QMainWindow *win = windowQt;
         windowQt = nullptr;
         webEngineView = nullptr;
+        if (bridge) {
+            bridge->window = nullptr;
+            bridge = nullptr;
+        }
+        if (authWindow) {
+            authWindow->opener = nullptr;
+            authWindow = nullptr;
+        }
+        {
+            std::lock_guard<std::mutex> lock(syncMutex);
+            syncAwaitersResolve.clear();
+            syncAwaitersPayload.clear();
+        }
+        QObject::disconnect(win, nullptr, nullptr, nullptr);
         App::instance->close(ctx);
-        delete win;
+        win->close();
+        win->deleteLater();
     }
 }

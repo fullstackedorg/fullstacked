@@ -28,6 +28,7 @@ public:
     std::string buildDir;
     std::string deeplink;
     bool kiosk = false;
+    bool isPanicRecovering = false;
 
     App();
     ~App();

@@ -5,6 +5,7 @@
 #include <QApplication>
 #include <QMainWindow>
 #include <QObject>
+#include <QPointer>
 #include <QTimer>
 #include <QWebEnginePage>
 #include <QWebEngineProfile>
@@ -81,6 +82,7 @@ private:
     void init();
 
 public:
+    QPointer<AuthWindow> authWindow;
     bool skipInitialDir = false;
     QtWindow(uint8_t ctx, bool skipInitialDir = false);
     ~QtWindow() override;

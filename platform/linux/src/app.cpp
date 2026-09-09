@@ -92,14 +92,23 @@ void App::close(uint8_t ctx) {
 }
 
 void App::panicRecovery() {
+    if (isPanicRecovering) return;
+    isPanicRecovering = true;
+
+    std::vector<Window *> windowsToClose;
     for (auto const& [ctx, win] : activeWindows) {
+        windowsToClose.push_back(win);
+    }
+    for (Window *win : windowsToClose) {
+        win->close();
         delete win;
-        Core::stop(ctx);
     }
     activeWindows.clear();
 
     uint8_t mainCtx = startMain(rootDir, buildDir, true);
     open(mainCtx, true);
+
+    isPanicRecovering = false;
 }
 
 void App::onStreamData(uint8_t ctx, uint8_t streamId, const std::vector<uint8_t> &data) {
