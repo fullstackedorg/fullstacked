@@ -2,15 +2,33 @@
 # make
 
 cmake_minimum_required(VERSION 3.22.1)
-project(fullstacked)
 
 if(NOT DEFINED ARCH)
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64")
+    execute_process(COMMAND uname -m OUTPUT_VARIABLE HOST_ARCH OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(HOST_ARCH MATCHES "x86_64|amd64")
         set(ARCH "x64")
     else()
         set(ARCH "arm64")
     endif()
 endif()
+
+if(NOT DEFINED CMAKE_C_COMPILER)
+    if(ARCH STREQUAL "x64")
+        set(CMAKE_C_COMPILER "x86_64-linux-gnu-gcc")
+    elseif(ARCH STREQUAL "arm64")
+        set(CMAKE_C_COMPILER "aarch64-linux-gnu-gcc")
+    endif()
+endif()
+
+if(NOT DEFINED CMAKE_CXX_COMPILER)
+    if(ARCH STREQUAL "x64")
+        set(CMAKE_CXX_COMPILER "x86_64-linux-gnu-g++")
+    elseif(ARCH STREQUAL "arm64")
+        set(CMAKE_CXX_COMPILER "aarch64-linux-gnu-g++")
+    endif()
+endif()
+
+project(fullstacked)
 
 execute_process(
     COMMAND bash prebuild.sh ${ARCH} qt

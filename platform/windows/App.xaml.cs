@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 
 namespace FullStacked
 {
@@ -108,9 +109,15 @@ namespace FullStacked
             this.webviews.Add(ctx, webview);
             webview.Closed += delegate (object sender, WindowEventArgs args)
             {
-                this.webviews.Remove(ctx);
+                if (this.webviews.TryGetValue(ctx, out var existing) && existing == webview)
+                {
+                    this.webviews.Remove(ctx);
+                }
             };
         }
+
+        private bool isPanicRecovering = false;
+        private DateTime lastPanicTime = DateTime.MinValue;
 
         public void PanicRecovery()
         {
@@ -120,20 +127,59 @@ namespace FullStacked
                 return;
             }
 
-            foreach (var kv in new List<KeyValuePair<byte, WebView>>(this.webviews))
+            if (isPanicRecovering || (DateTime.UtcNow - lastPanicTime).TotalMilliseconds < 2000)
             {
-                byte ctx = kv.Key;
-                kv.Value.Close();
-                core.stop(ctx);
+                return;
             }
-            this.webviews.Clear();
+            isPanicRecovering = true;
+            lastPanicTime = DateTime.UtcNow;
 
-            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string appDataFolder = Path.Combine(localAppData, "fullstacked");
-            string buildFolder = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledPath, "out");
+            try
+            {
+                var oldWebviews = new List<KeyValuePair<byte, WebView>>(this.webviews);
+                this.webviews.Clear();
 
-            var (mainCtx, isInitialDir) = StartMain(appDataFolder, buildFolder, true);
-            this.open(mainCtx, false, true);
+                foreach (var kv in oldWebviews)
+                {
+                    try
+                    {
+                        kv.Value.UnregisterHotKeys();
+                    }
+                    catch {}
+                    try
+                    {
+                        core.stop(kv.Key);
+                    }
+                    catch {}
+                }
+
+                string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                string appDataFolder = Path.Combine(localAppData, "fullstacked");
+                string buildFolder = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledPath, "out");
+
+                var (mainCtx, isInitialDir) = StartMain(appDataFolder, buildFolder, true);
+                this.open(mainCtx, false, true);
+
+                foreach (var kv in oldWebviews)
+                {
+                    try
+                    {
+                        kv.Value.Close();
+                    }
+                    catch {}
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error in PanicRecovery: {ex}");
+            }
+            finally
+            {
+                dispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+                {
+                    isPanicRecovering = false;
+                });
+            }
         }
 
         private void onStreamData(byte ctx, byte streamId, byte[] data)

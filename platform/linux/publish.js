@@ -145,17 +145,7 @@ for (const target of targets) {
             fs.rmSync(cmakeFiles, { recursive: true });
         }
 
-        let cmakeFlags = `-DARCH=${target.arch}`;
-        const hostArch = process.arch === "x64" ? "x64" : "arm64";
-        if (target.arch === "x64" && hostArch !== "x64") {
-            cmakeFlags +=
-                " -DCMAKE_C_COMPILER=x86_64-linux-gnu-gcc -DCMAKE_CXX_COMPILER=x86_64-linux-gnu-g++";
-        } else if (target.arch === "arm64" && hostArch !== "arm64") {
-            cmakeFlags +=
-                " -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++";
-        }
-
-        child_process.execSync(`cmake ${cmakeFlags} .`, {
+        child_process.execSync(`cmake -DARCH=${target.arch} .`, {
             cwd: currentDirectory,
             stdio: "inherit"
         });
