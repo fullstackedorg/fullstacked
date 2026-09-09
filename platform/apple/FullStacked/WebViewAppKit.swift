@@ -13,6 +13,12 @@ class ResizeHelper: NSObject, WKScriptMessageHandler {
     var isFullScreen: Bool = false
     private var isChangingScreen: Bool = false
 
+    func reset() {
+        isFullScreen = false
+        lastRequestedWidth = nil
+        lastRequestedHeight = nil
+    }
+
     func observeWindow(_ window: NSWindow) {
         if observedWindow === window { return }
         stopObservingWindow()
@@ -270,6 +276,13 @@ class WebViewExtended: WKWebView, WKUIDelegate {
         NSWorkspace.shared.open(URL(fileURLWithPath: downloadDirectory))
     }
     
+    func panicReset() {
+        self.resizeHelper.reset()
+        if let window = self.window {
+            self.resizeHelper.applySize("700:550", to: window)
+        }
+    }
+    
     func close() {
         self.resizeHelper.stopObservingWindow()
         self.resizeHelper.webView = nil
@@ -344,12 +357,19 @@ struct WebViewRepresentable: NSViewRepresentable {
         }
         
         self.webView.autoresizingMask = [.width, .height]
-        view.addSubview(self.webView);
+        self.webView.frame = view.bounds
+        view.addSubview(self.webView)
         return view
     }
     
-    
-    func updateNSView(_ uiView: NSView, context: Context) {    }
+    func updateNSView(_ uiView: NSView, context: Context) {
+        if self.webView.superview != uiView {
+            self.webView.frame = uiView.bounds
+            uiView.addSubview(self.webView)
+        } else if self.webView.frame != uiView.bounds && uiView.bounds.width > 0 && uiView.bounds.height > 0 {
+            self.webView.frame = uiView.bounds
+        }
+    }
 }
 
 extension Color {

@@ -29,7 +29,54 @@ class ClipboardHelper: NSObject, WKScriptMessageHandler {
     }
 }
 
-class WebViewExtended: WKWebView, WKUIDelegate  {
+private var touchSafetySwizzlesInstalled = false
+
+private typealias InsertObjectAtIndexIMP = @convention(c) (AnyObject, Selector, AnyObject?, Int) -> Void
+private var originalInsertObjectAtIndex: InsertObjectAtIndexIMP?
+
+private let swizzledInsertObjectAtIndex: @convention(c) (AnyObject, Selector, AnyObject?, Int) -> Void = { selfObj, _cmd, anObject, index in
+    guard let anObject = anObject else {
+        // Suppress insertion of nil into NSMutableArray.
+        // UIKitCore's -[UIGestureRecognizer _delayTouchesForEvent:inPhase:] calls
+        // [self._delayedTouches addObject:delayedTouch] where delayedTouch resolves to nil
+        // on multi-touch gestures when dispatcher is uninitialized or touches cross window scenes.
+        return
+    }
+    originalInsertObjectAtIndex?(selfObj, _cmd, anObject, index)
+}
+
+private typealias AddObjectIMP = @convention(c) (AnyObject, Selector, AnyObject?) -> Void
+private var originalAddObject: AddObjectIMP?
+
+private let swizzledAddObject: @convention(c) (AnyObject, Selector, AnyObject?) -> Void = { selfObj, _cmd, anObject in
+    guard let anObject = anObject else { return }
+    originalAddObject?(selfObj, _cmd, anObject)
+}
+
+func installTouchSafetySwizzles() {
+    guard !touchSafetySwizzlesInstalled else { return }
+    touchSafetySwizzlesInstalled = true
+    
+    if let arrayMClass = objc_getClass("__NSArrayM") as? AnyClass {
+        let selInsert = sel_registerName("insertObject:atIndex:")
+        if let method = class_getInstanceMethod(arrayMClass, selInsert) {
+            let origIMP = method_getImplementation(method)
+            originalInsertObjectAtIndex = unsafeBitCast(origIMP, to: InsertObjectAtIndexIMP.self)
+            let newIMP = unsafeBitCast(swizzledInsertObjectAtIndex, to: IMP.self)
+            method_setImplementation(method, newIMP)
+        }
+        
+        let selAdd = sel_registerName("addObject:")
+        if let method = class_getInstanceMethod(arrayMClass, selAdd) {
+            let origIMP = method_getImplementation(method)
+            originalAddObject = unsafeBitCast(origIMP, to: AddObjectIMP.self)
+            let newIMP = unsafeBitCast(swizzledAddObject, to: IMP.self)
+            method_setImplementation(method, newIMP)
+        }
+    }
+}
+
+class WebViewExtended: WKWebView, WKUIDelegate, UIGestureRecognizerDelegate {
     let clipboardHelper: ClipboardHelper;
     var ctxId: UInt8?
     
@@ -37,7 +84,14 @@ class WebViewExtended: WKWebView, WKUIDelegate  {
         return .zero
     }
     
+    // Suppress system-wide 3-finger editing gestures (cut/copy/paste/undo/redo menu)
+    // which crash on WKWebView with -[__NSArrayM insertObject:atIndex:]: object cannot be nil.
+    override var editingInteractionConfiguration: UIEditingInteractionConfiguration {
+        return .none
+    }
+    
     override init(frame: CGRect, configuration: WKWebViewConfiguration) {
+        installTouchSafetySwizzles()
         self.clipboardHelper = ClipboardHelper()
         
         super.init(frame: frame, configuration: configuration)
@@ -63,11 +117,22 @@ class WebViewExtended: WKWebView, WKUIDelegate  {
         let panicGesture = UILongPressGestureRecognizer(target: self, action: #selector(handlePanicGesture(_:)))
         panicGesture.numberOfTouchesRequired = 3
         panicGesture.minimumPressDuration = 1.5
+        panicGesture.cancelsTouchesInView = false
+        panicGesture.delaysTouchesBegan = false
+        panicGesture.delaysTouchesEnded = false
+        panicGesture.delegate = self
         self.addGestureRecognizer(panicGesture)
     }
     
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        return true
+    }
+    
     @objc func handlePanicGesture(_ gesture: UILongPressGestureRecognizer) {
-        if gesture.state == .began {
+        guard gesture.state == .began else { return }
+        gesture.isEnabled = false
+        gesture.isEnabled = true
+        DispatchQueue.main.async {
             WebViewStore.getInstance().panicRecovery()
         }
     }
@@ -76,8 +141,18 @@ class WebViewExtended: WKWebView, WKUIDelegate  {
         fatalError("init(coder:) has not been implemented")
     }
     
+    func panicReset() {
+        self.scrollView.contentOffset = .zero
+    }
+    
     func close(){
         self.configuration.userContentController.removeScriptMessageHandler(forName: "clipboard")
+        self.clipboardHelper.cb = nil
+        self.gestureRecognizers?.forEach {
+            $0.delegate = nil
+            self.removeGestureRecognizer($0)
+        }
+        self.uiDelegate = nil
     }
     
     func openBrowserURL(_ url: URL){

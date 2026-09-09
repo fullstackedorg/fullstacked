@@ -39,6 +39,10 @@ func parseWindowSize(_ sizeStr: String?) -> CGSize? {
     if (trimmed == "fullscreen" || trimmed == "kiosk"), let screen = NSScreen.main {
         return screen.visibleFrame.size
     }
+    #else
+    if (trimmed == "fullscreen" || trimmed == "kiosk") {
+        return UIScreen.main.bounds.size
+    }
     #endif
     let parts = trimmed.split(separator: ":")
     if parts.count >= 2,
@@ -132,7 +136,11 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     public var main = false
     public var isInitialDirectoryApp = false
     public var skipInitialDir = false
+    #if os(macOS)
     public var windowSize: CGSize = CGSize(width: 700, height: 550)
+    #else
+    public var windowSize: CGSize = UIScreen.main.bounds.size
+    #endif
     
     required init(from decoder: any Decoder) throws {
         fatalError("init(coder:) has not been implemented")
@@ -172,7 +180,11 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
                 self.windowSize = parsed
             }
         } else {
+            #if os(macOS)
             self.windowSize = CGSize(width: 700, height: 550)
+            #else
+            self.windowSize = UIScreen.main.bounds.size
+            #endif
         }
         
         // inspector / debug console
@@ -199,10 +211,38 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         self.load(URLRequest(url: URL(string: urlStr)!))
     }
     
+    private var isClosed = false
+    
+    func panicReload() {
+        stop(self.requestHandler.ctx)
+        self.requestHandler.reset()
+        let startResult = startMain(nil, skipInitialDir: true)
+        self.requestHandler.ctx = startResult.ctx
+        self.ctxId = startResult.ctx
+        self.main = true
+        self.isInitialDirectoryApp = false
+        self.skipInitialDir = true
+        #if os(macOS)
+        self.windowSize = CGSize(width: 700, height: 550)
+        #else
+        self.windowSize = UIScreen.main.bounds.size
+        #endif
+        self.panicReset()
+        self.stopLoading()
+        self.load(URLRequest(url: URL(string: "fs://localhost?skipInitialDir=true")!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30))
+    }
+    
     override func close(){
+        guard !self.isClosed else { return }
+        self.isClosed = true
+        self.isInspectable = false
+        self.stopLoading()
+        self.loadHTMLString("", baseURL: nil)
         self.navigationDelegate = nil
         self.configuration.userContentController.removeScriptMessageHandler(forName: "bridge")
+        self.configuration.userContentController.removeScriptMessageHandler(forName: "open")
         self.configuration.userContentController.removeScriptMessageHandler(forName: "exit")
+        self.requestHandler.reset()
         stop(self.requestHandler.ctx)
         self.closer.webView = nil
         super.close()
@@ -308,18 +348,33 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     }
     
     func getBackgroundColor() -> Color {
-        return Color(self.underPageBackgroundColor.cgColor)
+        #if os(iOS)
+        if let bg = self.underPageBackgroundColor {
+            return Color(uiColor: bg)
+        }
+        return Color(hex: 0)
+        #else
+        if let bg = self.underPageBackgroundColor {
+            return Color(nsColor: bg)
+        }
+        return Color(hex: 0)
+        #endif
     }
 }
 
 
 class RequestHandler: NSObject, WKURLSchemeHandler {
-    let ctx: UInt8
+    var ctx: UInt8
     private var syncAwaitersResolve: [UInt8:((_ payload: Data) -> Void)] = [:]
     private var syncAwaitersPayload: [UInt8:Data] = [:]
     
     init(ctx: UInt8) {
         self.ctx = ctx
+    }
+    
+    func reset() {
+        self.syncAwaitersResolve.removeAll()
+        self.syncAwaitersPayload.removeAll()
     }
     
     func resolveSyncAwaiter(id: UInt8, payload: Data) {

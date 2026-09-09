@@ -46,18 +46,28 @@ struct FullStackedApp: App {
     @Environment(\.supportsMultipleWindows) private var supportsMultipleWindows
     
     init() {
+        #if os(iOS)
+        installTouchSafetySwizzles()
+        #endif
         coreInit()
     }
 
     var body: some Scene {
         WindowGroup(id: "FullStacked", for: WebView.ID.self) { $id in
-            if let webView = self.webViewStore.get(id) {
-                let meta = self.webViewStore.webViewsMeta[id]
+            #if os(macOS)
+            let isWindowClosed = self.webViewStore.isClosed(id)
+            #else
+            let isWindowClosed = self.supportsMultipleWindows && self.webViewStore.isClosed(id)
+            #endif
+            
+            if !isWindowClosed {
+                let webView = self.webViewStore.get(id) ?? self.webViewStore.getOrCreate(id)
+                let meta = self.webViewStore.webViewsMeta[webView.id]
                 let winWidth = webView.windowSize.width
                 let winHeight = webView.windowSize.height
                 
                 #if os(iOS)
-                let isFull = isFullScreen(size: self.windowSize, windowScene: self.webViewStore.getScene(for: id))
+                let isFull = isFullScreen(size: self.windowSize, windowScene: self.webViewStore.getScene(for: webView.id))
                 #else
                 let isFull = true
                 #endif
@@ -83,6 +93,7 @@ struct FullStackedApp: App {
                                     .ignoresSafeArea()
                                 
                                 WebViewRepresentable(webView)
+                                    .id(webView.id)
                                     #if os(iOS)
                                     .ignoresSafeArea(edges: .bottom)
                                     #else
@@ -110,30 +121,33 @@ struct FullStackedApp: App {
                                 #endif
                                     
                                     .onAppear{
+                                        #if os(macOS)
+                                        self.webViewStore.openWindow = self.openWindow
+                                        self.webViewStore.dismissWindow = self.dismissWindow
+                                        #else
                                         if(self.supportsMultipleWindows) {
                                             self.webViewStore.openWindow = self.openWindow
                                             self.webViewStore.dismissWindow = self.dismissWindow
-                                            #if os(iOS)
-                                            // Cache the scene while the view is in the hierarchy.
-                                            // removeWebView may race ahead of webView.window being set.
-                                            if let scene = webView.window?.windowScene {
-                                                self.webViewStore.cacheScene(scene, for: id)
-                                            }
-                                            #endif
-                                        } else {
-                                            self.webViewStore.addWebView(webView)
                                         }
+                                        // Cache the scene while the view is in the hierarchy.
+                                        // removeWebView may race ahead of webView.window being set.
+                                        if let scene = webView.window?.windowScene {
+                                            self.webViewStore.cacheScene(scene, for: webView.id)
+                                        }
+                                        #endif
                                     }
                                     .onDisappear{
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                                            self.webViewStore.removeWebView(id)
+                                        if webView.id != self.webViewStore.webViews.first?.id {
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                                self.webViewStore.removeWebView(webView.id)
+                                            }
                                         }
                                     }
                                 
                                 if(webView.main) {
-                                    ForEach(self.webViewStore.webViewsPublished, id: \.self) { publishedWebView in
+                                    ForEach(self.webViewStore.webViewsPublished.filter { $0.id != webView.id }, id: \.id) { publishedWebView in
                                         VStack {
-                                            if self.webViewStore.webViewsPublished.count > 1 {
+                                            if self.webViewStore.webViewsPublished.filter({ $0.id != webView.id }).count > 0 {
                                                 HStack(alignment: .center) {
                                                     Button {
                                                         self.webViewStore.removeWebView(publishedWebView.id)
@@ -201,11 +215,17 @@ class WebViewStore: ObservableObject {
             hasPresentedFirstWindow = true
             return first.id
         }
+        
+        #if os(iOS)
+        if !isIPadOS, let first = self.webViews.first {
+            return first.id
+        }
+        #endif
+        
+        hasPresentedFirstWindow = true
         let shouldSkip = self.webViews.first?.skipInitialDir ?? false
         let webView = WebView(nil, skipInitialDir: shouldSkip)
-        if !self.webViews.contains(where: { $0.id == webView.id }) {
-            self.webViews.append(webView)
-        }
+        self.webViews.append(webView)
         DispatchQueue.main.async { [weak self] in
             self?.updateMeta(for: webView)
         }
@@ -227,10 +247,14 @@ class WebViewStore: ObservableObject {
     }
     
     var defaultWindowSize: CGSize {
+        #if os(macOS)
         if let mainView = self.webViews.first(where: { $0.main }) ?? self.webViews.first {
             return mainView.windowSize
         }
         return CGSize(width: 700, height: 550)
+        #else
+        return UIScreen.main.bounds.size
+        #endif
     }
     
     var openWindow: OpenWindowAction?
@@ -242,6 +266,10 @@ class WebViewStore: ObservableObject {
     @Published var webViewsMeta: [UUID: (title: String, color: Color)] = [:]
     // IDs that have been explicitly closed — getOrCreate must not resurrect them
     private var closedIDs: Set<UUID> = []
+    
+    func isClosed(_ id: UUID) -> Bool {
+        return self.closedIDs.contains(id)
+    }
     #if os(iOS)
     // Scene cache: populated in onAppear (view guaranteed in hierarchy) so
     // removeWebView can close the scene even if called before webView.window is set.
@@ -283,7 +311,17 @@ class WebViewStore: ObservableObject {
     }
     
     func get(_ id: UUID) -> WebView? {
-        return self.webViews.first(where: { $0.id == id })
+        if let found = self.webViews.first(where: { $0.id == id }) {
+            return found
+        }
+        #if os(iOS)
+        // On iPhone (single window), there is only 1 scene window.
+        // Always return the root WebView.
+        if !isIPadOS {
+            return self.webViews.first
+        }
+        #endif
+        return nil
     }
     
     func getOrCreate(_ id: UUID) -> WebView {
@@ -291,6 +329,20 @@ class WebViewStore: ObservableObject {
             return webView
         }
         
+        #if os(iOS)
+        // On iPhone (single window), there is only 1 scene window.
+        // Always adopt the root WebView rather than creating a duplicate.
+        if !isIPadOS, let first = self.webViews.first {
+            return first
+        }
+        #endif
+        
+        if !hasPresentedFirstWindow, let first = self.webViews.first {
+            hasPresentedFirstWindow = true
+            return first
+        }
+        
+        hasPresentedFirstWindow = true
         let shouldSkip = self.webViews.first?.skipInitialDir ?? false
         let webView = WebView(nil, skipInitialDir: shouldSkip)
         webView.id = id
@@ -330,25 +382,61 @@ class WebViewStore: ObservableObject {
         
         self.webViewsMeta.removeValue(forKey: id)
         
-        if(self.webViewsPublished.isEmpty && self.openWindow == nil) {
-            self.addWebView(WebView(nil))
+        if(self.webViews.isEmpty && self.webViewsPublished.isEmpty && self.openWindow == nil) {
+            let newMain = WebView(nil)
+            self.webViews.append(newMain)
+            self.updateMeta(for: newMain)
         }
     }
     
     func panicRecovery() {
-        let allViews = self.webViews
-        for webView in allViews {
-            webView.close()
-        }
-        self.webViews.removeAll()
-        self.webViewsPublished.removeAll()
-        self.webViewsMeta.removeAll()
-        self.closedIDs.removeAll()
-        self.hasPresentedFirstWindow = true
+        let mainView = self.webViews.first(where: { $0.main }) ?? self.webViews.first
         
-        let rootWebView = WebView(nil, skipInitialDir: true)
-        self.updateMeta(for: rootWebView)
-        self.addWebView(rootWebView)
+        // Close secondary views in webViews (e.g. additional windows on macOS)
+        for webView in self.webViews {
+            if webView.id != mainView?.id {
+                self.closedIDs.insert(webView.id)
+                #if os(iOS)
+                let scene = webView.window?.windowScene ?? self.cachedScenes[webView.id]
+                if let scene = scene {
+                    UIApplication.shared.requestSceneSessionDestruction(scene.session, options: nil)
+                } else if let dismissWindow = self.dismissWindow {
+                    dismissWindow(value: webView.id)
+                }
+                self.cachedScenes.removeValue(forKey: webView.id)
+                #else
+                self.dismissWindow?(value: webView.id)
+                #endif
+                webView.close()
+            }
+        }
+        
+        // Close overlay views in webViewsPublished (e.g. modals on iOS)
+        for webView in self.webViewsPublished {
+            if webView.id != mainView?.id {
+                self.closedIDs.insert(webView.id)
+                webView.close()
+            }
+        }
+        
+        self.webViewsPublished.removeAll()
+        
+        if let main = mainView {
+            self.closedIDs.remove(main.id)
+            self.webViews = [main]
+            self.webViewsMeta = self.webViewsMeta.filter { $0.key == main.id }
+            self.updateMeta(for: main)
+            main.panicReload()
+        } else {
+            self.webViews.removeAll()
+            self.webViewsMeta.removeAll()
+            self.closedIDs.removeAll()
+            self.hasPresentedFirstWindow = false
+            
+            let newMain = WebView(nil, skipInitialDir: true)
+            self.webViews = [newMain]
+            self.updateMeta(for: newMain)
+        }
     }
 }
 
