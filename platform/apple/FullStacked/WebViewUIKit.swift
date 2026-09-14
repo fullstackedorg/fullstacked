@@ -3,6 +3,24 @@ import WebKit
 
 // iOS
 
+class SafeTriggerHelper: UILongPressGestureRecognizer {
+    override init(target: Any?, action: Selector?) {
+        super.init(target: target, action: action)
+        // Configure for 3 fingers and 1500ms (1.5 seconds)
+        self.numberOfTouchesRequired = 3
+        self.minimumPressDuration = 1.5
+    }
+    
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        super.touchesBegan(touches, with: event)
+        
+        // Fail early if the initial touch count doesn't match
+        if let numberOfTouches = event.allTouches?.count, numberOfTouches > 3 {
+            self.state = .failed
+        }
+    }
+}
+
 class ClipboardHelper: NSObject, WKScriptMessageHandler {
     var cb: ((_ requestClipboardID: String, _ clipboardContent: String) -> Void)?
     
@@ -58,6 +76,14 @@ class WebViewExtended: WKWebView, WKUIDelegate  {
         }
         
         self.uiDelegate = self
+        
+        let safeTrigger = SafeTriggerHelper(target: self, action: #selector(safeTrigger(_:)))
+        self.addGestureRecognizer(safeTrigger)
+    }
+    
+    @objc private func safeTrigger(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+        WebViewStore.getInstance().safe()
     }
     
     required init?(coder: NSCoder) {

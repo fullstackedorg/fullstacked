@@ -272,6 +272,13 @@ class WebViewStore: ObservableObject {
             self.addWebView(WebView(nil))
         }
     }
+    
+    func safe(){
+        self.webViews.forEach{ webView in
+            self.removeWebView(webView.id)
+        }
+        self.addWebView(WebView(startMain(0, true)))
+    }
 }
 
 extension Color {

@@ -5,12 +5,14 @@ import AuthenticationServices
 let platform = "apple"
 let downloadDirectory = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first! + "/downloads";
 
-func startMain(_ providedCtx: UInt8?) -> UInt8 {
+func startMain(_ providedCtx: UInt8?, _ safe: Bool?) -> UInt8 {
     let rootPtr = root.ptr()
     let buildPtr = build.ptr()
     
     var ctx: UInt8
-    if(providedCtx == nil) {
+    if(safe == true) {
+        ctx = startSafe(rootPtr, buildPtr)
+    } else if(providedCtx == nil) {
         ctx = start(rootPtr, buildPtr)
     } else {
         startWithCtx(rootPtr, buildPtr, providedCtx!)
@@ -72,11 +74,11 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
             self.main = true
         }
         
-        let ctx = providedCtx ?? startMain(nil)
+        let ctx = providedCtx ?? startMain(nil, false)
         
         if check(ctx) == 0 {
             self.main = true
-            _ = startMain(ctx)
+            _ = startMain(ctx, false)
         }
         
         self.requestHandler = RequestHandler(ctx: ctx)

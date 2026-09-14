@@ -272,7 +272,15 @@ class WebViewExtended: WKWebView, WKUIDelegate {
 // source: https://stackoverflow.com/a/69858444
 class KeyView: NSView {
     override var acceptsFirstResponder: Bool { true }
-    override func keyDown(with event: NSEvent) {}
+    override func keyDown(with event: NSEvent) {
+        if(
+            event.modifierFlags.contains(.command) &&
+            event.modifierFlags.contains(.shift) &&
+            event.keyCode == 17
+        ) {
+            WebViewStore.getInstance().safe()
+        }
+    }
 }
 
 struct WebViewRepresentable: NSViewRepresentable {
