@@ -251,6 +251,7 @@ class WebViewExtended: WKWebView, WKUIDelegate {
         self.resizeHelper.stopObservingWindow()
         self.resizeHelper.webView = nil
         self.configuration.userContentController.removeScriptMessageHandler(forName: "resize")
+        self.uiDelegate = nil
         self.window?.close()
     }
     
@@ -300,8 +301,14 @@ struct WebViewRepresentable: NSViewRepresentable {
         return view
     }
     
-    
     func updateNSView(_ uiView: NSView, context: Context) {    }
+    
+    static func dismantleNSView(_ nsView: NSView, coordinator: ()) {
+        for subview in nsView.subviews {
+            subview.removeFromSuperview()
+        }
+        nsView.removeFromSuperview()
+    }
 }
 
 extension Color {

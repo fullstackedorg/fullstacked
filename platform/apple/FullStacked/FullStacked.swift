@@ -73,56 +73,36 @@ struct FullStackedApp: App {
                             (self.webViewStore.webViewsMeta[id]?.1 ?? Color(hex: 0))
                                 .ignoresSafeArea()
                             
-                            WebViewRepresentable(self.webViewStore.getOrCreate(id))
-                                #if os(iOS)
-                                .ignoresSafeArea(edges: .bottom)
-                                #else
-                                .ignoresSafeArea()
-                                #endif
-                                .background(self.webViewStore.webViewsMeta[id]?.1)
-                                .navigationTitle(self.webViewStore.webViewsMeta[id]?.0 ?? "FullStacked")
-                            
-                            #if os(macOS)
-                                .preferredColorScheme(getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[id]?.1))
-                                .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0))
-                                .toolbar{
-                                    Spacer()
-                                }
-                                .toolbarBackground(self.webViewStore.webViewsMeta[id]?.1 ?? Color(red: 0, green: 0, blue: 0, opacity: 0))
-                            #else
-                                .preferredColorScheme(isIPadOS
-                                                      ? getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[id]?.1)
-                                                      : nil)
-                                .toolbar(
-                                    isIPadOS && !isFull ? .visible : .hidden,
-                                    for: .navigationBar)
-                                .toolbarBackground(self.webViewStore.webViewsMeta[id]?.1 ?? Color(hex: 0), for: .navigationBar)
-                                .navigationBarTitleDisplayMode(.inline)
-                            #endif
+                            if self.supportsMultipleWindows {
+                                WebViewRepresentable(self.webViewStore.getOrCreate(id))
+                                    .id(id)
+                                    #if os(iOS)
+                                    .ignoresSafeArea(edges: .bottom)
+                                    #else
+                                    .ignoresSafeArea()
+                                    #endif
+                                    .background(self.webViewStore.webViewsMeta[id]?.1)
+                                    .navigationTitle(self.webViewStore.webViewsMeta[id]?.0 ?? "FullStacked")
                                 
-                                .onAppear{
-                                    if(self.supportsMultipleWindows) {
-                                        self.webViewStore.openWindow = self.openWindow
-                                        self.webViewStore.dismissWindow = self.dismissWindow
-                                        #if os(iOS)
-                                        // Cache the scene while the view is in the hierarchy.
-                                        // removeWebView may race ahead of webView.window being set.
-                                        if let scene = self.webViewStore.getOrCreate(id).window?.windowScene {
-                                            self.webViewStore.cacheScene(scene, for: id)
-                                        }
-                                        #endif
-                                    } else {
-                                        self.webViewStore.addWebView(self.webViewStore.getOrCreate(id))
+                                #if os(macOS)
+                                    .preferredColorScheme(getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[id]?.1))
+                                    .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0))
+                                    .toolbar{
+                                        Spacer()
                                     }
-                                }
-                                .onDisappear{
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                                        self.webViewStore.removeWebView(id)
-                                   }
-                                }
-                            
-                            if(self.webViewStore.getOrCreate(id).main) {
-                                ForEach(self.webViewStore.webViewsPublished, id: \.self) { webView in
+                                    .toolbarBackground(self.webViewStore.webViewsMeta[id]?.1 ?? Color(red: 0, green: 0, blue: 0, opacity: 0))
+                                #else
+                                    .preferredColorScheme(isIPadOS
+                                                          ? getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[id]?.1)
+                                                          : nil)
+                                    .toolbar(
+                                        isIPadOS && !isFull ? .visible : .hidden,
+                                        for: .navigationBar)
+                                    .toolbarBackground(self.webViewStore.webViewsMeta[id]?.1 ?? Color(hex: 0), for: .navigationBar)
+                                    .navigationBarTitleDisplayMode(.inline)
+                                #endif
+                            } else {
+                                ForEach(self.webViewStore.webViewsPublished, id: \.id) { webView in
                                     VStack {
                                         if self.webViewStore.webViewsPublished.count > 1 {
                                             HStack(alignment: .center) {
@@ -138,21 +118,40 @@ struct FullStackedApp: App {
                                                 .padding(windowSize.width > windowSize.height
                                                          ? EdgeInsets(top: 10, leading: 0, bottom: 2, trailing: 10)
                                                          : EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 10))
-                                                    
                                             }
                                         }
                                         
                                         WebViewRepresentable(webView)
+                                            .id(webView.id)
                                             #if os(iOS)
                                             .ignoresSafeArea(edges: .bottom)
                                             #else
                                             .ignoresSafeArea()
                                             #endif
-                                            
                                     }
                                     .background(self.webViewStore.webViewsMeta[webView.id]?.1 ?? Color(.black))
                                     .preferredColorScheme(getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[webView.id]?.1))
                                 }
+                            }
+                        }
+                        .onAppear{
+                            if(self.supportsMultipleWindows) {
+                                self.webViewStore.openWindow = self.openWindow
+                                self.webViewStore.dismissWindow = self.dismissWindow
+                                #if os(iOS)
+                                // Cache the scene while the view is in the hierarchy.
+                                // removeWebView may race ahead of webView.window being set.
+                                if let scene = self.webViewStore.getOrCreate(id).window?.windowScene {
+                                    self.webViewStore.cacheScene(scene, for: id)
+                                }
+                                #endif
+                            } else {
+                                self.webViewStore.addWebView(self.webViewStore.getOrCreate(id))
+                            }
+                        }
+                        .onDisappear{
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                self.webViewStore.removeWebView(id)
                             }
                         }
                     }
@@ -212,11 +211,15 @@ class WebViewStore: ObservableObject {
     #endif
     
     func addWebView(_ webView: WebView) {
-        self.webViews.append(webView)
+        if !self.webViews.contains(where: { $0.id == webView.id }) {
+            self.webViews.append(webView)
+        }
         if let openWindow = self.openWindow {
             openWindow(id: "FullStacked", value: webView.id)
         } else {
-            self.webViewsPublished.append(webView)
+            if !self.webViewsPublished.contains(where: { $0.id == webView.id }) {
+                self.webViewsPublished.append(webView)
+            }
         }
     }
     
@@ -241,43 +244,77 @@ class WebViewStore: ObservableObject {
     
     func removeWebView(_ id: UUID){
         self.closedIDs.insert(id)
-        if let index = self.webViewsPublished.firstIndex(where: { $0.id == id }) {
-            self.webViewsPublished.remove(at: index).close()
-        }
-        if let index = self.webViews.firstIndex(where: { $0.id == id }) {
-            let webView = self.webViews.remove(at: index)
-            #if os(iOS)
-            // Use the cached scene (stored in onAppear) as fallback when webView.window
-            // is nil — this happens when exit runs before the view is fully in the hierarchy.
-            // Destroy only when other WebViews exist; if this is the last one, iOS would
-            // immediately auto-spawn a replacement, so fall back to dismissWindow instead.
-            let scene = webView.window?.windowScene ?? self.cachedScenes[id]
-            if let scene = scene, !self.webViews.isEmpty {
-                UIApplication.shared.requestSceneSessionDestruction(scene.session, options: nil)
-            } else if let dismissWindow = self.dismissWindow {
-                dismissWindow(value: webView.id)
-            }
-            self.cachedScenes.removeValue(forKey: id)
-            #else
-            if let dismissWindow = self.dismissWindow {
-                dismissWindow(value: webView.id)
-            }
-            #endif
-            webView.close()
-        }
         
+        let webViewToRemove = self.webViews.first(where: { $0.id == id }) ?? self.webViewsPublished.first(where: { $0.id == id })
+        
+        self.webViewsPublished.removeAll(where: { $0.id == id })
+        self.webViews.removeAll(where: { $0.id == id })
         self.webViewsMeta.removeValue(forKey: id)
         
-        if(self.webViewsPublished.isEmpty && self.openWindow == nil) {
+        #if os(iOS)
+        // Use the cached scene (stored in onAppear) as fallback when webView.window
+        // is nil — this happens when exit runs before the view is fully in the hierarchy.
+        // Destroy only when other WebViews exist; if this is the last one, iOS would
+        // immediately auto-spawn a replacement, so fall back to dismissWindow instead.
+        let scene = webViewToRemove?.window?.windowScene ?? self.cachedScenes[id]
+        if let scene = scene, !self.webViews.isEmpty {
+            UIApplication.shared.requestSceneSessionDestruction(scene.session, options: nil)
+        } else if let dismissWindow = self.dismissWindow {
+            dismissWindow(value: id)
+        }
+        self.cachedScenes.removeValue(forKey: id)
+        #else
+        if let dismissWindow = self.dismissWindow {
+            dismissWindow(value: id)
+        }
+        #endif
+        
+        webViewToRemove?.close()
+        
+        if self.webViewsPublished.isEmpty && self.openWindow == nil && self.webViews.isEmpty {
             self.addWebView(WebView(nil))
         }
     }
     
     func safe(){
-        self.webViews.forEach{ webView in
-            self.removeWebView(webView.id)
+        var webViewsToClose: [WebView] = []
+        for wv in self.webViews {
+            if !webViewsToClose.contains(where: { $0.id == wv.id }) {
+                webViewsToClose.append(wv)
+            }
         }
-        self.addWebView(WebView(startMain(0, true)))
+        for wv in self.webViewsPublished {
+            if !webViewsToClose.contains(where: { $0.id == wv.id }) {
+                webViewsToClose.append(wv)
+            }
+        }
+        
+        let oldIDs = Set(webViewsToClose.map { $0.id })
+        self.closedIDs.formUnion(oldIDs)
+        
+        self.webViews.removeAll()
+        self.webViewsPublished.removeAll()
+        self.webViewsMeta.removeAll()
+        
+        #if os(iOS)
+        for id in oldIDs {
+            if let scene = self.cachedScenes[id] {
+                UIApplication.shared.requestSceneSessionDestruction(scene.session, options: nil)
+            }
+        }
+        self.cachedScenes.removeAll()
+        #endif
+        
+        for webView in webViewsToClose {
+            #if !os(iOS)
+            self.dismissWindow?(value: webView.id)
+            #endif
+            webView.close()
+        }
+        
+        let safeCtx = startMain(0, true)
+        let safeWebView = WebView(safeCtx)
+        self.addWebView(safeWebView)
     }
 }
 

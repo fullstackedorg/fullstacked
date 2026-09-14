@@ -49,6 +49,7 @@ class ClipboardHelper: NSObject, WKScriptMessageHandler {
 
 class WebViewExtended: WKWebView, WKUIDelegate  {
     let clipboardHelper: ClipboardHelper;
+    private var safeTrigger: SafeTriggerHelper?
     
     override var safeAreaInsets: UIEdgeInsets {
         return .zero
@@ -78,6 +79,7 @@ class WebViewExtended: WKWebView, WKUIDelegate  {
         self.uiDelegate = self
         
         let safeTrigger = SafeTriggerHelper(target: self, action: #selector(safeTrigger(_:)))
+        self.safeTrigger = safeTrigger
         self.addGestureRecognizer(safeTrigger)
     }
     
@@ -91,7 +93,13 @@ class WebViewExtended: WKWebView, WKUIDelegate  {
     }
     
     func close(){
+        if let safeTrigger = self.safeTrigger {
+            self.removeGestureRecognizer(safeTrigger)
+            self.safeTrigger = nil
+        }
+        self.clipboardHelper.cb = nil
         self.configuration.userContentController.removeScriptMessageHandler(forName: "clipboard")
+        self.uiDelegate = nil
     }
     
     func openBrowserURL(_ url: URL){
@@ -121,6 +129,10 @@ struct WebViewRepresentable: UIViewRepresentable {
         uiView.scrollView.contentInsetAdjustmentBehavior = .never
         uiView.scrollView.contentInset = .zero
         uiView.scrollView.scrollIndicatorInsets = .zero
+    }
+    
+    static func dismantleUIView(_ uiView: WebView, coordinator: ()) {
+        uiView.removeFromSuperview()
     }
 }
 

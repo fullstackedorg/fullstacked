@@ -106,9 +106,16 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     }
     
     override func close(){
+        self.isInspectable = false
+        self.stopLoading()
+        self.loadHTMLString("", baseURL: nil)
+        self.removeFromSuperview()
         self.navigationDelegate = nil
         self.configuration.userContentController.removeScriptMessageHandler(forName: "bridge")
+        self.configuration.userContentController.removeScriptMessageHandler(forName: "open")
         self.configuration.userContentController.removeScriptMessageHandler(forName: "exit")
+        self.configuration.userContentController.removeAllUserScripts()
+        self.configuration.userContentController.removeAllScriptMessageHandlers()
         stop(self.requestHandler.ctx)
         self.closer.webView = nil
         super.close()
