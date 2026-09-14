@@ -149,7 +149,8 @@ function getPositionalArgs(args: string[]): string[] {
         ["-v", "--version"],
         ["-o", "--open"],
         ["-n", "--no-open"],
-        ["-b", "--build"]
+        ["-b", "--build"],
+        ["-s", "--safe"]
     ];
 
     for (let i = 0; i < args.length; i++) {
@@ -201,6 +202,7 @@ function getExtraArgs(args: string[]): string[] {
         ["-v", "--version"],
         ["-o", "--open"],
         ["-n", "--no-open"],
+        ["-s", "--safe"],
         ["-b", "--build"]
     ];
 
@@ -268,7 +270,7 @@ async function bundleAndImportFile(
     try {
         await fs.promises.stat(targetFilePath);
         fileExists = true;
-    } catch {}
+    } catch { }
 
     if (!fileExists) {
         writeErr(formatMessage(`Error: file not found: ${file}`, false));
@@ -392,6 +394,7 @@ async function runDirectory(
     buildOnly: boolean,
     noOpen: boolean,
     env: Record<string, string>,
+    safe: boolean,
     writeOut: (msg: any) => void,
     writeErr: (msg: any) => void
 ): Promise<number> {
@@ -404,12 +407,12 @@ async function runDirectory(
         for (const bp of buildPlugins) {
             try {
                 await bp.unregister();
-            } catch {}
+            } catch { }
         }
         for (const tempFile of tempPluginFiles) {
             try {
-                await fs.promises.rm(tempFile).catch(() => {});
-            } catch {}
+                await fs.promises.rm(tempFile).catch(() => { });
+            } catch { }
         }
     };
 
@@ -464,7 +467,7 @@ async function runDirectory(
         return 0;
     }
 
-    const newCtx = await run({ directory: targetDirectory, env });
+    const newCtx = await run({ directory: targetDirectory, env, safe });
     await cleanupPlugins();
     if (!noOpen && typeof newCtx === "number") {
         globalThis.fullstacked.open?.(newCtx);
@@ -555,6 +558,7 @@ Options:
   -o, --open    Directly open the browser
   -b, --build   Only bundle the project, don't run it afterward
   -f, --file    Bundle and execute a single script file
+  -s, --safe    Skip the initialDirectory config check
   -h, --help    Display this help message
 
 Directory:
@@ -569,6 +573,7 @@ Directory:
     const noOpen = hasArgFlag(["-n", "--no-open"], args);
     const envArgs = findArgValues(["-e", "--env"], args);
     const pluginsArgs = findArgValues(["-p", "--plugin"], args);
+    const safe = hasArgFlag(["-s", "--safe"], args);
     const positionals = getPositionalArgs(args);
 
     const env: Record<string, string> = {};
@@ -592,6 +597,7 @@ Directory:
         buildOnly,
         noOpen,
         env,
+        safe,
         writeOut,
         writeErr
     );

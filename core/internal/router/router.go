@@ -155,7 +155,12 @@ func Switch(
 		response.Type = types.CoreResponseData
 		root := filepath.Join(ctx.Directories.Root, data[0].Data.(string))
 
-		id := store.NewContext(root, root)
+		safe := false
+		if len(data) > 2 && data[2].Type == types.BOOLEAN {
+			safe = data[2].Data.(bool)
+		}
+
+		id := store.NewContext(root, root, safe)
 		response.Data = id
 
 		if len(data) > 1 && data[1].Type == types.OBJECT {

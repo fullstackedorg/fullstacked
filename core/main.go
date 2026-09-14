@@ -34,7 +34,7 @@ func start(
 	rootStr := C.GoString(root)
 	buildStr := C.GoString(build)
 
-	id := store.NewContext(rootStr, buildStr)
+	id := store.NewContext(rootStr, buildStr, false)
 	return C.uint8_t(id)
 }
 
@@ -58,8 +58,8 @@ func startSafe(
 	rootStr := C.GoString(root)
 	buildStr := C.GoString(build)
 
-	store.NewContextWithCtxId(0, rootStr, buildStr, true)
-	return C.uint8_t(0)
+	id := store.NewContext(rootStr, buildStr, true)
+	return C.uint8_t(id)
 }
 
 //export check
