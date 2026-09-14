@@ -85,11 +85,42 @@ class WebViewExtended: WKWebView, WKUIDelegate  {
     
     @objc private func safeTrigger(_ gesture: UILongPressGestureRecognizer) {
         guard gesture.state == .began else { return }
-        WebViewStore.getInstance().safe()
+        WebViewStore.getInstance().safe(from: self as? WebView)
+    }
+    
+    override var keyCommands: [UIKeyCommand]? {
+        let cmdT = UIKeyCommand(
+            title: "Safe Mode",
+            action: #selector(handleSafeKeyCommand),
+            input: "t",
+            modifierFlags: [.command, .shift]
+        )
+        let cmdUpperT = UIKeyCommand(
+            title: "Safe Mode",
+            action: #selector(handleSafeKeyCommand),
+            input: "T",
+            modifierFlags: [.command, .shift]
+        )
+        if #available(iOS 15.0, *) {
+            cmdT.wantsPriorityOverSystemBehavior = true
+            cmdUpperT.wantsPriorityOverSystemBehavior = true
+        }
+        return [cmdT, cmdUpperT]
+    }
+    
+    @objc private func handleSafeKeyCommand() {
+        WebViewStore.getInstance().safe(from: self as? WebView)
     }
     
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+    
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if let scene = self.window?.windowScene, let webView = self as? WebView {
+            WebViewStore.getInstance().cacheScene(scene, for: webView.id)
+        }
     }
     
     func close(){
@@ -113,6 +144,24 @@ class WebViewExtended: WKWebView, WKUIDelegate  {
     }
 }
 
+class WebViewContainerView: UIView {
+    private weak var currentWebView: WebView?
+    
+    func setWebView(_ webView: WebView) {
+        if self.currentWebView === webView { return }
+        self.currentWebView?.removeFromSuperview()
+        self.currentWebView = webView
+        webView.frame = self.bounds
+        webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        self.addSubview(webView)
+    }
+    
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        self.currentWebView?.frame = self.bounds
+    }
+}
+
 struct WebViewRepresentable: UIViewRepresentable {
     static let isIPadOS = UIDevice.current.userInterfaceIdiom == .pad
     
@@ -121,18 +170,24 @@ struct WebViewRepresentable: UIViewRepresentable {
         self.webView = webView
     }
     
-    func makeUIView(context: Context) -> WebView  {
-        return self.webView
+    func makeUIView(context: Context) -> WebViewContainerView  {
+        let container = WebViewContainerView()
+        container.setWebView(self.webView)
+        return container
     }
     
-    func updateUIView(_ uiView: WebView, context: Context) {
-        uiView.scrollView.contentInsetAdjustmentBehavior = .never
-        uiView.scrollView.contentInset = .zero
-        uiView.scrollView.scrollIndicatorInsets = .zero
+    func updateUIView(_ container: WebViewContainerView, context: Context) {
+        container.setWebView(self.webView)
+        self.webView.scrollView.contentInsetAdjustmentBehavior = .never
+        self.webView.scrollView.contentInset = .zero
+        self.webView.scrollView.scrollIndicatorInsets = .zero
     }
     
-    static func dismantleUIView(_ uiView: WebView, coordinator: ()) {
-        uiView.removeFromSuperview()
+    static func dismantleUIView(_ container: WebViewContainerView, coordinator: ()) {
+        for subview in container.subviews {
+            subview.removeFromSuperview()
+        }
+        container.removeFromSuperview()
     }
 }
 

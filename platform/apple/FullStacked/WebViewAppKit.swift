@@ -272,6 +272,7 @@ class WebViewExtended: WKWebView, WKUIDelegate {
 // suppress "funk" noise
 // source: https://stackoverflow.com/a/69858444
 class KeyView: NSView {
+    weak var webView: WebView?
     override var acceptsFirstResponder: Bool { true }
     override func keyDown(with event: NSEvent) {
         if(
@@ -279,7 +280,7 @@ class KeyView: NSView {
             event.modifierFlags.contains(.shift) &&
             event.keyCode == 17
         ) {
-            WebViewStore.getInstance().safe()
+            WebViewStore.getInstance().safe(from: self.webView)
         }
     }
 }
@@ -292,6 +293,7 @@ struct WebViewRepresentable: NSViewRepresentable {
     
     func makeNSView(context: Context) -> NSView  {
         let view = KeyView()
+        view.webView = self.webView
         DispatchQueue.main.async {
             view.window?.makeFirstResponder(view)
         }
@@ -301,7 +303,11 @@ struct WebViewRepresentable: NSViewRepresentable {
         return view
     }
     
-    func updateNSView(_ uiView: NSView, context: Context) {    }
+    func updateNSView(_ uiView: NSView, context: Context) {
+        if let keyView = uiView as? KeyView {
+            keyView.webView = self.webView
+        }
+    }
     
     static func dismantleNSView(_ nsView: NSView, coordinator: ()) {
         for subview in nsView.subviews {

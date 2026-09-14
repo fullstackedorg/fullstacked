@@ -60,7 +60,8 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     let closer = WebViewCloser();
     
     public let requestHandler: RequestHandler
-    public var main = false
+    
+    public var isSafe = false
     
     required init(from decoder: any Decoder) throws {
         fatalError("init(coder:) has not been implemented")
@@ -69,16 +70,20 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         
     }
     
-    init(_ providedCtx: UInt8?) {
-        if(providedCtx == nil) {
-            self.main = true
-        }
+    init(dummy: Bool) {
+        self.isSafe = false
+        self.requestHandler = RequestHandler(ctx: 0)
+        let wkWebViewConfig = WKWebViewConfiguration()
+        super.init(frame: CGRect(), configuration: wkWebViewConfig)
+    }
+
+    init(_ providedCtx: UInt8?, safe: Bool = false) {
+        self.isSafe = safe
         
-        let ctx = providedCtx ?? startMain(nil, false)
+        let ctx = providedCtx ?? startMain(nil, safe)
         
         if check(ctx) == 0 {
-            self.main = true
-            _ = startMain(ctx, false)
+            _ = startMain(ctx, safe)
         }
         
         self.requestHandler = RequestHandler(ctx: ctx)
@@ -103,6 +108,15 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         userContentController.add(WeakMessageHandler(self.closer), name: "exit")
         
         self.load(URLRequest(url: URL(string: "fs://localhost")!))
+    }
+    
+    func switchToSafeMode() {
+        self.isSafe = true
+        self.stopLoading()
+        stop(self.requestHandler.ctx)
+        let safeCtx = startMain(nil, true)
+        self.requestHandler.reset(ctx: safeCtx)
+        self.load(URLRequest(url: URL(string: "fs://localhost")!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30))
     }
     
     override func close(){
@@ -231,12 +245,32 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
 
 
 class RequestHandler: NSObject, WKURLSchemeHandler {
-    let ctx: UInt8
+    var ctx: UInt8
     private var syncAwaitersResolve: [UInt8:((_ payload: Data) -> Void)] = [:]
     private var syncAwaitersPayload: [UInt8:Data] = [:]
+    private var stoppedTasks = Set<ObjectIdentifier>()
+    private let tasksLock = NSLock()
+    
+    private static var nextReqId: UInt8 = 0
+    private static let reqIdLock = NSLock()
+    static func getNextReqId() -> UInt8 {
+        reqIdLock.lock()
+        defer { reqIdLock.unlock() }
+        nextReqId = nextReqId &+ 1
+        return nextReqId
+    }
     
     init(ctx: UInt8) {
         self.ctx = ctx
+    }
+    
+    func reset(ctx: UInt8) {
+        self.ctx = ctx
+        self.syncAwaitersResolve.removeAll()
+        self.syncAwaitersPayload.removeAll()
+        tasksLock.lock()
+        stoppedTasks.removeAll()
+        tasksLock.unlock()
     }
     
     func resolveSyncAwaiter(id: UInt8, payload: Data) {
@@ -253,6 +287,10 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
               statusCode: Int,
               mimeType: String,
               data: Data) {
+        tasksLock.lock()
+        let isStopped = stoppedTasks.contains(ObjectIdentifier(urlSchemeTask as AnyObject))
+        tasksLock.unlock()
+        if isStopped { return }
         
         let responseHTTP = HTTPURLResponse(
             url: url,
@@ -324,9 +362,10 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
         // static file serving
         
         let pathnameData = pathname.data(using: .utf8)!
+        let reqId = RequestHandler.getNextReqId()
         var payload = Data([
             self.ctx,
-            0, // req id
+            reqId, // req id
             0, // Core Module
             0, // Fn Static File
             0, // Async
@@ -337,10 +376,26 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
         payload.append(pathnameData)
         
         let responseData = coreCall(payload: payload)
+        guard responseData.count > 1 else {
+            send(urlSchemeTask: urlSchemeTask,
+                 url: request.url!,
+                 statusCode: 404,
+                 mimeType: "text/plain",
+                 data: "Not Found".data(using: .utf8)!)
+            return
+        }
         let (response, _) = Deserialize(buffer: responseData, index: 1)
-        let args = DeserializeAll(buffer: response as! Data)
+        guard let responseDataPayload = response as? Data else {
+            send(urlSchemeTask: urlSchemeTask,
+                 url: request.url!,
+                 statusCode: 404,
+                 mimeType: "text/plain",
+                 data: "Not Found".data(using: .utf8)!)
+            return
+        }
+        let args = DeserializeAll(buffer: responseDataPayload)
         
-        if(args.count < 2 || args[0] == nil) {
+        guard args.count >= 2, let mimeType = args[0] as? String, let fileData = args[1] as? Data else {
             send(urlSchemeTask: urlSchemeTask,
                  url: request.url!,
                  statusCode: 404,
@@ -352,11 +407,15 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
         send(urlSchemeTask: urlSchemeTask,
              url: request.url!,
              statusCode: 200,
-             mimeType: args[0] as! String,
-             data: args[1] as! Data)
+             mimeType: mimeType,
+             data: fileData)
     }
     
-    func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) { }
+    func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) {
+        tasksLock.lock()
+        stoppedTasks.insert(ObjectIdentifier(urlSchemeTask as AnyObject))
+        tasksLock.unlock()
+    }
 }
 
 extension String {
