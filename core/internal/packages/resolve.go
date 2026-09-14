@@ -42,7 +42,6 @@ func addNodePath(ctx *types.Context, inputPath string) error {
 	}
 
 	relPath = filepath.ToSlash(filepath.Clean(relPath))
-	ctx.NodePaths = append(ctx.NodePaths, relPath)
 	return nil
 }
 
@@ -104,17 +103,6 @@ func resolveModule(ctx *types.Context, moduleName string, startDir string) (stri
 			break
 		}
 		currDir = parent
-	}
-
-	// Step 2: Fallback to ctx.NodePaths
-	for _, nodePath := range ctx.NodePaths {
-		targetPath := filepath.Join(ctx.Directories.Root, nodePath, moduleName)
-		if res, ok := loadAsFile(targetPath); ok {
-			return toRelToCwd(ctx, res)
-		}
-		if res, ok := loadAsDirectory(targetPath); ok {
-			return toRelToCwd(ctx, res)
-		}
 	}
 
 	return "", fmt.Errorf("cannot find module '%s' from '%s'", moduleName, startDir)

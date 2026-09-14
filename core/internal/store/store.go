@@ -2,9 +2,10 @@ package store
 
 import (
 	"errors"
+	"fullstackedorg/fullstacked/internal/config"
 	"fullstackedorg/fullstacked/internal/serialization"
 	"fullstackedorg/fullstacked/types"
-	"path"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -17,8 +18,6 @@ var OnStreamData = (func(uint8, uint8, int))(nil)
 var nextCtxId uint8 = 0
 var Contexts = map[uint8]*types.Context{}
 var ctxMutex = sync.Mutex{}
-
-var CrashLogDir string
 
 func NewContext(root string, build string) uint8 {
 	ctxMutex.Lock()
@@ -35,16 +34,28 @@ func NewContext(root string, build string) uint8 {
 
 	ctxMutex.Unlock()
 
-	NewContextWithCtxId(id, root, build)
+	NewContextWithCtxId(id, root, build, false)
 	return id
 }
 
-func NewContextWithCtxId(ctxId uint8, root string, build string) {
-	ctxMutex.Lock()
-	defer ctxMutex.Unlock()
+func NewContextWithCtxId(
+	ctxId uint8,
+	root string,
+	build string,
+	safe bool,
+) {
+	if !safe {
+		ctxMutex.Lock()
+		existingCtx, ok := Contexts[ctxId]
+		ctxMutex.Unlock()
+
+		if ok && existingCtx.Directories.Root == root {
+			return
+		}
+	}
 
 	if strings.Compare(root, build) == 0 {
-		build = path.Join(root, "out")
+		build = filepath.Join(root, "out")
 	}
 
 	directories := types.ContextDirectories{
@@ -52,9 +63,7 @@ func NewContextWithCtxId(ctxId uint8, root string, build string) {
 		Build: build,
 	}
 
-	CrashLogDir = root
-
-	Contexts[ctxId] = &types.Context{
+	ctx := &types.Context{
 		Id:          ctxId,
 		Directories: directories,
 
@@ -68,6 +77,18 @@ func NewContextWithCtxId(ctxId uint8, root string, build string) {
 
 		NextStreamId: 1,
 	}
+
+	ctxMutex.Lock()
+	Contexts[ctxId] = ctx
+	ctxMutex.Unlock()
+
+	if !safe {
+		initialDirectory := config.GetConfig(ctx, "initialDirectory")
+		if initialDirectory != "" {
+			targetDir := filepath.Clean(filepath.Join(root, initialDirectory))
+			NewContextWithCtxId(ctxId, targetDir, targetDir, true)
+		}
+	}
 }
 
 func ExitContext(ctxId uint8) {
@@ -75,7 +96,7 @@ func ExitContext(ctxId uint8) {
 	ctx, ok := Contexts[ctxId]
 
 	if ok {
-		ctx.Exit = true
+		ctx.Exited = true
 	}
 
 	ctxMutex.Unlock()

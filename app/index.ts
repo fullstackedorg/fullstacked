@@ -1,5 +1,5 @@
 import parentWindow from "fullstacked/parentWindow";
-import { getConfig, setConfig } from "./shell/cli/config";
+import config from "fullstacked/config";
 
 parentWindow.disableAutoWindowSize();
 
@@ -8,12 +8,12 @@ const saveSkipWelcomeUntil = (dontShowAgain: boolean) => {
         ? Number.MAX_SAFE_INTEGER
         : Date.now() + 1000 * 60 * 60 * 24; // 24h
 
-    setConfig("skipWelcomeUntil", until.toString());
+    config.set("skipWelcomeUntil", until.toString());
 };
 
 const getExpectedKeyboard = async () => {
-    const config = await getConfig("expectedKeyboard");
-    return Boolean(config && config !== "false" && config !== "0");
+    const enabled = await config.get("expectedKeyboard");
+    return Boolean(enabled && enabled !== "false" && enabled !== "0");
 };
 
 const openTerminal = async () => {
@@ -95,7 +95,7 @@ const openTerminal = async () => {
 };
 
 const getSkipWelcomeUntil = async () => {
-    const until = await getConfig("skipWelcomeUntil");
+    const until = await config.get("skipWelcomeUntil");
     return until ? parseInt(until) : 0;
 };
 

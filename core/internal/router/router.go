@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fullstackedorg/fullstacked/internal/bundle"
+	"fullstackedorg/fullstacked/internal/config"
 	"fullstackedorg/fullstacked/internal/dgram"
 	"fullstackedorg/fullstacked/internal/dns"
 	"fullstackedorg/fullstacked/internal/fetch"
@@ -119,6 +120,7 @@ var modules = map[types.CoreModule]types.ModuleSwitch{
 	types.Test:      test.Switch,
 	types.Plugin:    plugin.Switch,
 	types.WebSocket: websocket.Switch,
+	types.Config:    config.Switch,
 }
 
 func callProcess(

@@ -18,6 +18,7 @@
         "core/internal/bundle/lib/bridge/index.ts",
         "core/internal/bundle/lib/auth/index.ts",
         "core/internal/bundle/lib/bundle/index.ts",
+        "core/internal/bundle/lib/config/index.ts",
         "core/internal/bundle/lib/git/index.ts",
         "core/internal/bundle/lib/packages/index.ts",
         "core/internal/bundle/lib/parentWindow/index.ts",

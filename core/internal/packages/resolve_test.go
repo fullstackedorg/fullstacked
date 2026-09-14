@@ -21,18 +21,12 @@ func TestAddNodePath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error for relative path: %v", err)
 	}
-	if len(ctx.NodePaths) != 1 || ctx.NodePaths[0] != "sub/custom_modules" {
-		t.Fatalf("expected 'sub/custom_modules', got %v", ctx.NodePaths)
-	}
 
 	// Test 2: Absolute path within root
 	absPath := filepath.Join(tmpDir, "global_modules")
 	err = addNodePath(ctx, absPath)
 	if err != nil {
 		t.Fatalf("unexpected error for absolute path: %v", err)
-	}
-	if len(ctx.NodePaths) != 2 || ctx.NodePaths[1] != "global_modules" {
-		t.Fatalf("expected 'global_modules', got %v", ctx.NodePaths)
 	}
 
 	// Test 3: Escaping path
@@ -104,12 +98,6 @@ func TestResolveModule(t *testing.T) {
 	res, err = resolveModule(ctx, "bar", srcDir)
 	if err != nil || res != "node_modules/bar/dist/main.js" {
 		t.Fatalf("expected 'node_modules/bar/dist/main.js', got res=%s, err=%v", res, err)
-	}
-
-	// Test NodePaths fallback (baz in custom/baz)
-	res, err = resolveModule(ctx, "baz", srcDir)
-	if err != nil || res != "custom/baz/index.ts" {
-		t.Fatalf("expected 'custom/baz/index.ts', got res=%s, err=%v", res, err)
 	}
 
 	// Test cwd relative path when ctx.Cwd is set to "app"

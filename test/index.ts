@@ -25,6 +25,7 @@ let tests = [
     "./packages/index.ts",
     "./worker/index.ts",
     "./readline/index.ts",
+    "./config/index.ts",
     "./fullstacked/index.ts"
 ];
 
