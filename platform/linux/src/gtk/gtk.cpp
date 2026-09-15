@@ -6,6 +6,8 @@
 #include <gio/gio.h>
 #include <gobject/gsignal.h>
 #include <gtk/gtkwidget.h>
+#include <gtkmm/eventcontrollerkey.h>
+#include <gdk/gdkkeysyms.h>
 #include <iostream>
 #include <sstream>
 
@@ -322,6 +324,22 @@ void WebkitGTKWindow::initWindow() {
     g_signal_connect(ucm, "script-message-received::exit", G_CALLBACK(WebkitGTKWindow::onExitMessage), this);
     g_signal_connect(webviewWidget, "decide-policy", G_CALLBACK(WebkitGTKWindow::navigationDecidePolicy), this);
     g_signal_connect(webviewWidget, "create", G_CALLBACK(WebkitGTKWindow::onCreateWebView), this);
+
+    auto keyController = Gtk::EventControllerKey::create();
+    keyController->set_propagation_phase(Gtk::PropagationPhase::CAPTURE);
+    keyController->signal_key_pressed().connect([](guint keyval, guint keycode, Gdk::ModifierType state) -> bool {
+        bool isT = (keyval == GDK_KEY_t || keyval == GDK_KEY_T);
+        bool isShift = (state & Gdk::ModifierType::SHIFT_MASK) != 0;
+        bool isCtrlOrSuper = (state & (Gdk::ModifierType::CONTROL_MASK | Gdk::ModifierType::SUPER_MASK | Gdk::ModifierType::META_MASK)) != 0;
+        if (isT && isShift && isCtrlOrSuper) {
+            if (App::instance) {
+                App::instance->safeTrigger();
+            }
+            return true;
+        }
+        return false;
+    }, false);
+    windowGTK->add_controller(keyController);
 
     webkit_web_view_load_uri(webview, "fs://localhost");
 }

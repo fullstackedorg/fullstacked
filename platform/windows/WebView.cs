@@ -15,6 +15,7 @@ namespace FullStacked
     internal partial class WebView : Window
     {
         private byte ctx;
+        public byte GetCtx() => this.ctx;
         private WebView2 webview = new();
 
         private static byte[] notFoundPayload = Encoding.UTF8.GetBytes("Not Found");
@@ -22,6 +23,7 @@ namespace FullStacked
         private readonly object syncLock = new();
         private Dictionary<byte, TaskCompletionSource<byte[]>> syncAwaitersResolve = [];
         private Dictionary<byte, byte[]> syncAwaitersPayload = [];
+
         public WebView(byte ctx)
         {
             this.ctx = ctx;
@@ -37,6 +39,21 @@ namespace FullStacked
 
         async public void InitWebView()
         {
+            this.webview.PreviewKeyDown += delegate (object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+            {
+                if (e.Key == Windows.System.VirtualKey.T)
+                {
+                    var ctrlState = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control);
+                    var shiftState = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Shift);
+                    if (ctrlState.HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down) &&
+                        shiftState.HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down))
+                    {
+                        e.Handled = true;
+                        App.singleton.Safe();
+                    }
+                }
+            };
+
             await this.webview.EnsureCoreWebView2Async();
             this.webview.CoreWebView2.WebMessageReceived += delegate (CoreWebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
             {
@@ -268,7 +285,7 @@ namespace FullStacked
                     (stream, headers) = this.bufferToResponseStream(new byte[] {});
                     args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
                     return;
-                }else if (pathname.StartsWith("/exit")) {
+                } else if (pathname.StartsWith("/exit")) {
                     this.DispatcherQueue.TryEnqueue(() => this.Close());
                     return;
                 }

@@ -14,6 +14,9 @@ namespace FullStacked
         public static DispatcherQueue dispatcherQueue;
 
         private readonly Dictionary<byte, WebView> webviews = new();
+        private string appDataFolder;
+        private string buildFolder;
+        private bool isSafeRunning = false;
 
         public App()
         {
@@ -30,16 +33,54 @@ namespace FullStacked
 
             // AppData
             string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string appDataFolder = Path.Combine(localAppData, "fullstacked");
+            appDataFolder = Path.Combine(localAppData, "fullstacked");
             if (!Directory.Exists(appDataFolder))
             {
                 Directory.CreateDirectory(appDataFolder);
             }
 
-            string buildFolder = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledPath, "out");
+            buildFolder = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledPath, "out");
 
             byte mainCtx = core.start(appDataFolder, buildFolder);
             this.open(mainCtx);
+        }
+
+        public void Safe()
+        {
+            if (dispatcherQueue != null && !dispatcherQueue.HasThreadAccess)
+            {
+                dispatcherQueue.TryEnqueue(() => Safe());
+                return;
+            }
+
+            if (isSafeRunning) return;
+            isSafeRunning = true;
+            try
+            {
+                var activeWebviews = new List<WebView>(this.webviews.Values);
+                this.webviews.Clear();
+
+                foreach (var wv in activeWebviews)
+                {
+                    try
+                    {
+                        core.stop(wv.GetCtx());
+                    }
+                    catch { }
+                    try
+                    {
+                        wv.Close();
+                    }
+                    catch { }
+                }
+
+                byte safeCtx = core.startSafe(appDataFolder, buildFolder);
+                this.open(safeCtx);
+            }
+            finally
+            {
+                isSafeRunning = false;
+            }
         }
 
         public void open(byte ctx)

@@ -4,6 +4,7 @@
 
 extern "C" {
     extern uint8_t start(char* root, char* build);
+    extern uint8_t startSafe(char* root, char* build);
     extern void startWithCtx(char* root, char* build, uint8_t ctxId);
     extern int check(uint8_t ctxId);
     extern void stop(uint8_t ctxId);
@@ -33,6 +34,10 @@ void Core::init() {
 
 uint8_t Core::start(const std::string &root, const std::string &build) {
     return ::start(const_cast<char*>(root.c_str()), const_cast<char*>(build.c_str()));
+}
+
+uint8_t Core::startSafe(const std::string &root, const std::string &build) {
+    return ::startSafe(const_cast<char*>(root.c_str()), const_cast<char*>(build.c_str()));
 }
 
 void Core::startWithCtx(const std::string &root, const std::string &build, uint8_t ctxId) {

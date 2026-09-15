@@ -28,12 +28,15 @@ public:
     std::string buildDir;
     std::string deeplink;
     bool kiosk = false;
+    bool safe = false;
+    bool isSafeRunning = false;
 
     App();
     ~App();
 
     void open(uint8_t ctx);
     void close(uint8_t ctx);
+    void safeTrigger();
     void onStreamData(uint8_t ctx, uint8_t streamId, const std::vector<uint8_t> &data);
 
     int run(int argc, char *argv[]);

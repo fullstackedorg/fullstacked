@@ -1,6 +1,6 @@
 package org.fullstacked
 
-import android.app.Activity
+import android.annotation.SuppressLint
 import android.app.UiModeManager
 import android.content.Intent
 import android.content.pm.ApplicationInfo
@@ -11,6 +11,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.ViewGroup
 import android.webkit.ValueCallback
 import android.widget.FrameLayout
@@ -27,11 +29,16 @@ import java.io.ByteArrayInputStream
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.zip.ZipInputStream
+import kotlin.math.abs
+import androidx.core.net.toUri
+import androidx.core.content.edit
 
 const val EXTRA_CTX_ID = "ctxId"
 
 class MainActivity : ComponentActivity() {
     companion object {
+        val activeActivities = CopyOnWriteArrayList<MainActivity>()
+
         init {
             try {
                 System.loadLibrary("core")
@@ -65,6 +72,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        activeActivities.add(this)
 
         root = this.filesDir.absolutePath + "/projects"
 
@@ -206,7 +214,7 @@ class MainActivity : ComponentActivity() {
             lastOpenUrl = url
             lastOpenUrlTime = now
 
-            val uri = Uri.parse(url)
+            val uri = url.toUri()
             val scheme = uri.scheme?.lowercase()
             if (scheme == "fullstacked-ctx") {
                 val pathWithoutScheme = url.removePrefix("fullstacked-ctx://").removePrefix("fullstacked-ctx:")
@@ -232,6 +240,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        activeActivities.remove(this)
         AuthManager.unregisterActivity(this)
         try {
             removeCallback(callbackId)
@@ -251,12 +260,7 @@ class MainActivity : ComponentActivity() {
         val currentVersion = try {
             val pInfo = packageManager.getPackageInfo(packageName, 0)
             val vName = pInfo.versionName ?: "1.0.0"
-            val vCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                pInfo.longVersionCode
-            } else {
-                @Suppress("DEPRECATION")
-                pInfo.versionCode.toLong()
-            }
+            val vCode = pInfo.longVersionCode
             "$vName-$vCode"
         } catch (_: Exception) {
             "1.0.0-1"
@@ -276,7 +280,7 @@ class MainActivity : ComponentActivity() {
         if (needsDecompression) {
             val zipData = try {
                 resources.openRawResource(R.raw.out).use { it.readBytes() }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 null
             }
 
@@ -303,7 +307,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 if (unzipped) {
-                    prefs.edit().putString("last_decompressed_version", currentVersion).apply()
+                    prefs.edit { putString("last_decompressed_version", currentVersion) }
                     try {
                         buildFile.writeText(currentVersion)
                     } catch (_: Exception) { }
@@ -317,11 +321,7 @@ class MainActivity : ComponentActivity() {
     fun updateActiveContentView() {
         val currentWebView = stackedWebViews.lastOrNull()
         if (currentWebView == null) {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
-                finishAndRemoveTask()
-            } else {
-                finish()
-            }
+            finishAndRemoveTask()
             return
         }
 
@@ -409,7 +409,7 @@ class MainActivity : ComponentActivity() {
             if (useMultiWindow()) {
                 val intent = Intent(this, MainActivity::class.java).apply {
                     action = Intent.ACTION_VIEW
-                    data = Uri.parse("fullstacked-ctx://$targetCtxId")
+                    data = "fullstacked-ctx://$targetCtxId".toUri()
                     putExtra(EXTRA_CTX_ID, targetCtxId)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT)
                     addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
@@ -417,21 +417,16 @@ class MainActivity : ComponentActivity() {
                     addFlags(Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT)
                 }
 
-                val options = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    val currentDisplayId = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                        this.display?.displayId ?: android.view.Display.DEFAULT_DISPLAY
-                    } else {
-                        @Suppress("DEPRECATION")
-                        windowManager.defaultDisplay.displayId
-                    }
-                    android.app.ActivityOptions.makeBasic().apply {
-                        setLaunchDisplayId(currentDisplayId)
-                    }.toBundle()
-                } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-                    android.app.ActivityOptions.makeBasic().toBundle()
+
+                val currentDisplayId = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    this.display?.displayId ?: android.view.Display.DEFAULT_DISPLAY
                 } else {
-                    null
+                    @Suppress("DEPRECATION")
+                    windowManager.defaultDisplay.displayId
                 }
+                val options =  android.app.ActivityOptions.makeBasic().apply {
+                    launchDisplayId = currentDisplayId
+                }.toBundle()
 
                 startActivity(intent, options)
             } else {
@@ -475,11 +470,119 @@ class MainActivity : ComponentActivity() {
         this.stackedWebViews.clear()
     }
 
+    fun safe() {
+        runOnUiThread {
+            this.removeAllStackedProjects()
+
+            for (activity in activeActivities) {
+                if (activity != this && !activity.isFinishing) {
+                    activity.finishAndRemoveTask()
+                }
+            }
+
+            val safeCtxId = Core.startMain(root, getMainLocation(), null, safe = true)
+            val webView = FullStackedWebView(this, ctxId = safeCtxId.toByte(), isSafe = true)
+            this.addStackedProject(webView)
+        }
+    }
+
+    private var isTracking3Fingers = false
+    private val safeTouchHandler = Handler(Looper.getMainLooper())
+    private val initialTouchX = FloatArray(3)
+    private val initialTouchY = FloatArray(3)
+    private val initialPointerIds = IntArray(3)
+    private val safeTouchRunnable = Runnable {
+        isTracking3Fingers = false
+        safe()
+    }
+
+    private fun cancel3FingerTracking() {
+        if (isTracking3Fingers) {
+            isTracking3Fingers = false
+            safeTouchHandler.removeCallbacks(safeTouchRunnable)
+        }
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                if (ev.pointerCount == 3 && !isTracking3Fingers) {
+                    isTracking3Fingers = true
+                    for (i in 0 until 3) {
+                        initialPointerIds[i] = ev.getPointerId(i)
+                        initialTouchX[i] = ev.getX(i)
+                        initialTouchY[i] = ev.getY(i)
+                    }
+                    safeTouchHandler.postDelayed(safeTouchRunnable, 1500)
+                } else if (ev.pointerCount > 3) {
+                    cancel3FingerTracking()
+                }
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (isTracking3Fingers) {
+                    if (ev.pointerCount != 3) {
+                        cancel3FingerTracking()
+                    } else {
+                        val slop = 100f
+                        for (i in 0 until 3) {
+                            val id = ev.getPointerId(i)
+                            var matched = false
+                            for (j in 0 until 3) {
+                                if (initialPointerIds[j] == id) {
+                                    val dx = abs(ev.getX(i) - initialTouchX[j])
+                                    val dy = abs(ev.getY(i) - initialTouchY[j])
+                                    if (dx > slop || dy > slop) {
+                                        cancel3FingerTracking()
+                                        break
+                                    }
+                                    matched = true
+                                    break
+                                }
+                            }
+                            if (!matched || !isTracking3Fingers) {
+                                cancel3FingerTracking()
+                                break
+                            }
+                        }
+                    }
+                } else if (ev.pointerCount == 3) {
+                    isTracking3Fingers = true
+                    for (i in 0 until 3) {
+                        initialPointerIds[i] = ev.getPointerId(i)
+                        initialTouchX[i] = ev.getX(i)
+                        initialTouchY[i] = ev.getY(i)
+                    }
+                    safeTouchHandler.postDelayed(safeTouchRunnable, 1500)
+                }
+            }
+            MotionEvent.ACTION_POINTER_UP,
+            MotionEvent.ACTION_UP,
+            MotionEvent.ACTION_CANCEL -> {
+                cancel3FingerTracking()
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
+    @SuppressLint("RestrictedApi")
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            val isT = event.keyCode == KeyEvent.KEYCODE_T
+            val isShift = event.isShiftPressed
+            val isCmdOrCtrl = event.isCtrlPressed || event.isMetaPressed
+            if (isT && isShift && isCmdOrCtrl) {
+                safe()
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     lateinit var fileChooserResultLauncher: ActivityResultLauncher<Intent>
     var fileChooserValueCallback: ValueCallback<Array<Uri>>? = null
     private fun createFileChooserResultLauncher(): ActivityResultLauncher<Intent> {
         return this.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-            if (it.resultCode == Activity.RESULT_OK) {
+            if (it.resultCode == RESULT_OK) {
                 fileChooserValueCallback?.onReceiveValue(arrayOf(Uri.parse(it?.data?.dataString)))
             } else {
                 fileChooserValueCallback?.onReceiveValue(null)
@@ -501,14 +604,10 @@ class MainActivity : ComponentActivity() {
         val brand = android.os.Build.BRAND ?: ""
         val manufacturer = android.os.Build.MANUFACTURER ?: ""
         val device = android.os.Build.DEVICE ?: ""
-        if (device.contains("cheets", ignoreCase = true) ||
-            brand.equals("chromium", ignoreCase = true) ||
-            manufacturer.equals("Chromium", ignoreCase = true) ||
-            (brand.equals("google", ignoreCase = true) && device.contains("chrome", ignoreCase = true))
-        ) {
-            return true
-        }
-        return false
+        return device.contains("cheets", ignoreCase = true) ||
+                brand.equals("chromium", ignoreCase = true) ||
+                manufacturer.equals("Chromium", ignoreCase = true) ||
+                (brand.equals("google", ignoreCase = true) && device.contains("chrome", ignoreCase = true))
     }
 
     private fun isSamsungDexActive(): Boolean {

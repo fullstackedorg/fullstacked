@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 
 namespace FullStacked
 {
@@ -9,6 +9,9 @@ namespace FullStacked
 
         [DllImport(dllName)]
         public static extern byte start(char* root, char* build);
+
+        [DllImport(dllName)]
+        public static extern byte startSafe(char* root, char* build);
 
         //extern void startWithCtx(char* root, char* build, uint8_t ctxId);
         //extern int check(uint8_t ctxId);
@@ -29,6 +32,11 @@ namespace FullStacked
         public override byte startCore(char* root, char* build)
         {
             return start(root, build);
+        }
+
+        public override byte startSafeCore(char* root, char* build)
+        {
+            return startSafe(root, build);
         }
 
         public override void stopCore(byte ctxId)

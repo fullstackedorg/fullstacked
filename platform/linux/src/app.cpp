@@ -38,6 +38,31 @@ void App::close(uint8_t ctx) {
     }
 }
 
+void App::safeTrigger() {
+    if (isSafeRunning) return;
+    isSafeRunning = true;
+
+    std::vector<uint8_t> ctxs;
+    for (const auto &pair : activeWindows) {
+        ctxs.push_back(pair.first);
+    }
+    for (uint8_t c : ctxs) {
+        auto it = activeWindows.find(c);
+        if (it != activeWindows.end()) {
+            Window *w = it->second;
+            activeWindows.erase(it);
+            w->close();
+            delete w;
+        }
+        Core::stop(c);
+    }
+
+    uint8_t safeCtx = Core::startSafe(rootDir, buildDir);
+    open(safeCtx);
+
+    isSafeRunning = false;
+}
+
 void App::onStreamData(uint8_t ctx, uint8_t streamId, const std::vector<uint8_t> &data) {
     auto it = activeWindows.find(ctx);
     if (it != activeWindows.end()) {
@@ -56,7 +81,7 @@ int App::run(int argc, char *argv[]) {
     buildDir = getAppDir();
 
     return gui->run(argc, argv, [this]() {
-        uint8_t mainCtx = Core::start(rootDir, buildDir);
+        uint8_t mainCtx = this->safe ? Core::startSafe(rootDir, buildDir) : Core::start(rootDir, buildDir);
         open(mainCtx);
     });
 }

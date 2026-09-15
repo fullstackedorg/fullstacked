@@ -10,6 +10,8 @@ int main(int argc, char *argv[]) {
     std::string httpPrefix = "http";
     std::string fsPrefix = "fullstacked";
     std::string kioskFlag = "--kiosk";
+    std::string safeFlag = "--safe";
+    std::string safeFlagShort = "-s";
 
     for (int i = 1; i < argc; i++) {
         std::string arg(argv[i]);
@@ -19,6 +21,8 @@ int main(int argc, char *argv[]) {
             app->deeplink = arg;
         } else if (arg == kioskFlag) {
             app->kiosk = true;
+        } else if (arg == safeFlag || arg == safeFlagShort) {
+            app->safe = true;
         }
     }
 
