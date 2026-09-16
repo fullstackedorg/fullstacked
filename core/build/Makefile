@@ -1,6 +1,9 @@
 SHELL := /bin/bash
 OUT = $(CURDIR)/../bin
 
+MACOSX_DEPLOYMENT_TARGET ?= 15.0
+IPHONEOS_DEPLOYMENT_TARGET ?= 15.0
+
 ###### MacOS #######
 
 darwin-x64-shared:
@@ -8,8 +11,9 @@ darwin-x64-shared:
 	GOOS=darwin \
 	GOARCH=amd64 \
 	SDK=macosx \
+	MACOSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET) \
 	CC=$(CURDIR)/apple-clang.sh \
-	CGO_CFLAGS="-target x86_64-apple-darwin" \
+	CGO_CFLAGS="-target x86_64-apple-macos$(MACOSX_DEPLOYMENT_TARGET) -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)" \
 	go build -buildmode=c-shared -o $(OUT)/darwin-x64.so -v ..
 
 darwin-x64-static:
@@ -17,8 +21,9 @@ darwin-x64-static:
 	GOOS=darwin \
 	GOARCH=amd64 \
 	SDK=macosx \
+	MACOSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET) \
 	CC=$(CURDIR)/apple-clang.sh \
-	CGO_CFLAGS="-target x86_64-apple-darwin" \
+	CGO_CFLAGS="-target x86_64-apple-macos$(MACOSX_DEPLOYMENT_TARGET) -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)" \
 	go build -buildmode=c-archive -o $(OUT)/darwin-x64.a -v ..
 
 darwin-arm64-shared:
@@ -26,8 +31,9 @@ darwin-arm64-shared:
 	GOOS=darwin \
 	GOARCH=arm64 \
 	SDK=macosx \
+	MACOSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET) \
 	CC=$(CURDIR)/apple-clang.sh \
-	CGO_CFLAGS="-target arm64-apple-darwin" \
+	CGO_CFLAGS="-target arm64-apple-macos$(MACOSX_DEPLOYMENT_TARGET) -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)" \
 	go build -buildmode=c-shared -o $(OUT)/darwin-arm64.so -v ..
 
 darwin-arm64-static:
@@ -35,8 +41,9 @@ darwin-arm64-static:
 	GOOS=darwin \
 	GOARCH=arm64 \
 	SDK=macosx \
+	MACOSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET) \
 	CC=$(CURDIR)/apple-clang.sh \
-	CGO_CFLAGS="-target arm64-apple-darwin" \
+	CGO_CFLAGS="-target arm64-apple-macos$(MACOSX_DEPLOYMENT_TARGET) -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)" \
 	go build -buildmode=c-archive -o $(OUT)/darwin-arm64.a -v ..
 
 darwin-static: darwin-x64-static darwin-arm64-static
@@ -50,8 +57,9 @@ ios-arm64:
 	GOOS=ios \
 	GOARCH=arm64 \
 	SDK=iphoneos \
+	IPHONEOS_DEPLOYMENT_TARGET=$(IPHONEOS_DEPLOYMENT_TARGET) \
 	CC=$(CURDIR)/apple-clang.sh \
-	CGO_CFLAGS="-fembed-bitcode" \
+	CGO_CFLAGS="-target arm64-apple-ios$(IPHONEOS_DEPLOYMENT_TARGET) -miphoneos-version-min=$(IPHONEOS_DEPLOYMENT_TARGET)" \
 	go build -buildmode=c-archive -tags ios  -o $(OUT)/ios-arm64.a -v ..
 
 ###### Android #######
