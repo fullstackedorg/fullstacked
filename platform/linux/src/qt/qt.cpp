@@ -109,6 +109,8 @@ AuthWindow::AuthWindow(QtWindow *pOpener, QWidget *parent)
     page->settings()->setAttribute(QWebEngineSettings::JavascriptEnabled, true);
     page->settings()->setAttribute(QWebEngineSettings::LocalStorageEnabled, true);
     page->settings()->setAttribute(QWebEngineSettings::LocalContentCanAccessRemoteUrls, true);
+    page->settings()->setAttribute(QWebEngineSettings::WebGLEnabled, true);
+    page->settings()->setAttribute(QWebEngineSettings::Accelerated2dCanvasEnabled, true);
 
     // Inject opener polyfill so popup can communicate via postMessage
     QWebEngineScript script;
@@ -213,11 +215,20 @@ bool AuthWebEnginePage::acceptNavigationRequest(const QUrl &url, NavigationType 
 }
 
 int QtGUI::run(int &argc, char **argv, std::function<void()> onReady) {
-    if (!qEnvironmentVariableIsSet("QTWEBENGINE_CHROMIUM_FLAGS")) {
+    QByteArray existingFlags = qgetenv("QTWEBENGINE_CHROMIUM_FLAGS");
+    if (existingFlags.isEmpty()) {
         qputenv("QTWEBENGINE_CHROMIUM_FLAGS",
                 "--no-sandbox "
                 "--disable-dev-shm-usage "
-                "--disable-gpu-compositing");
+                "--disable-gpu-compositing "
+                "--ignore-gpu-blocklist "
+                "--ignore-gpu-blacklist "
+                "--enable-webgl");
+    } else {
+        if (!existingFlags.contains("ignore-gpu-blocklist")) {
+            existingFlags += " --ignore-gpu-blocklist --ignore-gpu-blacklist --enable-webgl";
+            qputenv("QTWEBENGINE_CHROMIUM_FLAGS", existingFlags);
+        }
     }
 
     QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
@@ -430,6 +441,8 @@ void QtWindow::init() {
     page->settings()->setAttribute(QWebEngineSettings::LocalContentCanAccessFileUrls, true);
     page->settings()->setAttribute(QWebEngineSettings::LocalStorageEnabled, true);
     page->settings()->setAttribute(QWebEngineSettings::JavascriptEnabled, true);
+    page->settings()->setAttribute(QWebEngineSettings::WebGLEnabled, true);
+    page->settings()->setAttribute(QWebEngineSettings::Accelerated2dCanvasEnabled, true);
     webEngineView->setPage(page);
 
     auto *channel = new QWebChannel(page);
