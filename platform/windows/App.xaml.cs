@@ -11,6 +11,7 @@ namespace FullStacked
     {
         public static Core core;
         public static App singleton;
+        public static App Singleton => singleton;
         public static DispatcherQueue dispatcherQueue;
 
         private readonly Dictionary<byte, WebView> webviews = new();

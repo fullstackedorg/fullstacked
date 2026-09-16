@@ -16,7 +16,23 @@ namespace FullStacked
     {
         private byte ctx;
         public byte GetCtx() => this.ctx;
-        private WebView2 webview = new();
+        private CoreWebView2Controller controller;
+        private CoreWebView2Environment environment;
+        private bool isClosed = false;
+
+        private static readonly object envLock = new();
+        private static Task<CoreWebView2Environment> sharedEnvironmentTask;
+        private static Task<CoreWebView2Environment> GetEnvironmentAsync()
+        {
+            lock (envLock)
+            {
+                if (sharedEnvironmentTask == null || sharedEnvironmentTask.IsFaulted)
+                {
+                    sharedEnvironmentTask = CoreWebView2Environment.CreateAsync().AsTask();
+                }
+                return sharedEnvironmentTask;
+            }
+        }
 
         private static byte[] notFoundPayload = Encoding.UTF8.GetBytes("Not Found");
 
@@ -31,31 +47,169 @@ namespace FullStacked
             this.Title = "FullStacked";
             this.AppWindow.SetIcon("Assets/Window-Icon.ico");
 
+            this.AppWindow.Changed += delegate (Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowChangedEventArgs args)
+            {
+                if (args.DidPositionChange)
+                {
+                    this.controller?.NotifyParentWindowPositionChanged();
+                }
+                if (args.DidSizeChange)
+                {
+                    this.UpdateBounds();
+                }
+            };
+
+            this.SizeChanged += delegate (object sender, WindowSizeChangedEventArgs args)
+            {
+                this.UpdateBounds();
+            };
+
+            this.Activated += delegate (object sender, WindowActivatedEventArgs args)
+            {
+                if (args.WindowActivationState != WindowActivationState.Deactivated)
+                {
+                    this.controller?.MoveFocus(CoreWebView2MoveFocusReason.Programmatic);
+                }
+            };
+
+            this.Closed += delegate (object sender, WindowEventArgs args)
+            {
+                this.isClosed = true;
+                this.controller?.Close();
+                this.controller = null;
+            };
+
             this.InitWebView();
 
-            this.Content = this.webview;
             this.Activate();
+        }
+
+        private const uint SWP_NOSIZE = 0x0001;
+        private const uint SWP_NOMOVE = 0x0002;
+        private const uint SWP_NOACTIVATE = 0x0010;
+        private const uint SWP_SHOWWINDOW = 0x0040;
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool EnumChildWindows(IntPtr hWndParent, EnumChildProc lpEnumFunc, IntPtr lParam);
+
+        private delegate bool EnumChildProc(IntPtr hWnd, IntPtr lParam);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true, CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+        private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct RECT { public int Left, Top, Right, Bottom; }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern short GetKeyState(int nVirtKey);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern short GetAsyncKeyState(int nVirtKey);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool EnableWindow(IntPtr hWnd, bool bEnable);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+        private void EnsureChildOnTop()
+        {
+            try
+            {
+                IntPtr hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                EnumChildWindows(hwnd, (childHwnd, lParam) =>
+                {
+                    var sb = new StringBuilder(256);
+                    GetClassName(childHwnd, sb, 256);
+                    string className = sb.ToString();
+                    if (className.Contains("DesktopChildSiteBridge") || className.Contains("InputSiteWindowClass"))
+                    {
+                        EnableWindow(childHwnd, false);
+                        int exStyle = GetWindowLong(childHwnd, -20);
+                        SetWindowLong(childHwnd, -20, exStyle | 0x00000020 /* WS_EX_TRANSPARENT */);
+                        SetWindowPos(childHwnd, (IntPtr)1 /* HWND_BOTTOM */, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                    }
+                    else if (className.StartsWith("Chrome_WidgetWin_0"))
+                    {
+                        SetWindowPos(childHwnd, IntPtr.Zero /* HWND_TOP */, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+                    }
+                    return true;
+                }, IntPtr.Zero);
+            }
+            catch { }
+        }
+
+        private void UpdateBounds()
+        {
+            if (this.controller == null) return;
+
+            var clientSize = this.AppWindow.ClientSize;
+            if (clientSize.Width > 0 && clientSize.Height > 0)
+            {
+                this.controller.IsVisible = true;
+                this.controller.Bounds = new Windows.Foundation.Rect(0, 0, clientSize.Width, clientSize.Height);
+                this.EnsureChildOnTop();
+            }
+            else
+            {
+                this.controller.IsVisible = false;
+            }
         }
 
         async public void InitWebView()
         {
-            this.webview.PreviewKeyDown += delegate (object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+            try
             {
-                if (e.Key == Windows.System.VirtualKey.T)
-                {
-                    var ctrlState = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control);
-                    var shiftState = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Shift);
-                    if (ctrlState.HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down) &&
-                        shiftState.HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down))
-                    {
-                        e.Handled = true;
-                        App.singleton.Safe();
-                    }
-                }
-            };
+                this.environment = await GetEnvironmentAsync();
+                if (this.isClosed) return;
 
-            await this.webview.EnsureCoreWebView2Async();
-            this.webview.CoreWebView2.WebMessageReceived += delegate (CoreWebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
+                IntPtr hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                var windowRef = CoreWebView2ControllerWindowReference.CreateFromWindowHandle((ulong)(nint)hwnd);
+
+                this.controller = await this.environment.CreateCoreWebView2ControllerAsync(windowRef);
+                if (this.isClosed)
+                {
+                    this.controller?.Close();
+                    this.controller = null;
+                    return;
+                }
+
+                this.controller.BoundsMode = CoreWebView2BoundsMode.UseRawPixels;
+                this.UpdateBounds();
+                this.controller.IsVisible = true;
+                this.EnsureChildOnTop();
+                this.controller.MoveFocus(CoreWebView2MoveFocusReason.Programmatic);
+
+                this.controller.AcceleratorKeyPressed += delegate (CoreWebView2Controller sender, CoreWebView2AcceleratorKeyPressedEventArgs e)
+                {
+                    if (e.KeyEventKind == CoreWebView2KeyEventKind.KeyDown || e.KeyEventKind == CoreWebView2KeyEventKind.SystemKeyDown)
+                    {
+                        if (e.VirtualKey == (uint)Windows.System.VirtualKey.T)
+                        {
+                            bool isCtrl = (GetKeyState(0x11) & 0x8000) != 0 || (GetAsyncKeyState(0x11) & 0x8000) != 0;
+                            bool isShift = (GetKeyState(0x10) & 0x8000) != 0 || (GetAsyncKeyState(0x10) & 0x8000) != 0;
+                            if (isCtrl && isShift)
+                            {
+                                e.Handled = true;
+                                this.DispatcherQueue.TryEnqueue(() => App.Singleton.Safe());
+                            }
+                        }
+                    }
+                };
+
+                var coreWebView2 = this.controller.CoreWebView2;
+
+                coreWebView2.WebMessageReceived += delegate (CoreWebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
             {
                 string base64 = args.TryGetWebMessageAsString();
                 byte[] data = Convert.FromBase64String(base64);
@@ -82,13 +236,13 @@ namespace FullStacked
                 // Async
                 else
                 {
-                    _ = this.webview.CoreWebView2.ExecuteScriptAsync("window.fullstacked.respond(" + id + ",`" + Convert.ToBase64String(response) + "`)");
+                    _ = coreWebView2.ExecuteScriptAsync("window.fullstacked.respond(" + id + ",`" + Convert.ToBase64String(response) + "`)");
                 }
 
 
             };
-            this.webview.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
-            this.webview.CoreWebView2.WebResourceRequested += async delegate (CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs args)
+            coreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
+            coreWebView2.WebResourceRequested += async delegate (CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs args)
             {
                 Uri uri = new(args.Request.Uri);
 
@@ -105,14 +259,14 @@ namespace FullStacked
                 if (pathname == "/platform")
                 {
                     (stream, headers) = this.bufferToResponseStream(Core.platform);
-                    args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
+                    args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
                     return;
                 }
                 else if (pathname == "/ctx")
                 {
                     byte[] ctxBuffer = Encoding.UTF8.GetBytes(this.ctx.ToString());
                     (stream, headers) = this.bufferToResponseStream(ctxBuffer);
-                    args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
+                    args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
                     return;
                 }
                 else if (pathname.StartsWith("/sync"))
@@ -126,7 +280,7 @@ namespace FullStacked
                         string b64 = Convert.ToBase64String(payload);
                         byte[] b64Buffer = Encoding.UTF8.GetBytes(b64);
                         (stream, headers) = this.bufferToResponseStream(b64Buffer, "application/octet-stream");
-                        args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
+                        args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
                     };
 
 
@@ -269,7 +423,7 @@ namespace FullStacked
 
                         byte[] resData = await resizeTcs.Task;
                         (stream, headers) = this.bufferToResponseStream(resData);
-                        args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
+                        args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
                     }
                     return;
                 } else if (pathname.StartsWith("/open")) {
@@ -283,7 +437,7 @@ namespace FullStacked
                     }
 
                     (stream, headers) = this.bufferToResponseStream(new byte[] {});
-                    args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
+                    args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
                     return;
                 } else if (pathname.StartsWith("/exit")) {
                     this.DispatcherQueue.TryEnqueue(() => this.Close());
@@ -315,15 +469,15 @@ namespace FullStacked
                 if (values.Count < 2)
                 {
                     (stream, headers) = this.bufferToResponseStream(WebView.notFoundPayload);
-                    args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 404, "OK", headers);
+                    args.Response = this.environment.CreateWebResourceResponse(stream, 404, "OK", headers);
                     return;
                 }
 
                 (stream, headers) = this.bufferToResponseStream(values[1].buffer, values[0].str);
-                args.Response = this.webview.CoreWebView2.Environment.CreateWebResourceResponse(stream, 200, "OK", headers);
+                args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
             };
 
-            this.webview.CoreWebView2.NewWindowRequested += delegate (CoreWebView2 sender, CoreWebView2NewWindowRequestedEventArgs e)
+            coreWebView2.NewWindowRequested += delegate (CoreWebView2 sender, CoreWebView2NewWindowRequestedEventArgs e)
             {
                 Uri url = new(e.Uri);
                 if (url.Query.Contains("auth")) {
@@ -334,19 +488,24 @@ namespace FullStacked
                 _ = Windows.System.Launcher.LaunchUriAsync(url);
             };
 
-            this.webview.Source = new Uri("http://localhost");
+            coreWebView2.Navigate("http://localhost");
         }
-
-        public void onStreamData(byte streamId, byte[] data)
+        catch (Exception ex)
         {
-            this.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.High, () =>
-            {
-                if (this.webview?.CoreWebView2 != null)
-                {
-                    _ = this.webview.CoreWebView2.ExecuteScriptAsync("window.fullstacked.onStreamData(" + streamId + ", `" + Convert.ToBase64String(data) + "`)");
-                }
-            });
+            System.Diagnostics.Debug.WriteLine($"Error initializing WebView2: {ex}");
         }
+    }
+
+    public void onStreamData(byte streamId, byte[] data)
+    {
+        this.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.High, () =>
+        {
+            if (this.controller?.CoreWebView2 != null)
+            {
+                _ = this.controller.CoreWebView2.ExecuteScriptAsync("window.fullstacked.onStreamData(" + streamId + ", `" + Convert.ToBase64String(data) + "`)");
+            }
+        });
+    }
 
         private (IRandomAccessStream, string) bufferToResponseStream(byte[] buffer, string mimeType = "text/plain")
         {
