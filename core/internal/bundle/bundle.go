@@ -33,6 +33,7 @@ var libModules = map[string]string{
 	"child_process":       "/lib/unavailable/index.ts",
 	"console":             "/lib/console/index.ts",
 	"constants":           "/lib/constants/index.json",
+	"config":              "/lib/config/index.ts",
 	"crypto":              "/lib/crypto/index.ts",
 	"diagnostics_channel": "/lib/diagnostics_channel/index.js",
 	"dgram":               "/lib/dgram/index.ts",

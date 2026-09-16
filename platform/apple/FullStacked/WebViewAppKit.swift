@@ -251,6 +251,7 @@ class WebViewExtended: WKWebView, WKUIDelegate {
         self.resizeHelper.stopObservingWindow()
         self.resizeHelper.webView = nil
         self.configuration.userContentController.removeScriptMessageHandler(forName: "resize")
+        self.uiDelegate = nil
         self.window?.close()
     }
     
@@ -271,8 +272,17 @@ class WebViewExtended: WKWebView, WKUIDelegate {
 // suppress "funk" noise
 // source: https://stackoverflow.com/a/69858444
 class KeyView: NSView {
+    weak var webView: WebView?
     override var acceptsFirstResponder: Bool { true }
-    override func keyDown(with event: NSEvent) {}
+    override func keyDown(with event: NSEvent) {
+        if(
+            event.modifierFlags.contains(.command) &&
+            event.modifierFlags.contains(.shift) &&
+            event.keyCode == 17
+        ) {
+            WebViewStore.getInstance().safe(from: self.webView)
+        }
+    }
 }
 
 struct WebViewRepresentable: NSViewRepresentable {
@@ -283,6 +293,7 @@ struct WebViewRepresentable: NSViewRepresentable {
     
     func makeNSView(context: Context) -> NSView  {
         let view = KeyView()
+        view.webView = self.webView
         DispatchQueue.main.async {
             view.window?.makeFirstResponder(view)
         }
@@ -292,8 +303,18 @@ struct WebViewRepresentable: NSViewRepresentable {
         return view
     }
     
+    func updateNSView(_ uiView: NSView, context: Context) {
+        if let keyView = uiView as? KeyView {
+            keyView.webView = self.webView
+        }
+    }
     
-    func updateNSView(_ uiView: NSView, context: Context) {    }
+    static func dismantleNSView(_ nsView: NSView, coordinator: ()) {
+        for subview in nsView.subviews {
+            subview.removeFromSuperview()
+        }
+        nsView.removeFromSuperview()
+    }
 }
 
 extension Color {

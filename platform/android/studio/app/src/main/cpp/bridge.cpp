@@ -21,6 +21,19 @@ JNIEXPORT jint JNICALL Java_org_fullstacked_Core_start
     return static_cast<jint>(ctxId);
 }
 
+JNIEXPORT jint JNICALL Java_org_fullstacked_Core_startSafe
+        (JNIEnv *env, jobject thiz, jstring root, jstring build) {
+    const char* rootPtr = env->GetStringUTFChars(root, nullptr);
+    const char* buildPtr = env->GetStringUTFChars(build, nullptr);
+
+    uint8_t ctxId = startSafe(const_cast<char*>(rootPtr), const_cast<char*>(buildPtr));
+
+    env->ReleaseStringUTFChars(root, rootPtr);
+    env->ReleaseStringUTFChars(build, buildPtr);
+
+    return static_cast<jint>(ctxId);
+}
+
 JNIEXPORT void JNICALL Java_org_fullstacked_Core_startWithCtx
         (JNIEnv *env, jobject thiz, jstring root, jstring build, jint ctxId) {
     const char* rootPtr = env->GetStringUTFChars(root, nullptr);

@@ -12,6 +12,7 @@ public:
 
     static void init();
     static uint8_t start(const std::string &root, const std::string &build);
+    static uint8_t startSafe(const std::string &root, const std::string &build);
     static void startWithCtx(const std::string &root, const std::string &build, uint8_t ctxId);
     static int check(uint8_t ctxId);
     static void stop(uint8_t ctxId);

@@ -20,6 +20,9 @@ object Core {
     external fun start(root: String, build: String): Int
 
     @JvmStatic
+    external fun startSafe(root: String, build: String): Int
+
+    @JvmStatic
     external fun startWithCtx(root: String, build: String, ctxId: Int)
 
     @JvmStatic
@@ -34,8 +37,10 @@ object Core {
     @JvmStatic
     external fun getCorePayload(ctx: Int, coreType: Int, id: Int, size: Int): ByteArray
 
-    fun startMain(root: String, build: String, providedCtx: Int? = null): Int {
-        return if (providedCtx == null) {
+    fun startMain(root: String, build: String, providedCtx: Int? = null, safe: Boolean = false): Int {
+        return if (safe) {
+            startSafe(root, build)
+        } else if (providedCtx == null) {
             start(root, build)
         } else {
             startWithCtx(root, build, providedCtx)

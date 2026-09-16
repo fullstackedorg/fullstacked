@@ -1,7 +1,6 @@
 package org.fullstacked
 
 import android.annotation.SuppressLint
-import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Handler
@@ -14,7 +13,6 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.core.content.ContextCompat.startActivity
 import java.io.ByteArrayInputStream
 import java.io.PipedInputStream
 import java.io.PipedOutputStream
@@ -24,7 +22,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 class FullStackedWebView(
     val ctx: MainActivity,
-    val ctxId: Byte = 0
+    val ctxId: Byte = 0,
+    val isSafe: Boolean = false
 ) : WebViewClient() {
     var firstContact = false
     val messageToBeSent = mutableListOf<Pair<String, String>>()
@@ -35,7 +34,7 @@ class FullStackedWebView(
     init {
         val c = ctxId.toInt() and 0xFF
         if (Core.check(c) == 0) {
-            Core.startMain(ctx.getRootPath(), ctx.getMainLocation(), c)
+            Core.startMain(ctx.getRootPath(), ctx.getMainLocation(), c, isSafe)
         }
     }
 
@@ -310,7 +309,6 @@ fun createWebView(delegate: FullStackedWebView): WebView {
     webView.settings.javaScriptCanOpenWindowsAutomatically = true
     webView.settings.setSupportMultipleWindows(true)
     webView.settings.domStorageEnabled = true
-    webView.settings.databaseEnabled = true
     webView.addJavascriptInterface(delegate, "android")
     webView.loadUrl("http://localhost")
 

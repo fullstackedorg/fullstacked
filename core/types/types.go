@@ -21,6 +21,7 @@ const (
 	Dgram     CoreModule = 13
 	Plugin    CoreModule = 14
 	WebSocket CoreModule = 15
+	Config    CoreModule = 16
 )
 
 type ModuleSwitch = func(*Context, CoreCallHeader, []DeserializedData, *CoreCallResponse) error
@@ -111,8 +112,6 @@ type Context struct {
 	Env map[string]string
 	Cwd string
 
-	NodePaths []string
-
 	Responses      map[uint8][]byte
 	ResponsesMutex *sync.Mutex
 
@@ -128,7 +127,7 @@ type Context struct {
 	GitAuths      map[string]*GitAuth
 	GitAuthsMutex *sync.Mutex
 
-	Exit bool
+	Exited bool
 }
 
 type SerializableData = any

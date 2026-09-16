@@ -6,6 +6,8 @@
 #include <gio/gio.h>
 #include <gobject/gsignal.h>
 #include <gtk/gtkwidget.h>
+#include <gtkmm/eventcontrollerkey.h>
+#include <gdk/gdkkeysyms.h>
 #include <iostream>
 #include <sstream>
 
@@ -168,6 +170,7 @@ GtkWidget *WebkitGTKWindow::createAuthWebView(WebKitNavigationAction *navigation
     WebKitSettings *settings = webkit_web_view_get_settings(authWebview);
     webkit_settings_set_enable_developer_extras(settings, true);
     webkit_settings_set_javascript_can_open_windows_automatically(settings, true);
+    webkit_settings_set_enable_webgl(settings, true);
 
     WebKitUserContentManager *ucm = webkit_web_view_get_user_content_manager(authWebview);
     webkit_user_content_manager_register_script_message_handler(ucm, "auth", NULL);
@@ -311,6 +314,7 @@ void WebkitGTKWindow::initWindow() {
     WebKitSettings *settings = webkit_web_view_get_settings(webview);
     webkit_settings_set_enable_developer_extras(settings, true);
     webkit_settings_set_javascript_can_open_windows_automatically(settings, true);
+    webkit_settings_set_enable_webgl(settings, true);
 
     WebKitUserContentManager *ucm = webkit_web_view_get_user_content_manager(webview);
     webkit_user_content_manager_register_script_message_handler(ucm, "bridge", NULL);
@@ -322,6 +326,22 @@ void WebkitGTKWindow::initWindow() {
     g_signal_connect(ucm, "script-message-received::exit", G_CALLBACK(WebkitGTKWindow::onExitMessage), this);
     g_signal_connect(webviewWidget, "decide-policy", G_CALLBACK(WebkitGTKWindow::navigationDecidePolicy), this);
     g_signal_connect(webviewWidget, "create", G_CALLBACK(WebkitGTKWindow::onCreateWebView), this);
+
+    auto keyController = Gtk::EventControllerKey::create();
+    keyController->set_propagation_phase(Gtk::PropagationPhase::CAPTURE);
+    keyController->signal_key_pressed().connect([](guint keyval, guint keycode, Gdk::ModifierType state) -> bool {
+        bool isT = (keyval == GDK_KEY_t || keyval == GDK_KEY_T);
+        bool isShift = (state & Gdk::ModifierType::SHIFT_MASK) != Gdk::ModifierType::NO_MODIFIER_MASK;
+        bool isCtrlOrSuper = (state & (Gdk::ModifierType::CONTROL_MASK | Gdk::ModifierType::SUPER_MASK | Gdk::ModifierType::META_MASK)) != Gdk::ModifierType::NO_MODIFIER_MASK;
+        if (isT && isShift && isCtrlOrSuper) {
+            if (App::instance) {
+                App::instance->safeTrigger();
+            }
+            return true;
+        }
+        return false;
+    }, false);
+    windowGTK->add_controller(keyController);
 
     webkit_web_view_load_uri(webview, "fs://localhost");
 }

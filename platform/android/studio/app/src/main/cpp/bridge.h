@@ -5,6 +5,7 @@
 
 extern "C" {
     uint8_t start(char* root, char* build);
+    uint8_t startSafe(char* root, char* build);
     void startWithCtx(char* root, char* build, uint8_t ctxId);
     int check(uint8_t ctxId);
     void stop(uint8_t ctxId);
@@ -13,6 +14,8 @@ extern "C" {
     void setOnStreamData(void* cb);
 
     JNIEXPORT jint JNICALL Java_org_fullstacked_Core_start
+            (JNIEnv *, jobject, jstring, jstring);
+    JNIEXPORT jint JNICALL Java_org_fullstacked_Core_startSafe
             (JNIEnv *, jobject, jstring, jstring);
     JNIEXPORT void JNICALL Java_org_fullstacked_Core_startWithCtx
             (JNIEnv *, jobject, jstring, jstring, jint);

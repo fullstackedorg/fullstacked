@@ -79,11 +79,11 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Windows.ImplementationLibrary" Version="1.0.260126.7" />
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.MSIX" Version="1.7.251221100">
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.MSIX" Version="1.7.260903100">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260209005" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.4.0" />
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
 

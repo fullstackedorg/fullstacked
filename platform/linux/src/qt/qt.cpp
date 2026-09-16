@@ -9,7 +9,10 @@
 #include <QCoreApplication>
 #include <QDesktopServices>
 #include <QGuiApplication>
+#include <QKeyEvent>
+#include <QKeySequence>
 #include <QScreen>
+#include <QShortcut>
 #include <QUrl>
 #include <QUrlQuery>
 #include <QWebChannel>
@@ -106,6 +109,8 @@ AuthWindow::AuthWindow(QtWindow *pOpener, QWidget *parent)
     page->settings()->setAttribute(QWebEngineSettings::JavascriptEnabled, true);
     page->settings()->setAttribute(QWebEngineSettings::LocalStorageEnabled, true);
     page->settings()->setAttribute(QWebEngineSettings::LocalContentCanAccessRemoteUrls, true);
+    page->settings()->setAttribute(QWebEngineSettings::WebGLEnabled, true);
+    page->settings()->setAttribute(QWebEngineSettings::Accelerated2dCanvasEnabled, true);
 
     // Inject opener polyfill so popup can communicate via postMessage
     QWebEngineScript script;
@@ -210,11 +215,20 @@ bool AuthWebEnginePage::acceptNavigationRequest(const QUrl &url, NavigationType 
 }
 
 int QtGUI::run(int &argc, char **argv, std::function<void()> onReady) {
-    if (!qEnvironmentVariableIsSet("QTWEBENGINE_CHROMIUM_FLAGS")) {
+    QByteArray existingFlags = qgetenv("QTWEBENGINE_CHROMIUM_FLAGS");
+    if (existingFlags.isEmpty()) {
         qputenv("QTWEBENGINE_CHROMIUM_FLAGS",
                 "--no-sandbox "
                 "--disable-dev-shm-usage "
-                "--disable-gpu-compositing");
+                "--disable-gpu-compositing "
+                "--ignore-gpu-blocklist "
+                "--ignore-gpu-blacklist "
+                "--enable-webgl");
+    } else {
+        if (!existingFlags.contains("ignore-gpu-blocklist")) {
+            existingFlags += " --ignore-gpu-blocklist --ignore-gpu-blacklist --enable-webgl";
+            qputenv("QTWEBENGINE_CHROMIUM_FLAGS", existingFlags);
+        }
     }
 
     QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
@@ -349,12 +363,68 @@ static const char *s_qwebchannel_js =
     "    }\n"
     "})();\n";
 
+class SafeKeyFilter : public QObject {
+public:
+    SafeKeyFilter(QObject *parent = nullptr) : QObject(parent) {}
+    ~SafeKeyFilter() override {
+        if (qApp) {
+            qApp->removeEventFilter(this);
+        }
+    }
+
+protected:
+    bool eventFilter(QObject *obj, QEvent *event) override {
+        if (event->type() == QEvent::KeyPress || event->type() == QEvent::ShortcutOverride) {
+            auto *keyEvent = static_cast<QKeyEvent *>(event);
+            if (keyEvent->key() == Qt::Key_T) {
+                auto mods = keyEvent->modifiers();
+                bool isShift = (mods & Qt::ShiftModifier) != 0;
+                bool isCtrlOrMeta = (mods & (Qt::ControlModifier | Qt::MetaModifier)) != 0;
+                if (isShift && isCtrlOrMeta) {
+                    if (event->type() == QEvent::ShortcutOverride) {
+                        event->accept();
+                        return true;
+                    }
+                    if (App::instance) {
+                        App::instance->safeTrigger();
+                    }
+                    return true;
+                }
+            }
+        }
+        return QObject::eventFilter(obj, event);
+    }
+};
+
 void QtWindow::init() {
     windowQt = new QMainWindow();
     windowQt->setWindowTitle("FullStacked");
     windowQt->resize(800, 600);
 
+    auto *shortcutCtrl = new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_T), windowQt);
+    shortcutCtrl->setContext(Qt::ApplicationShortcut);
+    QObject::connect(shortcutCtrl, &QShortcut::activated, []() {
+        if (App::instance) {
+            App::instance->safeTrigger();
+        }
+    });
+
+    auto *shortcutMeta = new QShortcut(QKeySequence(Qt::META | Qt::SHIFT | Qt::Key_T), windowQt);
+    shortcutMeta->setContext(Qt::ApplicationShortcut);
+    QObject::connect(shortcutMeta, &QShortcut::activated, []() {
+        if (App::instance) {
+            App::instance->safeTrigger();
+        }
+    });
+
+    auto *keyFilter = new SafeKeyFilter(windowQt);
+    windowQt->installEventFilter(keyFilter);
+    if (qApp) {
+        qApp->installEventFilter(keyFilter);
+    }
+
     webEngineView = new QWebEngineView(windowQt);
+    webEngineView->installEventFilter(keyFilter);
 
     auto *profile = QWebEngineProfile::defaultProfile();
 
@@ -371,6 +441,8 @@ void QtWindow::init() {
     page->settings()->setAttribute(QWebEngineSettings::LocalContentCanAccessFileUrls, true);
     page->settings()->setAttribute(QWebEngineSettings::LocalStorageEnabled, true);
     page->settings()->setAttribute(QWebEngineSettings::JavascriptEnabled, true);
+    page->settings()->setAttribute(QWebEngineSettings::WebGLEnabled, true);
+    page->settings()->setAttribute(QWebEngineSettings::Accelerated2dCanvasEnabled, true);
     webEngineView->setPage(page);
 
     auto *channel = new QWebChannel(page);

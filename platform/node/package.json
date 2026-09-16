@@ -1,6 +1,6 @@
 {
     "name": "fullstacked",
-    "version": "1.0.0-alpha.1788",
+    "version": "1.0.0-alpha.1796",
     "bin": {
         "fullstacked": "index.js"
     },
@@ -19,12 +19,12 @@
         "node-addon-api": "^8.9.0"
     },
     "optionalDependencies": {
-        "@fullstacked/darwin-arm64": "1.0.0-alpha.1788",
-        "@fullstacked/darwin-x64": "1.0.0-alpha.1788",
-        "@fullstacked/linux-arm64": "1.0.0-alpha.1788",
-        "@fullstacked/linux-x64": "1.0.0-alpha.1788",
-        "@fullstacked/win32-arm64": "1.0.0-alpha.1788",
-        "@fullstacked/win32-x64": "1.0.0-alpha.1788"
+        "@fullstacked/darwin-arm64": "1.0.0-alpha.1796",
+        "@fullstacked/darwin-x64": "1.0.0-alpha.1796",
+        "@fullstacked/linux-arm64": "1.0.0-alpha.1796",
+        "@fullstacked/linux-x64": "1.0.0-alpha.1796",
+        "@fullstacked/win32-arm64": "1.0.0-alpha.1796",
+        "@fullstacked/win32-x64": "1.0.0-alpha.1796"
     },
     "author": "FullStacked",
     "license": "MIT",
@@ -43,6 +43,9 @@
         },
         "./bundle": {
             "types": "./types/bundle/index.d.ts"
+        },
+        "./config": {
+            "types": "./types/config/index.d.ts"
         },
         "./git": {
             "types": "./types/git/index.d.ts"

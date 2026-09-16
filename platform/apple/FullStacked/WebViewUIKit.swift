@@ -3,6 +3,24 @@ import WebKit
 
 // iOS
 
+class SafeTriggerHelper: UILongPressGestureRecognizer {
+    override init(target: Any?, action: Selector?) {
+        super.init(target: target, action: action)
+        // Configure for 3 fingers and 1500ms (1.5 seconds)
+        self.numberOfTouchesRequired = 3
+        self.minimumPressDuration = 1.5
+    }
+    
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        super.touchesBegan(touches, with: event)
+        
+        // Fail early if the initial touch count doesn't match
+        if let numberOfTouches = event.allTouches?.count, numberOfTouches > 3 {
+            self.state = .failed
+        }
+    }
+}
+
 class ClipboardHelper: NSObject, WKScriptMessageHandler {
     var cb: ((_ requestClipboardID: String, _ clipboardContent: String) -> Void)?
     
@@ -31,6 +49,7 @@ class ClipboardHelper: NSObject, WKScriptMessageHandler {
 
 class WebViewExtended: WKWebView, WKUIDelegate  {
     let clipboardHelper: ClipboardHelper;
+    private var safeTrigger: SafeTriggerHelper?
     
     override var safeAreaInsets: UIEdgeInsets {
         return .zero
@@ -58,14 +77,60 @@ class WebViewExtended: WKWebView, WKUIDelegate  {
         }
         
         self.uiDelegate = self
+        
+        let safeTrigger = SafeTriggerHelper(target: self, action: #selector(safeTrigger(_:)))
+        self.safeTrigger = safeTrigger
+        self.addGestureRecognizer(safeTrigger)
+    }
+    
+    @objc private func safeTrigger(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+        WebViewStore.getInstance().safe(from: self as? WebView)
+    }
+    
+    override var keyCommands: [UIKeyCommand]? {
+        let cmdT = UIKeyCommand(
+            title: "Safe Mode",
+            action: #selector(handleSafeKeyCommand),
+            input: "t",
+            modifierFlags: [.command, .shift]
+        )
+        let cmdUpperT = UIKeyCommand(
+            title: "Safe Mode",
+            action: #selector(handleSafeKeyCommand),
+            input: "T",
+            modifierFlags: [.command, .shift]
+        )
+        if #available(iOS 15.0, *) {
+            cmdT.wantsPriorityOverSystemBehavior = true
+            cmdUpperT.wantsPriorityOverSystemBehavior = true
+        }
+        return [cmdT, cmdUpperT]
+    }
+    
+    @objc private func handleSafeKeyCommand() {
+        WebViewStore.getInstance().safe(from: self as? WebView)
     }
     
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
     
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if let scene = self.window?.windowScene, let webView = self as? WebView {
+            WebViewStore.getInstance().cacheScene(scene, for: webView.id)
+        }
+    }
+    
     func close(){
+        if let safeTrigger = self.safeTrigger {
+            self.removeGestureRecognizer(safeTrigger)
+            self.safeTrigger = nil
+        }
+        self.clipboardHelper.cb = nil
         self.configuration.userContentController.removeScriptMessageHandler(forName: "clipboard")
+        self.uiDelegate = nil
     }
     
     func openBrowserURL(_ url: URL){
@@ -79,6 +144,24 @@ class WebViewExtended: WKWebView, WKUIDelegate  {
     }
 }
 
+class WebViewContainerView: UIView {
+    private weak var currentWebView: WebView?
+    
+    func setWebView(_ webView: WebView) {
+        if self.currentWebView === webView { return }
+        self.currentWebView?.removeFromSuperview()
+        self.currentWebView = webView
+        webView.frame = self.bounds
+        webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        self.addSubview(webView)
+    }
+    
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        self.currentWebView?.frame = self.bounds
+    }
+}
+
 struct WebViewRepresentable: UIViewRepresentable {
     static let isIPadOS = UIDevice.current.userInterfaceIdiom == .pad
     
@@ -87,14 +170,24 @@ struct WebViewRepresentable: UIViewRepresentable {
         self.webView = webView
     }
     
-    func makeUIView(context: Context) -> WebView  {
-        return self.webView
+    func makeUIView(context: Context) -> WebViewContainerView  {
+        let container = WebViewContainerView()
+        container.setWebView(self.webView)
+        return container
     }
     
-    func updateUIView(_ uiView: WebView, context: Context) {
-        uiView.scrollView.contentInsetAdjustmentBehavior = .never
-        uiView.scrollView.contentInset = .zero
-        uiView.scrollView.scrollIndicatorInsets = .zero
+    func updateUIView(_ container: WebViewContainerView, context: Context) {
+        container.setWebView(self.webView)
+        self.webView.scrollView.contentInsetAdjustmentBehavior = .never
+        self.webView.scrollView.contentInset = .zero
+        self.webView.scrollView.scrollIndicatorInsets = .zero
+    }
+    
+    static func dismantleUIView(_ container: WebViewContainerView, coordinator: ()) {
+        for subview in container.subviews {
+            subview.removeFromSuperview()
+        }
+        container.removeFromSuperview()
     }
 }
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fullstackedorg/fullstacked/internal/bundle"
+	"fullstackedorg/fullstacked/internal/config"
 	"fullstackedorg/fullstacked/internal/dgram"
 	"fullstackedorg/fullstacked/internal/dns"
 	"fullstackedorg/fullstacked/internal/fetch"
@@ -119,6 +120,7 @@ var modules = map[types.CoreModule]types.ModuleSwitch{
 	types.Test:      test.Switch,
 	types.Plugin:    plugin.Switch,
 	types.WebSocket: websocket.Switch,
+	types.Config:    config.Switch,
 }
 
 func callProcess(
@@ -153,7 +155,12 @@ func Switch(
 		response.Type = types.CoreResponseData
 		root := filepath.Join(ctx.Directories.Root, data[0].Data.(string))
 
-		id := store.NewContext(root, root)
+		safe := false
+		if len(data) > 2 && data[2].Type == types.BOOLEAN {
+			safe = data[2].Data.(bool)
+		}
+
+		id := store.NewContext(root, root, safe)
 		response.Data = id
 
 		if len(data) > 1 && data[1].Type == types.OBJECT {

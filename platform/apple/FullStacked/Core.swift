@@ -1,7 +1,15 @@
 import SwiftUI
 
-func coreCall(payload: Data) -> Data{
+private let coreCallLock = NSLock()
+
+func coreCall(payload: Data) -> Data {
+    coreCallLock.lock()
+    defer { coreCallLock.unlock() }
+    
     let responseLength = call(payload.ptr(), Int32(payload.count))
+    if responseLength <= 0 {
+        return Data()
+    }
     let responsePtr = UnsafeMutableRawPointer.allocate(byteCount: Int(responseLength), alignment: 1)
     getCorePayload(payload[0], 1, payload[1], responsePtr, responseLength)
     let response = Data(bytes: responsePtr, count: Int(responseLength))

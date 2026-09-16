@@ -7,6 +7,7 @@ namespace FullStacked
     unsafe internal abstract class CoreImplementation
     {
         public abstract byte startCore(char* root, char* build);
+        public abstract byte startSafeCore(char* root, char* build);
         public abstract void stopCore(byte ctxId);
         public abstract void setOnStreamDataCore(CoreOnStreamData cb);
         public abstract void getCorePayloadCore(byte ctx, byte coreType, byte id, void* ptr, int size);
@@ -61,6 +62,18 @@ namespace FullStacked
                 return this.lib.startCore((char*)rootPtr, (char*)buildPtr);
             }
         }
+
+        public byte startSafe(string root, string build)
+        {
+            byte[] rootBuffer = strToBufferUTF8(root);
+            byte[] buildBuffer = strToBufferUTF8(build);
+
+            fixed (byte* rootPtr = rootBuffer, buildPtr = buildBuffer)
+            {
+                return this.lib.startSafeCore((char*)rootPtr, (char*)buildPtr);
+            }
+        }
+
         public void stop(byte ctxId)
         {
             this.lib.stopCore(ctxId);

@@ -101,7 +101,7 @@ func TestPullPushAlreadyUpToDate(t *testing.T) {
 	}
 
 	// 4. Setup mock Context.
-	ctxId := store.NewContext(localDir, localDir)
+	ctxId := store.NewContext(localDir, localDir, false)
 	ctx := store.Contexts[ctxId]
 	if ctx == nil {
 		t.Fatalf("failed to create store context")

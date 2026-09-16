@@ -11,9 +11,14 @@ namespace FullStacked
     {
         public static Core core;
         public static App singleton;
+        public static App Singleton => singleton;
         public static DispatcherQueue dispatcherQueue;
 
         private readonly Dictionary<byte, WebView> webviews = new();
+        private string appDataFolder;
+        private string buildFolder;
+        private bool isSafeRunning = false;
+        private DateTime lastSafeTriggerTime = DateTime.MinValue;
 
         public App()
         {
@@ -30,16 +35,61 @@ namespace FullStacked
 
             // AppData
             string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string appDataFolder = Path.Combine(localAppData, "fullstacked");
+            appDataFolder = Path.Combine(localAppData, "fullstacked");
             if (!Directory.Exists(appDataFolder))
             {
                 Directory.CreateDirectory(appDataFolder);
             }
 
-            string buildFolder = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledPath, "out");
+            buildFolder = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledPath, "out");
 
             byte mainCtx = core.start(appDataFolder, buildFolder);
             this.open(mainCtx);
+        }
+
+        public void Safe()
+        {
+            if (dispatcherQueue != null && !dispatcherQueue.HasThreadAccess)
+            {
+                dispatcherQueue.TryEnqueue(() => Safe());
+                return;
+            }
+
+            if (isSafeRunning) return;
+            if (DateTime.UtcNow - lastSafeTriggerTime < TimeSpan.FromSeconds(1)) return;
+            lastSafeTriggerTime = DateTime.UtcNow;
+            isSafeRunning = true;
+            try
+            {
+                var activeWebviews = new List<WebView>(this.webviews.Values);
+
+                byte safeCtx = core.startSafe(appDataFolder, buildFolder);
+                this.open(safeCtx);
+
+                foreach (var wv in activeWebviews)
+                {
+                    if (wv.GetCtx() == safeCtx) continue;
+                    try
+                    {
+                        core.stop(wv.GetCtx());
+                    }
+                    catch { }
+                    try
+                    {
+                        wv.Close();
+                    }
+                    catch { }
+                }
+
+                if (this.webviews.TryGetValue(safeCtx, out var safeWebview))
+                {
+                    safeWebview.Activate();
+                }
+            }
+            finally
+            {
+                isSafeRunning = false;
+            }
         }
 
         public void open(byte ctx)
