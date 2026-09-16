@@ -18,6 +18,7 @@ namespace FullStacked
         private string appDataFolder;
         private string buildFolder;
         private bool isSafeRunning = false;
+        private DateTime lastSafeTriggerTime = DateTime.MinValue;
 
         public App()
         {
@@ -55,14 +56,19 @@ namespace FullStacked
             }
 
             if (isSafeRunning) return;
+            if (DateTime.UtcNow - lastSafeTriggerTime < TimeSpan.FromSeconds(1)) return;
+            lastSafeTriggerTime = DateTime.UtcNow;
             isSafeRunning = true;
             try
             {
                 var activeWebviews = new List<WebView>(this.webviews.Values);
-                this.webviews.Clear();
+
+                byte safeCtx = core.startSafe(appDataFolder, buildFolder);
+                this.open(safeCtx);
 
                 foreach (var wv in activeWebviews)
                 {
+                    if (wv.GetCtx() == safeCtx) continue;
                     try
                     {
                         core.stop(wv.GetCtx());
@@ -75,8 +81,10 @@ namespace FullStacked
                     catch { }
                 }
 
-                byte safeCtx = core.startSafe(appDataFolder, buildFolder);
-                this.open(safeCtx);
+                if (this.webviews.TryGetValue(safeCtx, out var safeWebview))
+                {
+                    safeWebview.Activate();
+                }
             }
             finally
             {
