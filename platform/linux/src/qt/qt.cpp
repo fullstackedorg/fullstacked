@@ -26,7 +26,8 @@
 
 static void openExternalUrl(const QUrl &url) {
     if (!QDesktopServices::openUrl(url)) {
-        std::string cmd = "xdg-open '" + url.toString().toStdString() + "' 2>/dev/null &";
+        std::string cmd =
+            "xdg-open '" + url.toString().toStdString() + "' 2>/dev/null &";
         system(cmd.c_str());
     }
 }
@@ -54,7 +55,8 @@ void SchemeHandler::requestStarted(QWebEngineUrlRequestJob *job) {
     }
 
     if (!win && App::instance && !App::instance->activeWindows.empty()) {
-        win = static_cast<QtWindow *>(App::instance->activeWindows.begin()->second);
+        win = static_cast<QtWindow *>(
+            App::instance->activeWindows.begin()->second);
     }
 
     if (win) {
@@ -70,21 +72,27 @@ void Bridge::postMessage(const QString &message) {
     }
 }
 
-QtWebEnginePage::QtWebEnginePage(QWebEngineProfile *profile, QObject *parent, QtWindow *win)
+QtWebEnginePage::QtWebEnginePage(QWebEngineProfile *profile, QObject *parent,
+                                 QtWindow *win)
     : QWebEnginePage(profile, parent), window(win) {
 }
 
 QWebEnginePage *QtWebEnginePage::createWindow(WebWindowType type) {
-    auto *authWin = new AuthWindow(window, window ? window->getQMainWindow() : nullptr);
+    auto *authWin =
+        new AuthWindow(window, window ? window->getQMainWindow() : nullptr);
     authWin->show();
     return authWin->authView->page();
 }
 
-bool QtWebEnginePage::acceptNavigationRequest(const QUrl &url, NavigationType type, bool isMainFrame) {
+bool QtWebEnginePage::acceptNavigationRequest(const QUrl &url,
+                                              NavigationType type,
+                                              bool isMainFrame) {
     QString scheme = url.scheme();
     QString host = url.host();
 
-    if (scheme == "fs" || host == "localhost" || host == "127.0.0.1" || host.startsWith("ctx-") || scheme == "data" || scheme == "about" || scheme == "blob") {
+    if (scheme == "fs" || host == "localhost" || host == "127.0.0.1" ||
+        host.startsWith("ctx-") || scheme == "data" || scheme == "about" ||
+        scheme == "blob") {
         return QWebEnginePage::acceptNavigationRequest(url, type, isMainFrame);
     }
 
@@ -107,20 +115,23 @@ AuthWindow::AuthWindow(QtWindow *pOpener, QWidget *parent)
     auto *page = new AuthWebEnginePage(profile, authView, this);
 
     page->settings()->setAttribute(QWebEngineSettings::JavascriptEnabled, true);
-    page->settings()->setAttribute(QWebEngineSettings::LocalStorageEnabled, true);
-    page->settings()->setAttribute(QWebEngineSettings::LocalContentCanAccessRemoteUrls, true);
+    page->settings()->setAttribute(QWebEngineSettings::LocalStorageEnabled,
+                                   true);
+    page->settings()->setAttribute(
+        QWebEngineSettings::LocalContentCanAccessRemoteUrls, true);
     page->settings()->setAttribute(QWebEngineSettings::WebGLEnabled, true);
-    page->settings()->setAttribute(QWebEngineSettings::Accelerated2dCanvasEnabled, true);
+    page->settings()->setAttribute(
+        QWebEngineSettings::Accelerated2dCanvasEnabled, true);
 
     // Inject opener polyfill so popup can communicate via postMessage
     QWebEngineScript script;
-    QString openerJs =
-        "window.opener = {\n"
-        "    postMessage: function(data) {\n"
-        "        var q = (data && typeof data === 'object') ? new URLSearchParams(data).toString() : String(data);\n"
-        "        location.href = 'fullstacked://auth?' + q;\n"
-        "    }\n"
-        "};\n";
+    QString openerJs = "window.opener = {\n"
+                       "    postMessage: function(data) {\n"
+                       "        var q = (data && typeof data === 'object') ? "
+                       "new URLSearchParams(data).toString() : String(data);\n"
+                       "        location.href = 'fullstacked://auth?' + q;\n"
+                       "    }\n"
+                       "};\n";
     script.setSourceCode(openerJs);
     script.setName("auth_opener.js");
     script.setWorldId(QWebEngineScript::MainWorld);
@@ -128,9 +139,8 @@ AuthWindow::AuthWindow(QtWindow *pOpener, QWidget *parent)
     script.setRunsOnSubFrames(true);
     page->scripts().insert(script);
 
-    QObject::connect(page, &QWebEnginePage::windowCloseRequested, [this]() {
-        close();
-    });
+    QObject::connect(page, &QWebEnginePage::windowCloseRequested,
+                     [this]() { close(); });
 
     authView->setPage(page);
     setCentralWidget(authView);
@@ -139,7 +149,8 @@ AuthWindow::AuthWindow(QtWindow *pOpener, QWidget *parent)
 AuthWindow::~AuthWindow() {
     if (!resolved && opener) {
         resolved = true;
-        opener->evaluateJavaScript("window.postMessage(new Error(`Authentication Canceled`), \"*\");");
+        opener->evaluateJavaScript(
+            "window.postMessage(new Error(`Authentication Canceled`), \"*\");");
     }
 }
 
@@ -147,7 +158,9 @@ void AuthWindow::handleAuthResult(const QString &query) {
     if (resolved) return;
     resolved = true;
     if (opener) {
-        QString script = QString("window.postMessage(Object.fromEntries(new URLSearchParams(`%1`)), \"*\");").arg(query);
+        QString script = QString("window.postMessage(Object.fromEntries(new "
+                                 "URLSearchParams(`%1`)), \"*\");")
+                             .arg(query);
         opener->evaluateJavaScript(script.toStdString());
     }
     close();
@@ -158,7 +171,8 @@ void AuthWindow::handleAuthError(const QString &error) {
     if (resolved) return;
     resolved = true;
     if (opener) {
-        QString script = QString("window.postMessage(new Error(`%1`), \"*\");").arg(error);
+        QString script =
+            QString("window.postMessage(new Error(`%1`), \"*\");").arg(error);
         opener->evaluateJavaScript(script.toStdString());
     }
     close();
@@ -168,20 +182,25 @@ void AuthWindow::handleAuthError(const QString &error) {
 void AuthWindow::closeEvent(QCloseEvent *event) {
     if (!resolved && opener) {
         resolved = true;
-        opener->evaluateJavaScript("window.postMessage(new Error(`Authentication Canceled`), \"*\");");
+        opener->evaluateJavaScript(
+            "window.postMessage(new Error(`Authentication Canceled`), \"*\");");
     }
     QMainWindow::closeEvent(event);
 }
 
-AuthWebEnginePage::AuthWebEnginePage(QWebEngineProfile *profile, QObject *parent, AuthWindow *win)
+AuthWebEnginePage::AuthWebEnginePage(QWebEngineProfile *profile,
+                                     QObject *parent, AuthWindow *win)
     : QWebEnginePage(profile, parent), authWin(win) {
 }
 
-bool AuthWebEnginePage::acceptNavigationRequest(const QUrl &url, NavigationType type, bool isMainFrame) {
+bool AuthWebEnginePage::acceptNavigationRequest(const QUrl &url,
+                                                NavigationType type,
+                                                bool isMainFrame) {
     QString scheme = url.scheme();
     QUrlQuery query(url);
 
-    if (scheme == "fullstacked" || scheme == "fullstacked-auth" || scheme == "fullstacked-ctx" || scheme == "fullstacked-native") {
+    if (scheme == "fullstacked" || scheme == "fullstacked-auth" ||
+        scheme == "fullstacked-ctx" || scheme == "fullstacked-native") {
         if (authWin) {
             authWin->handleAuthResult(url.query());
         }
@@ -189,7 +208,8 @@ bool AuthWebEnginePage::acceptNavigationRequest(const QUrl &url, NavigationType 
     }
 
     if ((url.host() == "localhost" || url.host() == "127.0.0.1") &&
-        (query.hasQueryItem("code") || query.hasQueryItem("token") || query.hasQueryItem("access_token"))) {
+        (query.hasQueryItem("code") || query.hasQueryItem("token") ||
+         query.hasQueryItem("access_token"))) {
         if (authWin) {
             authWin->handleAuthResult(url.query());
         }
@@ -205,7 +225,8 @@ bool AuthWebEnginePage::acceptNavigationRequest(const QUrl &url, NavigationType 
             setUrl(nativeUrl);
             return false;
         }
-    } else if (authWin && !authWin->isAuthFlow && scheme != "about" && scheme != "data" && scheme != "blob") {
+    } else if (authWin && !authWin->isAuthFlow && scheme != "about" &&
+               scheme != "data" && scheme != "blob") {
         openExternalUrl(url);
         authWin->close();
         return false;
@@ -217,16 +238,16 @@ bool AuthWebEnginePage::acceptNavigationRequest(const QUrl &url, NavigationType 
 int QtGUI::run(int &argc, char **argv, std::function<void()> onReady) {
     QByteArray existingFlags = qgetenv("QTWEBENGINE_CHROMIUM_FLAGS");
     if (existingFlags.isEmpty()) {
-        qputenv("QTWEBENGINE_CHROMIUM_FLAGS",
-                "--no-sandbox "
-                "--disable-dev-shm-usage "
-                "--disable-gpu-compositing "
-                "--ignore-gpu-blocklist "
-                "--ignore-gpu-blacklist "
-                "--enable-webgl");
+        qputenv("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox "
+                                              "--disable-dev-shm-usage "
+                                              "--disable-gpu-compositing "
+                                              "--ignore-gpu-blocklist "
+                                              "--ignore-gpu-blacklist "
+                                              "--enable-webgl");
     } else {
         if (!existingFlags.contains("ignore-gpu-blocklist")) {
-            existingFlags += " --ignore-gpu-blocklist --ignore-gpu-blacklist --enable-webgl";
+            existingFlags +=
+                " --ignore-gpu-blocklist --ignore-gpu-blacklist --enable-webgl";
             qputenv("QTWEBENGINE_CHROMIUM_FLAGS", existingFlags);
         }
     }
@@ -247,7 +268,8 @@ int QtGUI::run(int &argc, char **argv, std::function<void()> onReady) {
     app = new QApplication(argc, argv);
 
     schemeHandler = new SchemeHandler(app);
-    QWebEngineProfile::defaultProfile()->installUrlSchemeHandler("fs", schemeHandler);
+    QWebEngineProfile::defaultProfile()->installUrlSchemeHandler("fs",
+                                                                 schemeHandler);
 
     QTimer::singleShot(0, onReady);
     return app->exec();
@@ -267,14 +289,18 @@ QtWindow::~QtWindow() {
 }
 
 static const char *s_qwebchannel_js =
-    "var QWebChannelMessageTypes = { signal: 1, propertyUpdate: 2, init: 3, idle: 4, typeDebug: 5, invokeMethod: 6, connectToSignal: 7, disconnectFromSignal: 8, setProperty: 9, response: 10 };\n"
+    "var QWebChannelMessageTypes = { signal: 1, propertyUpdate: 2, init: 3, "
+    "idle: 4, typeDebug: 5, invokeMethod: 6, connectToSignal: 7, "
+    "disconnectFromSignal: 8, setProperty: 9, response: 10 };\n"
     "var QWebChannel = function(transport, initCallback) {\n"
-    "    if (typeof transport !== 'object' || typeof transport.send !== 'function') {\n"
+    "    if (typeof transport !== 'object' || typeof transport.send !== "
+    "'function') {\n"
     "        return;\n"
     "    }\n"
     "    var channel = this;\n"
     "    this.transport = transport;\n"
-    "    this.send = function(data) { channel.transport.send(JSON.stringify(data)); };\n"
+    "    this.send = function(data) { "
+    "channel.transport.send(JSON.stringify(data)); };\n"
     "    this.execCallbacks = {};\n"
     "    this.execId = 0;\n"
     "    this.objects = {};\n"
@@ -293,15 +319,20 @@ static const char *s_qwebchannel_js =
     "        for (var i in message.data) {\n"
     "            var data = message.data[i];\n"
     "            var object = channel.objects[data.object];\n"
-    "            if (object) object.propertyUpdate(data.signals, data.properties);\n"
+    "            if (object) object.propertyUpdate(data.signals, "
+    "data.properties);\n"
     "        }\n"
     "    };\n"
     "    this.transport.onmessage = function(message) {\n"
-    "        var data = typeof message.data === 'string' ? JSON.parse(message.data) : message.data;\n"
+    "        var data = typeof message.data === 'string' ? "
+    "JSON.parse(message.data) : message.data;\n"
     "        switch (data.type) {\n"
-    "            case QWebChannelMessageTypes.signal: channel.handleSignal(data); break;\n"
-    "            case QWebChannelMessageTypes.response: channel.handleResponse(data); break;\n"
-    "            case QWebChannelMessageTypes.propertyUpdate: channel.handlePropertyUpdate(data); break;\n"
+    "            case QWebChannelMessageTypes.signal: "
+    "channel.handleSignal(data); break;\n"
+    "            case QWebChannelMessageTypes.response: "
+    "channel.handleResponse(data); break;\n"
+    "            case QWebChannelMessageTypes.propertyUpdate: "
+    "channel.handlePropertyUpdate(data); break;\n"
     "        }\n"
     "    };\n"
     "    this.exec = function(data, callback) {\n"
@@ -331,7 +362,8 @@ static const char *s_qwebchannel_js =
     "            self[methodName] = function() {\n"
     "                var args = Array.prototype.slice.call(arguments);\n"
     "                var callback;\n"
-    "                if (args.length > 0 && typeof args[args.length - 1] === 'function') {\n"
+    "                if (args.length > 0 && typeof args[args.length - 1] === "
+    "'function') {\n"
     "                    callback = args.pop();\n"
     "                }\n"
     "                webChannel.exec({\n"
@@ -354,8 +386,10 @@ static const char *s_qwebchannel_js =
     "    if (typeof qt !== 'undefined' && qt.webChannelTransport) {\n"
     "        new QWebChannel(qt.webChannelTransport, function(channel) {\n"
     "            window.bridge = channel.objects.bridge;\n"
-    "            while (window._pendingBridge && window._pendingBridge.length) {\n"
-    "                window.bridge.postMessage(window._pendingBridge.shift());\n"
+    "            while (window._pendingBridge && window._pendingBridge.length) "
+    "{\n"
+    "                "
+    "window.bridge.postMessage(window._pendingBridge.shift());\n"
     "            }\n"
     "        });\n"
     "    } else {\n"
@@ -364,36 +398,39 @@ static const char *s_qwebchannel_js =
     "})();\n";
 
 class SafeKeyFilter : public QObject {
-public:
-    SafeKeyFilter(QObject *parent = nullptr) : QObject(parent) {}
-    ~SafeKeyFilter() override {
-        if (qApp) {
-            qApp->removeEventFilter(this);
+    public:
+        SafeKeyFilter(QObject *parent = nullptr) : QObject(parent) {
         }
-    }
-
-protected:
-    bool eventFilter(QObject *obj, QEvent *event) override {
-        if (event->type() == QEvent::KeyPress || event->type() == QEvent::ShortcutOverride) {
-            auto *keyEvent = static_cast<QKeyEvent *>(event);
-            if (keyEvent->key() == Qt::Key_T) {
-                auto mods = keyEvent->modifiers();
-                bool isShift = (mods & Qt::ShiftModifier) != 0;
-                bool isCtrlOrMeta = (mods & (Qt::ControlModifier | Qt::MetaModifier)) != 0;
-                if (isShift && isCtrlOrMeta) {
-                    if (event->type() == QEvent::ShortcutOverride) {
-                        event->accept();
-                        return true;
-                    }
-                    if (App::instance) {
-                        App::instance->safeTrigger();
-                    }
-                    return true;
-                }
+        ~SafeKeyFilter() override {
+            if (qApp) {
+                qApp->removeEventFilter(this);
             }
         }
-        return QObject::eventFilter(obj, event);
-    }
+
+    protected:
+        bool eventFilter(QObject *obj, QEvent *event) override {
+            if (event->type() == QEvent::KeyPress ||
+                event->type() == QEvent::ShortcutOverride) {
+                auto *keyEvent = static_cast<QKeyEvent *>(event);
+                if (keyEvent->key() == Qt::Key_T) {
+                    auto mods = keyEvent->modifiers();
+                    bool isShift = (mods & Qt::ShiftModifier) != 0;
+                    bool isCtrlOrMeta =
+                        (mods & (Qt::ControlModifier | Qt::MetaModifier)) != 0;
+                    if (isShift && isCtrlOrMeta) {
+                        if (event->type() == QEvent::ShortcutOverride) {
+                            event->accept();
+                            return true;
+                        }
+                        if (App::instance) {
+                            App::instance->safeTrigger();
+                        }
+                        return true;
+                    }
+                }
+            }
+            return QObject::eventFilter(obj, event);
+        }
 };
 
 void QtWindow::init() {
@@ -401,7 +438,8 @@ void QtWindow::init() {
     windowQt->setWindowTitle("FullStacked");
     windowQt->resize(800, 600);
 
-    auto *shortcutCtrl = new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_T), windowQt);
+    auto *shortcutCtrl =
+        new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_T), windowQt);
     shortcutCtrl->setContext(Qt::ApplicationShortcut);
     QObject::connect(shortcutCtrl, &QShortcut::activated, []() {
         if (App::instance) {
@@ -409,7 +447,8 @@ void QtWindow::init() {
         }
     });
 
-    auto *shortcutMeta = new QShortcut(QKeySequence(Qt::META | Qt::SHIFT | Qt::Key_T), windowQt);
+    auto *shortcutMeta =
+        new QShortcut(QKeySequence(Qt::META | Qt::SHIFT | Qt::Key_T), windowQt);
     shortcutMeta->setContext(Qt::ApplicationShortcut);
     QObject::connect(shortcutMeta, &QShortcut::activated, []() {
         if (App::instance) {
@@ -437,12 +476,16 @@ void QtWindow::init() {
     profile->scripts()->insert(script);
 
     auto *page = new QtWebEnginePage(profile, webEngineView, this);
-    page->settings()->setAttribute(QWebEngineSettings::LocalContentCanAccessRemoteUrls, true);
-    page->settings()->setAttribute(QWebEngineSettings::LocalContentCanAccessFileUrls, true);
-    page->settings()->setAttribute(QWebEngineSettings::LocalStorageEnabled, true);
+    page->settings()->setAttribute(
+        QWebEngineSettings::LocalContentCanAccessRemoteUrls, true);
+    page->settings()->setAttribute(
+        QWebEngineSettings::LocalContentCanAccessFileUrls, true);
+    page->settings()->setAttribute(QWebEngineSettings::LocalStorageEnabled,
+                                   true);
     page->settings()->setAttribute(QWebEngineSettings::JavascriptEnabled, true);
     page->settings()->setAttribute(QWebEngineSettings::WebGLEnabled, true);
-    page->settings()->setAttribute(QWebEngineSettings::Accelerated2dCanvasEnabled, true);
+    page->settings()->setAttribute(
+        QWebEngineSettings::Accelerated2dCanvasEnabled, true);
     webEngineView->setPage(page);
 
     auto *channel = new QWebChannel(page);
@@ -451,9 +494,7 @@ void QtWindow::init() {
     channel->registerObject("bridge", bridge);
     page->setWebChannel(channel);
 
-    QObject::connect(windowQt, &QMainWindow::destroyed, [this]() {
-        close();
-    });
+    QObject::connect(windowQt, &QMainWindow::destroyed, [this]() { close(); });
 
     QUrl url = QUrl(QString("fs://ctx-%1/index.html").arg(ctx));
     webEngineView->load(url);
@@ -494,7 +535,8 @@ void QtWindow::handleSchemeRequest(QWebEngineUrlRequestJob *job) {
             syncAwaitersPayload.erase(it);
             std::string b64 = base64_encode(payload.data(), payload.size());
             auto *buffer = new QBuffer();
-            buffer->setData(QByteArray(b64.data(), static_cast<int>(b64.size())));
+            buffer->setData(
+                QByteArray(b64.data(), static_cast<int>(b64.size())));
             buffer->open(QIODevice::ReadOnly);
             job->reply("application/octet-stream", buffer);
         } else {
@@ -504,9 +546,7 @@ void QtWindow::handleSchemeRequest(QWebEngineUrlRequestJob *job) {
     }
 
     if (path == "/exit") {
-        QTimer::singleShot(0, [this]() {
-            close();
-        });
+        QTimer::singleShot(0, [this]() { close(); });
         auto *buffer = new QBuffer();
         buffer->open(QIODevice::ReadOnly);
         job->reply("text/plain", buffer);
@@ -518,9 +558,9 @@ void QtWindow::handleSchemeRequest(QWebEngineUrlRequestJob *job) {
         if (query.hasQueryItem("size")) {
             std::string sizeVal = query.queryItemValue("size").toStdString();
             if (windowQt) {
-                QMetaObject::invokeMethod(windowQt, [this, sizeVal]() {
-                    resize(sizeVal);
-                }, Qt::QueuedConnection);
+                QMetaObject::invokeMethod(
+                    windowQt, [this, sizeVal]() { resize(sizeVal); },
+                    Qt::QueuedConnection);
             }
             auto *buffer = new QBuffer();
             buffer->open(QIODevice::ReadOnly);
@@ -528,7 +568,8 @@ void QtWindow::handleSchemeRequest(QWebEngineUrlRequestJob *job) {
         } else {
             std::string sizeStr = getSize();
             auto *buffer = new QBuffer();
-            buffer->setData(QByteArray(sizeStr.data(), static_cast<int>(sizeStr.size())));
+            buffer->setData(
+                QByteArray(sizeStr.data(), static_cast<int>(sizeStr.size())));
             buffer->open(QIODevice::ReadOnly);
             job->reply("text/plain", buffer);
         }
@@ -538,10 +579,10 @@ void QtWindow::handleSchemeRequest(QWebEngineUrlRequestJob *job) {
     if (path.startsWith("/open")) {
         QUrlQuery query(url);
         if (query.hasQueryItem("ctx")) {
-            uint8_t targetCtx = static_cast<uint8_t>(query.queryItemValue("ctx").toUInt());
-            QTimer::singleShot(0, [targetCtx]() {
-                App::instance->open(targetCtx);
-            });
+            uint8_t targetCtx =
+                static_cast<uint8_t>(query.queryItemValue("ctx").toUInt());
+            QTimer::singleShot(
+                0, [targetCtx]() { App::instance->open(targetCtx); });
         }
         auto *buffer = new QBuffer();
         buffer->open(QIODevice::ReadOnly);
@@ -551,14 +592,12 @@ void QtWindow::handleSchemeRequest(QWebEngineUrlRequestJob *job) {
 
     // Static file serving via Core
     std::string pathStd = path.toStdString();
-    std::vector<uint8_t> header = {
-        ctx,
-        0, // req id
-        0, // Core Module
-        0, // Fn Static File
-        0, // Async
-        static_cast<uint8_t>(STRING)
-    };
+    std::vector<uint8_t> header = {ctx,
+                                   0, // req id
+                                   0, // Core Module
+                                   0, // Fn Static File
+                                   0, // Async
+                                   static_cast<uint8_t>(STRING)};
 
     uint8_t pathLen[4];
     numberToUint4Bytes(pathStd.size(), pathLen);
@@ -582,8 +621,9 @@ void QtWindow::handleSchemeRequest(QWebEngineUrlRequestJob *job) {
     }
 
     auto *buffer = new QBuffer();
-    buffer->setData(QByteArray(reinterpret_cast<const char*>(values[1].buffer.data()),
-                               static_cast<int>(values[1].buffer.size())));
+    buffer->setData(
+        QByteArray(reinterpret_cast<const char *>(values[1].buffer.data()),
+                   static_cast<int>(values[1].buffer.size())));
     buffer->open(QIODevice::ReadOnly);
     job->reply(QByteArray::fromStdString(values[0].str), buffer);
 }
@@ -601,16 +641,19 @@ void QtWindow::onBridgeMessage(const std::string &payloadB64) {
         resolveSyncAwaiter(id, response);
     } else {
         std::string respB64 = base64_encode(response.data(), response.size());
-        QString script = QString("if (window.fullstacked && window.fullstacked.respond) { window.fullstacked.respond(%1, `%2`); }")
-            .arg(id)
-            .arg(QString::fromStdString(respB64));
+        QString script =
+            QString("if (window.fullstacked && window.fullstacked.respond) { "
+                    "window.fullstacked.respond(%1, `%2`); }")
+                .arg(id)
+                .arg(QString::fromStdString(respB64));
         if (webEngineView && webEngineView->page()) {
             webEngineView->page()->runJavaScript(script);
         }
     }
 }
 
-void QtWindow::resolveSyncAwaiter(uint8_t id, const std::vector<uint8_t> &payload) {
+void QtWindow::resolveSyncAwaiter(uint8_t id,
+                                  const std::vector<uint8_t> &payload) {
     std::lock_guard<std::mutex> lock(syncMutex);
     auto it = syncAwaitersResolve.find(id);
     if (it != syncAwaitersResolve.end()) {
@@ -626,25 +669,36 @@ void QtWindow::resolveSyncAwaiter(uint8_t id, const std::vector<uint8_t> &payloa
     }
 }
 
-void QtWindow::onStreamData(uint8_t streamId, const std::vector<uint8_t> &data) {
+void QtWindow::onStreamData(uint8_t streamId,
+                            const std::vector<uint8_t> &data) {
     if (!webEngineView) return;
     std::string b64 = base64_encode(data.data(), data.size());
-    QMetaObject::invokeMethod(webEngineView, [this, streamId, b64]() {
-        if (!webEngineView || !webEngineView->page()) return;
-        QString script = QString("if (window.fullstacked && window.fullstacked.onStreamData) { window.fullstacked.onStreamData(%1, `%2`); }")
-            .arg(streamId)
-            .arg(QString::fromStdString(b64));
-        webEngineView->page()->runJavaScript(script);
-    }, Qt::QueuedConnection);
+    QMetaObject::invokeMethod(
+        webEngineView,
+        [this, streamId, b64]() {
+            if (!webEngineView || !webEngineView->page()) return;
+            QString script =
+                QString("if (window.fullstacked && "
+                        "window.fullstacked.onStreamData) { "
+                        "window.fullstacked.onStreamData(%1, `%2`); }")
+                    .arg(streamId)
+                    .arg(QString::fromStdString(b64));
+            webEngineView->page()->runJavaScript(script);
+        },
+        Qt::QueuedConnection);
 }
 
 void QtWindow::evaluateJavaScript(const std::string &script) {
     if (!webEngineView) return;
-    QMetaObject::invokeMethod(webEngineView, [this, script]() {
-        if (webEngineView && webEngineView->page()) {
-            webEngineView->page()->runJavaScript(QString::fromStdString(script));
-        }
-    }, Qt::QueuedConnection);
+    QMetaObject::invokeMethod(
+        webEngineView,
+        [this, script]() {
+            if (webEngineView && webEngineView->page()) {
+                webEngineView->page()->runJavaScript(
+                    QString::fromStdString(script));
+            }
+        },
+        Qt::QueuedConnection);
 }
 
 void QtWindow::bringToFront(bool reload) {
@@ -683,7 +737,8 @@ std::string QtWindow::getSize() {
     int h = windowQt->height();
     int x = windowQt->x();
     int y = windowQt->y();
-    return std::to_string(w) + ":" + std::to_string(h) + ":" + std::to_string(x) + ":" + std::to_string(y);
+    return std::to_string(w) + ":" + std::to_string(h) + ":" +
+           std::to_string(x) + ":" + std::to_string(y);
 }
 
 void QtWindow::resize(const std::string &sizeVal) {
@@ -708,7 +763,8 @@ void QtWindow::resize(const std::string &sizeVal) {
     while (std::getline(ss, segment, ':')) {
         try {
             parts.push_back(std::stoi(segment));
-        } catch (...) {}
+        } catch (...) {
+        }
     }
     if (parts.size() == 2) {
         int w = parts[0];

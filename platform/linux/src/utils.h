@@ -16,19 +16,21 @@ enum SerializableDataType : uint8_t {
 };
 
 struct DataValue {
-    SerializableDataType type = UNDEFINED;
-    bool boolean = false;
-    double number = 0;
-    std::string str;
-    std::vector<uint8_t> buffer;
+        SerializableDataType type = UNDEFINED;
+        bool boolean = false;
+        double number = 0;
+        std::string str;
+        std::vector<uint8_t> buffer;
 };
 
 uint32_t uint4BytesToNumber(const uint8_t *bytes);
 void numberToUint4Bytes(uint32_t num, uint8_t *bytes);
 
-std::pair<DataValue, int> deserialize(const std::vector<uint8_t> &buffer, size_t index);
+std::pair<DataValue, int> deserialize(const std::vector<uint8_t> &buffer,
+                                      size_t index);
 std::vector<DataValue> deserializeAll(const std::vector<uint8_t> &buffer);
-std::vector<uint8_t> mergeBuffers(const std::vector<std::vector<uint8_t>> &buffers);
+std::vector<uint8_t>
+mergeBuffers(const std::vector<std::vector<uint8_t>> &buffers);
 
 std::string getExePath();
 std::string getAppDir();

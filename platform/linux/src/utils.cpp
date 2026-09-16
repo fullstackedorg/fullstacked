@@ -21,7 +21,8 @@ void numberToUint4Bytes(uint32_t num, uint8_t *bytes) {
     bytes[3] = static_cast<uint8_t>(num & 0xff);
 }
 
-std::pair<DataValue, int> deserialize(const std::vector<uint8_t> &buffer, size_t index) {
+std::pair<DataValue, int> deserialize(const std::vector<uint8_t> &buffer,
+                                      size_t index) {
     DataValue val;
     if (index >= buffer.size()) {
         return {val, 0};
@@ -47,7 +48,8 @@ std::pair<DataValue, int> deserialize(const std::vector<uint8_t> &buffer, size_t
         uint32_t size = uint4BytesToNumber(&buffer[index + 1]);
         size_t start = index + 5;
         size_t end = std::min(start + size, buffer.size());
-        val.str = std::string(reinterpret_cast<const char *>(&buffer[start]), end - start);
+        val.str = std::string(reinterpret_cast<const char *>(&buffer[start]),
+                              end - start);
         return {val, static_cast<int>(5 + size)};
     }
 
@@ -72,7 +74,8 @@ std::pair<DataValue, int> deserialize(const std::vector<uint8_t> &buffer, size_t
         uint32_t size = uint4BytesToNumber(&buffer[index + 1]);
         size_t start = index + 5;
         size_t end = std::min(start + size, buffer.size());
-        val.buffer = std::vector<uint8_t>(buffer.begin() + start, buffer.begin() + end);
+        val.buffer =
+            std::vector<uint8_t>(buffer.begin() + start, buffer.begin() + end);
         return {val, static_cast<int>(5 + size)};
     }
 
@@ -83,7 +86,8 @@ std::pair<DataValue, int> deserialize(const std::vector<uint8_t> &buffer, size_t
         uint32_t size = uint4BytesToNumber(&buffer[index + 1]);
         size_t start = index + 5;
         size_t end = std::min(start + size, buffer.size());
-        val.str = std::string(reinterpret_cast<const char *>(&buffer[start]), end - start);
+        val.str = std::string(reinterpret_cast<const char *>(&buffer[start]),
+                              end - start);
         return {val, static_cast<int>(5 + size)};
     }
 
@@ -104,7 +108,8 @@ std::vector<DataValue> deserializeAll(const std::vector<uint8_t> &buffer) {
     return data;
 }
 
-std::vector<uint8_t> mergeBuffers(const std::vector<std::vector<uint8_t>> &buffers) {
+std::vector<uint8_t>
+mergeBuffers(const std::vector<std::vector<uint8_t>> &buffers) {
     size_t total = 0;
     for (const auto &b : buffers) {
         total += b.size();
@@ -128,11 +133,13 @@ std::string getAppDir() {
     size_t pos = path.find_last_of("/");
     std::string dir = (pos != std::string::npos) ? path.substr(0, pos) : "";
     pos = dir.find_last_of("/");
-    std::string parentDir = (pos != std::string::npos) ? dir.substr(0, pos) : dir;
+    std::string parentDir =
+        (pos != std::string::npos) ? dir.substr(0, pos) : dir;
 
     std::error_code ec;
 
-    // 1. Portable: dir/app (e.g. tarball extracted with app folder next to executable)
+    // 1. Portable: dir/app (e.g. tarball extracted with app folder next to
+    // executable)
     std::string portableAppDir = dir + "/app";
     if (std::filesystem::exists(portableAppDir, ec)) {
         return portableAppDir;
@@ -144,7 +151,8 @@ std::string getAppDir() {
         return portableShareAppDir;
     }
 
-    // 3. FHS standard (e.g. /usr/bin/fullstacked -> /usr/share/fullstacked/app, or bin/fullstacked -> share/fullstacked/app)
+    // 3. FHS standard (e.g. /usr/bin/fullstacked -> /usr/share/fullstacked/app,
+    // or bin/fullstacked -> share/fullstacked/app)
     std::string appDir = parentDir + "/share/fullstacked/app";
     if (std::filesystem::exists(appDir, ec)) {
         return appDir;
@@ -164,7 +172,8 @@ std::string getAppDir() {
     return appDir;
 }
 
-void replaceAll(std::string &str, const std::string &from, const std::string &to) {
+void replaceAll(std::string &str, const std::string &from,
+                const std::string &to) {
     if (from.empty()) return;
     size_t start_pos = 0;
     while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
@@ -185,14 +194,18 @@ void registerDesktopApp() {
     std::string appDir = getAppDir();
     std::string iconFound = "";
     if (std::filesystem::exists(appDir, ec)) {
-        for (const auto &entry : std::filesystem::directory_iterator(appDir, ec)) {
-            if (entry.path().filename().string().find("app-icon") != std::string::npos && entry.path().extension() == ".png") {
+        for (const auto &entry :
+             std::filesystem::directory_iterator(appDir, ec)) {
+            if (entry.path().filename().string().find("app-icon") !=
+                    std::string::npos &&
+                entry.path().extension() == ".png") {
                 iconFound = entry.path().string();
                 break;
             }
         }
     }
-    if (iconFound.empty() && std::filesystem::exists(appDir + "/assets/icon.png", ec)) {
+    if (iconFound.empty() &&
+        std::filesystem::exists(appDir + "/assets/icon.png", ec)) {
         iconFound = appDir + "/assets/icon.png";
     }
     if (!iconFound.empty()) {
@@ -222,7 +235,8 @@ void registerDesktopApp() {
         replaceAll(localAppsDir, "\\", "\\\\");
         replaceAll(localAppsDir, "'", "\\'");
 
-        std::string command = "update-desktop-database '" + localAppsDir + "' 2>/dev/null";
+        std::string command =
+            "update-desktop-database '" + localAppsDir + "' 2>/dev/null";
         system(command.c_str());
     }
 }

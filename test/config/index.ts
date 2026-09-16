@@ -45,10 +45,7 @@ suite("config - e2e", () => {
         assert.strictEqual(retrieved, value);
 
         // Verify .git/config.json exists on disk
-        assert.ok(
-            nodeFs.existsSync(configFile),
-            ".git/config.json must exist"
-        );
+        assert.ok(nodeFs.existsSync(configFile), ".git/config.json must exist");
 
         const raw = JSON.parse(nodeFs.readFileSync(configFile, "utf-8"));
         assert.strictEqual(raw[key], value);

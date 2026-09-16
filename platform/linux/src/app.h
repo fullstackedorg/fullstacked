@@ -14,32 +14,33 @@
 #endif
 
 class App {
-private:
+    private:
 #ifdef GTK
-    GUI *gui = new WebkitGTKGUI();
+        GUI *gui = new WebkitGTKGUI();
 #else
-    GUI *gui = new QtGUI();
+        GUI *gui = new QtGUI();
 #endif
 
-public:
-    inline static App *instance = nullptr;
-    std::map<uint8_t, Window *> activeWindows;
-    std::string rootDir;
-    std::string buildDir;
-    std::string deeplink;
-    bool kiosk = false;
-    bool safe = false;
-    bool isSafeRunning = false;
+    public:
+        inline static App *instance = nullptr;
+        std::map<uint8_t, Window *> activeWindows;
+        std::string rootDir;
+        std::string buildDir;
+        std::string deeplink;
+        bool kiosk = false;
+        bool safe = false;
+        bool isSafeRunning = false;
 
-    App();
-    ~App();
+        App();
+        ~App();
 
-    void open(uint8_t ctx);
-    void close(uint8_t ctx);
-    void safeTrigger();
-    void onStreamData(uint8_t ctx, uint8_t streamId, const std::vector<uint8_t> &data);
+        void open(uint8_t ctx);
+        void close(uint8_t ctx);
+        void safeTrigger();
+        void onStreamData(uint8_t ctx, uint8_t streamId,
+                          const std::vector<uint8_t> &data);
 
-    int run(int argc, char *argv[]);
+        int run(int argc, char *argv[]);
 };
 
 #endif

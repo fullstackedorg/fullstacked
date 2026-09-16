@@ -63,7 +63,8 @@ void App::safeTrigger() {
     isSafeRunning = false;
 }
 
-void App::onStreamData(uint8_t ctx, uint8_t streamId, const std::vector<uint8_t> &data) {
+void App::onStreamData(uint8_t ctx, uint8_t streamId,
+                       const std::vector<uint8_t> &data) {
     auto it = activeWindows.find(ctx);
     if (it != activeWindows.end()) {
         it->second->onStreamData(streamId, data);
@@ -72,7 +73,8 @@ void App::onStreamData(uint8_t ctx, uint8_t streamId, const std::vector<uint8_t>
 
 int App::run(int argc, char *argv[]) {
     Core::init();
-    Core::setStreamCallback([this](uint8_t ctx, uint8_t streamId, const std::vector<uint8_t> &data) {
+    Core::setStreamCallback([this](uint8_t ctx, uint8_t streamId,
+                                   const std::vector<uint8_t> &data) {
         onStreamData(ctx, streamId, data);
     });
 
@@ -81,7 +83,8 @@ int App::run(int argc, char *argv[]) {
     buildDir = getAppDir();
 
     return gui->run(argc, argv, [this]() {
-        uint8_t mainCtx = this->safe ? Core::startSafe(rootDir, buildDir) : Core::start(rootDir, buildDir);
+        uint8_t mainCtx = this->safe ? Core::startSafe(rootDir, buildDir)
+                                     : Core::start(rootDir, buildDir);
         open(mainCtx);
     });
 }

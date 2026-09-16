@@ -5,7 +5,7 @@ import path from "../path/index.ts";
 type RunOptions = {
     directory?: string;
     env?: Record<string, string>;
-    safe?: boolean
+    safe?: boolean;
 };
 
 export async function run(
