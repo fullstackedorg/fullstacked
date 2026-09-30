@@ -147,3 +147,72 @@ func TestConfig(t *testing.T) {
 		t.Fatalf("expected secondValue, got %v", resp.Data)
 	}
 }
+
+func TestConfigSubmodule(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "fullstacked-config-submodule-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	gitModulesDir := filepath.Join(tempDir, "real-git-dir")
+	if err := os.MkdirAll(gitModulesDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	submoduleDir := filepath.Join(tempDir, "submodule")
+	if err := os.MkdirAll(submoduleDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create .git file in submodule pointing to real-git-dir
+	gitFile := filepath.Join(submoduleDir, ".git")
+	err = os.WriteFile(gitFile, []byte("gitdir: ../real-git-dir\n"), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := &types.Context{
+		Directories: types.ContextDirectories{
+			Root: submoduleDir,
+		},
+	}
+
+	header := types.CoreCallHeader{Fn: Set}
+	resp := &types.CoreCallResponse{}
+
+	// Set a key
+	err = Switch(ctx, header, []types.DeserializedData{
+		{Data: "subKey", Type: types.STRING},
+		{Data: "subValue", Type: types.STRING},
+	}, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify file was written to the resolved git directory, not submodule/.git/config.json
+	expectedPath := filepath.Join(gitModulesDir, "config.json")
+	content, err := os.ReadFile(expectedPath)
+	if err != nil {
+		t.Fatalf("failed to read %s: %v", expectedPath, err)
+	}
+	var savedJSON map[string]string
+	if err := json.Unmarshal(content, &savedJSON); err != nil {
+		t.Fatalf("failed to parse json: %v", err)
+	}
+	if savedJSON["subKey"] != "subValue" {
+		t.Fatalf("expected subValue, got %v", savedJSON["subKey"])
+	}
+
+	// Get the key
+	header.Fn = Get
+	err = Switch(ctx, header, []types.DeserializedData{
+		{Data: "subKey", Type: types.STRING},
+	}, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Data != "subValue" {
+		t.Fatalf("expected subValue, got %v", resp.Data)
+	}
+}

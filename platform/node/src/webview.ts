@@ -44,18 +44,21 @@ export async function createWebViewWithCore(
     const server = http.createServer(createHandler(core, ctx));
     activeServers.add(server);
 
-    const close = () => {
+    let close: () => void;
+    const wsManager = createWebSocketServer(core, ctx, server, () => close?.());
+    close = () => {
         core.stop(ctx);
+        wsManager.close();
+        server?.closeAllConnections?.();
         server.close();
         activeServers.delete(server);
     };
 
-    const webSockets = createWebSocketServer(core, ctx, server, close);
     const callback = (id: number, buffer: ArrayBuffer) => {
         const payload = new Uint8Array(buffer.byteLength + 1);
         payload[0] = id;
         payload.set(new Uint8Array(buffer), 1);
-        webSockets.forEach((ws) => ws.send(payload));
+        wsManager.webSockets.forEach((ws) => ws.send(payload));
     };
 
     server.listen(port);
@@ -278,5 +281,22 @@ function createWebSocketServer(
         wss.handleUpgrade(...args, handleUpgrade);
     };
     server.on("upgrade", onUpgrade);
-    return webSockets;
+    return {
+        webSockets,
+        close: () => {
+            if (closeTimeout) {
+                clearTimeout(closeTimeout);
+                closeTimeout = undefined;
+            }
+            for (const ws of webSockets) {
+                try {
+                    ws.terminate();
+                } catch {}
+            }
+            webSockets.clear();
+            try {
+                wss.close();
+            } catch {}
+        }
+    };
 }

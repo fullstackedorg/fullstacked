@@ -6,6 +6,7 @@ import (
 	"fullstackedorg/fullstacked/types"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -20,11 +21,37 @@ const (
 
 var configMutex sync.Mutex
 
+func getGitDir(root string) string {
+	gitPath := filepath.Join(root, ".git")
+	fi, err := os.Stat(gitPath)
+	if err != nil {
+		return gitPath
+	}
+	if !fi.IsDir() {
+		data, err := os.ReadFile(gitPath)
+		if err == nil {
+			content := strings.TrimSpace(string(data))
+			for _, line := range strings.Split(content, "\n") {
+				line = strings.TrimSpace(line)
+				if strings.HasPrefix(strings.ToLower(line), "gitdir:") {
+					gitDir := strings.TrimSpace(line[len("gitdir:"):])
+					if !filepath.IsAbs(gitDir) {
+						gitDir = filepath.Clean(filepath.Join(root, gitDir))
+					}
+					return gitDir
+				}
+			}
+		}
+	}
+	return gitPath
+}
+
 func getConfigFilePath(ctx *types.Context) string {
-	if ctx == nil {
+	if ctx == nil || ctx.Directories.Root == "" {
 		return ""
 	}
-	return filepath.Join(ctx.Directories.Root, ".git", "config.json")
+	gitDir := getGitDir(ctx.Directories.Root)
+	return filepath.Join(gitDir, "config.json")
 }
 
 func GetConfig(ctx *types.Context, key string) string {
@@ -43,6 +70,9 @@ func GetConfig(ctx *types.Context, key string) string {
 
 func loadConfig(ctx *types.Context) (map[string]string, error) {
 	configPath := getConfigFilePath(ctx)
+	if configPath == "" {
+		return map[string]string{}, nil
+	}
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -66,6 +96,9 @@ func loadConfig(ctx *types.Context) (map[string]string, error) {
 
 func saveConfig(ctx *types.Context, conf map[string]string) error {
 	configPath := getConfigFilePath(ctx)
+	if configPath == "" {
+		return errors.New("cannot determine config file path: context or root directory is empty")
+	}
 	dir := filepath.Dir(configPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err

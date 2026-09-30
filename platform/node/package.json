@@ -1,6 +1,6 @@
 {
     "name": "fullstacked",
-    "version": "1.0.0-alpha.1804",
+    "version": "1.0.0-alpha.1805",
     "bin": {
         "fullstacked": "index.js"
     },
@@ -10,21 +10,21 @@
         "prepack": "npm run build"
     },
     "dependencies": {
-        "open": "^11.0.0",
-        "ws": "^8.21.1"
+        "open": "^11.0.4",
+        "ws": "^8.22.0"
     },
     "devDependencies": {
-        "@types/ws": "^8.18.1",
-        "esbuild": "^0.28.1",
-        "node-addon-api": "^8.9.0"
+        "@types/ws": "^8.18.2",
+        "esbuild": "^0.28.2",
+        "node-addon-api": "^8.9.2"
     },
     "optionalDependencies": {
-        "@fullstacked/darwin-arm64": "1.0.0-alpha.1804",
-        "@fullstacked/darwin-x64": "1.0.0-alpha.1804",
-        "@fullstacked/linux-arm64": "1.0.0-alpha.1804",
-        "@fullstacked/linux-x64": "1.0.0-alpha.1804",
-        "@fullstacked/win32-arm64": "1.0.0-alpha.1804",
-        "@fullstacked/win32-x64": "1.0.0-alpha.1804"
+        "@fullstacked/darwin-arm64": "1.0.0-alpha.1805",
+        "@fullstacked/darwin-x64": "1.0.0-alpha.1805",
+        "@fullstacked/linux-arm64": "1.0.0-alpha.1805",
+        "@fullstacked/linux-x64": "1.0.0-alpha.1805",
+        "@fullstacked/win32-arm64": "1.0.0-alpha.1805",
+        "@fullstacked/win32-x64": "1.0.0-alpha.1805"
     },
     "author": "FullStacked",
     "license": "MIT",

@@ -5,7 +5,18 @@ import * as nodeFs from "node:fs";
 import * as nodePath from "node:path";
 
 suite("config - e2e", () => {
-    const gitDir = nodePath.join(process.cwd(), ".git");
+    let gitDir = nodePath.join(process.cwd(), ".git");
+    if (nodeFs.existsSync(gitDir) && nodeFs.statSync(gitDir).isFile()) {
+        const content = nodeFs.readFileSync(gitDir, "utf-8");
+        for (const line of content.split("\n")) {
+            const trimmed = line.trim();
+            if (trimmed.toLowerCase().startsWith("gitdir:")) {
+                const target = trimmed.slice("gitdir:".length).trim();
+                gitDir = nodePath.resolve(process.cwd(), target);
+                break;
+            }
+        }
+    }
     const configFile = nodePath.join(gitDir, "config.json");
 
     // Clean up any test config file afterwards
@@ -44,8 +55,8 @@ suite("config - e2e", () => {
         const retrieved = await config.get(key);
         assert.strictEqual(retrieved, value);
 
-        // Verify .git/config.json exists on disk
-        assert.ok(nodeFs.existsSync(configFile), ".git/config.json must exist");
+        // Verify config.json exists on disk
+        assert.ok(nodeFs.existsSync(configFile), "config.json must exist");
 
         const raw = JSON.parse(nodeFs.readFileSync(configFile, "utf-8"));
         assert.strictEqual(raw[key], value);
