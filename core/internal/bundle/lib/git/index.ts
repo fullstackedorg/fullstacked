@@ -5,6 +5,7 @@ import {
     Checkout,
     Clone,
     Commit,
+    Fetch,
     type GitAuthor,
     type GitBranch,
     type GitCommit,
@@ -126,6 +127,18 @@ export function pull(directory: string, tunnel?: string): Promise<Duplex> {
     });
 }
 
+/**
+ * Updates every remote-tracking branch and every tag from origin,
+ * without touching the worktree or the current branch.
+ */
+export function fetch(directory: string, tunnel?: string): Promise<Duplex> {
+    return globalThis.fullstacked.bridge({
+        mod: Git,
+        fn: Fetch,
+        data: [directory, tunnel || ""]
+    });
+}
+
 export function push(directory: string, tunnel?: string): Promise<Duplex> {
     return globalThis.fullstacked.bridge({
         mod: Git,
@@ -213,6 +226,7 @@ const git = {
     clone,
     commit,
     pull,
+    fetch,
     push,
     reset,
     branch,

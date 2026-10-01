@@ -49,6 +49,7 @@ const (
 	Merge     GitFn = 14
 	Restore   GitFn = 15
 	SetConfig GitFn = 16
+	Fetch     GitFn = 17
 )
 
 // 2026-06-15
@@ -325,6 +326,14 @@ func Switch(
 			}
 		}
 		return restore(path.ResolveWithContext(ctx, data[0].Data.(string)), files)
+	case Fetch:
+		response.Type = types.CoreResponseStream
+		tunnel := ""
+		if len(data) > 1 && data[1].Type == types.STRING {
+			tunnel = data[1].Data.(string)
+		}
+		response.Stream = fetch(path.ResolveWithContext(ctx, data[0].Data.(string)), tunnel)
+		return nil
 	case SetConfig:
 		response.Type = types.CoreResponseData
 		return setConfig(
@@ -932,6 +941,40 @@ func pull(directory string, tunnel string) (*types.ResponseStream, error) {
 	}, nil
 }
 
+// fetch updates every remote-tracking branch and every tag from origin
+// without touching the worktree.
+func fetch(directory string, tunnel string) *types.ResponseStream {
+	return &types.ResponseStream{
+		Open: func(ctx *types.Context, streamId uint8) {
+			dir, err := OpenGitDirectory(directory)
+			if err != nil {
+				store.StreamError(ctx, streamId, err)
+				return
+			}
+			defer dir.Close()
+			dir.Tunnel = tunnel
+
+			urlStr, err := dir.GetUrl()
+			if err == nil {
+				err = testHost(urlStr, tunnel, directory, nil)
+			}
+			if err == nil {
+				err = dir.FetchAll(&GitStream{
+					ctx:      ctx,
+					streamId: streamId,
+				})
+			}
+
+			if err != nil {
+				store.StreamError(ctx, streamId, err)
+				return
+			}
+
+			store.StreamChunk(ctx, streamId, nil, true)
+		},
+	}
+}
+
 func push(directory string, tunnel string) (*types.ResponseStream, error) {
 	dir, err := OpenGitDirectory(directory)
 	if err == nil {
@@ -1223,37 +1266,45 @@ func checkout(directory string, ref string, create bool, tunnel string) (*types.
 				return
 			}
 
+			progress := &GitStream{
+				ctx:      ctx,
+				streamId: streamId,
+			}
+
 			switch refType {
 			case RefCommit:
-				err = worktree.Checkout(&git.CheckoutOptions{
-					Hash: plumbing.NewHash(ref),
-				})
-			case RefTag:
-				tag, err := dir.Tag(ref)
-				if err != nil {
-					fmt.Println(err)
-				}
-				err = worktree.Checkout(&git.CheckoutOptions{
-					Hash: tag.Hash(),
-				})
-			case RefBranch:
-				if remote {
-					err = dir.FetchBranch(ref, &GitStream{
-						ctx:      ctx,
-						streamId: streamId,
+				// an unknown ref would otherwise parse to the zero hash,
+				// which go-git silently checks out as master
+				if !plumbing.IsHash(ref) {
+					err = fmt.Errorf("cannot find branch, tag or commit %q", ref)
+				} else {
+					err = worktree.Checkout(&git.CheckoutOptions{
+						Hash: plumbing.NewHash(ref),
 					})
 				}
-
-				if err != nil {
-					fmt.Println(err)
+			case RefTag:
+				// a tag only known by the remote must be fetched before it can be resolved
+				if remote {
+					err = dir.FetchTag(ref, progress)
 				}
-
-				err = worktree.Checkout(&git.CheckoutOptions{
-					Branch: plumbing.NewBranchReferenceName(ref),
-					Create: create,
-				})
-				if err != nil {
-					fmt.Println(err)
+				if err == nil {
+					var commitHash plumbing.Hash
+					commitHash, err = dir.TagCommit(ref)
+					if err == nil {
+						err = worktree.Checkout(&git.CheckoutOptions{
+							Hash: commitHash,
+						})
+					}
+				}
+			case RefBranch:
+				if remote {
+					err = dir.FetchBranch(ref, progress)
+				}
+				if err == nil {
+					err = worktree.Checkout(&git.CheckoutOptions{
+						Branch: plumbing.NewBranchReferenceName(ref),
+						Create: create,
+					})
 				}
 			}
 

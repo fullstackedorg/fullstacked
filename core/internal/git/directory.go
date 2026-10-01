@@ -411,6 +411,24 @@ func (r *GitDirectory) FindRefType(ctx *types.Context, ref string) (GitRefType, 
 
 // https://github.com/go-git/go-git/blob/main/_examples/checkout-branch/main.go#L66
 func (r *GitDirectory) FetchBranch(branchName string, progress *GitStream) error {
+	return r.Fetch(progress, config.RefSpec("refs/heads/"+branchName+":"+"refs/heads/"+branchName))
+}
+
+func (r *GitDirectory) FetchTag(tagName string, progress *GitStream) error {
+	return r.Fetch(progress, config.RefSpec("+refs/tags/"+tagName+":"+"refs/tags/"+tagName))
+}
+
+// FetchAll updates every remote-tracking branch and every tag from origin.
+// Remote tags that moved overwrite their local copy.
+func (r *GitDirectory) FetchAll(progress *GitStream) error {
+	return r.Fetch(
+		progress,
+		config.RefSpec("+refs/heads/*:refs/remotes/origin/*"),
+		config.RefSpec("+refs/tags/*:refs/tags/*"),
+	)
+}
+
+func (r *GitDirectory) Fetch(progress *GitStream, refSpecs ...config.RefSpec) error {
 	repository, err := r.Repository()
 
 	if err != nil {
@@ -422,7 +440,6 @@ func (r *GitDirectory) FetchBranch(branchName string, progress *GitStream) error
 	if err != nil {
 		return err
 	}
-	refSpecs := []config.RefSpec{config.RefSpec("refs/heads/" + branchName + ":" + "refs/heads/" + branchName)}
 
 	urlStr, err := r.GetUrl()
 
@@ -460,6 +477,41 @@ func (r *GitDirectory) FetchBranch(branchName string, progress *GitStream) error
 	}
 
 	return err
+}
+
+// TagCommit resolves a local tag to the commit it points to,
+// peeling annotated tag objects.
+func (r *GitDirectory) TagCommit(tag string) (plumbing.Hash, error) {
+	repository, err := r.Repository()
+
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+
+	ref, err := repository.Tag(tag)
+
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+
+	tagObject, err := repository.TagObject(ref.Hash())
+
+	if errors.Is(err, plumbing.ErrObjectNotFound) {
+		// lightweight tag
+		return ref.Hash(), nil
+	}
+
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+
+	commit, err := tagObject.Commit()
+
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+
+	return commit.Hash, nil
 }
 
 type reverseProxyRoundTripper struct {

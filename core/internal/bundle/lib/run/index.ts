@@ -8,6 +8,11 @@ type RunOptions = {
     safe?: boolean;
 };
 
+/**
+ * Creates a new runtime context for the project in `directory`.
+ * Resolves with the context id: pass it to `globalThis.fullstacked.open(ctx)`
+ * to display the project.
+ */
 export async function run(
     directoryOrOptions?: string | RunOptions
 ): Promise<number> {
