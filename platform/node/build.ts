@@ -107,9 +107,11 @@ const fullVersion = `${version.major}.${version.minor}.${version.patch}${version
 
 packageJson.version = fullVersion;
 
-Object.keys(packageJson.optionalDependencies).forEach((key) => {
-    packageJson.optionalDependencies[key] = fullVersion;
-});
+if (packageJson.optionalDependencies) {
+    Object.keys(packageJson.optionalDependencies).forEach((key) => {
+        packageJson.optionalDependencies[key] = fullVersion;
+    });
+}
 
 fs.writeFileSync(packageJsonFile, JSON.stringify(packageJson, null, 4));
 

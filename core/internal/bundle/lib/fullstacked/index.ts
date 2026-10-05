@@ -241,6 +241,44 @@ function getExtraArgs(args: string[]): string[] {
     return extraArgs;
 }
 
+function parseEnv(src: string): Record<string, string> {
+    const obj: Record<string, string> = {};
+    const text = src.replace(/\r\n?/gm, "\n");
+    const lineRegex =
+        /(?:^|^)\s*(?:export\s+)?([\w.-]+)(?:\s*=\s*?|:\s+?)(\s*'(?:\\'|[^'])*'|\s*"(?:\\"|[^"])*"|\s*`(?:\\`|[^`])*`|[^#\r\n]+)?\s*(?:#.*)?(?:$|$)/gm;
+    let match: RegExpExecArray | null;
+    while ((match = lineRegex.exec(text)) !== null) {
+        const key = match[1];
+        let val = (match[2] || "").trim();
+        const firstChar = val[0];
+        val = val.replace(/^(['"`])([\s\S]*)\1$/gm, "$2");
+        if (firstChar === '"') {
+            val = val.replace(/\\n/g, "\n").replace(/\\r/g, "\r");
+        }
+        obj[key] = val;
+    }
+    return obj;
+}
+
+async function loadEnvFile(envPath: string): Promise<Record<string, string>> {
+    try {
+        const stats = await fs.promises.stat(envPath);
+        if (typeof stats.isDirectory === "function" && stats.isDirectory()) {
+            return {};
+        }
+        const content = await fs.promises.readFile(envPath, {
+            encoding: "utf-8"
+        });
+        return parseEnv(
+            typeof content === "string"
+                ? content
+                : new TextDecoder().decode(content)
+        );
+    } catch {
+        return {};
+    }
+}
+
 interface BundleImportResult {
     module: any;
     outputFile: string;
@@ -576,20 +614,32 @@ Directory:
     const safe = hasArgFlag(["-s", "--safe"], args);
     const positionals = getPositionalArgs(args);
 
-    const env: Record<string, string> = {};
+    const cliEnv: Record<string, string> = {};
     for (const val of envArgs) {
         const index = val.indexOf("=");
         if (index !== -1) {
-            env[val.slice(0, index)] = val.slice(index + 1);
+            cliEnv[val.slice(0, index)] = val.slice(index + 1);
         } else if (val) {
-            env[val] = "";
+            cliEnv[val] = "";
         }
     }
 
     if (file) {
+        const envPath = path.resolve(".env");
+        const fileEnv = await loadEnvFile(envPath);
+        const env = { ...fileEnv, ...cliEnv };
+        for (const [key, value] of Object.entries(env)) {
+            process.env[key] = value;
+        }
+
         const extraArgs = getExtraArgs(args);
         return runFile(file, extraArgs, writeOut, writeErr);
     }
+
+    const targetDirectory = path.resolve(positionals.at(-1) || ".");
+    const envPath = path.resolve(targetDirectory, ".env");
+    const fileEnv = await loadEnvFile(envPath);
+    const env = { ...fileEnv, ...cliEnv };
 
     return runDirectory(
         positionals,

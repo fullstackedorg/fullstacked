@@ -1,13 +1,14 @@
 {
     "name": "fullstacked",
-    "version": "1.0.0-alpha.1807",
+    "version": "1.0.0-alpha.1808",
     "bin": {
         "fullstacked": "index.js"
     },
     "type": "module",
     "scripts": {
         "build": "node build.ts",
-        "prepack": "npm run build"
+        "prepack": "node prepare-package.ts --inject",
+        "postpack": "node prepare-package.ts --clean"
     },
     "dependencies": {
         "open": "^11.0.4",
@@ -17,14 +18,6 @@
         "@types/ws": "^8.18.2",
         "esbuild": "^0.28.2",
         "node-addon-api": "^8.9.2"
-    },
-    "optionalDependencies": {
-        "@fullstacked/darwin-arm64": "1.0.0-alpha.1807",
-        "@fullstacked/darwin-x64": "1.0.0-alpha.1807",
-        "@fullstacked/linux-arm64": "1.0.0-alpha.1807",
-        "@fullstacked/linux-x64": "1.0.0-alpha.1807",
-        "@fullstacked/win32-arm64": "1.0.0-alpha.1807",
-        "@fullstacked/win32-x64": "1.0.0-alpha.1807"
     },
     "author": "FullStacked",
     "license": "MIT",
