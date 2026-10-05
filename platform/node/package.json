@@ -1,6 +1,6 @@
 {
     "name": "fullstacked",
-    "version": "1.0.0-alpha.1808",
+    "version": "1.0.0-alpha.1809",
     "bin": {
         "fullstacked": "index.js"
     },
@@ -8,7 +8,7 @@
     "scripts": {
         "build": "node build.ts",
         "prepack": "node prepare-package.ts --inject",
-        "postpack": "node prepare-package.ts --clean"
+        "postpublish": "node prepare-package.ts --clean"
     },
     "dependencies": {
         "open": "^11.0.4",
