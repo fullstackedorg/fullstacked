@@ -8,12 +8,12 @@ namespace FullStacked
         const string dllName = "win32-arm64.dll";
 
         [DllImport(dllName)]
-        public static extern byte start(char* root, char* build);
+        public static extern byte start(char* root, char* build, char* deeplink);
 
         [DllImport(dllName)]
         public static extern byte startSafe(char* root, char* build);
 
-        //extern void startWithCtx(char* root, char* build, uint8_t ctxId);
+        //extern void startWithCtx(char* root, char* build, uint8_t ctxId, char* deeplink);
         //extern int check(uint8_t ctxId);
 
         [DllImport(dllName)]
@@ -29,8 +29,8 @@ namespace FullStacked
         public static extern int call(void* buffer, int length);
 
         //public static extern void freePtr(void* ptr);
-        public override byte startCore(char* root, char* build) {
-            return start(root, build);
+        public override byte startCore(char* root, char* build, char* deeplink) {
+            return start(root, build, deeplink);
         }
 
         public override byte startSafeCore(char* root, char* build) {

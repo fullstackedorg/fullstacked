@@ -4,9 +4,9 @@
 #define FULLSTACKED_ANDROID_BRIDGE_H
 
 extern "C" {
-    uint8_t start(char* root, char* build);
+    uint8_t start(char* root, char* build, char* deeplink);
     uint8_t startSafe(char* root, char* build);
-    void startWithCtx(char* root, char* build, uint8_t ctxId);
+    void startWithCtx(char* root, char* build, uint8_t ctxId, char* deeplink);
     int check(uint8_t ctxId);
     void stop(uint8_t ctxId);
     int call(void* buffer, int length);
@@ -14,11 +14,11 @@ extern "C" {
     void setOnStreamData(void* cb);
 
     JNIEXPORT jint JNICALL Java_org_fullstacked_Core_start
-            (JNIEnv *, jobject, jstring, jstring);
+            (JNIEnv *, jobject, jstring, jstring, jstring);
     JNIEXPORT jint JNICALL Java_org_fullstacked_Core_startSafe
             (JNIEnv *, jobject, jstring, jstring);
     JNIEXPORT void JNICALL Java_org_fullstacked_Core_startWithCtx
-            (JNIEnv *, jobject, jstring, jstring, jint);
+            (JNIEnv *, jobject, jstring, jstring, jint, jstring);
     JNIEXPORT jint JNICALL Java_org_fullstacked_Core_check
             (JNIEnv *, jobject, jint);
     JNIEXPORT void JNICALL Java_org_fullstacked_Core_stop

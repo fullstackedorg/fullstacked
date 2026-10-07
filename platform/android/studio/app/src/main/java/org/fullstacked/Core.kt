@@ -17,13 +17,19 @@ object Core {
     external fun setOnStreamData()
 
     @JvmStatic
-    external fun start(root: String, build: String): Int
+    external fun start(root: String, build: String, deeplink: String): Int
+
+    @JvmStatic
+    fun start(root: String, build: String): Int = start(root, build, "")
 
     @JvmStatic
     external fun startSafe(root: String, build: String): Int
 
     @JvmStatic
-    external fun startWithCtx(root: String, build: String, ctxId: Int)
+    external fun startWithCtx(root: String, build: String, ctxId: Int, deeplink: String)
+
+    @JvmStatic
+    fun startWithCtx(root: String, build: String, ctxId: Int) = startWithCtx(root, build, ctxId, "")
 
     @JvmStatic
     external fun check(ctxId: Int): Int
@@ -37,13 +43,13 @@ object Core {
     @JvmStatic
     external fun getCorePayload(ctx: Int, coreType: Int, id: Int, size: Int): ByteArray
 
-    fun startMain(root: String, build: String, providedCtx: Int? = null, safe: Boolean = false): Int {
+    fun startMain(root: String, build: String, providedCtx: Int? = null, safe: Boolean = false, deeplink: String = ""): Int {
         return if (safe) {
             startSafe(root, build)
         } else if (providedCtx == null) {
-            start(root, build)
+            start(root, build, deeplink)
         } else {
-            startWithCtx(root, build, providedCtx)
+            startWithCtx(root, build, providedCtx, deeplink)
             providedCtx
         }
     }

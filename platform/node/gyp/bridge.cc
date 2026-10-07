@@ -20,9 +20,14 @@ Napi::Number N_Start(const Napi::CallbackInfo &info) {
     if (info.Length() > 1 && !info[1].IsUndefined()) {
         build = info[1].As<Napi::String>().ToString();
     }
+    std::string deeplink = "";
+    if (info.Length() > 2 && !info[2].IsUndefined()) {
+        deeplink = info[2].As<Napi::String>().ToString().Utf8Value();
+    }
     return Napi::Number::New(info.Env(),
                              lib.start((char *)root.Utf8Value().c_str(),
-                                       (char *)build.Utf8Value().c_str()));
+                                       (char *)build.Utf8Value().c_str(),
+                                       (char *)deeplink.c_str()));
 }
 
 Napi::Boolean N_Check(const Napi::CallbackInfo &info) {

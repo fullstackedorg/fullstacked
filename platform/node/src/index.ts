@@ -37,7 +37,7 @@ const forcefullyExit = () => {
 });
 
 globalThis.bridge = {
-    ctxId: core.start(process.cwd(), process.cwd()),
+    ctxId: core.start(process.cwd(), process.cwd(), ""),
     Sync: (payload: ArrayBuffer) => core.call(payload),
     Async: async (payload: ArrayBuffer) => core.call(payload)
 };

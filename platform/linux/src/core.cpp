@@ -3,9 +3,10 @@
 #include <mutex>
 
 extern "C" {
-extern uint8_t start(char *root, char *build);
+extern uint8_t start(char *root, char *build, char *deeplink);
 extern uint8_t startSafe(char *root, char *build);
-extern void startWithCtx(char *root, char *build, uint8_t ctxId);
+extern void startWithCtx(char *root, char *build, uint8_t ctxId,
+                         char *deeplink);
 extern int check(uint8_t ctxId);
 extern void stop(uint8_t ctxId);
 extern void setOnStreamData(void *cb);
@@ -34,9 +35,11 @@ void Core::init() {
     setOnStreamData(reinterpret_cast<void *>(c_onStreamData));
 }
 
-uint8_t Core::start(const std::string &root, const std::string &build) {
+uint8_t Core::start(const std::string &root, const std::string &build,
+                    const std::string &deeplink) {
     return ::start(const_cast<char *>(root.c_str()),
-                   const_cast<char *>(build.c_str()));
+                   const_cast<char *>(build.c_str()),
+                   const_cast<char *>(deeplink.c_str()));
 }
 
 uint8_t Core::startSafe(const std::string &root, const std::string &build) {
@@ -45,9 +48,10 @@ uint8_t Core::startSafe(const std::string &root, const std::string &build) {
 }
 
 void Core::startWithCtx(const std::string &root, const std::string &build,
-                        uint8_t ctxId) {
+                        uint8_t ctxId, const std::string &deeplink) {
     ::startWithCtx(const_cast<char *>(root.c_str()),
-                   const_cast<char *>(build.c_str()), ctxId);
+                   const_cast<char *>(build.c_str()), ctxId,
+                   const_cast<char *>(deeplink.c_str()));
 }
 
 int Core::check(uint8_t ctxId) {

@@ -30,11 +30,16 @@ func main() {}
 func start(
 	root *C.char,
 	build *C.char,
+	deeplink *C.char,
 ) C.uint8_t {
 	rootStr := C.GoString(root)
 	buildStr := C.GoString(build)
+	var deeplinkStr string
+	if deeplink != nil {
+		deeplinkStr = C.GoString(deeplink)
+	}
 
-	id := store.NewContext(rootStr, buildStr, false)
+	id := store.NewContext(rootStr, buildStr, false, deeplinkStr)
 	return C.uint8_t(id)
 }
 
@@ -43,11 +48,16 @@ func startWithCtx(
 	root *C.char,
 	build *C.char,
 	ctxId C.uint8_t,
+	deeplink *C.char,
 ) {
 	rootStr := C.GoString(root)
 	buildStr := C.GoString(build)
+	var deeplinkStr string
+	if deeplink != nil {
+		deeplinkStr = C.GoString(deeplink)
+	}
 
-	store.NewContextWithCtxId(uint8(ctxId), rootStr, buildStr, false)
+	store.NewContextWithCtxId(uint8(ctxId), rootStr, buildStr, false, deeplinkStr)
 }
 
 //export startSafe
@@ -58,7 +68,7 @@ func startSafe(
 	rootStr := C.GoString(root)
 	buildStr := C.GoString(build)
 
-	id := store.NewContext(rootStr, buildStr, true)
+	id := store.NewContext(rootStr, buildStr, true, "")
 	return C.uint8_t(id)
 }
 

@@ -19,7 +19,7 @@ var nextCtxId uint8 = 0
 var Contexts = map[uint8]*types.Context{}
 var ctxMutex = sync.Mutex{}
 
-func NewContext(root string, build string, safe bool) uint8 {
+func NewContext(root string, build string, safe bool, deeplink string) uint8 {
 	ctxMutex.Lock()
 
 	id := nextCtxId
@@ -34,7 +34,7 @@ func NewContext(root string, build string, safe bool) uint8 {
 
 	ctxMutex.Unlock()
 
-	NewContextWithCtxId(id, root, build, safe)
+	NewContextWithCtxId(id, root, build, safe, deeplink)
 	return id
 }
 
@@ -43,6 +43,7 @@ func NewContextWithCtxId(
 	root string,
 	build string,
 	safe bool,
+	deeplink string,
 ) {
 	if strings.Compare(root, build) == 0 {
 		build = filepath.Join(root, "out")
@@ -68,6 +69,12 @@ func NewContextWithCtxId(
 		NextStreamId: 1,
 	}
 
+	if deeplink != "" {
+		ctx.Env = map[string]string{
+			"DEEPLINK": deeplink,
+		}
+	}
+
 	ctxMutex.Lock()
 	Contexts[ctxId] = ctx
 	ctxMutex.Unlock()
@@ -76,7 +83,7 @@ func NewContextWithCtxId(
 		initialDirectory := config.GetConfig(ctx, "initialDirectory")
 		if initialDirectory != "" {
 			targetDir := filepath.Clean(filepath.Join(root, initialDirectory))
-			NewContextWithCtxId(ctxId, targetDir, targetDir, safe)
+			NewContextWithCtxId(ctxId, targetDir, targetDir, safe, deeplink)
 		}
 	}
 }

@@ -6,7 +6,7 @@ namespace FullStacked
 {
     unsafe internal abstract class CoreImplementation
     {
-        public abstract byte startCore(char* root, char* build);
+        public abstract byte startCore(char* root, char* build, char* deeplink);
         public abstract byte startSafeCore(char* root, char* build);
         public abstract void stopCore(byte ctxId);
         public abstract void setOnStreamDataCore(CoreOnStreamData cb);
@@ -52,14 +52,15 @@ namespace FullStacked
             return buffer;
         }
 
-        public byte start(string root, string build)
+        public byte start(string root, string build, string deeplink = "")
         {
             byte[] rootBuffer = strToBufferUTF8(root);
             byte[] buildBuffer = strToBufferUTF8(build);
+            byte[] deeplinkBuffer = strToBufferUTF8(deeplink);
 
-            fixed (byte* rootPtr = rootBuffer, buildPtr = buildBuffer)
+            fixed (byte* rootPtr = rootBuffer, buildPtr = buildBuffer, deeplinkPtr = deeplinkBuffer)
             {
-                return this.lib.startCore((char*)rootPtr, (char*)buildPtr);
+                return this.lib.startCore((char*)rootPtr, (char*)buildPtr, (char*)deeplinkPtr);
             }
         }
 

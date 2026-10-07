@@ -11,12 +11,13 @@ class Core {
         using StreamDataCallback = std::function<void(
             uint8_t ctx, uint8_t streamId, const std::vector<uint8_t> &data)>;
 
-        static void init();
-        static uint8_t start(const std::string &root, const std::string &build);
+        static uint8_t start(const std::string &root, const std::string &build,
+                             const std::string &deeplink = "");
         static uint8_t startSafe(const std::string &root,
                                  const std::string &build);
         static void startWithCtx(const std::string &root,
-                                 const std::string &build, uint8_t ctxId);
+                                 const std::string &build, uint8_t ctxId,
+                                 const std::string &deeplink = "");
         static int check(uint8_t ctxId);
         static void stop(uint8_t ctxId);
         static std::vector<uint8_t>

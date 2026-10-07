@@ -113,7 +113,13 @@ class MainActivity : ComponentActivity() {
             this.stackedWebViews.add(webView)
         } else {
             // Create default app context using out directory from mainBuildDir
-            val defaultCtxId = Core.startMain(root, mainBuildDir, null)
+            val deeplink = intent?.data?.let { data ->
+                val str = data.toString()
+                if (!str.startsWith("fullstacked-ctx://") && !str.startsWith("fullstacked-ctx:") && !AuthManager.isAuthRedirect(data)) {
+                    str
+                } else null
+            } ?: ""
+            val defaultCtxId = Core.startMain(root, mainBuildDir, null, deeplink = deeplink)
             val webView = FullStackedWebView(this, ctxId = defaultCtxId.toByte())
             this.stackedWebViews.add(webView)
         }

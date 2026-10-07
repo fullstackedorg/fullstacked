@@ -38,7 +38,7 @@ func commitFile(t *testing.T, repo *git.Repository, dir string, content string) 
 
 func mockStreamContext(t *testing.T, dir string) (*types.Context, *types.StoredStream) {
 	t.Helper()
-	ctxId := store.NewContext(dir, dir, false)
+	ctxId := store.NewContext(dir, dir, false, "")
 	ctx := store.Contexts[ctxId]
 	t.Cleanup(func() { store.EndContext(ctxId) })
 

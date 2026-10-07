@@ -19,7 +19,7 @@ void App::open(uint8_t ctx) {
     }
 
     if (Core::check(ctx) == 0) {
-        Core::startWithCtx(rootDir, buildDir, ctx);
+        Core::startWithCtx(rootDir, buildDir, ctx, deeplink);
     }
 
     Window *window = gui->createWindow(ctx);
@@ -83,8 +83,9 @@ int App::run(int argc, char *argv[]) {
     buildDir = getAppDir();
 
     return gui->run(argc, argv, [this]() {
-        uint8_t mainCtx = this->safe ? Core::startSafe(rootDir, buildDir)
-                                     : Core::start(rootDir, buildDir);
+        uint8_t mainCtx = this->safe
+                              ? Core::startSafe(rootDir, buildDir)
+                              : Core::start(rootDir, buildDir, this->deeplink);
         open(mainCtx);
     });
 }

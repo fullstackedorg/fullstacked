@@ -160,7 +160,7 @@ func Switch(
 			safe = data[2].Data.(bool)
 		}
 
-		id := store.NewContext(root, root, safe)
+		id := store.NewContext(root, root, safe, "")
 		response.Data = id
 
 		if len(data) > 1 && data[1].Type == types.OBJECT {
