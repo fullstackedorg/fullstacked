@@ -125,13 +125,14 @@ AuthWindow::AuthWindow(QtWindow *pOpener, QWidget *parent)
 
     // Inject opener polyfill so popup can communicate via postMessage
     QWebEngineScript script;
-    QString openerJs = "window.opener = {\n"
-                       "    postMessage: function(data) {\n"
-                       "        var q = (data && typeof data === 'object') ? "
-                       "new URLSearchParams(data).toString() : String(data);\n"
-                       "        location.href = 'fullstacked://auth?' + q;\n"
-                       "    }\n"
-                       "};\n";
+    QString openerJs =
+        "window.opener = {\n"
+        "    postMessage: function(data) {\n"
+        "        var q = (data && typeof data === 'object') ? "
+        "new URLSearchParams(data).toString() : String(data);\n"
+        "        location.href = 'fullstacked-auth://auth?' + q;\n"
+        "    }\n"
+        "};\n";
     script.setSourceCode(openerJs);
     script.setName("auth_opener.js");
     script.setWorldId(QWebEngineScript::MainWorld);
@@ -199,11 +200,17 @@ bool AuthWebEnginePage::acceptNavigationRequest(const QUrl &url,
     QString scheme = url.scheme();
     QUrlQuery query(url);
 
-    if (scheme == "fullstacked" || scheme == "fullstacked-auth" ||
-        scheme == "fullstacked-ctx" || scheme == "fullstacked-native") {
+    // Auth results: fullstacked-auth://auth?... fullstacked:// links are
+    // deeplinks.
+    if (scheme == "fullstacked-auth" || scheme == "fullstacked-ctx" ||
+        scheme == "fullstacked-native") {
         if (authWin) {
             authWin->handleAuthResult(url.query());
         }
+        return false;
+    }
+    if (scheme == "fullstacked") {
+        App::instance->deepLink(url.toString().toStdString());
         return false;
     }
 
@@ -221,6 +228,8 @@ bool AuthWebEnginePage::acceptNavigationRequest(const QUrl &url,
         if (!query.hasQueryItem("native")) {
             QUrl nativeUrl = url;
             query.addQueryItem("native", "1");
+            // answer on fullstacked-auth://, fullstacked:// carries deeplinks
+            query.addQueryItem("callback_scheme", "fullstacked-auth");
             nativeUrl.setQuery(query);
             setUrl(nativeUrl);
             return false;

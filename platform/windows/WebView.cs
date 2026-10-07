@@ -16,6 +16,15 @@ namespace FullStacked
     {
         private byte ctx;
         public byte GetCtx() => this.ctx;
+
+        // Delivers an auth result (query of fullstacked-auth://auth?...) to the page, like the
+        // auth window of the other platforms
+        public void postAuthResult(string query)
+        {
+            string escaped = query.Replace("\\", "\\\\").Replace("`", "\\`");
+            _ = this.controller?.CoreWebView2?.ExecuteScriptAsync(
+                "window.postMessage(Object.fromEntries(new URLSearchParams(`" + escaped + "`)), \"*\")");
+        }
         private CoreWebView2Controller controller;
         private CoreWebView2Environment environment;
         private bool isClosed = false;
@@ -68,6 +77,7 @@ namespace FullStacked
             {
                 if (args.WindowActivationState != WindowActivationState.Deactivated)
                 {
+                    App.singleton.lastActiveCtx = this.ctx;
                     this.controller?.MoveFocus(CoreWebView2MoveFocusReason.Programmatic);
                 }
             };

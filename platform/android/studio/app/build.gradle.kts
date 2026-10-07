@@ -1,6 +1,6 @@
 plugins {
-    id("com.android.application") version "9.3.2"
-    id("org.jetbrains.kotlin.plugin.compose") version "2.4.10"
+    id("com.android.application") version "9.3.3"
+    id("org.jetbrains.kotlin.plugin.compose") version "2.4.20"
 }
 
 extensions.configure<com.android.build.api.dsl.ApplicationExtension> {

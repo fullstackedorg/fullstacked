@@ -1,5 +1,7 @@
 package org.fullstacked
 
+import java.util.concurrent.atomic.AtomicInteger
+
 object Core {
     init {
         try {
@@ -54,7 +56,7 @@ object Core {
         val urlBytes = url.toByteArray(Charsets.UTF_8)
         var payload = byteArrayOf(
             ctx.toByte(),
-            0, // req id
+            nextReqId(), // req id
             0, // Core Module
             6, // Fn DeepLink
             0, // Async
@@ -80,6 +82,12 @@ object Core {
             }
         }
     }
+
+    private val nextReqId = AtomicInteger(0)
+
+    // Request id for calls made by the platform (static files, deeplinks): concurrent calls
+    // in the same context must not share an id, the core refuses an id already in use.
+    fun nextReqId(): Byte = nextReqId.updateAndGet { (it + 1) and 0xFF }.toByte()
 
     fun coreCall(payload: ByteArray): ByteArray {
         val responseSize = call(payload)

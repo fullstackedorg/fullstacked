@@ -119,9 +119,6 @@ class MainActivity : ComponentActivity() {
             this.stackedWebViews.add(webView)
         }
 
-        // Launched by a deeplink (AuthCallbackActivity forwards fullstacked:// links)
-        intent?.getStringExtra(EXTRA_DEEPLINK)?.let { Core.deepLinkAll(it) }
-
         AuthManager.registerActivity(this)
 
         this.updateActiveContentView()
@@ -153,6 +150,13 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
+        // Launched or resumed by a deeplink (DeepLinkActivity forwards fullstacked:// links).
+        // Removed once triggered so recreating the activity does not trigger it again.
+        intent?.getStringExtra(EXTRA_DEEPLINK)?.let { url ->
+            intent.removeExtra(EXTRA_DEEPLINK)
+            Core.deepLinkAll(url)
+        }
+
         val data: Uri = intent?.data ?: return
         if (AuthManager.isAuthRedirect(data)) {
             AuthManager.handleAuthRedirect(data)
@@ -194,6 +198,10 @@ class MainActivity : ComponentActivity() {
         }
         if (uri.getQueryParameter("native") == null) {
             builder = builder.appendQueryParameter("native", "1")
+        }
+        // answer on fullstacked-auth://, fullstacked:// carries deeplinks (DeepLinkActivity)
+        if (uri.getQueryParameter("callback_scheme") == null) {
+            builder = builder.appendQueryParameter("callback_scheme", "fullstacked-auth")
         }
         val authUri = builder.build()
 

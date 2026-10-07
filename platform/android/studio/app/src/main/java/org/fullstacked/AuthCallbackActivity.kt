@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 
+// Receives fullstacked-auth:// auth results (fullstacked:// only carries deeplinks, see DeepLinkActivity)
 class AuthCallbackActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -21,39 +22,24 @@ class AuthCallbackActivity : Activity() {
 
     private fun handleIntent(intent: Intent?) {
         val data: Uri = intent?.data ?: return
-
-        // fullstacked:// links that are not auth redirects are deeplinks
-        if (!AuthManager.isAuthRedirect(data)) {
-            handleDeepLink(data.toString())
-            return
-        }
-
-        val originatingActivity = AuthManager.getActiveMainActivity()
-        val originatingWebView = AuthManager.getActiveWebView()
-        val targetActivity = originatingActivity ?: originatingWebView?.ctx
-
-        AuthManager.handleAuthRedirect(data)
-        bringToFront(targetActivity)
+        handleAuthRedirect(this, data)
     }
 
-    // Triggers the deeplink in every running context, or launches the app with it.
-    private fun handleDeepLink(url: String) {
-        val running = MainActivity.activeActivities.filter { !it.isFinishing && !it.isDestroyed }
-        if (running.isEmpty()) {
-            startActivity(Intent(this, MainActivity::class.java).apply {
-                putExtra(EXTRA_DEEPLINK, url)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            })
-            return
-        }
-        Core.deepLinkAll(url)
-        bringToFront(running.last())
-    }
+    companion object {
+        fun handleAuthRedirect(context: Activity, data: Uri) {
+            val originatingActivity = AuthManager.getActiveMainActivity()
+            val originatingWebView = AuthManager.getActiveWebView()
+            val targetActivity = originatingActivity ?: originatingWebView?.ctx
 
-    private fun bringToFront(targetActivity: MainActivity?) {
-        if (targetActivity != null && !targetActivity.isFinishing && !targetActivity.isDestroyed) {
+            AuthManager.handleAuthRedirect(data)
+            bringToFront(context, targetActivity)
+        }
+
+        fun bringToFront(context: Activity, targetActivity: MainActivity?) {
+            if (targetActivity == null || targetActivity.isFinishing || targetActivity.isDestroyed) return
+
             try {
-                val am = getSystemService(ACTIVITY_SERVICE) as? ActivityManager
+                val am = context.getSystemService(ACTIVITY_SERVICE) as? ActivityManager
                 am?.moveTaskToFront(targetActivity.taskId, ActivityManager.MOVE_TASK_WITH_HOME)
             } catch (_: Exception) { }
 

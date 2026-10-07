@@ -245,7 +245,7 @@ WebkitGTKWindow::createAuthWebView(WebKitNavigationAction *navigation_action) {
         "window.webkit.messageHandlers.auth) {\n"
         "            window.webkit.messageHandlers.auth.postMessage(q);\n"
         "        } else {\n"
-        "            location.href = 'fullstacked://auth?' + q;\n"
+        "            location.href = 'fullstacked-auth://auth?' + q;\n"
         "        }\n"
         "    }\n"
         "};\n"
@@ -289,8 +289,9 @@ WebkitGTKWindow::createAuthWebView(WebKitNavigationAction *navigation_action) {
 }
 
 bool WebkitGTKWindow::checkAuthUri(const std::string &u) {
-    if (u.rfind("fullstacked://", 0) == 0 ||
-        u.rfind("fullstacked-auth://", 0) == 0 ||
+    // Auth results: fullstacked-auth://auth?... fullstacked:// links are
+    // deeplinks, not auth results.
+    if (u.rfind("fullstacked-auth://", 0) == 0 ||
         u.rfind("fullstacked-ctx://", 0) == 0) {
         size_t qPos = u.find('?');
         std::string query =

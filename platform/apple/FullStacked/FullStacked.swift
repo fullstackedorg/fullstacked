@@ -67,7 +67,9 @@ struct FullStackedApp: App {
                 // opening a new one, then trigger them in every running context.
                 .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
                 .onOpenURL { url in
-                    self.webViewStore.deepLink(url.absoluteString)
+                    if url.scheme == "fullstacked" {
+                        self.webViewStore.deepLink(url.absoluteString)
+                    }
                 }
             
                 .onGeometryChange(for: CGSize.self) { proxy in

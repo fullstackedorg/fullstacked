@@ -50,23 +50,8 @@ object AuthManager {
         }
     }
 
-    fun isAuthRedirect(uri: Uri): Boolean {
-        val uriStr = uri.toString()
-        if (!uriStr.startsWith("fullstacked://") && !uriStr.startsWith("fullstacked:")) return false
-
-        val pathWithoutScheme = uriStr.removePrefix("fullstacked://").removePrefix("fullstacked:")
-        val candidate = pathWithoutScheme.substringBefore('?').substringBefore('#').trimStart('/')
-
-        if (candidate.startsWith("done") ||
-            uri.getQueryParameter("token") != null ||
-            uri.getQueryParameter("error") != null ||
-            uri.fragment?.contains("token=") == true ||
-            uri.fragment?.contains("error=") == true
-        ) {
-            return true
-        }
-        return false
-    }
+    // Auth results come on fullstacked-auth:// (fullstacked:// carries deeplinks)
+    fun isAuthRedirect(uri: Uri): Boolean = uri.scheme == "fullstacked-auth"
 
     @Synchronized
     fun handleAuthRedirect(uri: Uri): Boolean {
@@ -93,7 +78,7 @@ object AuthManager {
 
         val error = uri.getQueryParameter("error")
             ?: if (uri.fragment?.contains("error=") == true) {
-                Uri.parse("fullstacked://temp?" + uri.fragment).getQueryParameter("error")
+                Uri.parse("fullstacked-auth://temp?" + uri.fragment).getQueryParameter("error")
             } else null
 
         val mainLooper = Looper.getMainLooper()

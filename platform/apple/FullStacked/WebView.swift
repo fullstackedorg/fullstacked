@@ -155,10 +155,12 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
             var urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: false)
             if (urlComponents?.queryItems?.first(where: { $0.name == "auth" })?.value) != nil {
                 urlComponents?.queryItems?.append(URLQueryItem(name: "native", value: "1"))
+                // answer on fullstacked-auth://, fullstacked:// carries deeplinks (onOpenURL)
+                urlComponents?.queryItems?.append(URLQueryItem(name: "callback_scheme", value: "fullstacked-auth"))
 
                 let authUrl = urlComponents?.url!
                 // Initialize the session.
-                let session = ASWebAuthenticationSession(url: authUrl!, callbackURLScheme: "fullstacked")
+                let session = ASWebAuthenticationSession(url: authUrl!, callbackURLScheme: "fullstacked-auth")
                 { callbackURL, error in
                     DispatchQueue.main.async {
                         if(error != nil) {

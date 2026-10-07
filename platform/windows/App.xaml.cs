@@ -17,6 +17,7 @@ namespace FullStacked
         public static DispatcherQueue dispatcherQueue;
 
         private readonly Dictionary<byte, WebView> webviews = new();
+        public byte lastActiveCtx;
         private string appDataFolder;
         private string buildFolder;
         private bool isSafeRunning = false;
@@ -60,30 +61,46 @@ namespace FullStacked
             byte mainCtx = core.start(appDataFolder, buildFolder);
             this.open(mainCtx);
 
-            string launchDeepLink = getDeepLink(activation);
-            if (launchDeepLink != null)
-            {
-                this.deepLink(launchDeepLink);
-            }
-        }
-
-        private static string getDeepLink(AppActivationArguments activation)
-        {
-            if (activation.Kind == ExtendedActivationKind.Protocol &&
-                activation.Data is IProtocolActivatedEventArgs protocolArgs)
-            {
-                return protocolArgs.Uri.AbsoluteUri;
-            }
-            return null;
+            this.openProtocolUri(activation);
         }
 
         // Activation redirected from another launch of the app
         private void onActivated(object sender, AppActivationArguments activation)
         {
-            string url = getDeepLink(activation);
-            if (url != null)
+            this.openProtocolUri(activation);
+        }
+
+        // fullstacked-auth:// carries auth results, every other fullstacked:// link is a deeplink.
+        private void openProtocolUri(AppActivationArguments activation)
+        {
+            if (activation.Kind != ExtendedActivationKind.Protocol ||
+                activation.Data is not IProtocolActivatedEventArgs protocolArgs)
             {
-                this.deepLink(url);
+                return;
+            }
+
+            Uri uri = protocolArgs.Uri;
+            if (uri.Scheme == "fullstacked-auth")
+            {
+                this.authResult(uri.Query.TrimStart('?'));
+            }
+            else
+            {
+                this.deepLink(uri.AbsoluteUri);
+            }
+        }
+
+        private void authResult(string query)
+        {
+            if (dispatcherQueue != null && !dispatcherQueue.HasThreadAccess)
+            {
+                dispatcherQueue.TryEnqueue(() => authResult(query));
+                return;
+            }
+
+            if (this.webviews.TryGetValue(this.lastActiveCtx, out WebView webview))
+            {
+                webview.postAuthResult(query);
             }
         }
 

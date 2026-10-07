@@ -205,7 +205,7 @@ class FullStackedWebView(
         val pathnameBytes = path.toByteArray(StandardCharsets.UTF_8)
         var payload = byteArrayOf(
             ctxId,
-            0, // req id
+            Core.nextReqId(), // req id
             0, // Core Module
             0, // Fn Static File
             0, // Async
