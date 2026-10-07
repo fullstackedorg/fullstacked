@@ -34,6 +34,7 @@ import androidx.core.net.toUri
 import androidx.core.content.edit
 
 const val EXTRA_CTX_ID = "ctxId"
+const val EXTRA_DEEPLINK = "deeplink"
 
 class MainActivity : ComponentActivity() {
     companion object {
@@ -113,16 +114,13 @@ class MainActivity : ComponentActivity() {
             this.stackedWebViews.add(webView)
         } else {
             // Create default app context using out directory from mainBuildDir
-            val deeplink = intent?.data?.let { data ->
-                val str = data.toString()
-                if (!str.startsWith("fullstacked-ctx://") && !str.startsWith("fullstacked-ctx:") && !AuthManager.isAuthRedirect(data)) {
-                    str
-                } else null
-            } ?: ""
-            val defaultCtxId = Core.startMain(root, mainBuildDir, null, deeplink = deeplink)
+            val defaultCtxId = Core.startMain(root, mainBuildDir, null)
             val webView = FullStackedWebView(this, ctxId = defaultCtxId.toByte())
             this.stackedWebViews.add(webView)
         }
+
+        // Launched by a deeplink (AuthCallbackActivity forwards fullstacked:// links)
+        intent?.getStringExtra(EXTRA_DEEPLINK)?.let { Core.deepLinkAll(it) }
 
         AuthManager.registerActivity(this)
 

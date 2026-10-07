@@ -1,6 +1,6 @@
 #include <stdint.h>
 
-typedef uint8_t (*Start)(char *root, char *build, char *deeplink);
+typedef uint8_t (*Start)(char *root, char *build);
 typedef bool (*Check)(uint8_t ctx);
 typedef void (*Stop)(uint8_t ctx);
 typedef void (*SetOnStreamData)(void *cb);

@@ -85,7 +85,8 @@ class WebkitGTKWindow : public Window {
 
 class WebkitGTKGUI : public GUI {
     public:
-        int run(int &argc, char **argv, std::function<void()> onReady) override;
+        int run(int &argc, char **argv, std::function<void()> onReady,
+                std::function<void(const std::string &)> onDeepLink) override;
         Window *createWindow(uint8_t ctx) override;
 
     private:

@@ -15,14 +15,38 @@ Window *WebkitGTKGUI::createWindow(uint8_t ctx) {
     return new WebkitGTKWindow(ctx, app);
 }
 
-int WebkitGTKGUI::run(int &argc, char **argv, std::function<void()> onReady) {
-    app = Gtk::Application::create("org.fullstacked");
+int WebkitGTKGUI::run(int &argc, char **argv, std::function<void()> onReady,
+                      std::function<void(const std::string &)> onDeepLink) {
+    // org.fullstacked is single instance: a second launch forwards its command
+    // line here (fullstacked:// deeplinks) and exits. Unknown options such as
+    // --kiosk are passed through since the app handles its command line.
+    app = Gtk::Application::create(
+        "org.fullstacked", Gio::Application::Flags::HANDLES_COMMAND_LINE);
     WebKitWebContext *context = webkit_web_context_get_default();
     webkit_web_context_register_uri_scheme(
         context, "fs", WebkitGTKWindow::webKitURISchemeRequestCallback, nullptr,
         nullptr);
     app->signal_startup().connect(onReady);
-    return app->run();
+    app->signal_command_line().connect(
+        [onDeepLink](
+            const Glib::RefPtr<Gio::ApplicationCommandLine> &cmdline) -> int {
+            // The first launch reads its own arguments in main.cpp
+            if (!cmdline->is_remote()) {
+                return 0;
+            }
+            int cmdArgc = 0;
+            char **cmdArgv = cmdline->get_arguments(cmdArgc);
+            for (int i = 1; i < cmdArgc; i++) {
+                std::string arg(cmdArgv[i]);
+                if (arg.rfind("fullstacked", 0) == 0) {
+                    onDeepLink(arg);
+                }
+            }
+            g_strfreev(cmdArgv);
+            return 0;
+        },
+        false);
+    return app->run(argc, argv);
 }
 
 WebkitGTKWindow::WebkitGTKWindow(uint8_t pCtx,

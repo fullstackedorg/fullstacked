@@ -1,8 +1,10 @@
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
+using Microsoft.Windows.AppLifecycle;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Windows.ApplicationModel.Activation;
 
 namespace FullStacked
 {
@@ -27,8 +29,20 @@ namespace FullStacked
         }
 
 
-        protected override void OnLaunched(LaunchActivatedEventArgs args)
+        protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
+            // Single instance: a second launch (e.g. a fullstacked:// deeplink while the
+            // app runs) hands its activation to the running instance and exits.
+            AppActivationArguments activation = AppInstance.GetCurrent().GetActivatedEventArgs();
+            AppInstance mainInstance = AppInstance.FindOrRegisterForKey("main");
+            if (!mainInstance.IsCurrent)
+            {
+                await mainInstance.RedirectActivationToAsync(activation);
+                System.Diagnostics.Process.GetCurrentProcess().Kill();
+                return;
+            }
+            mainInstance.Activated += onActivated;
+
             dispatcherQueue = DispatcherQueue.GetForCurrentThread();
 
             core = new(new Core.CoreCallbackDelegate(onStreamData));
@@ -45,6 +59,47 @@ namespace FullStacked
 
             byte mainCtx = core.start(appDataFolder, buildFolder);
             this.open(mainCtx);
+
+            string launchDeepLink = getDeepLink(activation);
+            if (launchDeepLink != null)
+            {
+                this.deepLink(launchDeepLink);
+            }
+        }
+
+        private static string getDeepLink(AppActivationArguments activation)
+        {
+            if (activation.Kind == ExtendedActivationKind.Protocol &&
+                activation.Data is IProtocolActivatedEventArgs protocolArgs)
+            {
+                return protocolArgs.Uri.AbsoluteUri;
+            }
+            return null;
+        }
+
+        // Activation redirected from another launch of the app
+        private void onActivated(object sender, AppActivationArguments activation)
+        {
+            string url = getDeepLink(activation);
+            if (url != null)
+            {
+                this.deepLink(url);
+            }
+        }
+
+        // A deeplink comes from the outside: trigger it in every context we manage.
+        public void deepLink(string url)
+        {
+            if (dispatcherQueue != null && !dispatcherQueue.HasThreadAccess)
+            {
+                dispatcherQueue.TryEnqueue(() => deepLink(url));
+                return;
+            }
+
+            foreach (byte ctx in new List<byte>(this.webviews.Keys))
+            {
+                core.deepLink(ctx, url);
+            }
         }
 
         public void Safe()

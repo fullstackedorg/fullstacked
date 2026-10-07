@@ -11,13 +11,15 @@ class Core {
         using StreamDataCallback = std::function<void(
             uint8_t ctx, uint8_t streamId, const std::vector<uint8_t> &data)>;
 
-        static uint8_t start(const std::string &root, const std::string &build,
-                             const std::string &deeplink = "");
+        static void init();
+        static uint8_t start(const std::string &root, const std::string &build);
         static uint8_t startSafe(const std::string &root,
                                  const std::string &build);
         static void startWithCtx(const std::string &root,
-                                 const std::string &build, uint8_t ctxId,
-                                 const std::string &deeplink = "");
+                                 const std::string &build, uint8_t ctxId);
+        // Calls Core Fn DeepLink in ctx: the deeplink plugins of ctx receive
+        // url
+        static void deepLink(uint8_t ctxId, const std::string &url);
         static int check(uint8_t ctxId);
         static void stop(uint8_t ctxId);
         static std::vector<uint8_t>

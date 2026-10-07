@@ -142,7 +142,8 @@ function getPositionalArgs(args: string[]): string[] {
         ["-e", "--env"],
         ["-p", "--port"],
         ["-p", "--plugin"],
-        ["-f", "--file"]
+        ["-f", "--file"],
+        ["-l", "--deeplink"]
     ];
     const booleanFlags = [
         ["-h", "--help"],
@@ -195,7 +196,8 @@ function getExtraArgs(args: string[]): string[] {
         ["-e", "--env"],
         ["-p", "--port"],
         ["-p", "--plugin"],
-        ["-f", "--file"]
+        ["-f", "--file"],
+        ["-l", "--deeplink"]
     ];
     const booleanFlags = [
         ["-h", "--help"],
@@ -433,6 +435,7 @@ async function runDirectory(
     noOpen: boolean,
     env: Record<string, string>,
     safe: boolean,
+    deeplink: string | undefined,
     writeOut: (msg: any) => void,
     writeErr: (msg: any) => void
 ): Promise<number> {
@@ -509,6 +512,11 @@ async function runDirectory(
     await cleanupPlugins();
     if (!noOpen && typeof newCtx === "number") {
         globalThis.fullstacked.open?.(newCtx);
+    }
+    // Like a platform receiving a deeplink: the project has not registered its
+    // deeplink plugin yet, so the core keeps the link until it does.
+    if (deeplink && typeof newCtx === "number") {
+        await plugin.deeplink(deeplink, newCtx);
     }
     return 0;
 }
@@ -597,6 +605,7 @@ Options:
   -b, --build   Only bundle the project, don't run it afterward
   -f, --file    Bundle and execute a single script file
   -s, --safe    Skip the initialDirectory config check
+  -l, --deeplink Trigger a deeplink (fullstacked://...) in the project once it runs
   -h, --help    Display this help message
 
 Directory:
@@ -612,6 +621,7 @@ Directory:
     const envArgs = findArgValues(["-e", "--env"], args);
     const pluginsArgs = findArgValues(["-p", "--plugin"], args);
     const safe = hasArgFlag(["-s", "--safe"], args);
+    const deeplink = findArgValues(["-l", "--deeplink"], args).at(0);
     const positionals = getPositionalArgs(args);
 
     const cliEnv: Record<string, string> = {};
@@ -648,6 +658,7 @@ Directory:
         noOpen,
         env,
         safe,
+        deeplink,
         writeOut,
         writeErr
     );

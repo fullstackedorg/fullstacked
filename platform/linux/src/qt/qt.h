@@ -3,6 +3,8 @@
 
 #include "../gui.h"
 #include <QApplication>
+#include <QLocalServer>
+#include <QLocalSocket>
 #include <QMainWindow>
 #include <QObject>
 #include <QTimer>
@@ -118,11 +120,13 @@ class Bridge : public QObject {
 
 class QtGUI : public GUI {
     public:
-        int run(int &argc, char **argv, std::function<void()> onReady) override;
+        int run(int &argc, char **argv, std::function<void()> onReady,
+                std::function<void(const std::string &)> onDeepLink) override;
         Window *createWindow(uint8_t ctx) override;
 
     private:
         QApplication *app = nullptr;
+        QLocalServer *instanceServer = nullptr;
         SchemeHandler *schemeHandler = nullptr;
 };
 

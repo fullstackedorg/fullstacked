@@ -5,24 +5,22 @@ import AuthenticationServices
 let platform = "apple"
 let downloadDirectory = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first! + "/downloads";
 
-func startMain(_ providedCtx: UInt8?, _ safe: Bool?, _ deeplink: String? = nil) -> UInt8 {
+func startMain(_ providedCtx: UInt8?, _ safe: Bool?) -> UInt8 {
     let rootPtr = root.ptr()
     let buildPtr = build.ptr()
-    let deeplinkPtr = (deeplink ?? "").ptr()
     
     var ctx: UInt8
     if(safe == true) {
         ctx = startSafe(rootPtr, buildPtr)
     } else if(providedCtx == nil) {
-        ctx = start(rootPtr, buildPtr, deeplinkPtr)
+        ctx = start(rootPtr, buildPtr)
     } else {
-        startWithCtx(rootPtr, buildPtr, providedCtx!, deeplinkPtr)
+        startWithCtx(rootPtr, buildPtr, providedCtx!)
         ctx = providedCtx!
     }
     
     rootPtr?.deallocate()
     buildPtr?.deallocate()
-    deeplinkPtr?.deallocate()
     
     return ctx
 }
@@ -79,13 +77,13 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         super.init(frame: CGRect(), configuration: wkWebViewConfig)
     }
 
-    init(_ providedCtx: UInt8?, safe: Bool = false, deeplink: String? = nil) {
+    init(_ providedCtx: UInt8?, safe: Bool = false) {
         self.isSafe = safe
         
-        let ctx = providedCtx ?? startMain(nil, safe, deeplink)
+        let ctx = providedCtx ?? startMain(nil, safe)
         
         if check(ctx) == 0 {
-            _ = startMain(ctx, safe, deeplink)
+            _ = startMain(ctx, safe)
         }
         
         self.requestHandler = RequestHandler(ctx: ctx)

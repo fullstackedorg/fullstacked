@@ -60,6 +60,8 @@ type BridgeOpts = {
     mod: CoreModule;
     fn: number;
     data?: SerializableData[];
+    // context the call runs in (defaults to this runtime's context)
+    ctx?: number;
 };
 
 type BridgeAsync = (opts: BridgeOpts) => Promise<SerializableData>;
@@ -99,7 +101,7 @@ async function init() {
                 : null;
             const payload = new Uint8Array(5 + (data?.byteLength ?? 0));
 
-            payload[0] = platformBridge.bridge.ctx;
+            payload[0] = opts.ctx ?? platformBridge.bridge.ctx;
             payload[1] = id;
             payload[2] = opts.mod;
             payload[3] = opts.fn;

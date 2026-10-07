@@ -23,8 +23,7 @@ import java.util.concurrent.ConcurrentHashMap
 class FullStackedWebView(
     val ctx: MainActivity,
     val ctxId: Byte = 0,
-    val isSafe: Boolean = false,
-    val deeplink: String = ""
+    val isSafe: Boolean = false
 ) : WebViewClient() {
     var firstContact = false
     val messageToBeSent = mutableListOf<Pair<String, String>>()
@@ -35,7 +34,7 @@ class FullStackedWebView(
     init {
         val c = ctxId.toInt() and 0xFF
         if (Core.check(c) == 0) {
-            Core.startMain(ctx.getRootPath(), ctx.getMainLocation(), c, isSafe, deeplink)
+            Core.startMain(ctx.getRootPath(), ctx.getMainLocation(), c, isSafe)
         }
     }
 

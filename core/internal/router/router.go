@@ -36,6 +36,7 @@ const (
 	Chdir      CoreFn = 3
 	GetEnv     CoreFn = 4
 	Exit       CoreFn = 5
+	DeepLink   CoreFn = 6
 )
 
 /*
@@ -160,7 +161,7 @@ func Switch(
 			safe = data[2].Data.(bool)
 		}
 
-		id := store.NewContext(root, root, safe, "")
+		id := store.NewContext(root, root, safe)
 		response.Data = id
 
 		if len(data) > 1 && data[1].Type == types.OBJECT {
@@ -216,6 +217,13 @@ func Switch(
 	case Exit:
 		response.Type = types.CoreResponseData
 		store.ExitContext(ctx.Id)
+		return nil
+	case DeepLink:
+		if len(data) == 0 || data[0].Type != types.STRING {
+			return errors.New("deeplink requires a url string")
+		}
+		response.Type = types.CoreResponseData
+		response.Data = plugin.TriggerDeepLink(ctx, data[0].Data.(string))
 		return nil
 	}
 

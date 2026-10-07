@@ -63,6 +63,13 @@ struct FullStackedApp: App {
                 .ignoresSafeArea()
                 .navigationTitle(self.webViewStore.webViewsMeta[webView.id]?.0 ?? "FullStacked")
             
+                // fullstacked:// deeplinks: deliver to the existing window instead of
+                // opening a new one, then trigger them in every running context.
+                .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
+                .onOpenURL { url in
+                    self.webViewStore.deepLink(url.absoluteString)
+                }
+            
                 .onGeometryChange(for: CGSize.self) { proxy in
                     proxy.size
                 } action: { newSize in
@@ -256,6 +263,17 @@ class WebViewStore: ObservableObject {
         return false
     }
     #endif
+    
+    // A deeplink comes from the outside: trigger it in every running context.
+    func deepLink(_ url: String) {
+        var contexts = Set<UInt8>()
+        for webView in self.webViews where !self.closedIDs.contains(webView.id) {
+            let ctx = webView.requestHandler.ctx
+            if contexts.insert(ctx).inserted && check(ctx) == 1 {
+                _ = coreDeepLink(ctx: ctx, url: url)
+            }
+        }
+    }
     
     func addWebView(_ webView: WebView) {
         if !self.webViews.contains(where: { $0.id == webView.id }) {

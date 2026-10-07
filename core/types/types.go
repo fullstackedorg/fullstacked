@@ -1,6 +1,9 @@
 package types
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 type CoreModule = uint8
 
@@ -78,8 +81,9 @@ type ContextDirectories struct {
 type PluginType = string
 
 const (
-	PluginTypeGitAuth PluginType = "git-auth"
-	PluginTypeBuild   PluginType = "build"
+	PluginTypeGitAuth  PluginType = "git-auth"
+	PluginTypeBuild    PluginType = "build"
+	PluginTypeDeepLink PluginType = "deeplink"
 )
 
 type PluginRequest struct {
@@ -127,7 +131,17 @@ type Context struct {
 	GitAuths      map[string]*GitAuth
 	GitAuthsMutex *sync.Mutex
 
+	// Deeplinks received before a deeplink plugin registered in this context
+	// (e.g. the deeplink that launched the app), see plugin.TriggerDeepLink
+	PendingDeepLinks      []PendingDeepLink
+	PendingDeepLinksMutex *sync.Mutex
+
 	Exited bool
+}
+
+type PendingDeepLink struct {
+	Url        string
+	ReceivedAt time.Time
 }
 
 type SerializableData = any

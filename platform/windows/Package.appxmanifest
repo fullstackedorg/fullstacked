@@ -27,6 +27,13 @@
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
         <uap:LockScreen BadgeLogo="Assets\BadgeLogo.png" Notification="badge" />
       </uap:VisualElements>
+      <Extensions>
+        <uap:Extension Category="windows.protocol">
+          <uap:Protocol Name="fullstacked">
+            <uap:DisplayName>FullStacked</uap:DisplayName>
+          </uap:Protocol>
+        </uap:Extension>
+      </Extensions>
     </Application>
   </Applications>
 

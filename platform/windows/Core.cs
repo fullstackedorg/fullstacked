@@ -6,7 +6,7 @@ namespace FullStacked
 {
     unsafe internal abstract class CoreImplementation
     {
-        public abstract byte startCore(char* root, char* build, char* deeplink);
+        public abstract byte startCore(char* root, char* build);
         public abstract byte startSafeCore(char* root, char* build);
         public abstract void stopCore(byte ctxId);
         public abstract void setOnStreamDataCore(CoreOnStreamData cb);
@@ -52,15 +52,14 @@ namespace FullStacked
             return buffer;
         }
 
-        public byte start(string root, string build, string deeplink = "")
+        public byte start(string root, string build)
         {
             byte[] rootBuffer = strToBufferUTF8(root);
             byte[] buildBuffer = strToBufferUTF8(build);
-            byte[] deeplinkBuffer = strToBufferUTF8(deeplink);
 
-            fixed (byte* rootPtr = rootBuffer, buildPtr = buildBuffer, deeplinkPtr = deeplinkBuffer)
+            fixed (byte* rootPtr = rootBuffer, buildPtr = buildBuffer)
             {
-                return this.lib.startCore((char*)rootPtr, (char*)buildPtr, (char*)deeplinkPtr);
+                return this.lib.startCore((char*)rootPtr, (char*)buildPtr);
             }
         }
 
@@ -111,6 +110,23 @@ namespace FullStacked
                 this.lib.getCorePayloadCore(payload[0], 1, payload[1], responsePtr, responseSize);
             }
             return response;
+        }
+
+        // Calls Core Fn DeepLink in ctx: the deeplink plugins of ctx receive url.
+        public void deepLink(byte ctx, string url)
+        {
+            byte[] header = [
+                ctx,
+                0, // req id
+                0, // Core Module
+                6, // Fn DeepLink
+                0, // Async
+
+                ((byte)SerializableDataType.STRING),
+            ];
+            byte[] urlData = Encoding.UTF8.GetBytes(url);
+            byte[] urlLength = Serialization.NumberToUint4Bytes(urlData.Length);
+            this.call(Serialization.MergeBuffers([header, urlLength, urlData]));
         }
 
         public delegate void CoreCallbackDelegate(byte ctx, byte streamId, byte[] data);

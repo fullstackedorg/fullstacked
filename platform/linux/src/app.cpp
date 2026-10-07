@@ -19,7 +19,7 @@ void App::open(uint8_t ctx) {
     }
 
     if (Core::check(ctx) == 0) {
-        Core::startWithCtx(rootDir, buildDir, ctx, deeplink);
+        Core::startWithCtx(rootDir, buildDir, ctx);
     }
 
     Window *window = gui->createWindow(ctx);
@@ -63,6 +63,19 @@ void App::safeTrigger() {
     isSafeRunning = false;
 }
 
+// A deeplink comes from the outside: trigger it in every context we manage.
+void App::deepLink(const std::string &url) {
+    std::vector<uint8_t> ctxs;
+    for (const auto &pair : activeWindows) {
+        ctxs.push_back(pair.first);
+    }
+    for (uint8_t ctx : ctxs) {
+        if (Core::check(ctx) == 1) {
+            Core::deepLink(ctx, url);
+        }
+    }
+}
+
 void App::onStreamData(uint8_t ctx, uint8_t streamId,
                        const std::vector<uint8_t> &data) {
     auto it = activeWindows.find(ctx);
@@ -82,10 +95,15 @@ int App::run(int argc, char *argv[]) {
     rootDir = (homeEnv ? std::string(homeEnv) : "/tmp") + "/FullStacked";
     buildDir = getAppDir();
 
-    return gui->run(argc, argv, [this]() {
-        uint8_t mainCtx = this->safe
-                              ? Core::startSafe(rootDir, buildDir)
-                              : Core::start(rootDir, buildDir, this->deeplink);
-        open(mainCtx);
-    });
+    return gui->run(
+        argc, argv,
+        [this]() {
+            uint8_t mainCtx = this->safe ? Core::startSafe(rootDir, buildDir)
+                                         : Core::start(rootDir, buildDir);
+            open(mainCtx);
+            if (!this->deeplink.empty()) {
+                deepLink(this->deeplink);
+            }
+        },
+        [this](const std::string &url) { deepLink(url); });
 }

@@ -26,6 +26,7 @@ let tests = [
     "./worker/index.ts",
     "./readline/index.ts",
     "./config/index.ts",
+    "./deeplink/index.ts",
     "./fullstacked/index.ts"
 ];
 

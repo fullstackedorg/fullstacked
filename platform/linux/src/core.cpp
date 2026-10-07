@@ -1,12 +1,12 @@
 #include "./core.h"
+#include "./utils.h"
 #include <iostream>
 #include <mutex>
 
 extern "C" {
-extern uint8_t start(char *root, char *build, char *deeplink);
+extern uint8_t start(char *root, char *build);
 extern uint8_t startSafe(char *root, char *build);
-extern void startWithCtx(char *root, char *build, uint8_t ctxId,
-                         char *deeplink);
+extern void startWithCtx(char *root, char *build, uint8_t ctxId);
 extern int check(uint8_t ctxId);
 extern void stop(uint8_t ctxId);
 extern void setOnStreamData(void *cb);
@@ -35,11 +35,9 @@ void Core::init() {
     setOnStreamData(reinterpret_cast<void *>(c_onStreamData));
 }
 
-uint8_t Core::start(const std::string &root, const std::string &build,
-                    const std::string &deeplink) {
+uint8_t Core::start(const std::string &root, const std::string &build) {
     return ::start(const_cast<char *>(root.c_str()),
-                   const_cast<char *>(build.c_str()),
-                   const_cast<char *>(deeplink.c_str()));
+                   const_cast<char *>(build.c_str()));
 }
 
 uint8_t Core::startSafe(const std::string &root, const std::string &build) {
@@ -48,10 +46,23 @@ uint8_t Core::startSafe(const std::string &root, const std::string &build) {
 }
 
 void Core::startWithCtx(const std::string &root, const std::string &build,
-                        uint8_t ctxId, const std::string &deeplink) {
+                        uint8_t ctxId) {
     ::startWithCtx(const_cast<char *>(root.c_str()),
-                   const_cast<char *>(build.c_str()), ctxId,
-                   const_cast<char *>(deeplink.c_str()));
+                   const_cast<char *>(build.c_str()), ctxId);
+}
+
+void Core::deepLink(uint8_t ctxId, const std::string &url) {
+    std::vector<uint8_t> payload = {ctxId,
+                                    0, // req id
+                                    0, // Core Module
+                                    6, // Fn DeepLink
+                                    0, // Async
+                                    static_cast<uint8_t>(STRING)};
+    uint8_t urlLen[4];
+    numberToUint4Bytes(url.size(), urlLen);
+    payload.insert(payload.end(), urlLen, urlLen + 4);
+    payload.insert(payload.end(), url.begin(), url.end());
+    callCore(payload);
 }
 
 int Core::check(uint8_t ctxId) {

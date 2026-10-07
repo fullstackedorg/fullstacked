@@ -19,7 +19,7 @@ execute_process(
 
 set(CMAKE_CXX_STANDARD 20)
 
-find_package(Qt6 COMPONENTS Core Widgets WebEngineWidgets WebEngineCore WebChannel REQUIRED)
+find_package(Qt6 COMPONENTS Core Widgets Network WebEngineWidgets WebEngineCore WebChannel REQUIRED)
 
 qt_add_executable(${PROJECT_NAME} 
     src/main.cpp 
@@ -31,6 +31,7 @@ qt_add_executable(${PROJECT_NAME}
 set_target_properties(${PROJECT_NAME} PROPERTIES AUTOMOC ON)
 target_link_libraries(${PROJECT_NAME} PUBLIC 
     Qt6::Core Qt6::Widgets 
+    Qt6::Network
     Qt6::WebEngineWidgets
     Qt6::WebEngineCore 
     Qt6::WebChannel

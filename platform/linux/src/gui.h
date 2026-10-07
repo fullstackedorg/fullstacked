@@ -26,8 +26,11 @@ class GUI {
     public:
         virtual ~GUI() = default;
 
-        virtual int run(int &argc, char **argv,
-                        std::function<void()> onReady) = 0;
+        // onDeepLink receives fullstacked:// links given to a second launch
+        // of the app while it already runs.
+        virtual int
+        run(int &argc, char **argv, std::function<void()> onReady,
+            std::function<void(const std::string &)> onDeepLink) = 0;
         virtual Window *createWindow(uint8_t ctx) = 0;
 };
 

@@ -26,6 +26,7 @@ class App {
         std::map<uint8_t, Window *> activeWindows;
         std::string rootDir;
         std::string buildDir;
+        // fullstacked:// link the app was launched with
         std::string deeplink;
         bool kiosk = false;
         bool safe = false;
@@ -37,6 +38,7 @@ class App {
         void open(uint8_t ctx);
         void close(uint8_t ctx);
         void safeTrigger();
+        void deepLink(const std::string &url);
         void onStreamData(uint8_t ctx, uint8_t streamId,
                           const std::vector<uint8_t> &data);
 

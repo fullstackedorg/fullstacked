@@ -9,18 +9,14 @@
 extern "C" {
 
 JNIEXPORT jint JNICALL Java_org_fullstacked_Core_start
-        (JNIEnv *env, jobject thiz, jstring root, jstring build, jstring deeplink) {
+        (JNIEnv *env, jobject thiz, jstring root, jstring build) {
     const char* rootPtr = env->GetStringUTFChars(root, nullptr);
     const char* buildPtr = env->GetStringUTFChars(build, nullptr);
-    const char* deeplinkPtr = deeplink != nullptr ? env->GetStringUTFChars(deeplink, nullptr) : nullptr;
 
-    uint8_t ctxId = start(const_cast<char*>(rootPtr), const_cast<char*>(buildPtr), const_cast<char*>(deeplinkPtr != nullptr ? deeplinkPtr : ""));
+    uint8_t ctxId = start(const_cast<char*>(rootPtr), const_cast<char*>(buildPtr));
 
     env->ReleaseStringUTFChars(root, rootPtr);
     env->ReleaseStringUTFChars(build, buildPtr);
-    if (deeplinkPtr != nullptr) {
-        env->ReleaseStringUTFChars(deeplink, deeplinkPtr);
-    }
 
     return static_cast<jint>(ctxId);
 }
@@ -39,18 +35,14 @@ JNIEXPORT jint JNICALL Java_org_fullstacked_Core_startSafe
 }
 
 JNIEXPORT void JNICALL Java_org_fullstacked_Core_startWithCtx
-        (JNIEnv *env, jobject thiz, jstring root, jstring build, jint ctxId, jstring deeplink) {
+        (JNIEnv *env, jobject thiz, jstring root, jstring build, jint ctxId) {
     const char* rootPtr = env->GetStringUTFChars(root, nullptr);
     const char* buildPtr = env->GetStringUTFChars(build, nullptr);
-    const char* deeplinkPtr = deeplink != nullptr ? env->GetStringUTFChars(deeplink, nullptr) : nullptr;
 
-    startWithCtx(const_cast<char*>(rootPtr), const_cast<char*>(buildPtr), static_cast<uint8_t>(ctxId), const_cast<char*>(deeplinkPtr != nullptr ? deeplinkPtr : ""));
+    startWithCtx(const_cast<char*>(rootPtr), const_cast<char*>(buildPtr), static_cast<uint8_t>(ctxId));
 
     env->ReleaseStringUTFChars(root, rootPtr);
     env->ReleaseStringUTFChars(build, buildPtr);
-    if (deeplinkPtr != nullptr) {
-        env->ReleaseStringUTFChars(deeplink, deeplinkPtr);
-    }
 }
 
 JNIEXPORT jint JNICALL Java_org_fullstacked_Core_check

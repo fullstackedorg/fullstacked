@@ -17,6 +17,30 @@ func coreCall(payload: Data) -> Data {
     return response
 }
 
+// Calls Core Fn DeepLink in ctx: the deeplink plugins of ctx receive url.
+// Returns how many plugins were called.
+func coreDeepLink(ctx: UInt8, url: String) -> Int {
+    let urlData = url.data(using: .utf8)!
+    var payload = Data([
+        ctx,
+        RequestHandler.getNextReqId(), // req id
+        0, // Core Module
+        6, // Fn DeepLink
+        0, // Async
+        
+        SerializableDataType.STRING.rawValue,
+    ])
+    payload.append(NumberToUint4Bytes(num: urlData.count))
+    payload.append(urlData)
+    
+    let responseData = coreCall(payload: payload)
+    guard responseData.count > 1 else { return 0 }
+    let (count, _) = Deserialize(buffer: responseData, index: 1)
+    if let count = count as? Double { return Int(count) }
+    if let count = count as? Int { return count }
+    return 0
+}
+
 func onStreamDataCallback(
     ctx: UInt8,
     streamId: UInt8,

@@ -3,4 +3,4 @@ Version: 1.0.0-1780
 Maintainer: cplepage
 Architecture:
 Description: FullStacked
-Depends: libqt6webenginewidgets6, libqt6webchannel6
+Depends: libqt6webenginewidgets6, libqt6webchannel6, libqt6network6

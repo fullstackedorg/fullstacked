@@ -235,7 +235,8 @@ bool AuthWebEnginePage::acceptNavigationRequest(const QUrl &url,
     return QWebEnginePage::acceptNavigationRequest(url, type, isMainFrame);
 }
 
-int QtGUI::run(int &argc, char **argv, std::function<void()> onReady) {
+int QtGUI::run(int &argc, char **argv, std::function<void()> onReady,
+               std::function<void(const std::string &)> onDeepLink) {
     QByteArray existingFlags = qgetenv("QTWEBENGINE_CHROMIUM_FLAGS");
     if (existingFlags.isEmpty()) {
         qputenv("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox "
@@ -266,6 +267,43 @@ int QtGUI::run(int &argc, char **argv, std::function<void()> onReady) {
     QWebEngineUrlScheme::registerScheme(scheme);
 
     app = new QApplication(argc, argv);
+
+    // Single instance: a second launch forwards its fullstacked:// deeplinks
+    // to the running app over a local socket and exits.
+    const QString instanceName = QStringLiteral("org.fullstacked");
+    QLocalSocket runningInstance;
+    runningInstance.connectToServer(instanceName);
+    if (runningInstance.waitForConnected(300)) {
+        for (int i = 1; i < argc; i++) {
+            std::string arg(argv[i]);
+            if (arg.rfind("fullstacked", 0) == 0) {
+                runningInstance.write(QByteArray::fromStdString(arg + "\n"));
+            }
+        }
+        runningInstance.flush();
+        runningInstance.waitForBytesWritten(1000);
+        runningInstance.disconnectFromServer();
+        return 0;
+    }
+    QLocalServer::removeServer(instanceName);
+    instanceServer = new QLocalServer(app);
+    instanceServer->listen(instanceName);
+    QObject::connect(
+        instanceServer, &QLocalServer::newConnection, [this, onDeepLink]() {
+            QLocalSocket *client = instanceServer->nextPendingConnection();
+            QObject::connect(
+                client, &QLocalSocket::readyRead, [client, onDeepLink]() {
+                    while (client->canReadLine()) {
+                        std::string url =
+                            client->readLine().trimmed().toStdString();
+                        if (!url.empty()) {
+                            onDeepLink(url);
+                        }
+                    }
+                });
+            QObject::connect(client, &QLocalSocket::disconnected, client,
+                             &QObject::deleteLater);
+        });
 
     schemeHandler = new SchemeHandler(app);
     QWebEngineProfile::defaultProfile()->installUrlSchemeHandler("fs",

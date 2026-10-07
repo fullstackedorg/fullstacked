@@ -14,6 +14,8 @@ const (
 	StartPluginStream PluginFn = 0
 	Register          PluginFn = 1
 	Unregister        PluginFn = 2
+	// Ready: the JS runtime can receive calls for the registered plugin
+	Ready PluginFn = 3
 )
 
 func GetPluginsOfTypes(ctx *types.Context, pluginType types.PluginType) []*types.ContextPlugin {
@@ -123,6 +125,24 @@ func Switch(
 	case Unregister:
 		pluginId := (uint8)(data[0].Data.(float64))
 		unregisterPlugin(ctx, pluginId)
+
+		response.Type = types.CoreResponseData
+		response.Data = nil
+
+		return nil
+	case Ready:
+		pluginId := (uint8)(data[0].Data.(float64))
+
+		ctx.PluginsMutex.Lock()
+		plugin, ok := ctx.Plugins[pluginId]
+		ctx.PluginsMutex.Unlock()
+		if !ok {
+			return errors.New("plugin not found")
+		}
+
+		if plugin.Type == types.PluginTypeDeepLink {
+			deliverPendingDeepLinks(ctx, pluginId)
+		}
 
 		response.Type = types.CoreResponseData
 		response.Data = nil
