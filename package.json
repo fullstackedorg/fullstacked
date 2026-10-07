@@ -24,7 +24,7 @@
         "trailingComma": "none"
     },
     "dependencies": {
-        "@aws-sdk/client-s3": "^3.1146.0",
+        "@aws-sdk/client-s3": "^3.1147.0",
         "@tailwindcss/cli": "^4.3.3",
         "@types/node": "^26.6.4",
         "@types/pg": "^8.23.1",
@@ -37,7 +37,7 @@
         "crypto-browserify": "^3.12.1",
         "csstype": "^3.2.3",
         "dc-polyfill": "^0.1.11",
-        "dotenv": "^18.0.5",
+        "dotenv": "^18.0.6",
         "elliptic": "^6.6.1",
         "esbuild": "^0.28.2",
         "events": "^3.3.0",
@@ -53,7 +53,8 @@
         "util": "^0.12.5"
     },
     "overrides": {
-        "undici": "^8.10.2"
+        "pbkdf2": "^3.1.7",
+        "source-map-js": "^1.2.2"
     },
     "allowScripts": {
         "esbuild": true,
