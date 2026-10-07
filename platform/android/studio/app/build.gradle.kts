@@ -60,7 +60,7 @@ extensions.configure<com.android.build.api.dsl.ApplicationExtension> {
 }
 
 tasks.register<Zip>("zipAppOut") {
-    from("../../../../app/out")
+    from("../../../../shell/out")
     archiveFileName.set("out.zip")
     destinationDirectory.set(file("src/main/res/raw"))
 }

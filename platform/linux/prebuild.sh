@@ -18,7 +18,9 @@ if [ -f "bin/linux-$ARCH.h" ]; then
 fi
 
 mkdir -p ./out/usr/share/fullstacked
-if [ -d "../../app/out" ]; then
+if [ -d "../../shell/out" ]; then
+    cp -r ../../shell/out ./out/usr/share/fullstacked/app
+elif [ -d "../../app/out" ]; then
     cp -r ../../app/out ./out/usr/share/fullstacked/app
 fi
 

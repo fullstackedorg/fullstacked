@@ -24,7 +24,7 @@ IF "%arg1%" == "x64" (
     xcopy ..\bin\win32-x64.dll ..\..\platform\windows /y /q
 )
 
-SET SOURCE_DIR="..\..\app\out"
+SET SOURCE_DIR="..\..\shell\out"
 SET TARGET_DIR="..\..\platform\windows\out"
 
 IF "%arg1%" == "copy" (    

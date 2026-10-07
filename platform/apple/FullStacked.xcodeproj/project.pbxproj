@@ -32,7 +32,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		9C5516FD2F589B8D006B0B64 /* out */ = {isa = PBXFileReference; lastKnownFileType = folder; name = out; path = ../../../app/out; sourceTree = "<group>"; };
+		9C5516FD2F589B8D006B0B64 /* out */ = {isa = PBXFileReference; lastKnownFileType = folder; name = out; path = ../../../shell/out; sourceTree = "<group>"; };
 		9C5517032F594475006B0B64 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		9C5A1EDA2CDB99BB009B4A20 /* ios-arm64.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "ios-arm64.a"; path = "../../core/bin/ios-arm64.a"; sourceTree = SOURCE_ROOT; };
 		9C5A1EDE2CDB9AD6009B4A20 /* WebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebView.swift; sourceTree = "<group>"; };

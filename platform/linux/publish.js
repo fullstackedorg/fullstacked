@@ -76,10 +76,10 @@ const s3Client = new S3Client({
     }
 });
 
-// 2. Build main app
-console.log("Building main app...");
+// 2. Build shell app
+console.log("Building shell app...");
 child_process.execSync(
-    "npm start -- fullstacked app --plugin @fullstacked/tailwindcss --build",
+    "npm start -- fullstacked shell --build",
     {
         cwd: rootDirectory,
         stdio: "inherit"

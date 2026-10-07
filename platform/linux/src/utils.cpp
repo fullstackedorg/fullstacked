@@ -159,6 +159,16 @@ std::string getAppDir() {
     }
 
     // 4. Check development path fallbacks
+    std::string devShellPath = dir + "/../../../../shell/out";
+    if (std::filesystem::exists(devShellPath, ec)) {
+        return std::filesystem::canonical(devShellPath, ec).string();
+    }
+
+    std::string devShellPath2 = dir + "/../../shell/out";
+    if (std::filesystem::exists(devShellPath2, ec)) {
+        return std::filesystem::canonical(devShellPath2, ec).string();
+    }
+
     std::string devPath = dir + "/../../../../app/out";
     if (std::filesystem::exists(devPath, ec)) {
         return std::filesystem::canonical(devPath, ec).string();

@@ -10,7 +10,7 @@
         "test": "node --experimental-test-coverage --test-coverage-exclude='**/*.js' --test-coverage-exclude='**/*.cjs' --test-coverage-exclude='test/**/*' test/index.ts"
     },
     "workspaces": [
-        "app/*",
+        "shell",
         "platform/electron",
         "platform/node",
         "platform/wasm",
