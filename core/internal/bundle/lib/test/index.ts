@@ -10,7 +10,9 @@ import {
     SerializationIndex,
     Stream,
     StreamWrite,
-    Panic
+    Panic,
+    BenchEcho,
+    BenchStream
 } from "../@types/test.ts";
 import type { Duplex } from "../bridge/duplex.ts";
 import type { EventEmitter } from "../bridge/eventEmitter.ts";
@@ -109,6 +111,32 @@ function panic(message: string): void {
     );
 }
 
+// echoes data back, without data acts as a noop
+function benchEcho(data: Uint8Array | undefined, sync: true): Uint8Array;
+function benchEcho(
+    data: Uint8Array | undefined,
+    sync: false
+): Promise<Uint8Array>;
+function benchEcho(data: Uint8Array | undefined, sync: boolean) {
+    return globalThis.fullstacked.bridge(
+        {
+            mod: Test,
+            fn: BenchEcho,
+            data: data === undefined ? undefined : [data]
+        },
+        sync
+    );
+}
+
+// streams `total` bytes in chunks of `chunkSize`, stops early on end()
+function benchStream(total: number, chunkSize: number): Promise<Duplex> {
+    return globalThis.fullstacked.bridge({
+        mod: Test,
+        fn: BenchStream,
+        data: [total, chunkSize]
+    });
+}
+
 const test = {
     hello,
     serialization,
@@ -116,7 +144,9 @@ const test = {
     streaming,
     streamWrite,
     eventEmitter,
-    panic
+    panic,
+    benchEcho,
+    benchStream
 };
 
 export default test;

@@ -259,7 +259,44 @@ For each platform:
    mv output.json perfs/bench/[STAGE]-[COMMIT_HASH]/[PLATFORM].json
    ```
    *(Or specify the output file directly via `bench ... -o perfs/bench/[STAGE]-[COMMIT_HASH]/[PLATFORM].json`).*
+   On a device (iOS, Android) or any host where the repository isn't the working directory, upload the file to your machine with `curl` instead (see 4.5).
 7. Commit the resulting JSON file(s) to git to record benchmark history for that stage.
+
+### 4.5. Getting `output.json` off a Device with `curl`
+
+The shell's `curl` command follows the Unix `curl` arguments for uploads, so `output.json` can be sent to any server on the LAN that accepts POST or PUT uploads:
+
+| Option | Request |
+|---|---|
+| `-F, --form name=@file` | `POST` `multipart/form-data`, `name=@file;type=mime;filename=name` also supported |
+| `--data-binary @file` | `POST` with the raw file as the body |
+| `-d, --data @file` | `POST` `application/x-www-form-urlencoded`, CR/LF stripped like curl (avoid for JSON) |
+| `-T, --upload-file file` | `PUT` with the raw file, the file name is appended when the URL ends with `/` |
+
+Requests go through the Go core's `fetch`, so platform rules for plain-HTTP traffic (iOS ATS, Android cleartext) don't apply. On iOS, accept the Local Network permission prompt the first time.
+
+**1. Start the receiver on your machine** from the repository root:
+
+```sh
+node perfs/server.ts
+```
+
+It listens on port `8000` (or `node perfs/server.ts <port>`), logs the private LAN IP(s) to use, and saves each upload under `perfs/bench/` at the request path. Only JSON bodies are accepted. Raw bodies (`--data-binary`, `-T`) and multipart file parts (`-F`) both work.
+
+**2. Upload from the FullStacked shell on the device**, using the stage, commit and platform as the path:
+
+```sh
+curl --data-binary @output.json http://192.168.1.10:8000/stage1-5ffcd9c6/android.json
+```
+
+or with `PUT`, or as a multipart form:
+
+```sh
+curl -T output.json http://192.168.1.10:8000/stage1-5ffcd9c6/android.json
+curl -F file=@output.json http://192.168.1.10:8000/stage1-5ffcd9c6/android.json
+```
+
+The file lands in `perfs/bench/stage1-5ffcd9c6/android.json`, ready to commit.
 
 ---
 

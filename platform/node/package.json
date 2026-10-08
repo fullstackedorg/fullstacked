@@ -1,6 +1,6 @@
 {
     "name": "fullstacked",
-    "version": "1.0.0-alpha.1817",
+    "version": "1.0.0-alpha.1818",
     "bin": {
         "fullstacked": "index.js"
     },
@@ -54,6 +54,9 @@
         },
         "./run": {
             "types": "./types/run/index.d.ts"
+        },
+        "./test": {
+            "types": "./types/test/index.d.ts"
         },
         "./tunnel": {
             "types": "./types/tunnel/index.d.ts"
