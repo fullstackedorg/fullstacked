@@ -11,9 +11,7 @@
     },
     "workspaces": [
         "shell",
-        "platform/electron",
         "platform/node",
-        "platform/wasm",
         "plugins/*"
     ],
     "author": "FullStacked",

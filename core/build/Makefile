@@ -126,16 +126,6 @@ linux-arm64-static:
 	CC=aarch64-linux-gnu-gcc \
 	go build -buildmode=c-archive -o $(OUT)/linux-arm64.a -v ..
 
-
-###### WebAssembly #######
-
-wasm:
-	GOOS=js \
-	GOARCH=wasm \
-	go build -o $(OUT)/fullstacked.wasm -v ../wasm && \
-	cp -rf $(shell find $(HOME)/go -name "wasm_exec.js" | grep lib) $(OUT)/wasm_exec.js
-
-
 ###### Clean #######
 
 clean: 
