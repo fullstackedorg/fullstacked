@@ -1,8 +1,11 @@
 #include <napi.h>
+#include <cstring>
 #include <functional>
 #include <iostream>
 #include <map>
 #include <string>
+#include <thread>
+#include <vector>
 
 #ifdef _MSC_VER
 #include "./win.h"
@@ -102,6 +105,78 @@ Napi::ArrayBuffer N_Call(const Napi::CallbackInfo &info) {
     return response;
 }
 
+// Stream data of a context as binary frames for GET /stream, see
+// core/internal/frames
+Napi::Number N_StreamAttach(const Napi::CallbackInfo &info) {
+    uint32_t ctxId = info[0].As<Napi::Number>().Uint32Value();
+    return Napi::Number::New(info.Env(),
+                             lib.streamAttach(static_cast<uint8_t>(ctxId)));
+}
+
+void N_StreamDetach(const Napi::CallbackInfo &info) {
+    uint32_t ctxId = info[0].As<Napi::Number>().Uint32Value();
+    int gen = info[1].As<Napi::Number>().Int32Value();
+    lib.streamDetach(static_cast<uint8_t>(ctxId), gen);
+}
+
+struct FramesChunk {
+        std::vector<uint8_t> data;
+        bool end;
+};
+
+void CallFrames(Napi::Env env, Function callback, std::nullptr_t *context,
+                FramesChunk *chunk) {
+    if (env != nullptr && callback != nullptr) {
+        if (chunk->end) {
+            callback.Call({env.Null()});
+        } else {
+            Napi::ArrayBuffer buffer =
+                Napi::ArrayBuffer::New(env, chunk->data.size());
+            memcpy(buffer.Data(), chunk->data.data(), chunk->data.size());
+            callback.Call({buffer});
+        }
+    }
+    delete chunk;
+}
+using FramesTSFN = TypedThreadSafeFunction<std::nullptr_t, FramesChunk,
+                                           CallFrames>;
+
+// reads the frames on its own thread (streamRead blocks), calls back with
+// each batch and null once the reader ended
+void N_StreamStart(const Napi::CallbackInfo &info) {
+    Napi::Env env = info.Env();
+    uint8_t ctxId =
+        static_cast<uint8_t>(info[0].As<Napi::Number>().Uint32Value());
+    int gen = info[1].As<Napi::Number>().Int32Value();
+
+    FramesTSFN tsfn =
+        FramesTSFN::New(env, info[2].As<Function>(), "StreamFrames", 0, 1);
+    // does not keep the process alive
+    tsfn.Unref(env);
+
+    std::thread([tsfn, ctxId, gen]() mutable {
+        while (true) {
+            int size = 0;
+            void *frames = lib.streamRead(ctxId, gen, &size);
+            if (frames == nullptr) break;
+            uint8_t *bytes = static_cast<uint8_t *>(frames);
+            auto *chunk = new FramesChunk{
+                std::vector<uint8_t>(bytes, bytes + size), false};
+            lib.freePtr(frames);
+            if (tsfn.BlockingCall(chunk) != napi_ok) {
+                delete chunk;
+                lib.streamDetach(ctxId, gen);
+                break;
+            }
+        }
+        auto *end = new FramesChunk{{}, true};
+        if (tsfn.BlockingCall(end) != napi_ok) {
+            delete end;
+        }
+        tsfn.Release();
+    }).detach();
+}
+
 void N_Load(const Napi::CallbackInfo &info) {
     Napi::String libPath = info[0].As<Napi::String>().ToString();
     lib = loadLibrary(libPath.Utf8Value());
@@ -125,6 +200,15 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
 
     exports.Set(Napi::String::New(env, "call"),
                 Napi::Function::New(env, N_Call));
+
+    exports.Set(Napi::String::New(env, "streamAttach"),
+                Napi::Function::New(env, N_StreamAttach));
+
+    exports.Set(Napi::String::New(env, "streamStart"),
+                Napi::Function::New(env, N_StreamStart));
+
+    exports.Set(Napi::String::New(env, "streamDetach"),
+                Napi::Function::New(env, N_StreamDetach));
 
     exports.Set(Napi::String::New(env, "end"), Napi::Function::New(env, N_End));
     return exports;

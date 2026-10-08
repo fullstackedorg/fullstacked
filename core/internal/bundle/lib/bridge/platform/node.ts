@@ -1,6 +1,7 @@
 import { toByteArray } from "../base64.ts";
 import type { PlatformBridge } from "./index.ts";
 import { isWorker } from "../isWorker.ts";
+import { readFrameStream } from "../frames.ts";
 
 export async function BridgeNodeInit(): Promise<PlatformBridge> {
     if (isWorker) {
@@ -70,6 +71,11 @@ export async function BridgeNodeInit(): Promise<PlatformBridge> {
     });
 
     await webSocketForCallback;
+
+    // stream data as binary frames, the WebSocket stays for the fallback
+    if (!(await readFrameStream())) {
+        globalThis.fullstacked.streamTransport = "websocket";
+    }
 
     globalThis.fullstacked.open = function (ctx: number) {
         return globalThis.fullstacked.fetch("/open", {

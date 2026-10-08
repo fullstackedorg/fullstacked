@@ -98,7 +98,12 @@ function frameReceiver() {
             resolveHello(true);
             return;
         }
-        onStreamFrame(streamId, flags, data);
+        // a throwing listener must not stop the reader of every stream
+        try {
+            onStreamFrame(streamId, flags, data);
+        } catch (e) {
+            console.error(e);
+        }
     });
 
     const fail = () => {
@@ -135,6 +140,7 @@ export async function readFrameStream(): Promise<boolean> {
     })();
 
     const received = await hello;
+    globalThis.fullstacked.streamTransport = received ? "frames" : "evaluated";
     if (!received) {
         // the host detaches the reader when the response is cancelled
         controller.abort();
@@ -172,6 +178,9 @@ export async function readFrameSharedBuffers(webview: {
     }
 
     const received = await hello;
+    globalThis.fullstacked.streamTransport = received
+        ? "shared-buffers"
+        : "evaluated";
     if (!received) {
         webview.removeEventListener("sharedbufferreceived", onSharedBuffer);
         fetch("/stream/detach").catch(() => {});

@@ -114,6 +114,8 @@ function createHandler(core: Core, ctx: number) {
             const newCtx = await readBody(req);
             globalThis.fullstacked.open(newCtx[0]);
             return res.end();
+        } else if (pathname === "/stream") {
+            return streamFrames(core, ctx, res);
         } else if (pathname === "/call") {
             const payload = await coreCall(core, req);
             res.writeHead(200, {
@@ -142,6 +144,39 @@ function createHandler(core: Core, ctx: number) {
         });
         res.end(staticFile.data);
     };
+}
+
+// Stream data of the context as binary frames (see core/internal/frames)
+// until the context ends, the page reloads or goes away
+function streamFrames(core: Core, ctx: number, res: http.ServerResponse) {
+    const gen = core.streamAttach(ctx);
+    if (gen < 0) {
+        res.writeHead(404);
+        return res.end();
+    }
+
+    res.writeHead(200, {
+        "content-type": "application/octet-stream",
+        "cache-control": "no-cache"
+    });
+    res.flushHeaders();
+
+    let ended = false;
+    res.on("close", () => {
+        if (!ended) {
+            ended = true;
+            core.streamDetach(ctx, gen);
+        }
+    });
+
+    core.streamStart(ctx, gen, (frames) => {
+        if (frames === null) {
+            ended = true;
+            res.end();
+            return;
+        }
+        res.write(new Uint8Array(frames));
+    });
 }
 
 export function staticFileWithCore(

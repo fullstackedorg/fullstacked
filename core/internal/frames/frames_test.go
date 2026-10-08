@@ -33,7 +33,49 @@ func TestHelloAndFrames(t *testing.T) {
 	}
 }
 
+func withoutKeepalives(t *testing.T) {
+	delays := KeepaliveDelays
+	KeepaliveDelays = nil
+	t.Cleanup(func() { KeepaliveDelays = delays })
+}
+
+func TestKeepalives(t *testing.T) {
+	delays := KeepaliveDelays
+	KeepaliveDelays = []time.Duration{5 * time.Millisecond, 10 * time.Millisecond}
+	t.Cleanup(func() { KeepaliveDelays = delays })
+
+	q := NewQueue()
+	gen := q.Attach()
+	q.Read(gen)
+
+	// one keepalive per delay after data, then the reader waits for data
+	for i := range KeepaliveDelays {
+		if b := q.Read(gen); !bytes.Equal(b, []byte{0, 0, 0, 0, 0, 0}) {
+			t.Fatalf("keepalive %d: %v", i, b)
+		}
+	}
+
+	read := make(chan []byte)
+	go func() { read <- q.Read(gen) }()
+	select {
+	case b := <-read:
+		t.Fatalf("read %v without data", b)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	q.Push(1, FlagData, []byte("z"))
+	if b := <-read; len(b) != HeaderSize+1 {
+		t.Fatalf("read %v", b)
+	}
+
+	// data resets the keepalives
+	if b := q.Read(gen); len(b) != HeaderSize {
+		t.Fatalf("keepalive after data: %v", b)
+	}
+}
+
 func TestReattachEndsOldReader(t *testing.T) {
+	withoutKeepalives(t)
 	q := NewQueue()
 	old := q.Attach()
 	q.Read(old)

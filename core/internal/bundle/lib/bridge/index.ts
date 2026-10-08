@@ -29,6 +29,10 @@ type FullStacked = {
 
     onStreamData: (id: number, payload: ArrayBuffer | string) => void;
 
+    // how stream data reaches this runtime: frames (GET /stream),
+    // shared-buffers (WebView2), evaluated (onStreamData), websocket (Node)
+    streamTransport?: string;
+
     workerStreams: Map<number, any>;
 
     plugins: Map<number, JSPlugin>;

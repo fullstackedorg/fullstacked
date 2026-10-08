@@ -1,6 +1,7 @@
 package router
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fullstackedorg/fullstacked/internal/frames"
 	"fullstackedorg/fullstacked/internal/serialization"
@@ -43,7 +44,10 @@ func parseFrames(t *testing.T, buf []byte) []frame {
 			t.Fatalf("partial header %v", buf)
 		}
 		length := int(binary.BigEndian.Uint32(buf[2:6]))
-		parsed = append(parsed, frame{buf[0], buf[1], buf[6 : 6+length]})
+		// stream 0 is hello and keepalives
+		if buf[0] != 0 {
+			parsed = append(parsed, frame{buf[0], buf[1], buf[6 : 6+length]})
+		}
 		buf = buf[6+length:]
 	}
 	return parsed
@@ -57,8 +61,8 @@ func TestStreamFrames(t *testing.T) {
 	ctx, _ := store.GetContext(ctxId)
 
 	gen := ctx.Frames.Attach()
-	hello := parseFrames(t, ctx.Frames.Read(gen))
-	if len(hello) != 1 || hello[0].streamId != 0 {
+	hello := ctx.Frames.Read(gen)
+	if !bytes.Equal(hello, []byte{0, 0, 0, 0, 0, 0}) {
 		t.Fatalf("hello %v", hello)
 	}
 

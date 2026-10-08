@@ -19,6 +19,16 @@ export interface Core {
     setOnStreamData(
         cb: (ctx: number, streamId: number, buffer: ArrayBuffer) => void
     ): void;
+    // stream data of a context as binary frames for GET /stream, see
+    // core/internal/frames
+    streamAttach(ctx: number): number;
+    // calls back with each batch of frames, null once the reader ended
+    streamStart(
+        ctx: number,
+        gen: number,
+        cb: (frames: ArrayBuffer | null) => void
+    ): void;
+    streamDetach(ctx: number, gen: number): void;
     end(): void;
 }
 

@@ -15,6 +15,7 @@ package frames
 import (
 	"encoding/binary"
 	"sync"
+	"time"
 )
 
 const (
@@ -28,6 +29,18 @@ const (
 	MaxQueued = 8 << 20
 )
 
+// Webviews (WebKit, Android WebView) hold the last bytes of a streaming
+// response until more bytes arrive, which leaves the end of a stream with the
+// host. Once the queue is idle after data, Read returns keepalive frames
+// (stream 0, empty, like hello) at these delays to push the tail through,
+// the first one soon since the tail waits for it.
+var KeepaliveDelays = []time.Duration{
+	1 * time.Millisecond,
+	10 * time.Millisecond,
+	100 * time.Millisecond,
+	500 * time.Millisecond,
+}
+
 type Queue struct {
 	mu       sync.Mutex
 	cond     *sync.Cond
@@ -35,6 +48,11 @@ type Queue struct {
 	gen      int
 	attached bool
 	closed   bool
+
+	// keepalives returned since the last data, see KeepaliveDelays
+	keepalives int
+	// incremented by each keepalive timer that fires
+	timeouts int
 }
 
 func NewQueue() *Queue {
@@ -97,13 +115,32 @@ func (q *Queue) Read(gen int) []byte {
 	defer q.mu.Unlock()
 
 	for len(q.buf) == 0 && gen == q.gen && !q.closed {
+		if q.keepalives >= len(KeepaliveDelays) {
+			q.cond.Wait()
+			continue
+		}
+
+		timeouts := q.timeouts
+		timer := time.AfterFunc(KeepaliveDelays[q.keepalives], func() {
+			q.mu.Lock()
+			q.timeouts++
+			q.cond.Broadcast()
+			q.mu.Unlock()
+		})
 		q.cond.Wait()
+		timer.Stop()
+
+		if len(q.buf) == 0 && gen == q.gen && !q.closed && q.timeouts != timeouts {
+			q.keepalives++
+			return Encode(nil, 0, FlagData, nil)
+		}
 	}
 
 	if gen != q.gen || q.closed {
 		return nil
 	}
 
+	q.keepalives = 0
 	out := q.buf
 	q.buf = nil
 	// wake producers waiting on a full queue
