@@ -444,6 +444,15 @@ Each stage is measured with `bench` on every platform before and after. A stage 
 
 **Exit:** `echo` suite MB/s at 64k and 1m improves on every native platform. `noop` latency is at or below Node's.
 
+**Implementation notes:**
+
+- JS: `bridge/platform/transport.ts`. `postCall` posts the payload to `POST /call` with the native `fetch` (captured before the bridge replaces it) and returns the response body. `postSync` posts it with a sync XHR to `POST /sync`; a page cannot ask a sync XHR for an `arraybuffer`, so it reads the response as `text/plain; charset=x-user-defined` (one char per byte), workers read an `arraybuffer`. No base64 and no evaluated script on either path.
+- Apple, Windows and GTK always serve them, Qt from 6.7 (`QWebEngineUrlRequestJob::requestBody`). `GET /bridge` answers `binary` (or `message` on Qt < 6.7, which keeps the QWebChannel messages and the `/sync/{id}` awaiters). Apple reads `request.httpBody`, Windows `Request.Content`, GTK `webkit_uri_scheme_request_get_http_body` (WebKitGTK 6.0).
+- The calls of a page run in arrival order on the per webview serial queue of Stage 2 (Apple `DispatchQueue` now in `RequestHandler`, Windows chained tasks awaited by the request deferral, GTK `GThreadPool` of one thread, Qt `QThreadPool` of one thread), the response is sent on the UI thread.
+- Deleted on Apple, Windows and GTK: the `bridge` script message, `window.fullstacked.respond`, the `/sync/{id}` awaiters and the `Send` of the worker relay.
+- Workers: async calls still go through the main thread (`relayCall`), which records the streams they open to hand them their frames (a worker has no `/stream` reader). Sync calls of a worker post `POST /sync` themselves (a stream opened by a sync call of a worker was not forwarded before either).
+- Android: `shouldInterceptRequest` has no request body. Async calls are posted to a `WebViewCompat.addWebMessageListener` object (`fullstackedBridge`, origin `http://localhost`, main frame) as `ArrayBuffer` and answered `[id][response]` through the `JavaScriptReplyProxy`, run in order on a single thread executor per webview. Gated on `WEB_MESSAGE_LISTENER` and `WEB_MESSAGE_ARRAY_BUFFER` (androidx.webkit 1.14.0), otherwise the page keeps `android.coreCall`. Sync calls of the page stay on `@JavascriptInterface`; workers keep the relay and `/sync/{id}`, so the Kotlin awaiters stay for them.
+
 ### Stage 5: Unify and package
 
 **Goal:** one bridge implementation, minimal per-platform glue, and new platforms that are cheap to add.

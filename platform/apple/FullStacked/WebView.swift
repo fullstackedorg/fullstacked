@@ -53,7 +53,7 @@ class WebViewCloser: NSObject, WKScriptMessageHandler {
     }
 }
 
-class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WKDownloadDelegate, Codable, Identifiable, ASWebAuthenticationPresentationContextProviding {
+class WebView: WebViewExtended, WKNavigationDelegate, WKDownloadDelegate, Codable, Identifiable, ASWebAuthenticationPresentationContextProviding {
     
     var id = UUID()
     let open = WebViewOpen();
@@ -62,9 +62,6 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     public let requestHandler: RequestHandler
     
     public var isSafe = false
-    
-    // core calls of this webview run in order, off the main thread
-    private let coreQueue = DispatchQueue(label: "org.fullstacked.core", qos: .userInitiated)
     
     // responses and stream chunks received between two main thread ticks are
     // evaluated in one script
@@ -112,7 +109,6 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         
         self.isInspectable = true
         self.navigationDelegate = self
-        userContentController.add(WeakMessageHandler(self), name: "bridge")
         userContentController.add(WeakMessageHandler(self.open), name: "open")
         userContentController.add(WeakMessageHandler(self.closer), name: "exit")
         
@@ -134,7 +130,6 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         self.loadHTMLString("", baseURL: nil)
         self.removeFromSuperview()
         self.navigationDelegate = nil
-        self.configuration.userContentController.removeScriptMessageHandler(forName: "bridge")
         self.configuration.userContentController.removeScriptMessageHandler(forName: "open")
         self.configuration.userContentController.removeScriptMessageHandler(forName: "exit")
         self.configuration.userContentController.removeAllUserScripts()
@@ -227,27 +222,6 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         }
     }
     
-    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard let body = message.body as? String else { return }
-        
-        coreQueue.async { [weak self] in
-            guard let payload = Data(base64Encoded: body), payload.count >= 5 else { return }
-            let response = coreCall(payload: payload)
-            let id = payload[payload.startIndex + 1]
-            
-            // Sync
-            if(payload[payload.startIndex + 4] == 1) {
-                DispatchQueue.main.async {
-                    self?.requestHandler.resolveSyncAwaiter(id: id, payload: response)
-                }
-            }
-            // Async
-            else {
-                self?.queueScript("window.fullstacked.respond(\(id),`\(response.base64EncodedString())`)")
-            }
-        }
-    }
-    
     func webView(_ webView: WKWebView, didFinish didFinishNavigation: WKNavigation) {
         var title = webView.title
         if(title == nil || title!.isEmpty) {
@@ -288,8 +262,8 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
 
 class RequestHandler: NSObject, WKURLSchemeHandler {
     var ctx: UInt8
-    private var syncAwaitersResolve: [UInt8:((_ payload: Data) -> Void)] = [:]
-    private var syncAwaitersPayload: [UInt8:Data] = [:]
+    // core calls of this webview run in order, off the main thread
+    private let coreQueue = DispatchQueue(label: "org.fullstacked.core", qos: .userInitiated)
     private var stoppedTasks = Set<ObjectIdentifier>()
     private let tasksLock = NSLock()
     // GET /stream tasks and their reader generation, main thread only
@@ -301,20 +275,9 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
     
     func reset(ctx: UInt8) {
         self.ctx = ctx
-        self.syncAwaitersResolve.removeAll()
-        self.syncAwaitersPayload.removeAll()
         tasksLock.lock()
         stoppedTasks.removeAll()
         tasksLock.unlock()
-    }
-    
-    func resolveSyncAwaiter(id: UInt8, payload: Data) {
-        if let resolve = syncAwaitersResolve[id] {
-            resolve(payload)
-            syncAwaitersResolve.removeValue(forKey: id)
-        } else {
-            syncAwaitersPayload[id] = payload
-        }
     }
     
     func send(urlSchemeTask: WKURLSchemeTask,
@@ -378,29 +341,28 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
                       mimeType: "text/plain",
                       data: Data())
             return
-        } else if (pathname.starts(with: "sync")) {
-            let idStr = pathname.split(separator: "/").last!
-            let id = UInt8(idStr)!
-            
-            let sendCallback = {(payload: Data) -> Void in
+        } else if (pathname == "bridge") {
+            // the page posts its calls to /call and /sync
+            self.send(urlSchemeTask: urlSchemeTask,
+                      url: request.url!,
+                      statusCode: 200,
+                      mimeType: "text/plain",
+                      data: Data("binary".utf8))
+            return
+        } else if (pathname == "call" || pathname == "sync") {
+            // the body is the payload, the response the core response; sync is
+            // a sync XHR of the page, the same for the host
+            let payload = request.httpBody ?? Data()
+            coreQueue.async {
+                let response = coreCall(payload: payload)
                 DispatchQueue.main.async {
-                    self.send(
-                        urlSchemeTask: urlSchemeTask,
-                        url: request.url!,
-                        statusCode: 200,
-                        mimeType: "application/octet-stream",
-                        data: payload.base64EncodedData()
-                    )
+                    self.send(urlSchemeTask: urlSchemeTask,
+                              url: request.url!,
+                              statusCode: 200,
+                              mimeType: "application/octet-stream",
+                              data: response)
                 }
             }
-            
-            if let payload = self.syncAwaitersPayload[id] {
-                sendCallback(payload)
-                self.syncAwaitersPayload.removeValue(forKey: id)
-            } else {
-                self.syncAwaitersResolve[id] = sendCallback
-            }
-            
             return
         }
         

@@ -13,6 +13,10 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.webkit.JavaScriptReplyProxy
+import androidx.webkit.WebMessageCompat
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.io.PipedInputStream
@@ -20,6 +24,7 @@ import java.io.PipedOutputStream
 import java.nio.charset.StandardCharsets
 import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 
 class FullStackedWebView(
     val ctx: MainActivity,
@@ -158,7 +163,28 @@ class FullStackedWebView(
         }
     }
 
+    // async calls of the page, in order, off the UI thread
+    private val coreExecutor = Executors.newSingleThreadExecutor()
+
+    // An async call posted to fullstackedBridge (see createWebView): the payload
+    // as an ArrayBuffer, answered with [id][response], no base64 and no evaluated
+    // script
+    fun onCallMessage(message: WebMessageCompat, replyProxy: JavaScriptReplyProxy) {
+        if (message.type != WebMessageCompat.TYPE_ARRAY_BUFFER) return
+        val payload = message.arrayBuffer
+        if (payload.size < 5) return
+        val id = payload[1]
+        coreExecutor.execute {
+            val response = Core.coreCall(payload)
+            val reply = ByteArray(response.size + 1)
+            reply[0] = id
+            System.arraycopy(response, 0, reply, 1, response.size)
+            mainHandler.post { replyProxy.postMessage(reply) }
+        }
+    }
+
     fun destroyView() {
+        coreExecutor.shutdown()
         AuthManager.clearAuthSession(ctx, this)
         val c = ctxId.toInt() and 0xFF
         Core.stop(c)
@@ -450,6 +476,21 @@ fun createWebView(delegate: FullStackedWebView): WebView {
     webView.settings.setSupportMultipleWindows(true)
     webView.settings.domStorageEnabled = true
     webView.addJavascriptInterface(delegate, "android")
+    // binary async calls when the WebView supports ArrayBuffer messages,
+    // otherwise the page keeps calling android.coreCall
+    if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER) &&
+        WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_ARRAY_BUFFER)
+    ) {
+        WebViewCompat.addWebMessageListener(
+            webView,
+            "fullstackedBridge",
+            setOf("http://localhost")
+        ) { _, message, _, isMainFrame, replyProxy ->
+            if (isMainFrame) {
+                delegate.onCallMessage(message, replyProxy)
+            }
+        }
+    }
     webView.loadUrl("http://localhost")
 
     return webView

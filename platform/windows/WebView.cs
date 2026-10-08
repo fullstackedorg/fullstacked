@@ -50,10 +50,6 @@ namespace FullStacked
 
         private static byte[] notFoundPayload = Encoding.UTF8.GetBytes("Not Found");
 
-        private readonly object syncLock = new();
-        private Dictionary<byte, TaskCompletionSource<byte[]>> syncAwaitersResolve = [];
-        private Dictionary<byte, byte[]> syncAwaitersPayload = [];
-
         // core calls of this webview run in order, off the UI thread
         private readonly object coreQueueLock = new();
         private Task coreQueue = Task.CompletedTask;
@@ -243,17 +239,6 @@ namespace FullStacked
 
                 var coreWebView2 = this.coreWebView2 = this.controller.CoreWebView2;
 
-                coreWebView2.WebMessageReceived += delegate (CoreWebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
-            {
-                string base64 = args.TryGetWebMessageAsString();
-                lock (this.coreQueueLock)
-                {
-                    this.coreQueue = this.coreQueue.ContinueWith(
-                        _ => this.handleBridgeMessage(base64),
-                        TaskScheduler.Default
-                    );
-                }
-            };
             coreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
             coreWebView2.WebResourceRequested += async delegate (CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs args)
             {
@@ -296,48 +281,27 @@ namespace FullStacked
                     args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
                     return;
                 }
-                else if (pathname.StartsWith("/sync"))
+                else if (pathname == "/bridge")
                 {
-                    string idStr = pathname.Split("/").Last();
-                    byte id = byte.Parse(idStr);
-
-
-                    Action<byte[]> sendCallback = (byte[] payload) =>
-                    {
-                        string b64 = Convert.ToBase64String(payload);
-                        byte[] b64Buffer = Encoding.UTF8.GetBytes(b64);
-                        (stream, headers) = this.bufferToResponseStream(b64Buffer, "application/octet-stream");
-                        args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
-                    };
-
-
-                    // take the response or register the awaiter in one lock, the core
-                    // call completes on the core queue and can land in between
-                    byte[] cachedPayload;
-                    TaskCompletionSource<byte[]> resolve = null;
-                    lock (this.syncLock)
-                    {
-                        if (!this.syncAwaitersPayload.Remove(id, out cachedPayload))
-                        {
-                            resolve = new(TaskCreationOptions.RunContinuationsAsynchronously);
-                            this.syncAwaitersResolve[id] = resolve;
-                        }
-                    }
-
-                    if (resolve == null)
-                    {
-                        sendCallback(cachedPayload);
-                    }
-                    else
-                    {
-                        using (args.GetDeferral())
-                        {
-                            sendCallback(await resolve.Task);
-                        }
-                    }
-
+                    // the page posts its calls to /call and /sync
+                    (stream, headers) = this.bufferToResponseStream(Encoding.UTF8.GetBytes("binary"));
+                    args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
                     return;
-                } else if (pathname.StartsWith("/resize")) {
+                }
+                else if (pathname == "/call" || pathname == "/sync")
+                {
+                    // the body is the payload, the response the core response; sync is
+                    // a sync XHR of the page, the same for the host
+                    using (args.GetDeferral())
+                    {
+                        byte[] payload = await readRequestBody(args.Request);
+                        byte[] response = await this.enqueueCoreCall(payload);
+                        (stream, headers) = this.bufferToResponseStream(response, "application/octet-stream");
+                        args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
+                    }
+                    return;
+                }
+                else if (pathname.StartsWith("/resize")) {
                     var queryParams = this.parseQueryParams(uri);
 
                     using (args.GetDeferral())
@@ -521,41 +485,28 @@ namespace FullStacked
         }
     }
 
-    // runs on the core queue
-    private void handleBridgeMessage(string base64)
+    // calls of this webview run in order on the core queue, off the UI thread
+    private Task<byte[]> enqueueCoreCall(byte[] payload)
     {
-        try
+        lock (this.coreQueueLock)
         {
-            byte[] data = Convert.FromBase64String(base64);
-            byte[] response = App.core.call(data);
-
-            byte id = data[1];
-
-            // Sync
-            if (data[4] == 1)
-            {
-                lock (this.syncLock)
-                {
-                    if (this.syncAwaitersResolve.Remove(id, out TaskCompletionSource<byte[]> resolve))
-                    {
-                        resolve.SetResult(response);
-                    }
-                    else
-                    {
-                        this.syncAwaitersPayload[id] = response;
-                    }
-                }
-            }
-            // Async
-            else
-            {
-                this.queueScript("window.fullstacked.respond(" + id + ",`" + Convert.ToBase64String(response) + "`)");
-            }
+            Task<byte[]> call = this.coreQueue.ContinueWith(_ => App.core.call(payload), TaskScheduler.Default);
+            this.coreQueue = call;
+            return call;
         }
-        catch (Exception ex)
+    }
+
+    private static async Task<byte[]> readRequestBody(CoreWebView2WebResourceRequest request)
+    {
+        IRandomAccessStream content = request.Content;
+        if (content == null)
         {
-            System.Diagnostics.Debug.WriteLine($"Error in core call: {ex}");
+            return [];
         }
+        using Stream body = content.AsStreamForRead();
+        using MemoryStream buffer = new();
+        await body.CopyToAsync(buffer);
+        return buffer.ToArray();
     }
 
     public void onStreamData(byte streamId, byte[] data)

@@ -2,6 +2,12 @@ import type { PlatformBridge } from "./index.ts";
 import { fromByteArray, toByteArray } from "../base64.ts";
 import { isWorker } from "../isWorker.ts";
 import { readFrameStream } from "../frames.ts";
+import {
+    hostSupportsBinaryCalls,
+    postCall,
+    postSync,
+    relayCall
+} from "./transport.ts";
 
 const asyncResponsePromises = new Map<
     number,
@@ -80,6 +86,16 @@ export async function BridgeLinuxInit(): Promise<PlatformBridge> {
     // stream data as binary frames, workers get theirs through the main thread
     if (!isWorker) {
         await readFrameStream();
+    }
+
+    // GTK and Qt >= 6.7 read the request body of POST /call and /sync, older
+    // Qt keeps the messages over QWebChannel
+    if (await hostSupportsBinaryCalls()) {
+        return {
+            ctx,
+            Async: isWorker ? relayCall : postCall,
+            Sync: postSync
+        };
     }
 
     return {

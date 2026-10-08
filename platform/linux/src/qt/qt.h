@@ -8,6 +8,7 @@
 #include <QMainWindow>
 #include <QIODevice>
 #include <QObject>
+#include <QThreadPool>
 #include <QTimer>
 #include <QWebEnginePage>
 #include <QWebEngineProfile>
@@ -116,6 +117,11 @@ class QtWindow : public Window {
         QMainWindow *windowQt = nullptr;
         QWebEngineView *webEngineView = nullptr;
         Bridge *bridge = nullptr;
+
+        // POST /call and /sync of this window run in order, off the main
+        // thread (one thread)
+        QThreadPool *corePool = nullptr;
+        void handleCall(QWebEngineUrlRequestJob *job);
 
         std::mutex syncMutex;
         std::map<uint8_t, QWebEngineUrlRequestJob *> syncAwaitersResolve;

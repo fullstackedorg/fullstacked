@@ -21,10 +21,6 @@ class WebkitGTKWindow : public Window {
         Gtk::Window *authWindowGTK = nullptr;
         bool authResolved = false;
 
-        std::mutex syncMutex;
-        std::map<uint8_t, WebKitURISchemeRequest *> syncAwaitersResolve;
-        std::map<uint8_t, std::vector<uint8_t>> syncAwaitersPayload;
-
         // core calls of this window run in order, off the main thread
         GThreadPool *corePool = nullptr;
 
@@ -39,14 +35,12 @@ class WebkitGTKWindow : public Window {
         // webview (ref'd), the window is looked up from it once on the main
         // thread since it may have closed in between
         static WebkitGTKWindow *fromWebView(WebKitWebView *view);
-        static void runBridgeTask(gpointer data, gpointer userData);
-        static gboolean dispatchBridgeResult(gpointer userData);
+        static void runCallTask(gpointer data, gpointer userData);
+        static gboolean dispatchCallResult(gpointer userData);
         static void runStaticFileTask(gpointer data, gpointer userData);
         static gboolean dispatchStaticFileResult(gpointer userData);
         static gboolean flushScripts(gpointer userData);
 
-        static void onBridgeMessage(WebKitUserContentManager *manager,
-                                    JSCValue *value, gpointer userData);
         static void onOpenMessage(WebKitUserContentManager *manager,
                                   JSCValue *value, gpointer userData);
         static void onExitMessage(WebKitUserContentManager *manager,
@@ -77,9 +71,7 @@ class WebkitGTKWindow : public Window {
         void initWindow();
         void handleSchemeRequest(WebKitURISchemeRequest *request);
         void startFrameStream(WebKitURISchemeRequest *request);
-        void handleBridgeMessage(const std::string &payloadB64);
-        void resolveSyncAwaiter(uint8_t id,
-                                const std::vector<uint8_t> &payload);
+        void handleCall(WebKitURISchemeRequest *request);
 
         GtkWidget *createAuthWebView(WebKitNavigationAction *navigation_action);
         void closeAuthWindow(bool canceled = false);

@@ -12,6 +12,16 @@ declare global {
     };
 }
 
+// Injected by the host with WebViewCompat.addWebMessageListener when the
+// WebView supports ArrayBuffer messages: async calls go there as raw bytes
+// and come back as [id][response], no base64 and no evaluated script.
+declare global {
+    var fullstackedBridge: {
+        postMessage(message: ArrayBuffer): void;
+        onmessage: (event: MessageEvent<ArrayBuffer>) => void;
+    };
+}
+
 const asyncResponsePromises = new Map<
     number,
     (response: ArrayBuffer) => void
@@ -57,6 +67,15 @@ export async function BridgeAndroidInit(): Promise<PlatformBridge> {
         await readFrameStream();
     }
 
+    const messageBridge = isWorker ? null : globalThis.fullstackedBridge;
+    if (messageBridge) {
+        messageBridge.onmessage = (event) => {
+            const id = new Uint8Array(event.data)[0];
+            asyncResponsePromises.get(id)?.(event.data.slice(1));
+            asyncResponsePromises.delete(id);
+        };
+    }
+
     return {
         ctx,
         Send(payload) {
@@ -69,7 +88,9 @@ export async function BridgeAndroidInit(): Promise<PlatformBridge> {
             const id = dataView.getUint8(1);
             return new Promise<ArrayBuffer>((resolve) => {
                 asyncResponsePromises.set(id, resolve);
-                if (isWorker) {
+                if (messageBridge) {
+                    messageBridge.postMessage(payload);
+                } else if (isWorker) {
                     // transfer, the payload is not used after
                     globalThis.postMessage(payload, { transfer: [payload] });
                 } else {

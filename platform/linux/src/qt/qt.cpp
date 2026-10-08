@@ -111,6 +111,35 @@ qint64 FrameDevice::readData(char *data, qint64 maxSize) {
     return n;
 }
 
+// POST /call and /sync: the body is the payload, the response the core
+// response; sync is a sync XHR of the page, the same for the host
+void QtWindow::handleCall(QWebEngineUrlRequestJob *job) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+    QByteArray body = job->requestBody() ? job->requestBody()->readAll()
+                                         : QByteArray();
+    QPointer<QWebEngineUrlRequestJob> target(job);
+    corePool->start([body, target]() {
+        std::vector<uint8_t> payload(body.begin(), body.end());
+        auto response = Core::callCore(payload);
+        QByteArray data(reinterpret_cast<const char *>(response.data()),
+                        static_cast<qsizetype>(response.size()));
+        QMetaObject::invokeMethod(
+            qApp,
+            [target, data]() {
+                // the request may be cancelled meanwhile
+                if (!target) return;
+                auto *buffer = new QBuffer(target);
+                buffer->setData(data);
+                buffer->open(QIODevice::ReadOnly);
+                target->reply("application/octet-stream", buffer);
+            },
+            Qt::QueuedConnection);
+    });
+#else
+    job->fail(QWebEngineUrlRequestJob::UrlNotFound);
+#endif
+}
+
 SchemeHandler *SchemeHandler::instance = nullptr;
 
 SchemeHandler::SchemeHandler(QObject *parent)
@@ -566,6 +595,8 @@ class SafeKeyFilter : public QObject {
 
 void QtWindow::init() {
     windowQt = new QMainWindow();
+    corePool = new QThreadPool(windowQt);
+    corePool->setMaxThreadCount(1);
     windowQt->setWindowTitle("FullStacked");
     windowQt->resize(800, 600);
 
@@ -677,6 +708,27 @@ void QtWindow::handleSchemeRequest(QWebEngineUrlRequestJob *job) {
         job->reply("text/plain", buffer);
         return;
     }
+
+    if (path == "/bridge") {
+        // Qt >= 6.7 reads request bodies: the page posts its calls to /call
+        // and /sync, older Qt keeps the messages over QWebChannel
+        auto *buffer = new QBuffer(job);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+        buffer->setData("binary");
+#else
+        buffer->setData("message");
+#endif
+        buffer->open(QIODevice::ReadOnly);
+        job->reply("text/plain", buffer);
+        return;
+    }
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+    if (path == "/call" || path == "/sync") {
+        handleCall(job);
+        return;
+    }
+#endif
 
     if (path.startsWith("/sync/")) {
         uint8_t id = static_cast<uint8_t>(path.mid(6).toUInt());

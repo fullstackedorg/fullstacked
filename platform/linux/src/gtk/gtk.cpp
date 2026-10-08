@@ -157,15 +157,6 @@ void WebkitGTKWindow::webKitURISchemeRequestCallback(
     }
 }
 
-void WebkitGTKWindow::onBridgeMessage(WebKitUserContentManager *manager,
-                                      JSCValue *value, gpointer userData) {
-    auto *win = static_cast<WebkitGTKWindow *>(userData);
-    char *valStr = jsc_value_to_string(value);
-    std::string payload(valStr ? valStr : "");
-    g_free(valStr);
-    win->handleBridgeMessage(payload);
-}
-
 void WebkitGTKWindow::onOpenMessage(WebKitUserContentManager *manager,
                                     JSCValue *value, gpointer userData) {
     if (jsc_value_is_number(value)) {
@@ -464,7 +455,7 @@ void WebkitGTKWindow::initWindow() {
     g_object_set_data(G_OBJECT(webview), "fullstacked_window", this);
 
     // one thread: the calls of the window keep their order
-    corePool = g_thread_pool_new(runBridgeTask, nullptr, 1, FALSE, nullptr);
+    corePool = g_thread_pool_new(runCallTask, nullptr, 1, FALSE, nullptr);
 
     Gtk::Widget *widget = Glib::wrap(webviewWidget, false);
     windowGTK->set_child(*widget);
@@ -477,15 +468,11 @@ void WebkitGTKWindow::initWindow() {
 
     WebKitUserContentManager *ucm =
         webkit_web_view_get_user_content_manager(webview);
-    webkit_user_content_manager_register_script_message_handler(ucm, "bridge",
-                                                                NULL);
     webkit_user_content_manager_register_script_message_handler(ucm, "open",
                                                                 NULL);
     webkit_user_content_manager_register_script_message_handler(ucm, "exit",
                                                                 NULL);
 
-    g_signal_connect(ucm, "script-message-received::bridge",
-                     G_CALLBACK(WebkitGTKWindow::onBridgeMessage), this);
     g_signal_connect(ucm, "script-message-received::open",
                      G_CALLBACK(WebkitGTKWindow::onOpenMessage), this);
     g_signal_connect(ucm, "script-message-received::exit",
@@ -525,85 +512,52 @@ WebkitGTKWindow *WebkitGTKWindow::fromWebView(WebKitWebView *view) {
         g_object_get_data(G_OBJECT(view), "fullstacked_window"));
 }
 
-struct GtkBridgeTask {
-        WebKitWebView *webview; // ref'd
-        std::string payloadB64;
-};
-
-struct GtkBridgeResult {
-        WebKitWebView *webview; // ref'd
-        uint8_t id = 0;
-        bool isSync = false;
+struct GtkCallTask {
+        WebKitURISchemeRequest *request; // ref'd
+        std::vector<uint8_t> payload;
         std::vector<uint8_t> response;
-        std::string script;
 };
 
-void WebkitGTKWindow::handleBridgeMessage(const std::string &payloadB64) {
-    if (!corePool || !webview) return;
-    auto *task = new GtkBridgeTask();
-    task->webview = WEBKIT_WEB_VIEW(g_object_ref(webview));
-    task->payloadB64 = payloadB64;
+// POST /call and /sync: the body is the payload, the response the core
+// response; sync is a sync XHR of the page, the same for the host
+void WebkitGTKWindow::handleCall(WebKitURISchemeRequest *request) {
+    auto *task = new GtkCallTask();
+    task->request = WEBKIT_URI_SCHEME_REQUEST(g_object_ref(request));
+
+    GInputStream *body = webkit_uri_scheme_request_get_http_body(request);
+    if (body) {
+        uint8_t chunk[16384];
+        gssize n;
+        while ((n = g_input_stream_read(body, chunk, sizeof(chunk), nullptr,
+                                        nullptr)) > 0) {
+            task->payload.insert(task->payload.end(), chunk, chunk + n);
+        }
+        g_object_unref(body);
+    }
+
+    if (!corePool) {
+        dispatchCallResult(task);
+        return;
+    }
     g_thread_pool_push(corePool, task, nullptr);
 }
 
 // runs on the window core pool
-void WebkitGTKWindow::runBridgeTask(gpointer data, gpointer userData) {
-    auto *task = static_cast<GtkBridgeTask *>(data);
-    auto *result = new GtkBridgeResult();
-    result->webview = task->webview;
+void WebkitGTKWindow::runCallTask(gpointer data, gpointer userData) {
+    auto *task = static_cast<GtkCallTask *>(data);
+    task->response = Core::callCore(task->payload);
+    task->payload.clear();
+    // default priority: idle sources wait while requests keep coming
+    g_idle_add_full(G_PRIORITY_DEFAULT, dispatchCallResult, task, nullptr);
+}
 
-    std::string payloadRaw = base64_decode(task->payloadB64);
+gboolean WebkitGTKWindow::dispatchCallResult(gpointer userData) {
+    auto *task = static_cast<GtkCallTask *>(userData);
+    sendGtkResponse(task->request, task->response.data(),
+                    task->response.size(), "application/octet-stream");
+    g_object_unref(task->request);
     delete task;
-    std::vector<uint8_t> payload(payloadRaw.begin(), payloadRaw.end());
-
-    if (payload.size() >= 5) {
-        auto response = Core::callCore(payload);
-        result->id = payload[1];
-        result->isSync = payload[4] == 1;
-        if (result->isSync) {
-            result->response = std::move(response);
-        } else {
-            std::string respB64 =
-                base64_encode(response.data(), response.size());
-            result->script = "window.fullstacked.respond(" +
-                             std::to_string(result->id) + ", `" + respB64 +
-                             "`)";
-        }
-    }
-
-    // default priority: idle sources wait while messages keep coming
-    g_idle_add_full(G_PRIORITY_DEFAULT, dispatchBridgeResult, result, nullptr);
-}
-
-gboolean WebkitGTKWindow::dispatchBridgeResult(gpointer userData) {
-    auto *result = static_cast<GtkBridgeResult *>(userData);
-    WebkitGTKWindow *win = fromWebView(result->webview);
-    if (win) {
-        if (result->isSync) {
-            win->resolveSyncAwaiter(result->id, result->response);
-        } else if (!result->script.empty()) {
-            win->queueScript(result->script);
-        }
-    }
-    g_object_unref(result->webview);
-    delete result;
     return G_SOURCE_REMOVE;
-}
-
-void WebkitGTKWindow::resolveSyncAwaiter(uint8_t id,
-                                         const std::vector<uint8_t> &payload) {
-    std::lock_guard<std::mutex> lock(syncMutex);
-    auto it = syncAwaitersResolve.find(id);
-    if (it != syncAwaitersResolve.end()) {
-        WebKitURISchemeRequest *req = it->second;
-        syncAwaitersResolve.erase(it);
-        std::string b64 = base64_encode(payload.data(), payload.size());
-        sendGtkResponse(req, b64.data(), b64.size(),
-                        "application/octet-stream");
-        g_object_unref(req);
-    } else {
-        syncAwaitersPayload[id] = payload;
-    }
 }
 
 void WebkitGTKWindow::handleSchemeRequest(WebKitURISchemeRequest *request) {
@@ -638,22 +592,15 @@ void WebkitGTKWindow::handleSchemeRequest(WebKitURISchemeRequest *request) {
         return;
     }
 
-    if (path.rfind("/sync/", 0) == 0) {
-        std::string idStr = path.substr(6);
-        uint8_t id = static_cast<uint8_t>(std::stoi(idStr));
+    if (path == "/bridge") {
+        // the page posts its calls to /call and /sync
+        std::string binary = "binary";
+        sendGtkResponse(request, binary.data(), binary.size(), "text/plain");
+        return;
+    }
 
-        std::lock_guard<std::mutex> lock(syncMutex);
-        auto it = syncAwaitersPayload.find(id);
-        if (it != syncAwaitersPayload.end()) {
-            auto payload = it->second;
-            syncAwaitersPayload.erase(it);
-            std::string b64 = base64_encode(payload.data(), payload.size());
-            sendGtkResponse(request, b64.data(), b64.size(),
-                            "application/octet-stream");
-        } else {
-            g_object_ref(request);
-            syncAwaitersResolve[id] = request;
-        }
+    if (path == "/call" || path == "/sync") {
+        handleCall(request);
         return;
     }
 

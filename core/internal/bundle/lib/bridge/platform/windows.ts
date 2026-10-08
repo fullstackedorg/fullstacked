@@ -1,40 +1,12 @@
 import type { PlatformBridge } from "./index.ts";
-import { fromByteArray, toByteArray } from "../base64.ts";
 import { isWorker } from "../isWorker.ts";
 import { readFrameSharedBuffers } from "../frames.ts";
-
-const asyncResponsePromises = new Map<
-    number,
-    (response: ArrayBuffer) => void
->();
+import { postCall, postSync, relayCall } from "./transport.ts";
 
 export async function BridgeWindowsInit(): Promise<PlatformBridge> {
-    globalThis.fullstacked.respond = function (
-        id: number,
-        responseBase64: string
-    ) {
-        const promise = asyncResponsePromises.get(id);
-        promise?.(toByteArray(responseBase64).buffer);
-        asyncResponsePromises.delete(id);
-    };
-
     const ctx = await (await fetch("/ctx")).json();
 
-    if (isWorker) {
-        globalThis.onmessage = (event) => {
-            if (!(event.data instanceof ArrayBuffer)) {
-                return;
-            }
-            const buffer: ArrayBuffer = event.data;
-            const dataView = new DataView(buffer);
-            const id = dataView.getUint8(0);
-            const response = new Uint8Array(buffer.byteLength - 1);
-            response.set(new Uint8Array(buffer, 1));
-            const promise = asyncResponsePromises.get(id);
-            promise?.(response.buffer);
-            asyncResponsePromises.delete(id);
-        };
-    } else {
+    if (!isWorker) {
         globalThis.fullstacked.exit = () =>
             globalThis.fullstacked.fetch("/exit");
 
@@ -56,40 +28,7 @@ export async function BridgeWindowsInit(): Promise<PlatformBridge> {
 
     return {
         ctx,
-        Send(payload) {
-            globalThis.chrome.webview.postMessage(
-                fromByteArray(new Uint8Array(payload))
-            );
-        },
-        async Async(payload) {
-            const dataView = new DataView(payload);
-            const id = dataView.getUint8(1);
-            return new Promise<ArrayBuffer>((resolve) => {
-                asyncResponsePromises.set(id, resolve);
-                if (isWorker) {
-                    // transfer, the payload is not used after
-                    globalThis.postMessage(payload, { transfer: [payload] });
-                } else {
-                    const base64 = fromByteArray(new Uint8Array(payload));
-                    globalThis.chrome.webview.postMessage(base64);
-                }
-            });
-        },
-        Sync(payload) {
-            const uint8array = new Uint8Array(payload);
-            const id = uint8array[1];
-            if (isWorker) {
-                // transfer, the payload is not used after
-                globalThis.postMessage(payload, { transfer: [payload] });
-            } else {
-                const base64 = fromByteArray(uint8array);
-                globalThis.chrome.webview.postMessage(base64);
-            }
-            const xmlHttpRequest = new XMLHttpRequest();
-            xmlHttpRequest.open("POST", `/sync/${id}`, false);
-            xmlHttpRequest.send();
-            const response = xmlHttpRequest.response;
-            return toByteArray(response).buffer;
-        }
+        Async: isWorker ? relayCall : postCall,
+        Sync: postSync
     };
 }
