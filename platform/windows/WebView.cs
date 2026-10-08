@@ -652,7 +652,8 @@ namespace FullStacked
             {
                 // closing on this side does not affect the access of the page
                 using CoreWebView2SharedBuffer sharedBuffer = this.environment.CreateSharedBuffer((ulong)frames.Length);
-                using (Stream stream = sharedBuffer.OpenStream())
+                // OpenStream is a WinRT stream, unbuffered adapter so the frames are written once
+                using (Stream stream = sharedBuffer.OpenStream().AsStreamForWrite(0))
                 {
                     stream.Write(frames, 0, frames.Length);
                 }
