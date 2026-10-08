@@ -1,11 +1,11 @@
 {
   "meta": {
     "commit": "f63299e9",
-    "branch": "v1-perfs",
+    "branch": "HEAD",
     "platform": "linux",
-    "arch": "amd64",
+    "arch": "arm64",
     "fullstackedVersion": "1.0.0-alpha.1819",
-    "timestamp": "2026-10-08T15:36:15.816Z",
+    "timestamp": "2026-10-08T20:09:38.512Z",
     "options": {
       "iterations": 200,
       "echoSizes": [
@@ -36,100 +36,100 @@
     {
       "suite": "noop",
       "name": "noop sync",
-      "meanMs": 1.643,
-      "p95Ms": 1.9,
-      "opsPerSec": 608.75
+      "meanMs": 0.421,
+      "p95Ms": 0.6,
+      "opsPerSec": 2383.8
     },
     {
       "suite": "noop",
       "name": "noop async",
-      "meanMs": 0.264,
-      "p95Ms": 0.35,
-      "opsPerSec": 3794.3
+      "meanMs": 0.167,
+      "p95Ms": 0.25,
+      "opsPerSec": 6126.55
     },
     {
       "suite": "echo",
       "name": "echo sync 1k",
-      "meanMs": 2.202,
-      "p95Ms": 2.5,
-      "opsPerSec": 454.15,
-      "mbPerSec": 0.885
+      "meanMs": 0.447,
+      "p95Ms": 0.6,
+      "opsPerSec": 2237.2,
+      "mbPerSec": 4.37
     },
     {
       "suite": "echo",
       "name": "echo async 1k",
-      "meanMs": 0.853,
-      "p95Ms": 1,
-      "opsPerSec": 1173.15,
-      "mbPerSec": 2.295
+      "meanMs": 0.223,
+      "p95Ms": 0.3,
+      "opsPerSec": 4520.25,
+      "mbPerSec": 8.83
     },
     {
       "suite": "echo",
       "name": "echo sync 64k",
-      "meanMs": 37.403,
-      "p95Ms": 38.7,
-      "opsPerSec": 26.75,
-      "mbPerSec": 3.345
+      "meanMs": 3.681,
+      "p95Ms": 4.15,
+      "opsPerSec": 271.7,
+      "mbPerSec": 33.965
     },
     {
       "suite": "echo",
       "name": "echo async 64k",
-      "meanMs": 44.598,
-      "p95Ms": 121.45,
-      "opsPerSec": 22.45,
-      "mbPerSec": 2.8
+      "meanMs": 3.575,
+      "p95Ms": 4.05,
+      "opsPerSec": 279.9,
+      "mbPerSec": 34.99
     },
     {
       "suite": "concurrent",
       "name": "concurrent noop x32",
-      "durationMs": 77.7,
-      "opsPerSec": 4706.25
+      "durationMs": 2.45,
+      "opsPerSec": 81939.8
     },
     {
       "suite": "stream",
       "name": "stream 4m / 4k chunks",
-      "durationMs": 996.35,
-      "chunksPerSec": 1027.95,
-      "mbPerSec": 4.015
+      "durationMs": 62.55,
+      "chunksPerSec": 16392.15,
+      "mbPerSec": 64.03
     },
     {
       "suite": "stream",
       "name": "stream 4m / 256k chunks",
-      "durationMs": 975.25,
-      "chunksPerSec": 16.45,
-      "mbPerSec": 4.11
+      "durationMs": 57.45,
+      "chunksPerSec": 278.7,
+      "mbPerSec": 69.68
     },
     {
       "suite": "fs",
       "name": "readFileSync 1k",
-      "meanMs": 1.979,
-      "p95Ms": 2.2,
-      "opsPerSec": 505.4,
-      "mbPerSec": 0.49
+      "meanMs": 0.405,
+      "p95Ms": 0.5,
+      "opsPerSec": 2476.55,
+      "mbPerSec": 2.42
     },
     {
       "suite": "fs",
       "name": "readFile 1k",
-      "meanMs": 0.863,
-      "p95Ms": 0.7,
-      "opsPerSec": 1319,
-      "mbPerSec": 1.29
+      "meanMs": 0.176,
+      "p95Ms": 0.25,
+      "opsPerSec": 5727.6,
+      "mbPerSec": 5.595
     },
     {
       "suite": "fs",
       "name": "readFileSync 64k",
-      "meanMs": 17.609,
-      "p95Ms": 19.05,
-      "opsPerSec": 56.75,
-      "mbPerSec": 3.55
+      "meanMs": 1.528,
+      "p95Ms": 1.75,
+      "opsPerSec": 654.45,
+      "mbPerSec": 40.905
     },
     {
       "suite": "fs",
       "name": "readFile 64k",
-      "meanMs": 19.772,
-      "p95Ms": 21.55,
-      "opsPerSec": 50.6,
-      "mbPerSec": 3.16
+      "meanMs": 1.275,
+      "p95Ms": 1.5,
+      "opsPerSec": 784.5,
+      "mbPerSec": 49.03
     }
   ]
 }
