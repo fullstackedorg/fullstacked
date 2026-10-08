@@ -183,10 +183,50 @@ class FullStackedWebView(
             )
         }
 
+        // The WebView reads the stream on its own thread: it takes the response length
+        // from the first available() call, then for each read sizes a buffer from
+        // available() and reads until that buffer is full. available() reports the
+        // largest length first (0 would make an empty response), then blocks until
+        // frames are queued and reports exactly their size so every read returns
+        // the frames as they come.
         val stream = object : InputStream() {
             private var frames: ByteArray? = null
             private var position = 0
+            private var delivered = 0L
+            private var lengthReported = false
             @Volatile private var ended = false
+
+            // blocks until frames are available, false once the response ends
+            private fun fill(): Boolean {
+                while (true) {
+                    val current = frames
+                    if (current != null && position < current.size) return true
+                    if (ended) return false
+                    // the response length is fixed, end it between two batches of
+                    // whole frames, still attached: the page reconnects and the core
+                    // keeps the frames queued meanwhile
+                    if (delivered >= ROTATE_BYTES) {
+                        ended = true
+                        return false
+                    }
+                    val next = Core.streamRead(c, gen)
+                    if (next == null) {
+                        ended = true
+                        return false
+                    }
+                    frames = next
+                    position = 0
+                }
+            }
+
+            override fun available(): Int {
+                if (!lengthReported) {
+                    lengthReported = true
+                    return Int.MAX_VALUE
+                }
+                if (!fill()) return 0
+                return frames!!.size - position
+            }
 
             override fun read(): Int {
                 val byte = ByteArray(1)
@@ -195,28 +235,13 @@ class FullStackedWebView(
 
             override fun read(b: ByteArray, off: Int, len: Int): Int {
                 if (len == 0) return 0
-                while (true) {
-                    val current = frames
-                    if (current != null && position < current.size) {
-                        val n = minOf(len, current.size - position)
-                        System.arraycopy(current, position, b, off, n)
-                        position += n
-                        return n
-                    }
-                    if (ended) return -1
-                    val next = Core.streamRead(c, gen)
-                    if (next == null) {
-                        ended = true
-                        return -1
-                    }
-                    frames = next
-                    position = 0
-                }
-            }
-
-            override fun available(): Int {
-                val current = frames ?: return 0
-                return current.size - position
+                if (!fill()) return -1
+                val current = frames!!
+                val n = minOf(len, current.size - position)
+                System.arraycopy(current, position, b, off, n)
+                position += n
+                delivered += n
+                return n
             }
 
             override fun close() {
@@ -227,14 +252,23 @@ class FullStackedWebView(
             }
         }
 
+        // binary frames, never to be sniffed as another type
         return WebResourceResponse(
-            "application/octet-stream",
+            "application/x-fullstacked-frames",
             null,
             200,
             "OK",
-            mapOf("Cache-Control" to "no-cache"),
+            mapOf(
+                "Cache-Control" to "no-cache",
+                "X-Content-Type-Options" to "nosniff"
+            ),
             stream
         )
+    }
+
+    companion object {
+        // under the length of a GET /stream response, see frameStreamResponse
+        private const val ROTATE_BYTES = 1L shl 30
     }
 
     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
@@ -269,6 +303,14 @@ class FullStackedWebView(
             )
         } else if (path == "/stream") {
             return frameStreamResponse()
+        } else if (path == "/stream/detach") {
+            // the page did not get the hello frame, it keeps the evaluated chunks
+            Core.streamDetach(ctxId.toInt() and 0xFF, 0)
+            return WebResourceResponse(
+                "text/plain",
+                "UTF-8",
+                ByteArrayInputStream(ByteArray(0))
+            )
         } else if (path.startsWith("/sync/")) {
             val idStr = path.removePrefix("/sync/")
             val id = idStr.toIntOrNull()

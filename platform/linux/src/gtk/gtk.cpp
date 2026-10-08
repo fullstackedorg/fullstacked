@@ -631,6 +631,13 @@ void WebkitGTKWindow::handleSchemeRequest(WebKitURISchemeRequest *request) {
         return;
     }
 
+    if (path == "/stream/detach") {
+        // the page did not get the hello frame, it keeps the evaluated chunks
+        Core::streamDetach(ctx, 0);
+        sendGtkResponse(request, "", 0, "text/plain");
+        return;
+    }
+
     if (path.rfind("/sync/", 0) == 0) {
         std::string idStr = path.substr(6);
         uint8_t id = static_cast<uint8_t>(std::stoi(idStr));

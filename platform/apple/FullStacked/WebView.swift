@@ -369,6 +369,15 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
         } else if (pathname == "stream") {
             self.startFrameStream(urlSchemeTask: urlSchemeTask, url: request.url!)
             return
+        } else if (pathname == "stream/detach") {
+            // the page did not get the hello frame, it keeps the evaluated chunks
+            streamDetach(self.ctx, 0)
+            self.send(urlSchemeTask: urlSchemeTask,
+                      url: request.url!,
+                      statusCode: 200,
+                      mimeType: "text/plain",
+                      data: Data())
+            return
         } else if (pathname.starts(with: "sync")) {
             let idStr = pathname.split(separator: "/").last!
             let id = UInt8(idStr)!

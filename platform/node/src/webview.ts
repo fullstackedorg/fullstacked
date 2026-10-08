@@ -116,6 +116,10 @@ function createHandler(core: Core, ctx: number) {
             return res.end();
         } else if (pathname === "/stream") {
             return streamFrames(core, ctx, res);
+        } else if (pathname === "/stream/detach") {
+            // the page did not get the hello frame, it keeps the WebSocket
+            core.streamDetach(ctx, 0);
+            return res.end();
         } else if (pathname === "/call") {
             const payload = await coreCall(core, req);
             res.writeHead(200, {

@@ -85,6 +85,17 @@ export class FrameParser {
     }
 }
 
+// Hands a frame to its duplex, stream 0 is hello and keepalives
+function dispatchFrame(streamId: number, flags: number, data: Uint8Array) {
+    if (streamId === 0) return;
+    // a throwing listener must not stop the reader of every stream
+    try {
+        onStreamFrame(streamId, flags, data);
+    } catch (e) {
+        console.error(e);
+    }
+}
+
 // Creates the parser handing frames to the duplexes and a promise of the
 // hello frame, false after HELLO_TIMEOUT_MS or once failed.
 function frameReceiver() {
@@ -96,14 +107,8 @@ function frameReceiver() {
         if (streamId === 0) {
             clearTimeout(timeout);
             resolveHello(true);
-            return;
         }
-        // a throwing listener must not stop the reader of every stream
-        try {
-            onStreamFrame(streamId, flags, data);
-        } catch (e) {
-            console.error(e);
-        }
+        dispatchFrame(streamId, flags, data);
     });
 
     const fail = () => {
@@ -114,36 +119,62 @@ function frameReceiver() {
     return { parser, hello, fail };
 }
 
+// Without the hello frame, the page keeps the evaluated chunks: the host
+// must stop queueing frames before any stream starts.
+async function detachFrameStream() {
+    try {
+        await fetch("/stream/detach", { cache: "no-store" });
+    } catch {}
+}
+
 // Reads the frames from the body of GET /stream. Resolves true once the
 // hello frame arrived, false to keep the evaluated chunks.
 export async function readFrameStream(): Promise<boolean> {
     const { parser, hello, fail } = frameReceiver();
     const controller = new AbortController();
 
+    // resolves true when the host ended the response
+    const readResponse = async (frameParser: FrameParser) => {
+        const response = await fetch("/stream", {
+            signal: controller.signal,
+            cache: "no-store"
+        });
+        if (!response.ok || !response.body) {
+            return false;
+        }
+        const reader = response.body.getReader();
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) return true;
+            frameParser.push(value);
+        }
+    };
+
     (async () => {
         try {
-            const response = await fetch("/stream", {
-                signal: controller.signal,
-                cache: "no-store"
-            });
-            if (!response.ok || !response.body) {
-                return fail();
-            }
-            const reader = response.body.getReader();
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                parser.push(value);
-            }
+            await readResponse(parser);
         } catch {}
         fail();
+
+        // the host ends a response (Android every ~1 GB, its length is
+        // fixed) and the core keeps the queued frames for the next one
+        if (!(await hello)) return;
+        while (true) {
+            try {
+                if (!(await readResponse(new FrameParser(dispatchFrame)))) {
+                    break;
+                }
+            } catch {
+                break;
+            }
+        }
     })();
 
     const received = await hello;
     globalThis.fullstacked.streamTransport = received ? "frames" : "evaluated";
     if (!received) {
-        // the host detaches the reader when the response is cancelled
         controller.abort();
+        await detachFrameStream();
     }
     return received;
 }
@@ -183,7 +214,7 @@ export async function readFrameSharedBuffers(webview: {
         : "evaluated";
     if (!received) {
         webview.removeEventListener("sharedbufferreceived", onSharedBuffer);
-        fetch("/stream/detach").catch(() => {});
+        await detachFrameStream();
     }
     return received;
 }

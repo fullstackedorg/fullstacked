@@ -70,8 +70,9 @@ func Encode(dst []byte, streamId uint8, flags uint8, data []byte) []byte {
 	return append(dst, data...)
 }
 
-// Attach makes the caller the only reader, drops what older readers left
-// and queues the hello frame. Returns the reader generation, 0 if closed.
+// Attach makes the caller the only reader and queues the hello frame in
+// front of the frames older readers left (whole frames, a reader that
+// reconnects gets them). Returns the reader generation, 0 if closed.
 func (q *Queue) Attach() int {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -82,15 +83,21 @@ func (q *Queue) Attach() int {
 
 	q.gen++
 	q.attached = true
-	q.buf = Encode(nil, 0, FlagData, nil)
+	q.buf = append(Encode(nil, 0, FlagData, nil), q.buf...)
+	q.keepalives = 0
 	q.cond.Broadcast()
 	return q.gen
 }
 
-// Detach ends the reader of gen, chunks go back to the callback.
+// Detach ends the reader of gen, or the current one for gen <= 0, chunks go
+// back to the callback.
 func (q *Queue) Detach(gen int) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
+
+	if gen <= 0 {
+		gen = q.gen
+	}
 
 	if gen != q.gen {
 		return

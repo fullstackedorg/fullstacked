@@ -139,3 +139,24 @@ func TestBackpressure(t *testing.T) {
 		t.Fatal("push should resume once drained")
 	}
 }
+
+func TestReattachKeepsQueuedFrames(t *testing.T) {
+	withoutKeepalives(t)
+	q := NewQueue()
+	old := q.Attach()
+	q.Read(old)
+	q.Push(2, FlagData, []byte("q"))
+
+	// the reader reconnects before reading the frame
+	gen := q.Attach()
+	want := append(Encode(nil, 0, FlagData, nil), Encode(nil, 2, FlagData, []byte("q"))...)
+	if b := q.Read(gen); !bytes.Equal(b, want) {
+		t.Fatalf("read %v, want %v", b, want)
+	}
+
+	// 0 detaches the current reader
+	q.Detach(0)
+	if q.Attached() {
+		t.Fatal("still attached")
+	}
+}

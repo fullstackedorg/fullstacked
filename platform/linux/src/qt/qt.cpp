@@ -669,6 +669,15 @@ void QtWindow::handleSchemeRequest(QWebEngineUrlRequestJob *job) {
         return;
     }
 
+    if (path == "/stream/detach") {
+        // the page did not get the hello frame, it keeps the evaluated chunks
+        Core::streamDetach(ctx, 0);
+        auto *buffer = new QBuffer(job);
+        buffer->open(QIODevice::ReadOnly);
+        job->reply("text/plain", buffer);
+        return;
+    }
+
     if (path.startsWith("/sync/")) {
         uint8_t id = static_cast<uint8_t>(path.mid(6).toUInt());
         std::lock_guard<std::mutex> lock(syncMutex);

@@ -185,8 +185,9 @@ func streamRead(ctxId C.uint8_t, gen C.int, size *C.int) unsafe.Pointer {
 	return C.CBytes(data)
 }
 
-// streamDetach ends the reader of gen (response cancelled), the stream data
-// of the context goes back to the setOnStreamData callback.
+// streamDetach ends the reader of gen (response cancelled), or the current
+// one for gen 0 (GET /stream/detach), the stream data of the context goes
+// back to the setOnStreamData callback.
 //
 //export streamDetach
 func streamDetach(ctxId C.uint8_t, gen C.int) {
