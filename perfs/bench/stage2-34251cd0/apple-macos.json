@@ -1,0 +1,135 @@
+{
+  "meta": {
+    "commit": "34251cd0",
+    "branch": "v1-perfs",
+    "platform": "darwin",
+    "arch": "arm64",
+    "fullstackedVersion": "1.0.0-alpha.1821",
+    "timestamp": "2026-10-08T17:35:39.143Z",
+    "options": {
+      "iterations": 200,
+      "echoSizes": [
+        "1k",
+        "64k"
+      ],
+      "streamTotal": "4m",
+      "streamChunks": [
+        "4k",
+        "256k"
+      ],
+      "concurrency": [
+        32
+      ],
+      "runs": 2,
+      "suites": [
+        "noop",
+        "echo",
+        "concurrent",
+        "stream",
+        "fs"
+      ],
+      "syncOnly": false,
+      "asyncOnly": false
+    }
+  },
+  "results": [
+    {
+      "suite": "noop",
+      "name": "noop sync",
+      "meanMs": 0.115,
+      "p95Ms": 1,
+      "opsPerSec": 9127
+    },
+    {
+      "suite": "noop",
+      "name": "noop async",
+      "meanMs": 0.06,
+      "p95Ms": 0.5,
+      "opsPerSec": 17777.75
+    },
+    {
+      "suite": "echo",
+      "name": "echo sync 1k",
+      "meanMs": 0.08,
+      "p95Ms": 1,
+      "opsPerSec": 12500,
+      "mbPerSec": 24.41
+    },
+    {
+      "suite": "echo",
+      "name": "echo async 1k",
+      "meanMs": 0.063,
+      "p95Ms": 1,
+      "opsPerSec": 16233.75,
+      "mbPerSec": 31.705
+    },
+    {
+      "suite": "echo",
+      "name": "echo sync 64k",
+      "meanMs": 0.31,
+      "p95Ms": 1.5,
+      "opsPerSec": 3643.8,
+      "mbPerSec": 455.48
+    },
+    {
+      "suite": "echo",
+      "name": "echo async 64k",
+      "meanMs": 0.238,
+      "p95Ms": 1,
+      "opsPerSec": 4248.7,
+      "mbPerSec": 531.085
+    },
+    {
+      "suite": "concurrent",
+      "name": "concurrent noop x32",
+      "durationMs": 3.5,
+      "opsPerSec": 58333.35
+    },
+    {
+      "suite": "stream",
+      "name": "stream 4m / 4k chunks",
+      "durationMs": 10.5,
+      "chunksPerSec": 103384.6,
+      "mbPerSec": 403.845
+    },
+    {
+      "suite": "stream",
+      "name": "stream 4m / 256k chunks",
+      "durationMs": 3.5,
+      "chunksPerSec": 4666.65,
+      "mbPerSec": 1166.665
+    },
+    {
+      "suite": "fs",
+      "name": "readFileSync 1k",
+      "meanMs": 0.08,
+      "p95Ms": 1,
+      "opsPerSec": 12698.4,
+      "mbPerSec": 12.4
+    },
+    {
+      "suite": "fs",
+      "name": "readFile 1k",
+      "meanMs": 0.093,
+      "p95Ms": 1,
+      "opsPerSec": 11011.9,
+      "mbPerSec": 10.755
+    },
+    {
+      "suite": "fs",
+      "name": "readFileSync 64k",
+      "meanMs": 0.168,
+      "p95Ms": 1,
+      "opsPerSec": 5971.5,
+      "mbPerSec": 373.22
+    },
+    {
+      "suite": "fs",
+      "name": "readFile 64k",
+      "meanMs": 0.16,
+      "p95Ms": 1,
+      "opsPerSec": 6274.55,
+      "mbPerSec": 392.16
+    }
+  ]
+}
