@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Windows.Storage.Streams;
 
@@ -57,13 +58,17 @@ namespace FullStacked
         private readonly object coreQueueLock = new();
         private Task coreQueue = Task.CompletedTask;
 
-        // stream chunks received between two UI thread ticks are evaluated in one script
-        private readonly object streamLock = new();
-        private StringBuilder pendingStreamScript = new();
-        private bool streamFlushScheduled = false;
+        // responses and stream chunks received between two UI thread ticks are
+        // evaluated in one script
+        private readonly object scriptLock = new();
+        private StringBuilder pendingScript = new();
+        private bool scriptFlushScheduled = false;
 
         // captured on the UI thread, used to get back to it from core threads
         private readonly DispatcherQueue uiQueue;
+
+        // reader generation of the stream frames posted to the page, UI thread only
+        private int frameStreamGen = -1;
 
         public WebView(byte ctx)
         {
@@ -102,6 +107,7 @@ namespace FullStacked
             this.Closed += delegate (object sender, WindowEventArgs args)
             {
                 this.isClosed = true;
+                this.stopFrameStream();
                 this.controller?.Close();
                 this.controller = null;
                 this.coreWebView2 = null;
@@ -273,6 +279,20 @@ namespace FullStacked
                 {
                     byte[] ctxBuffer = Encoding.UTF8.GetBytes(this.ctx.ToString());
                     (stream, headers) = this.bufferToResponseStream(ctxBuffer);
+                    args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
+                    return;
+                }
+                else if (pathname == "/stream")
+                {
+                    this.startFrameStream();
+                    (stream, headers) = this.bufferToResponseStream([]);
+                    args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
+                    return;
+                }
+                else if (pathname == "/stream/detach")
+                {
+                    this.stopFrameStream();
+                    (stream, headers) = this.bufferToResponseStream([]);
                     args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
                     return;
                 }
@@ -529,11 +549,7 @@ namespace FullStacked
             // Async
             else
             {
-                string script = "window.fullstacked.respond(" + id + ",`" + Convert.ToBase64String(response) + "`)";
-                this.uiQueue.TryEnqueue(() =>
-                {
-                    _ = this.coreWebView2?.ExecuteScriptAsync(script);
-                });
+                this.queueScript("window.fullstacked.respond(" + id + ",`" + Convert.ToBase64String(response) + "`)");
             }
         }
         catch (Exception ex)
@@ -544,29 +560,34 @@ namespace FullStacked
 
     public void onStreamData(byte streamId, byte[] data)
     {
-        string script = "window.fullstacked.onStreamData(" + streamId + ", `" + Convert.ToBase64String(data) + "`);";
+        this.queueScript("window.fullstacked.onStreamData(" + streamId + ", `" + Convert.ToBase64String(data) + "`)");
+    }
+
+    // a statement that throws does not stop the others of the batch
+    private void queueScript(string statement)
+    {
         bool schedule;
-        lock (this.streamLock)
+        lock (this.scriptLock)
         {
-            this.pendingStreamScript.Append(script);
-            schedule = !this.streamFlushScheduled;
-            this.streamFlushScheduled = true;
+            this.pendingScript.Append("try{").Append(statement).Append("}catch(e){console.error(e)};");
+            schedule = !this.scriptFlushScheduled;
+            this.scriptFlushScheduled = true;
         }
 
         if (schedule)
         {
-            this.uiQueue.TryEnqueue(DispatcherQueuePriority.High, this.flushStreamData);
+            this.uiQueue.TryEnqueue(DispatcherQueuePriority.High, this.flushScripts);
         }
     }
 
-    private void flushStreamData()
+    private void flushScripts()
     {
         string script;
-        lock (this.streamLock)
+        lock (this.scriptLock)
         {
-            script = this.pendingStreamScript.ToString();
-            this.pendingStreamScript.Clear();
-            this.streamFlushScheduled = false;
+            script = this.pendingScript.ToString();
+            this.pendingScript.Clear();
+            this.scriptFlushScheduled = false;
         }
 
         if (script.Length > 0 && this.coreWebView2 != null)
@@ -574,6 +595,74 @@ namespace FullStacked
             _ = this.coreWebView2.ExecuteScriptAsync(script);
         }
     }
+
+        // Stream data of the context as binary frames (see core/internal/frames). WebView2
+        // reads a response stream entirely before answering, so the frames are posted to
+        // the page in shared buffers instead (bridge/frames.ts readFrameSharedBuffers).
+        // A thread reads them from the core until the context ends or the page reloads.
+        private void startFrameStream()
+        {
+            this.stopFrameStream();
+
+            byte ctx = this.ctx;
+            int gen = App.core.streamAttach(ctx);
+            if (gen < 0)
+            {
+                return;
+            }
+            this.frameStreamGen = gen;
+
+            Thread reader = new(() =>
+            {
+                while (true)
+                {
+                    byte[] frames = App.core.streamRead(ctx, gen);
+                    if (frames == null)
+                    {
+                        break;
+                    }
+                    this.uiQueue.TryEnqueue(() => this.postFrames(gen, frames));
+                }
+            })
+            {
+                IsBackground = true,
+                Name = "FullStacked stream frames"
+            };
+            reader.Start();
+        }
+
+        private void stopFrameStream()
+        {
+            if (this.frameStreamGen < 0)
+            {
+                return;
+            }
+            App.core.streamDetach(this.ctx, this.frameStreamGen);
+            this.frameStreamGen = -1;
+        }
+
+        private void postFrames(int gen, byte[] frames)
+        {
+            if (gen != this.frameStreamGen || this.coreWebView2 == null || this.environment == null)
+            {
+                return;
+            }
+
+            try
+            {
+                // closing on this side does not affect the access of the page
+                using CoreWebView2SharedBuffer sharedBuffer = this.environment.CreateSharedBuffer((ulong)frames.Length);
+                using (Stream stream = sharedBuffer.OpenStream())
+                {
+                    stream.Write(frames, 0, frames.Length);
+                }
+                this.coreWebView2.PostSharedBufferToScript(sharedBuffer, CoreWebView2SharedBufferAccess.ReadOnly, "{\"type\":\"frames\"}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error posting stream frames: {ex}");
+            }
+        }
 
         private (IRandomAccessStream, string) bufferToResponseStream(byte[] buffer, string mimeType = "text/plain")
         {

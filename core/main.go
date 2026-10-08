@@ -149,6 +149,53 @@ func callWithResponse(buffer unsafe.Pointer, length C.int, size *C.int) unsafe.P
 	return C.CBytes(response)
 }
 
+// streamAttach makes the caller the reader of the stream frames of the
+// context (GET /stream), see package frames. Returns the reader generation
+// to pass to streamRead and streamDetach, or -1 for an unknown context.
+//
+//export streamAttach
+func streamAttach(ctxId C.uint8_t) C.int {
+	ctx, ok := store.GetContext(uint8(ctxId))
+	if !ok {
+		return -1
+	}
+	gen := ctx.Frames.Attach()
+	if gen == 0 {
+		return -1
+	}
+	return C.int(gen)
+}
+
+// streamRead blocks until frames are queued and returns them, whole frames
+// only, in a buffer of *size bytes freed with freePtr. Returns nil once the
+// reader is replaced, detached or the context ended: finish the response.
+//
+//export streamRead
+func streamRead(ctxId C.uint8_t, gen C.int, size *C.int) unsafe.Pointer {
+	*size = 0
+	ctx, ok := store.GetContext(uint8(ctxId))
+	if !ok {
+		return nil
+	}
+	data := ctx.Frames.Read(int(gen))
+	if len(data) == 0 {
+		return nil
+	}
+	*size = C.int(len(data))
+	return C.CBytes(data)
+}
+
+// streamDetach ends the reader of gen (response cancelled), the stream data
+// of the context goes back to the setOnStreamData callback.
+//
+//export streamDetach
+func streamDetach(ctxId C.uint8_t, gen C.int) {
+	ctx, ok := store.GetContext(uint8(ctxId))
+	if ok {
+		ctx.Frames.Detach(int(gen))
+	}
+}
+
 //export freePtr
 func freePtr(ptr unsafe.Pointer) {
 	C.free(ptr)

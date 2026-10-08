@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"fullstackedorg/fullstacked/internal/config"
+	"fullstackedorg/fullstacked/internal/frames"
 	"fullstackedorg/fullstacked/internal/serialization"
 	"fullstackedorg/fullstacked/types"
 	"path/filepath"
@@ -64,6 +65,8 @@ func NewContextWithCtxId(
 
 		Streams:      map[uint8]*types.StoredStream{},
 		StreamsMutex: &sync.Mutex{},
+
+		Frames: frames.NewQueue(),
 
 		NextStreamId: 1,
 
@@ -130,6 +133,8 @@ func EndContext(ctxId uint8) {
 	if !ok {
 		return
 	}
+
+	ctx.Frames.Close()
 
 	// close streams outside of the locks, Close callbacks may stream
 	ctx.StreamsMutex.Lock()
@@ -380,6 +385,14 @@ func StreamError(
 	} else {
 		errMsg = "unknown error"
 	}
+
+	if ctx.Frames.Attached() {
+		delete(ctx.Streams, storedStreamId)
+		ctx.StreamsMutex.Unlock()
+		ctx.Frames.Push(storedStreamId, frames.FlagError, []byte(errMsg))
+		return
+	}
+
 	stream.Buffer = []byte(errMsg)
 
 	if OnStreamData == nil {
@@ -408,10 +421,12 @@ func StreamChunk(
 	ctx.StreamsMutex.Lock()
 
 	stream, ok := ctx.Streams[storedStreamId]
+	framesAttached := ctx.Frames.Attached()
 
 	if !ok {
-		// a nil map means the context ended while streaming
-		if ctx.Streams != nil && (len(buffer) > 0 || !end) {
+		// a nil map means the context ended while streaming, frames delete
+		// ended streams right away so late chunks are dropped
+		if ctx.Streams != nil && !framesAttached && (len(buffer) > 0 || !end) {
 			panic("no stream for id")
 		} else {
 			ctx.StreamsMutex.Unlock()
@@ -421,6 +436,19 @@ func StreamChunk(
 
 	if !stream.Opened {
 		panic("streaming chunk for stream not opened")
+	}
+
+	// the host reads the frames, nothing is kept for GetCorePayload
+	if framesAttached {
+		flags := frames.FlagData
+		if end {
+			flags = frames.FlagEnd
+			delete(ctx.Streams, storedStreamId)
+		}
+		ctx.StreamsMutex.Unlock()
+		// waits while the reader catches up, outside of the streams lock
+		ctx.Frames.Push(storedStreamId, flags, buffer)
+		return
 	}
 
 	size := 0

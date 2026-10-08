@@ -376,6 +376,13 @@ Each stage is measured with `bench` on every platform before and after. A stage 
 - Windows: the `CoreWebView2` is kept in a field of the window. CsWinRT drops the event handlers of a collected projection, so after a GC `WebResourceRequested` stopped firing (requests fell through to the network with `ERR_CONNECTION_REFUSED`, blank window) or crashed with an `AccessViolationException` in `Application.Start`. Stage 1 got lucky with GC timing; Stage 2's allocations made it reproducible.
 - Windows sync: the `/sync/{id}` handler takes the response or registers its awaiter under one lock. With core calls off the UI thread, the response could land between the check and the registration and leave the sync XHR waiting forever.
 
+**Results** (`stage1-f63299e9` → `stage2-34251cd0`):
+
+- Streams: 1.6-1.8× on Apple (macOS 4k 251 → 404 MB/s, 256k 686 → 1167 MB/s; iOS 4k 1.8×), Windows 4k 1.5× but 256k 0.8×, GTK, Qt and Android flat.
+- 64k echo: 1.1-1.3× on Apple and Windows sync, 1.3-1.5× on Android. Android also gains on concurrent (2.25×) and readFileSync 1k (4.6×), once static files and calls stopped colliding.
+- Small calls are 5-15% slower on Apple, Windows and GTK (iOS noop async 0.58×): the extra thread hop costs more than the call.
+- Concurrent regressed on GTK (0.47×), macOS (0.78×) and Windows (0.84×), so the exit criteria are not met. Causes: GTK posted results at idle priority, which waits while messages keep coming, and every response was its own main thread hop and script evaluation. Fixed with Stage 3: results come back at default priority on GTK, and responses join the batched script of the tick on Apple, Windows and GTK, each statement wrapped in `try` so one failing callback does not drop the rest of the batch.
+
 ### Stage 3: Binary streaming responses
 
 **Goal:** take stream data off `evaluateJavaScript`. This is the largest single win: per-chunk cost drops and backpressure comes for free.
@@ -386,6 +393,14 @@ Each stage is measured with `bench` on every platform before and after. A stage 
 - Android: `WebResourceResponse` backed by a `PipedInputStream`. Windows: `IStream`. GTK: `GInputStream`. Qt: sequential `QIODevice`. Apple: repeated `didReceive`.
 
 **Exit:** `stream` suite MB/s within 2× of Node on every platform, and the 4k-chunk suite no longer bound by per-chunk script evaluation.
+
+**Implementation notes:**
+
+- Go: `internal/frames` keeps a frame queue per context. The host calls `streamAttach(ctx) → gen`, then `streamRead(ctx, gen, *size)` in a loop on its own thread: it blocks until frames are queued and returns all of them (whole frames, freed with `freePtr`), nil once the context ends, the page reloads (a new attach) or `streamDetach(ctx, gen)`. While a reader is attached, `StreamChunk`/`StreamError` push frames instead of calling `setOnStreamData`, ended streams are dropped right away, and producers wait while 8 MB are queued (backpressure). Without a reader, the per chunk callback still applies (Node, fallback).
+- The path is `GET /stream` (the context is the one of the page) and stream id 0 is a hello frame queued on attach. JS waits for it up to 3 s before making calls: without it (a webview buffering the response) it aborts the request, the host detaches and stream chunks keep coming through `window.fullstacked.onStreamData`, which stays registered for that fallback and for Node.
+- Apple: `didReceive` per read from a reader thread, delivered on the main thread, `stop` detaches. Android: `WebResourceResponse` with an `InputStream` reading `streamRead` directly (no pipe), `close` detaches. GTK: a socket pair, WebKit reads one end as a `GUnixInputStream`, the reader thread writes the other (a failed write detaches). Qt: a sequential `QIODevice` owned by the job, appended on the main thread, detaches when deleted.
+- Windows: WebView2 requires the response stream to hold the whole body when the request completes, so a long-lived response cannot stream. The reader thread posts the frames with `PostSharedBufferToScript` instead (binary, no base64, no script evaluation), the page parses them the same way.
+- Node keeps its WebSocket until Stage 5.
 
 ### Stage 4: Binary request path
 

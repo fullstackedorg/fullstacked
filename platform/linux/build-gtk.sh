@@ -34,7 +34,7 @@ elif [ "$ARCH" = "arm64" ] && [ "$(uname -m)" = "x86_64" ]; then
 fi
 
 $CXX -std=c++20 -DGTK=1 \
-    $($PKG_CONFIG gtkmm-4.0 webkitgtk-6.0 --cflags) \
+    $($PKG_CONFIG gtkmm-4.0 webkitgtk-6.0 gio-unix-2.0 --cflags) \
     src/utils.cpp \
     src/core.cpp \
     src/gtk/gtk.cpp \
@@ -42,6 +42,6 @@ $CXX -std=c++20 -DGTK=1 \
     src/main.cpp \
     src/base64.cpp \
     bin/linux-$ARCH.a \
-    $($PKG_CONFIG gtkmm-4.0 webkitgtk-6.0 --libs) \
+    $($PKG_CONFIG gtkmm-4.0 webkitgtk-6.0 gio-unix-2.0 --libs) \
     -lpthread -ldl \
     -o out/usr/bin/fullstacked

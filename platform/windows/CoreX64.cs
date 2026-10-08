@@ -34,6 +34,15 @@ namespace FullStacked
         [DllImport(dllName)]
         public static extern void freePtr(void* ptr);
 
+        [DllImport(dllName)]
+        public static extern int streamAttach(byte ctxId);
+
+        [DllImport(dllName)]
+        public static extern void* streamRead(byte ctxId, int gen, int* size);
+
+        [DllImport(dllName)]
+        public static extern void streamDetach(byte ctxId, int gen);
+
         public override byte startCore(char* root, char* build)
         {
             return start(root, build);
@@ -68,6 +77,18 @@ namespace FullStacked
         public override void freePtrCore(void* ptr)
         {
             freePtr(ptr);
+        }
+        public override int streamAttachCore(byte ctxId)
+        {
+            return streamAttach(ctxId);
+        }
+        public override void* streamReadCore(byte ctxId, int gen, int* size)
+        {
+            return streamRead(ctxId, gen, size);
+        }
+        public override void streamDetachCore(byte ctxId, int gen)
+        {
+            streamDetach(ctxId, gen);
         }
     }
 }

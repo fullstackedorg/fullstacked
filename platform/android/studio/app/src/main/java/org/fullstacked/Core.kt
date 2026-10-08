@@ -40,6 +40,17 @@ object Core {
     @JvmStatic
     external fun callWithResponse(payload: ByteArray): ByteArray
 
+    // stream data of a context as binary frames for GET /stream, see core/internal/frames
+    @JvmStatic
+    external fun streamAttach(ctxId: Int): Int
+
+    // blocks until frames are queued, null once the reader ended
+    @JvmStatic
+    external fun streamRead(ctxId: Int, gen: Int): ByteArray?
+
+    @JvmStatic
+    external fun streamDetach(ctxId: Int, gen: Int)
+
     fun startMain(root: String, build: String, providedCtx: Int? = null, safe: Boolean = false): Int {
         return if (safe) {
             startSafe(root, build)

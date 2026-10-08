@@ -6,6 +6,7 @@
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QMainWindow>
+#include <QIODevice>
 #include <QObject>
 #include <QTimer>
 #include <QWebEnginePage>
@@ -21,6 +22,40 @@
 
 class Bridge;
 class QtWindow;
+
+// Stream data of a context as binary frames for GET /stream (see
+// core/internal/frames). A thread reads the frames from the core and appends
+// them on the main thread, QtWebEngine reads the device as data comes. Owned
+// by the request job, detaches the reader when the job goes away.
+class FrameDevice : public QIODevice {
+        Q_OBJECT
+    public:
+        FrameDevice(uint8_t ctx, int gen, QObject *parent);
+        ~FrameDevice() override;
+
+        static void start(uint8_t ctx, int gen, FrameDevice *device);
+
+        bool isSequential() const override {
+            return true;
+        }
+        qint64 bytesAvailable() const override;
+        bool atEnd() const override;
+
+        void append(const QByteArray &frames);
+        void finish();
+
+    protected:
+        qint64 readData(char *data, qint64 maxSize) override;
+        qint64 writeData(const char *, qint64) override {
+            return -1;
+        }
+
+    private:
+        uint8_t ctx;
+        int gen;
+        QByteArray buffer;
+        bool ended = false;
+};
 class AuthWindow;
 
 class SchemeHandler : public QWebEngineUrlSchemeHandler {

@@ -25,6 +25,16 @@ class Core {
         static std::vector<uint8_t>
         callCore(const std::vector<uint8_t> &payload);
         static void setStreamCallback(StreamDataCallback cb);
+
+        // Stream data of a context as binary frames for GET /stream, see
+        // core/internal/frames. streamAttach returns the reader generation
+        // (-1 for an unknown context), streamRead blocks until frames are
+        // queued and returns them (free with freeBuffer), nullptr once the
+        // reader ended.
+        static int streamAttach(uint8_t ctxId);
+        static void *streamRead(uint8_t ctxId, int gen, int *size);
+        static void streamDetach(uint8_t ctxId, int gen);
+        static void freeBuffer(void *ptr);
 };
 
 #endif

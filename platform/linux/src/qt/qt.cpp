@@ -11,6 +11,7 @@
 #include <QGuiApplication>
 #include <QKeyEvent>
 #include <QKeySequence>
+#include <QPointer>
 #include <QScreen>
 #include <QShortcut>
 #include <QUrl>
@@ -23,6 +24,7 @@
 #include <QWebEngineSettings>
 #include <iostream>
 #include <sstream>
+#include <thread>
 
 static void openExternalUrl(const QUrl &url) {
     if (!QDesktopServices::openUrl(url)) {
@@ -30,6 +32,71 @@ static void openExternalUrl(const QUrl &url) {
             "xdg-open '" + url.toString().toStdString() + "' 2>/dev/null &";
         system(cmd.c_str());
     }
+}
+
+FrameDevice::FrameDevice(uint8_t pCtx, int pGen, QObject *parent)
+    : QIODevice(parent), ctx(pCtx), gen(pGen) {
+    open(QIODevice::ReadOnly);
+}
+
+FrameDevice::~FrameDevice() {
+    // the page went away, stream data goes back to evaluated chunks
+    if (!ended) {
+        Core::streamDetach(ctx, gen);
+    }
+}
+
+void FrameDevice::start(uint8_t ctx, int gen, FrameDevice *device) {
+    QPointer<FrameDevice> target(device);
+    std::thread([ctx, gen, target]() {
+        while (true) {
+            int size = 0;
+            void *frames = Core::streamRead(ctx, gen, &size);
+            if (frames == nullptr) break;
+            QByteArray data(static_cast<const char *>(frames), size);
+            Core::freeBuffer(frames);
+            QMetaObject::invokeMethod(
+                qApp,
+                [target, data]() {
+                    if (target) target->append(data);
+                },
+                Qt::QueuedConnection);
+        }
+        QMetaObject::invokeMethod(
+            qApp,
+            [target]() {
+                if (target) target->finish();
+            },
+            Qt::QueuedConnection);
+    }).detach();
+}
+
+qint64 FrameDevice::bytesAvailable() const {
+    return buffer.size() + QIODevice::bytesAvailable();
+}
+
+bool FrameDevice::atEnd() const {
+    return ended && buffer.isEmpty() && QIODevice::bytesAvailable() == 0;
+}
+
+void FrameDevice::append(const QByteArray &frames) {
+    buffer.append(frames);
+    emit readyRead();
+}
+
+void FrameDevice::finish() {
+    ended = true;
+    emit readChannelFinished();
+}
+
+qint64 FrameDevice::readData(char *data, qint64 maxSize) {
+    if (buffer.isEmpty()) {
+        return ended ? -1 : 0;
+    }
+    qint64 n = qMin(maxSize, static_cast<qint64>(buffer.size()));
+    memcpy(data, buffer.constData(), static_cast<size_t>(n));
+    buffer.remove(0, static_cast<qsizetype>(n));
+    return n;
 }
 
 SchemeHandler *SchemeHandler::instance = nullptr;
@@ -573,6 +640,18 @@ void QtWindow::handleSchemeRequest(QWebEngineUrlRequestJob *job) {
         return;
     }
 
+    if (path == "/stream") {
+        int gen = Core::streamAttach(ctx);
+        if (gen < 0) {
+            job->fail(QWebEngineUrlRequestJob::UrlNotFound);
+            return;
+        }
+        auto *device = new FrameDevice(ctx, gen, job);
+        job->reply("application/octet-stream", device);
+        FrameDevice::start(ctx, gen, device);
+        return;
+    }
+
     if (path.startsWith("/sync/")) {
         uint8_t id = static_cast<uint8_t>(path.mid(6).toUInt());
         std::lock_guard<std::mutex> lock(syncMutex);
@@ -721,9 +800,11 @@ void QtWindow::onStreamData(uint8_t streamId,
                             const std::vector<uint8_t> &data) {
     QWebEngineView *view = webEngineView;
     if (!view) return;
-    std::string script = "window.fullstacked.onStreamData(" +
+    // a statement that throws does not stop the others of the batch
+    std::string script = "try{window.fullstacked.onStreamData(" +
                          std::to_string(streamId) + ", `" +
-                         base64_encode(data.data(), data.size()) + "`);";
+                         base64_encode(data.data(), data.size()) +
+                         "`)}catch(e){console.error(e)};";
     bool schedule = false;
     {
         std::lock_guard<std::mutex> lock(streamMutex);
@@ -746,9 +827,7 @@ void QtWindow::flushStreamData() {
         streamFlushScheduled = false;
     }
     if (script.empty() || !webEngineView || !webEngineView->page()) return;
-    webEngineView->page()->runJavaScript(QString::fromStdString(
-        "if (window.fullstacked && window.fullstacked.onStreamData) { " +
-        script + " }"));
+    webEngineView->page()->runJavaScript(QString::fromStdString(script));
 }
 
 void QtWindow::evaluateJavaScript(const std::string &script) {

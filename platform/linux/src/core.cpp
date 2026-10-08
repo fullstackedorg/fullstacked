@@ -14,6 +14,9 @@ extern void getCorePayload(uint8_t ctx, uint8_t coreType, uint8_t id, void *ptr,
                            int size);
 extern int call(void *buffer, int length);
 extern void *callWithResponse(void *buffer, int length, int *size);
+extern int streamAttach(uint8_t ctxId);
+extern void *streamRead(uint8_t ctxId, int gen, int *size);
+extern void streamDetach(uint8_t ctxId, int gen);
 extern void freePtr(void *ptr);
 }
 
@@ -93,6 +96,22 @@ std::vector<uint8_t> Core::callCore(const std::vector<uint8_t> &payload) {
     std::vector<uint8_t> response(bytes, bytes + responseSize);
     freePtr(responsePtr);
     return response;
+}
+
+int Core::streamAttach(uint8_t ctxId) {
+    return ::streamAttach(ctxId);
+}
+
+void *Core::streamRead(uint8_t ctxId, int gen, int *size) {
+    return ::streamRead(ctxId, gen, size);
+}
+
+void Core::streamDetach(uint8_t ctxId, int gen) {
+    ::streamDetach(ctxId, gen);
+}
+
+void Core::freeBuffer(void *ptr) {
+    freePtr(ptr);
 }
 
 void Core::setStreamCallback(StreamDataCallback cb) {

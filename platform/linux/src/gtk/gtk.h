@@ -28,11 +28,12 @@ class WebkitGTKWindow : public Window {
         // core calls of this window run in order, off the main thread
         GThreadPool *corePool = nullptr;
 
-        // stream chunks received between two main loop iterations are
-        // evaluated in one script
-        std::mutex streamMutex;
-        std::string pendingStreamScript;
-        bool streamFlushScheduled = false;
+        // responses and stream chunks received between two main loop
+        // iterations are evaluated in one script
+        std::mutex scriptMutex;
+        std::string pendingScript;
+        bool scriptFlushScheduled = false;
+        void queueScript(const std::string &statement);
 
         // results of work done off the main thread come back through the
         // webview (ref'd), the window is looked up from it once on the main
@@ -42,7 +43,7 @@ class WebkitGTKWindow : public Window {
         static gboolean dispatchBridgeResult(gpointer userData);
         static void runStaticFileTask(gpointer data, gpointer userData);
         static gboolean dispatchStaticFileResult(gpointer userData);
-        static gboolean flushStreamData(gpointer userData);
+        static gboolean flushScripts(gpointer userData);
 
         static void onBridgeMessage(WebKitUserContentManager *manager,
                                     JSCValue *value, gpointer userData);
@@ -75,6 +76,7 @@ class WebkitGTKWindow : public Window {
 
         void initWindow();
         void handleSchemeRequest(WebKitURISchemeRequest *request);
+        void startFrameStream(WebKitURISchemeRequest *request);
         void handleBridgeMessage(const std::string &payloadB64);
         void resolveSyncAwaiter(uint8_t id,
                                 const std::vector<uint8_t> &payload);

@@ -14,6 +14,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import java.io.ByteArrayInputStream
+import java.io.InputStream
 import java.io.PipedInputStream
 import java.io.PipedOutputStream
 import java.nio.charset.StandardCharsets
@@ -132,7 +133,8 @@ class FullStackedWebView(
 
     fun onStreamData(streamId: Int, buffer: ByteArray) {
         val b64 = Base64.getEncoder().encodeToString(buffer)
-        val script = "window.fullstacked.onStreamData($streamId, `$b64`);"
+        // a statement that throws does not stop the others of the batch
+        val script = "try{window.fullstacked.onStreamData($streamId, `$b64`)}catch(e){console.error(e)};"
         val schedule = synchronized(streamLock) {
             pendingStreamScript.append(script)
             val schedule = !streamFlushScheduled
@@ -162,6 +164,77 @@ class FullStackedWebView(
         Core.stop(c)
         (webView.parent as? ViewGroup)?.removeView(webView)
         webView.destroy()
+    }
+
+    // Stream data of the context as binary frames (see core/internal/frames), the
+    // WebView reads the stream on its own thread and hands the data to the page
+    // as it comes, until the context ends or the page goes away.
+    private fun frameStreamResponse(): WebResourceResponse {
+        val c = ctxId.toInt() and 0xFF
+        val gen = Core.streamAttach(c)
+        if (gen < 0) {
+            return WebResourceResponse(
+                "text/plain",
+                "UTF-8",
+                404,
+                "Not Found",
+                emptyMap(),
+                ByteArrayInputStream("Not Found".toByteArray())
+            )
+        }
+
+        val stream = object : InputStream() {
+            private var frames: ByteArray? = null
+            private var position = 0
+            @Volatile private var ended = false
+
+            override fun read(): Int {
+                val byte = ByteArray(1)
+                return if (read(byte, 0, 1) <= 0) -1 else byte[0].toInt() and 0xFF
+            }
+
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                if (len == 0) return 0
+                while (true) {
+                    val current = frames
+                    if (current != null && position < current.size) {
+                        val n = minOf(len, current.size - position)
+                        System.arraycopy(current, position, b, off, n)
+                        position += n
+                        return n
+                    }
+                    if (ended) return -1
+                    val next = Core.streamRead(c, gen)
+                    if (next == null) {
+                        ended = true
+                        return -1
+                    }
+                    frames = next
+                    position = 0
+                }
+            }
+
+            override fun available(): Int {
+                val current = frames ?: return 0
+                return current.size - position
+            }
+
+            override fun close() {
+                if (!ended) {
+                    ended = true
+                    Core.streamDetach(c, gen)
+                }
+            }
+        }
+
+        return WebResourceResponse(
+            "application/octet-stream",
+            null,
+            200,
+            "OK",
+            mapOf("Cache-Control" to "no-cache"),
+            stream
+        )
     }
 
     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
@@ -194,6 +267,8 @@ class FullStackedWebView(
                 "UTF-8",
                 ByteArrayInputStream(c.toString().toByteArray())
             )
+        } else if (path == "/stream") {
+            return frameStreamResponse()
         } else if (path.startsWith("/sync/")) {
             val idStr = path.removePrefix("/sync/")
             val id = idStr.toIntOrNull()

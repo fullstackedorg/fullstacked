@@ -3,7 +3,12 @@
 #include "../base64.h"
 #include "../core.h"
 #include "../utils.h"
+#include <cerrno>
 #include <gio/gio.h>
+#include <gio/gunixinputstream.h>
+#include <sys/socket.h>
+#include <thread>
+#include <unistd.h>
 #include <gobject/gsignal.h>
 #include <gtk/gtkwidget.h>
 #include <gtkmm/eventcontrollerkey.h>
@@ -71,6 +76,60 @@ static void sendGtkResponse(WebKitURISchemeRequest *request, const void *data,
     webkit_uri_scheme_request_finish(request, inputStream, length,
                                      mimeType.c_str());
     g_object_unref(inputStream);
+}
+
+// Stream data of the context as binary frames (see core/internal/frames).
+// WebKit reads the response from one end of a socket pair as data comes, a
+// thread writes the frames to the other end until the context ends, the page
+// reloads, or the page goes away (the write fails).
+void WebkitGTKWindow::startFrameStream(WebKitURISchemeRequest *request) {
+    int gen = Core::streamAttach(ctx);
+    int fds[2];
+    if (gen < 0 ||
+        socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, fds) != 0) {
+        if (gen >= 0) {
+            Core::streamDetach(ctx, gen);
+        }
+        std::string notFound = "Not Found";
+        sendGtkResponse(request, notFound.data(), notFound.size(),
+                        "text/plain");
+        return;
+    }
+
+    GInputStream *input = g_unix_input_stream_new(fds[0], TRUE);
+    webkit_uri_scheme_request_finish(request, input, -1,
+                                     "application/octet-stream");
+    g_object_unref(input);
+
+    uint8_t streamCtx = ctx;
+    int fd = fds[1];
+    std::thread([streamCtx, gen, fd]() {
+        while (true) {
+            int size = 0;
+            void *frames = Core::streamRead(streamCtx, gen, &size);
+            if (frames == nullptr) break;
+
+            const char *data = static_cast<const char *>(frames);
+            size_t left = static_cast<size_t>(size);
+            while (left > 0) {
+                ssize_t n = send(fd, data, left, MSG_NOSIGNAL);
+                if (n < 0) {
+                    if (errno == EINTR) continue;
+                    break;
+                }
+                data += n;
+                left -= static_cast<size_t>(n);
+            }
+            Core::freeBuffer(frames);
+
+            if (left > 0) {
+                // the page went away, stream data goes back to evaluated chunks
+                Core::streamDetach(streamCtx, gen);
+                break;
+            }
+        }
+        ::close(fd);
+    }).detach();
 }
 
 struct GtkStaticFileTask {
@@ -506,14 +565,14 @@ void WebkitGTKWindow::runBridgeTask(gpointer data, gpointer userData) {
         } else {
             std::string respB64 =
                 base64_encode(response.data(), response.size());
-            result->script =
-                "if (window.fullstacked && window.fullstacked.respond) { "
-                "window.fullstacked.respond(" +
-                std::to_string(result->id) + ", `" + respB64 + "`); }";
+            result->script = "window.fullstacked.respond(" +
+                             std::to_string(result->id) + ", `" + respB64 +
+                             "`)";
         }
     }
 
-    g_idle_add(dispatchBridgeResult, result);
+    // default priority: idle sources wait while messages keep coming
+    g_idle_add_full(G_PRIORITY_DEFAULT, dispatchBridgeResult, result, nullptr);
 }
 
 gboolean WebkitGTKWindow::dispatchBridgeResult(gpointer userData) {
@@ -523,10 +582,7 @@ gboolean WebkitGTKWindow::dispatchBridgeResult(gpointer userData) {
         if (result->isSync) {
             win->resolveSyncAwaiter(result->id, result->response);
         } else if (!result->script.empty()) {
-            webkit_web_view_evaluate_javascript(
-                result->webview, result->script.c_str(),
-                static_cast<gssize>(result->script.size()), nullptr, nullptr,
-                nullptr, nullptr, nullptr);
+            win->queueScript(result->script);
         }
     }
     g_object_unref(result->webview);
@@ -567,6 +623,11 @@ void WebkitGTKWindow::handleSchemeRequest(WebKitURISchemeRequest *request) {
     if (path == "/ctx") {
         std::string ctxStr = std::to_string(ctx);
         sendGtkResponse(request, ctxStr.data(), ctxStr.size(), "text/plain");
+        return;
+    }
+
+    if (path == "/stream") {
+        startFrameStream(request);
         return;
     }
 
@@ -676,7 +737,8 @@ void WebkitGTKWindow::runStaticFileTask(gpointer data, gpointer userData) {
         }
     }
 
-    g_idle_add(dispatchStaticFileResult, task);
+    g_idle_add_full(G_PRIORITY_DEFAULT, dispatchStaticFileResult, task,
+                    nullptr);
 }
 
 gboolean WebkitGTKWindow::dispatchStaticFileResult(gpointer userData) {
@@ -697,37 +759,38 @@ gboolean WebkitGTKWindow::dispatchStaticFileResult(gpointer userData) {
 // called from core threads, App holds the window while it runs
 void WebkitGTKWindow::onStreamData(uint8_t streamId,
                                    const std::vector<uint8_t> &data) {
+    queueScript("window.fullstacked.onStreamData(" + std::to_string(streamId) +
+                ", `" + base64_encode(data.data(), data.size()) + "`)");
+}
+
+// any thread, a statement that throws does not stop the others of the batch
+void WebkitGTKWindow::queueScript(const std::string &statement) {
     WebKitWebView *view = webview;
     if (!view) return;
-    std::string script = "window.fullstacked.onStreamData(" +
-                         std::to_string(streamId) + ", `" +
-                         base64_encode(data.data(), data.size()) + "`);";
     bool schedule = false;
     {
-        std::lock_guard<std::mutex> lock(streamMutex);
-        pendingStreamScript += script;
-        schedule = !streamFlushScheduled;
-        streamFlushScheduled = true;
+        std::lock_guard<std::mutex> lock(scriptMutex);
+        pendingScript += "try{" + statement + "}catch(e){console.error(e)};";
+        schedule = !scriptFlushScheduled;
+        scriptFlushScheduled = true;
     }
     if (schedule) {
-        g_idle_add(flushStreamData, g_object_ref(view));
+        g_idle_add_full(G_PRIORITY_DEFAULT, flushScripts, g_object_ref(view),
+                        nullptr);
     }
 }
 
-gboolean WebkitGTKWindow::flushStreamData(gpointer userData) {
+gboolean WebkitGTKWindow::flushScripts(gpointer userData) {
     auto *view = WEBKIT_WEB_VIEW(userData);
     WebkitGTKWindow *win = fromWebView(view);
     if (win) {
         std::string script;
         {
-            std::lock_guard<std::mutex> lock(win->streamMutex);
-            script.swap(win->pendingStreamScript);
-            win->streamFlushScheduled = false;
+            std::lock_guard<std::mutex> lock(win->scriptMutex);
+            script.swap(win->pendingScript);
+            win->scriptFlushScheduled = false;
         }
         if (!script.empty()) {
-            script =
-                "if (window.fullstacked && window.fullstacked.onStreamData) { " +
-                script + " }";
             webkit_web_view_evaluate_javascript(
                 view, script.c_str(), static_cast<gssize>(script.size()),
                 nullptr, nullptr, nullptr, nullptr, nullptr);

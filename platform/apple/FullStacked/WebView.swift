@@ -66,10 +66,11 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     // core calls of this webview run in order, off the main thread
     private let coreQueue = DispatchQueue(label: "org.fullstacked.core", qos: .userInitiated)
     
-    // stream chunks received between two main thread ticks are evaluated in one script
-    private let streamLock = NSLock()
-    private var pendingStreamScript = ""
-    private var streamFlushScheduled = false
+    // responses and stream chunks received between two main thread ticks are
+    // evaluated in one script
+    private let scriptLock = NSLock()
+    private var pendingScript = ""
+    private var scriptFlushScheduled = false
     
     required init(from decoder: any Decoder) throws {
         fatalError("init(coder:) has not been implemented")
@@ -148,26 +149,30 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     }
 
     func onStreamData(streamId: UInt8, buffer: Data){
-        let script = "window.fullstacked.onStreamData(\(streamId),`\(buffer.base64EncodedString())`);"
-        streamLock.lock()
-        pendingStreamScript.append(script)
-        let schedule = !streamFlushScheduled
-        streamFlushScheduled = true
-        streamLock.unlock()
+        queueScript("window.fullstacked.onStreamData(\(streamId),`\(buffer.base64EncodedString())`)")
+    }
+    
+    // a statement that throws does not stop the others of the batch
+    private func queueScript(_ statement: String) {
+        scriptLock.lock()
+        pendingScript.append("try{\(statement)}catch(e){console.error(e)};")
+        let schedule = !scriptFlushScheduled
+        scriptFlushScheduled = true
+        scriptLock.unlock()
         
         if schedule {
             DispatchQueue.main.async { [weak self] in
-                self?.flushStreamData()
+                self?.flushScripts()
             }
         }
     }
     
-    private func flushStreamData() {
-        streamLock.lock()
-        let script = pendingStreamScript
-        pendingStreamScript = ""
-        streamFlushScheduled = false
-        streamLock.unlock()
+    private func flushScripts() {
+        scriptLock.lock()
+        let script = pendingScript
+        pendingScript = ""
+        scriptFlushScheduled = false
+        scriptLock.unlock()
         
         if !script.isEmpty {
             self.evaluateJavaScript(script)
@@ -238,10 +243,7 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
             }
             // Async
             else {
-                let script = "window.fullstacked.respond(\(id),`\(response.base64EncodedString())`)"
-                DispatchQueue.main.async {
-                    self?.evaluateJavaScript(script)
-                }
+                self?.queueScript("window.fullstacked.respond(\(id),`\(response.base64EncodedString())`)")
             }
         }
     }
@@ -290,6 +292,8 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
     private var syncAwaitersPayload: [UInt8:Data] = [:]
     private var stoppedTasks = Set<ObjectIdentifier>()
     private let tasksLock = NSLock()
+    // GET /stream tasks and their reader generation, main thread only
+    private var frameStreams: [ObjectIdentifier: (ctx: UInt8, gen: Int32)] = [:]
     
     init(ctx: UInt8) {
         self.ctx = ctx
@@ -362,6 +366,9 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
                       mimeType: "text/plain",
                       data: Data(String(self.ctx).utf8))
             return
+        } else if (pathname == "stream") {
+            self.startFrameStream(urlSchemeTask: urlSchemeTask, url: request.url!)
+            return
         } else if (pathname.starts(with: "sync")) {
             let idStr = pathname.split(separator: "/").last!
             let id = UInt8(idStr)!
@@ -415,6 +422,53 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
         }
     }
     
+    // Stream data of the context as binary frames (see core/internal/frames),
+    // read off the main thread and delivered on it until the context ends or
+    // the page goes away.
+    func startFrameStream(urlSchemeTask: any WKURLSchemeTask, url: URL) {
+        let ctx = self.ctx
+        let gen = streamAttach(ctx)
+        if gen < 0 {
+            send(urlSchemeTask: urlSchemeTask,
+                 url: url,
+                 statusCode: 404,
+                 mimeType: "text/plain",
+                 data: "Not Found".data(using: .utf8)!)
+            return
+        }
+        
+        let taskId = ObjectIdentifier(urlSchemeTask as AnyObject)
+        frameStreams[taskId] = (ctx: ctx, gen: gen)
+        
+        urlSchemeTask.didReceive(HTTPURLResponse(
+            url: url,
+            statusCode: 200,
+            httpVersion: "HTTP/1.1",
+            headerFields: [
+                "Content-Type": "application/octet-stream",
+                "Cache-Control": "no-cache"
+            ]
+        )!)
+        
+        Thread.detachNewThread { [weak self] in
+            while true {
+                var size: Int32 = 0
+                guard let ptr = streamRead(ctx, gen, &size), size > 0 else { break }
+                let data = Data(bytesNoCopy: ptr, count: Int(size), deallocator: .custom({ ptr, _ in
+                    freePtr(ptr)
+                }))
+                DispatchQueue.main.async {
+                    guard self?.frameStreams[taskId]?.gen == gen else { return }
+                    urlSchemeTask.didReceive(data)
+                }
+            }
+            DispatchQueue.main.async {
+                guard self?.frameStreams.removeValue(forKey: taskId)?.gen == gen else { return }
+                urlSchemeTask.didFinish()
+            }
+        }
+    }
+    
     static func staticFileResponse(_ responseData: Data) -> (statusCode: Int, mimeType: String, data: Data) {
         let notFound = (statusCode: 404, mimeType: "text/plain", data: "Not Found".data(using: .utf8)!)
         guard responseData.count > 1 else {
@@ -434,9 +488,15 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
     }
     
     func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) {
+        let taskId = ObjectIdentifier(urlSchemeTask as AnyObject)
         tasksLock.lock()
-        stoppedTasks.insert(ObjectIdentifier(urlSchemeTask as AnyObject))
+        stoppedTasks.insert(taskId)
         tasksLock.unlock()
+        
+        // the page went away, stream data goes back to evaluated chunks
+        if let stream = frameStreams.removeValue(forKey: taskId) {
+            streamDetach(stream.ctx, stream.gen)
+        }
     }
 }
 

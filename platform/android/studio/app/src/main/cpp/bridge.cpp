@@ -92,6 +92,36 @@ JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_callWithResponse
     return result;
 }
 
+// Stream data of a context as binary frames for GET /stream, see
+// core/internal/frames
+JNIEXPORT jint JNICALL Java_org_fullstacked_Core_streamAttach
+        (JNIEnv *env, jobject thiz, jint ctxId) {
+    return streamAttach(static_cast<uint8_t>(ctxId));
+}
+
+// Blocks until frames are queued, null once the reader ended
+JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_streamRead
+        (JNIEnv *env, jobject thiz, jint ctxId, jint gen) {
+    int size = 0;
+    void* frames = streamRead(static_cast<uint8_t>(ctxId), gen, &size);
+    if (frames == nullptr || size <= 0) {
+        return nullptr;
+    }
+
+    jbyteArray result = env->NewByteArray(size);
+    if (result != nullptr) {
+        env->SetByteArrayRegion(result, 0, size, static_cast<const jbyte*>(frames));
+    }
+    freePtr(frames);
+
+    return result;
+}
+
+JNIEXPORT void JNICALL Java_org_fullstacked_Core_streamDetach
+        (JNIEnv *env, jobject thiz, jint ctxId, jint gen) {
+    streamDetach(static_cast<uint8_t>(ctxId), gen);
+}
+
 JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_getCorePayload
         (JNIEnv *env, jobject thiz, jint ctx, jint coreType, jint id, jint size) {
     jbyteArray response = env->NewByteArray(size);

@@ -14,6 +14,9 @@ namespace FullStacked
         public abstract int callCore(void* buffer, int length);
         public abstract void* callWithResponseCore(void* buffer, int length, int* size);
         public abstract void freePtrCore(void* ptr);
+        public abstract int streamAttachCore(byte ctxId);
+        public abstract void* streamReadCore(byte ctxId, int gen, int* size);
+        public abstract void streamDetachCore(byte ctxId, int gen);
 
         public delegate void CoreOnStreamData(byte ctx, byte streamId, int size);
 
@@ -117,6 +120,33 @@ namespace FullStacked
             Marshal.Copy((IntPtr)responsePtr, response, 0, responseSize);
             this.lib.freePtrCore(responsePtr);
             return response;
+        }
+
+        // Stream data of a context as binary frames for GET /stream, see
+        // core/internal/frames. Returns the reader generation, -1 for an unknown context.
+        public int streamAttach(byte ctxId)
+        {
+            return this.lib.streamAttachCore(ctxId);
+        }
+
+        // Blocks until frames are queued, null once the reader ended.
+        public byte[] streamRead(byte ctxId, int gen)
+        {
+            int size = 0;
+            void* frames = this.lib.streamReadCore(ctxId, gen, &size);
+            if (frames == null || size <= 0)
+            {
+                return null;
+            }
+            byte[] data = new byte[size];
+            Marshal.Copy((IntPtr)frames, data, 0, size);
+            this.lib.freePtrCore(frames);
+            return data;
+        }
+
+        public void streamDetach(byte ctxId, int gen)
+        {
+            this.lib.streamDetachCore(ctxId, gen);
         }
 
         // Calls Core Fn DeepLink in ctx: the deeplink plugins of ctx receive url.

@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fullstackedorg/fullstacked/internal/frames"
 	"sync"
 	"time"
 )
@@ -121,6 +122,9 @@ type Context struct {
 
 	Streams      map[uint8]*StoredStream
 	StreamsMutex *sync.Mutex
+
+	// stream data for the host reader of GET /stream, see package frames
+	Frames *frames.Queue
 
 	NextStreamId uint8
 

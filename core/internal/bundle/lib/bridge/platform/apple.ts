@@ -1,6 +1,7 @@
 import type { PlatformBridge } from "./index.ts";
 import { fromByteArray, toByteArray } from "../base64.ts";
 import { isWorker } from "../isWorker.ts";
+import { readFrameStream } from "../frames.ts";
 
 const asyncResponsePromises = new Map<
     number,
@@ -89,6 +90,11 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
                 });
             };
         }
+    }
+
+    // stream data as binary frames, workers get theirs through the main thread
+    if (!isWorker) {
+        await readFrameStream();
     }
 
     return {

@@ -1,6 +1,7 @@
 import type { PlatformBridge } from "./index.ts";
 import { fromByteArray, toByteArray } from "../base64.ts";
 import { isWorker } from "../isWorker.ts";
+import { readFrameSharedBuffers } from "../frames.ts";
 
 const asyncResponsePromises = new Map<
     number,
@@ -46,6 +47,11 @@ export async function BridgeWindowsInit(): Promise<PlatformBridge> {
         globalThis.fullstacked.window.resize = function (size: string) {
             globalThis.fullstacked.fetch(`/resize?size=${size}`);
         };
+    }
+
+    // stream data as binary frames, workers get theirs through the main thread
+    if (!isWorker) {
+        await readFrameSharedBuffers(globalThis.chrome.webview);
     }
 
     return {

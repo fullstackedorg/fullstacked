@@ -18,32 +18,42 @@ type DuplexItem = {
         promise?: { resolve: () => void; reject: (reason: any) => void };
         data: Uint8Array | null;
     } | null;
-    queuedPackets: (ArrayBuffer | string)[];
+    queuedPackets: { flags: number; data: Uint8Array }[];
     error?: Error;
 };
 
 const activeDuplexes = new Map<number, DuplexItem[]>();
 
+// payload: [flags u8][data], base64 when evaluated by the host
 function onStreamData(id: number, payload: ArrayBuffer | string) {
+    const chunk =
+        typeof payload === "string"
+            ? toByteArray(payload)
+            : new Uint8Array(payload);
+    // a copy: consumers may use the whole underlying buffer
+    onStreamFrame(id, chunk[0], chunk.slice(1));
+}
+
+// flags: 0 data, 1 end, 2 error (data is the message)
+export function onStreamFrame(id: number, flags: number, data: Uint8Array) {
     const workerStreams = globalThis.fullstacked.workerStreams;
     if (workerStreams) {
         const worker = workerStreams.get(id);
         if (worker) {
-            const chunk =
-                typeof payload === "string"
-                    ? toByteArray(payload)
-                    : new Uint8Array(payload);
-            if (chunk[0] === 1) {
+            if (flags !== 0) {
                 workerStreams.delete(id);
             }
 
+            const payload = new Uint8Array(data.byteLength + 1);
+            payload[0] = flags;
+            payload.set(data, 1);
             worker.postMessage(
                 {
                     type: "on-stream-data",
                     streamId: id,
-                    payload
+                    payload: payload.buffer
                 },
-                [payload].filter((p) => p instanceof ArrayBuffer)
+                [payload.buffer]
             );
             return;
         }
@@ -52,37 +62,34 @@ function onStreamData(id: number, payload: ArrayBuffer | string) {
     const duplexes = activeDuplexes.get(id);
 
     if (!duplexes || duplexes.length === 0) {
-        globalThis.fullstacked.bridge({
-            mod: Stream,
-            fn: Close,
-            data: [id]
-        });
+        if (flags === 0) {
+            globalThis.fullstacked.bridge({
+                mod: Stream,
+                fn: Close,
+                data: [id]
+            });
+        }
         return;
     }
 
     const duplex = duplexes[0];
 
     if (duplex.opening) {
-        duplex.queuedPackets.push(payload);
+        duplex.queuedPackets.push({ flags, data });
         return;
     }
 
-    processPayload(id, duplex, payload);
+    processPayload(id, duplex, flags, data);
 }
 
 function processPayload(
     id: number,
     duplex: DuplexItem,
-    payload: ArrayBuffer | string
+    flags: number,
+    data: Uint8Array
 ) {
-    const chunk =
-        typeof payload === "string"
-            ? toByteArray(payload)
-            : new Uint8Array(payload);
-
-    const isError = chunk[0] === 2;
-    duplex.done = chunk[0] === 1 || isError;
-    const data = chunk.slice(1);
+    const isError = flags === 2;
+    duplex.done = flags === 1 || isError;
 
     if (isError) {
         const errorMsg = new TextDecoder().decode(data);
@@ -190,7 +197,7 @@ export function createDuplex(id: number): Duplex {
 
             const packets = duplex.queuedPackets;
             duplex.queuedPackets = [];
-            packets.forEach((p) => processPayload(id, duplex, p));
+            packets.forEach((p) => processPayload(id, duplex, p.flags, p.data));
 
             resolveOpening();
         });
