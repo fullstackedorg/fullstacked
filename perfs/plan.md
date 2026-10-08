@@ -373,6 +373,8 @@ Each stage is measured with `bench` on every platform before and after. A stage 
 - Stream chunks are batched on Apple, Android, Windows, GTK and Qt: chunks received before the UI thread runs are evaluated in one script.
 - The native base64 decode path never ran (`fromBase64` is static on `Uint8Array`, not on its prototype); fixed with a fallback to the JS decoder for URL-safe input.
 - `EndContext` closes streams outside the locks and skips streams without `Close`; Linux `App::activeWindows` is guarded for the stream callback.
+- Windows: the `CoreWebView2` is kept in a field of the window. CsWinRT drops the event handlers of a collected projection, so after a GC `WebResourceRequested` stopped firing (requests fell through to the network with `ERR_CONNECTION_REFUSED`, blank window) or crashed with an `AccessViolationException` in `Application.Start`. Stage 1 got lucky with GC timing; Stage 2's allocations made it reproducible.
+- Windows sync: the `/sync/{id}` handler takes the response or registers its awaiter under one lock. With core calls off the UI thread, the response could land between the check and the registration and leave the sync XHR waiting forever.
 
 ### Stage 3: Binary streaming responses
 

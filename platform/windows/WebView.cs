@@ -22,10 +22,14 @@ namespace FullStacked
         public void postAuthResult(string query)
         {
             string escaped = query.Replace("\\", "\\\\").Replace("`", "\\`");
-            _ = this.controller?.CoreWebView2?.ExecuteScriptAsync(
+            _ = this.coreWebView2?.ExecuteScriptAsync(
                 "window.postMessage(Object.fromEntries(new URLSearchParams(`" + escaped + "`)), \"*\")");
         }
         private CoreWebView2Controller controller;
+        // held for the lifetime of the window: CsWinRT drops the event handlers of a
+        // collected projection, so once the GC runs WebResourceRequested stops firing
+        // (requests fall through to the network) or crashes with an AccessViolation
+        private CoreWebView2 coreWebView2;
         private CoreWebView2Environment environment;
         private bool isClosed = false;
 
@@ -100,6 +104,7 @@ namespace FullStacked
                 this.isClosed = true;
                 this.controller?.Close();
                 this.controller = null;
+                this.coreWebView2 = null;
             };
 
             this.InitWebView();
@@ -230,7 +235,7 @@ namespace FullStacked
                     }
                 };
 
-                var coreWebView2 = this.controller.CoreWebView2;
+                var coreWebView2 = this.coreWebView2 = this.controller.CoreWebView2;
 
                 coreWebView2.WebMessageReceived += delegate (CoreWebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
             {
@@ -286,17 +291,20 @@ namespace FullStacked
                     };
 
 
-                    byte[] cachedPayload = null;
+                    // take the response or register the awaiter in one lock, the core
+                    // call completes on the core queue and can land in between
+                    byte[] cachedPayload;
+                    TaskCompletionSource<byte[]> resolve = null;
                     lock (this.syncLock)
                     {
-                        if (this.syncAwaitersPayload.ContainsKey(id))
+                        if (!this.syncAwaitersPayload.Remove(id, out cachedPayload))
                         {
-                            cachedPayload = this.syncAwaitersPayload[id];
-                            this.syncAwaitersPayload.Remove(id);
+                            resolve = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                            this.syncAwaitersResolve[id] = resolve;
                         }
                     }
 
-                    if (cachedPayload != null)
+                    if (resolve == null)
                     {
                         sendCallback(cachedPayload);
                     }
@@ -304,20 +312,7 @@ namespace FullStacked
                     {
                         using (args.GetDeferral())
                         {
-                            TaskCompletionSource<byte[]> resolve = new(TaskCreationOptions.RunContinuationsAsynchronously);
-                            lock (this.syncLock)
-                            {
-                                this.syncAwaitersResolve[id] = resolve;
-                            }
-
-                            byte[] awaitedPayload = await resolve.Task;
-
-                            lock (this.syncLock)
-                            {
-                                this.syncAwaitersResolve.Remove(id);
-                            }
-
-                            sendCallback(awaitedPayload);
+                            sendCallback(await resolve.Task);
                         }
                     }
 
@@ -521,9 +516,9 @@ namespace FullStacked
             {
                 lock (this.syncLock)
                 {
-                    if (this.syncAwaitersResolve.ContainsKey(id))
+                    if (this.syncAwaitersResolve.Remove(id, out TaskCompletionSource<byte[]> resolve))
                     {
-                        this.syncAwaitersResolve[id].SetResult(response);
+                        resolve.SetResult(response);
                     }
                     else
                     {
@@ -537,7 +532,7 @@ namespace FullStacked
                 string script = "window.fullstacked.respond(" + id + ",`" + Convert.ToBase64String(response) + "`)";
                 this.uiQueue.TryEnqueue(() =>
                 {
-                    _ = this.controller?.CoreWebView2?.ExecuteScriptAsync(script);
+                    _ = this.coreWebView2?.ExecuteScriptAsync(script);
                 });
             }
         }
@@ -574,9 +569,9 @@ namespace FullStacked
             this.streamFlushScheduled = false;
         }
 
-        if (script.Length > 0 && this.controller?.CoreWebView2 != null)
+        if (script.Length > 0 && this.coreWebView2 != null)
         {
-            _ = this.controller.CoreWebView2.ExecuteScriptAsync(script);
+            _ = this.coreWebView2.ExecuteScriptAsync(script);
         }
     }
 
