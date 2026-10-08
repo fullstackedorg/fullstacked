@@ -398,9 +398,36 @@ Each stage is measured with `bench` on every platform before and after. A stage 
 
 - Go: `internal/frames` keeps a frame queue per context. The host calls `streamAttach(ctx) → gen`, then `streamRead(ctx, gen, *size)` in a loop on its own thread: it blocks until frames are queued and returns all of them (whole frames, freed with `freePtr`), nil once the context ends, the page reloads (a new attach) or `streamDetach(ctx, gen)`. While a reader is attached, `StreamChunk`/`StreamError` push frames instead of calling `setOnStreamData`, ended streams are dropped right away, and producers wait while 8 MB are queued (backpressure). Without a reader, the per chunk callback still applies (Node, fallback).
 - The path is `GET /stream` (the context is the one of the page) and stream id 0 is a hello frame queued on attach. JS waits for it up to 3 s before making calls: without it (a webview buffering the response) it aborts the request, the host detaches and stream chunks keep coming through `window.fullstacked.onStreamData`, which stays registered for that fallback and for Node.
-- Apple: `didReceive` per read from a reader thread, delivered on the main thread, `stop` detaches. Android: `WebResourceResponse` with an `InputStream` reading `streamRead` directly (no pipe), `close` detaches. GTK: a socket pair, WebKit reads one end as a `GUnixInputStream`, the reader thread writes the other (a failed write detaches). Qt: a sequential `QIODevice` owned by the job, appended on the main thread, detaches when deleted.
+- Apple: `didReceive` per read from a reader thread, delivered on the main thread, `stop` detaches. Android: `WebResourceResponse` with an `InputStream` reading `streamRead` directly (no pipe), `close` detaches. GTK: a socket pair, WebKit reads one end as a `GUnixInputStream`, the reader thread writes the other (a failed write detaches). Qt: a sequential, unbuffered `QIODevice` owned by the job, appended on the main thread and read by QtWebEngine on its IO thread, so its buffer is locked; it detaches when deleted.
 - Windows: WebView2 requires the response stream to hold the whole body when the request completes, so a long-lived response cannot stream. The reader thread posts the frames with `PostSharedBufferToScript` instead (binary, no base64, no script evaluation), the page parses them the same way.
-- Node keeps its WebSocket until Stage 5.
+- WebKit (and apparently Android WebView) holds the tail of a streaming custom-scheme response until more bytes arrive, which stalled the first stream after `concurrent noop x32` on macOS. Once the queue goes idle after data, `frames.Queue.Read` returns empty keepalive frames (stream 0) after 1, 10, 100 and 500 ms to push the tail through.
+- Node reads `GET /stream` too (native `streamStart` with a reader thread) and keeps the WebSocket as fallback.
+- `bench` prints `streams: frames|shared-buffers|evaluated|websocket` in its header, saved as `meta.streamTransport`.
+
+**Linux** (arm64 VM, Debian 13, WebKitGTK 2.52, Qt 6.8.2):
+
+- CMake: `ARCH` now defaults to the host architecture and is not kept in the cache, and configuring fails when the cached compilers build for another architecture than `ARCH`, instead of silently building for it. A cross build directory has to be configured with `-DARCH` again (`publish.js` deletes the cache each time).
+- Qt bug: QtWebEngine reads the `/stream` device on its IO thread while frames were appended on the main thread, without a lock. The `QByteArray` race duplicated and dropped bytes (instrumented: 12.84 MB read for 12.60 MB appended), the page's parser lost a frame: `received 4190208 bytes, expected 4194304` when it was data, a stall on the first stream after `concurrent noop x32` when it was the end frame. Fixed by locking the buffer and opening the device unbuffered. 6 full runs and 3 runs of `bench -n 50 -t 64m -k 1k,4k,64k,1m -r 3 --suites concurrent,stream` passed afterwards.
+- GTK: 6 full runs and the same 3 stress runs, all on `streams: frames`, no stall and no error (with the keepalive frames; GTK was not tried without them).
+- Qt: `QWebEngineUrlScheme::FetchApiAllowed` is guarded with `QT_VERSION_CHECK(6, 6, 0)` for Ubuntu 24.04 (Qt 6.4).
+- Qt call path: Qt is the fastest Linux host on payloads (64k echo 1.8 ms, GTK 3.0 ms) and at par on async noop (0.23 ms medians for both). Only sync calls cost more (noop 0.40 ms against 0.18 ms on GTK): the postMessage over QWebChannel plus the XHR to `/sync/{id}`, which Stage 4's single-hop `POST fs://sync` removes (`QWebEngineUrlRequestJob::requestBody` with Qt ≥ 6.7, keeping the current path below 6.7). Moving async responses to frames or batching them was not worth a protocol change for these numbers.
+
+**Results** (`stage3-f7a070a7`, Linux, medians of 6 runs; saved files are the run closest to the median):
+
+| Case | GTK s2 | GTK s3 | Qt s3 |
+|---|---|---|---|
+| noop sync | 0.21 ms | 0.18 ms | 0.40 ms |
+| noop async | 0.17 ms | 0.23 ms | 0.23 ms |
+| echo sync 64k | 2.83 ms | 3.01 ms | 1.86 ms |
+| echo async 64k | 3.01 ms | 3.55 ms | 1.74 ms |
+| concurrent noop x32 | 29k ops/s | 32k ops/s | 41k ops/s |
+| stream 4m / 4k | 65 MB/s | 216 MB/s | 321 MB/s |
+| stream 4m / 256k | 70 MB/s | 238 MB/s | 392 MB/s |
+| stream 64m / 1k-1m (stress) | | 370-570 MB/s | 490-810 MB/s |
+
+- Streams: 3.3× on GTK. The 4 MB cases last 10-20 ms and vary ±40% from run to run; 64 MB streams are steadier.
+- Against Node in Stage 2 (164 MB/s at 4k, 800 MB/s at 256k): 4k is above Node on both hosts; 256k is 3.4× below on GTK and 2× below on Qt at 4 MB, and 1.4-2.2× (GTK) and 1-1.6× (Qt) below at 64 MB. Node has no Stage 3 run on this machine yet.
+- GTK small async calls are about 0.06 ms slower than in Stage 2 (noop async 0.17 → 0.23 ms, echo async 1k 0.24 → 0.29 ms), not investigated.
 
 ### Stage 4: Binary request path
 

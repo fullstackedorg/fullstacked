@@ -36,11 +36,13 @@ static void openExternalUrl(const QUrl &url) {
 
 FrameDevice::FrameDevice(uint8_t pCtx, int pGen, QObject *parent)
     : QIODevice(parent), ctx(pCtx), gen(pGen) {
-    open(QIODevice::ReadOnly);
+    // unbuffered: QIODevice keeps no copy of the data on the reading thread
+    open(QIODevice::ReadOnly | QIODevice::Unbuffered);
 }
 
 FrameDevice::~FrameDevice() {
     // the page went away, stream data goes back to evaluated chunks
+    std::lock_guard<std::mutex> lock(mutex);
     if (!ended) {
         Core::streamDetach(ctx, gen);
     }
@@ -72,24 +74,34 @@ void FrameDevice::start(uint8_t ctx, int gen, FrameDevice *device) {
 }
 
 qint64 FrameDevice::bytesAvailable() const {
+    std::lock_guard<std::mutex> lock(mutex);
     return buffer.size() + QIODevice::bytesAvailable();
 }
 
 bool FrameDevice::atEnd() const {
+    std::lock_guard<std::mutex> lock(mutex);
     return ended && buffer.isEmpty() && QIODevice::bytesAvailable() == 0;
 }
 
 void FrameDevice::append(const QByteArray &frames) {
-    buffer.append(frames);
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        buffer.append(frames);
+    }
     emit readyRead();
 }
 
 void FrameDevice::finish() {
-    ended = true;
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        ended = true;
+    }
     emit readChannelFinished();
 }
 
+// called by QtWebEngine on its IO thread
 qint64 FrameDevice::readData(char *data, qint64 maxSize) {
+    std::lock_guard<std::mutex> lock(mutex);
     if (buffer.isEmpty()) {
         return ended ? -1 : 0;
     }
@@ -334,12 +346,17 @@ int QtGUI::run(int &argc, char **argv, std::function<void()> onReady,
     QWebEngineUrlScheme scheme("fs");
     scheme.setSyntax(QWebEngineUrlScheme::Syntax::HostAndPort);
     scheme.setDefaultPort(80);
-    scheme.setFlags(QWebEngineUrlScheme::SecureScheme |
-                    QWebEngineUrlScheme::LocalAccessAllowed |
-                    QWebEngineUrlScheme::ViewSourceAllowed |
-                    QWebEngineUrlScheme::ContentSecurityPolicyIgnored |
-                    QWebEngineUrlScheme::CorsEnabled |
-                    QWebEngineUrlScheme::FetchApiAllowed);
+    QWebEngineUrlScheme::Flags schemeFlags =
+        QWebEngineUrlScheme::SecureScheme |
+        QWebEngineUrlScheme::LocalAccessAllowed |
+        QWebEngineUrlScheme::ViewSourceAllowed |
+        QWebEngineUrlScheme::ContentSecurityPolicyIgnored |
+        QWebEngineUrlScheme::CorsEnabled;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
+    // Qt < 6.6 (Ubuntu 24.04 ships 6.4) has no FetchApiAllowed
+    schemeFlags |= QWebEngineUrlScheme::FetchApiAllowed;
+#endif
+    scheme.setFlags(schemeFlags);
     QWebEngineUrlScheme::registerScheme(scheme);
 
     app = new QApplication(argc, argv);

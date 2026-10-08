@@ -25,8 +25,9 @@ class QtWindow;
 
 // Stream data of a context as binary frames for GET /stream (see
 // core/internal/frames). A thread reads the frames from the core and appends
-// them on the main thread, QtWebEngine reads the device as data comes. Owned
-// by the request job, detaches the reader when the job goes away.
+// them on the main thread, QtWebEngine reads the device as data comes from
+// its IO thread, so the buffer is locked. Owned by the request job, detaches
+// the reader when the job goes away.
 class FrameDevice : public QIODevice {
         Q_OBJECT
     public:
@@ -53,6 +54,7 @@ class FrameDevice : public QIODevice {
     private:
         uint8_t ctx;
         int gen;
+        mutable std::mutex mutex;
         QByteArray buffer;
         bool ended = false;
 };
