@@ -1,20 +1,17 @@
 import SwiftUI
 
-private let coreCallLock = NSLock()
-
+// Thread safe: the core synchronizes per context, responses are returned
+// directly instead of being stored by request id.
 func coreCall(payload: Data) -> Data {
-    coreCallLock.lock()
-    defer { coreCallLock.unlock() }
-    
-    let responseLength = call(payload.ptr(), Int32(payload.count))
-    if responseLength <= 0 {
+    var size: Int32 = 0
+    let responsePtr = callWithResponse(payload.ptr(), Int32(payload.count), &size)
+    guard let responsePtr, size > 0 else {
         return Data()
     }
-    let responsePtr = UnsafeMutableRawPointer.allocate(byteCount: Int(responseLength), alignment: 1)
-    getCorePayload(payload[0], 1, payload[1], responsePtr, responseLength)
-    let response = Data(bytes: responsePtr, count: Int(responseLength))
-    responsePtr.deallocate()
-    return response
+    // the core allocated the response, free it with the core once released
+    return Data(bytesNoCopy: responsePtr, count: Int(size), deallocator: .custom({ ptr, _ in
+        freePtr(ptr)
+    }))
 }
 
 // Calls Core Fn DeepLink in ctx: the deeplink plugins of ctx receive url.
@@ -23,7 +20,7 @@ func coreDeepLink(ctx: UInt8, url: String) -> Int {
     let urlData = url.data(using: .utf8)!
     var payload = Data([
         ctx,
-        RequestHandler.getNextReqId(), // req id
+        0, // req id, unused by callWithResponse
         0, // Core Module
         6, // Fn DeepLink
         0, // Async
@@ -47,11 +44,11 @@ func onStreamDataCallback(
     size: Int32
 ){
     if let webView = WebViewStore.getInstance().webViews.first(where: {$0.requestHandler.ctx == ctx}) {
-        let bufferPtr = UnsafeMutableRawPointer.allocate(byteCount: Int(size), alignment: 1)
-        getCorePayload(ctx, 2, streamId, bufferPtr, size)
-        let buffer = Data(bytes: bufferPtr, count: Int(size))
+        var buffer = Data(count: Int(size))
+        buffer.withUnsafeMutableBytes { bytes in
+            getCorePayload(ctx, 2, streamId, bytes.baseAddress, size)
+        }
         webView.onStreamData(streamId: streamId, buffer: buffer)
-        bufferPtr.deallocate()
     } else {
         print("[onStreamData] Unknown ctx")
     }

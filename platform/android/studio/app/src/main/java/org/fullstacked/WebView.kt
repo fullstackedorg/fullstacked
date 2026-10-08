@@ -31,6 +31,12 @@ class FullStackedWebView(
     private val syncAwaitersResolve = ConcurrentHashMap<Int, (String) -> Unit>()
     private val syncAwaitersPayload = ConcurrentHashMap<Int, String>()
 
+    // stream chunks received between two main looper iterations are evaluated in one script
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val streamLock = Any()
+    private val pendingStreamScript = StringBuilder()
+    private var streamFlushScheduled = false
+
     init {
         val c = ctxId.toInt() and 0xFF
         if (Core.check(c) == 0) {
@@ -125,11 +131,28 @@ class FullStackedWebView(
     }
 
     fun onStreamData(streamId: Int, buffer: ByteArray) {
-        val mainLooper = Looper.getMainLooper()
-        val handler = Handler(mainLooper)
         val b64 = Base64.getEncoder().encodeToString(buffer)
-        handler.post {
-            this.webView.evaluateJavascript("window.fullstacked.onStreamData($streamId, `$b64`)", null)
+        val script = "window.fullstacked.onStreamData($streamId, `$b64`);"
+        val schedule = synchronized(streamLock) {
+            pendingStreamScript.append(script)
+            val schedule = !streamFlushScheduled
+            streamFlushScheduled = true
+            schedule
+        }
+        if (schedule) {
+            mainHandler.post { flushStreamData() }
+        }
+    }
+
+    private fun flushStreamData() {
+        val script = synchronized(streamLock) {
+            val script = pendingStreamScript.toString()
+            pendingStreamScript.setLength(0)
+            streamFlushScheduled = false
+            script
+        }
+        if (script.isNotEmpty()) {
+            this.webView.evaluateJavascript(script, null)
         }
     }
 
@@ -205,7 +228,7 @@ class FullStackedWebView(
         val pathnameBytes = path.toByteArray(StandardCharsets.UTF_8)
         var payload = byteArrayOf(
             ctxId,
-            Core.nextReqId(), // req id
+            0, // req id, unused by callWithResponse
             0, // Core Module
             0, // Fn Static File
             0, // Async

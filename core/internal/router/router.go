@@ -49,28 +49,48 @@ const (
 */
 
 func Call(payload []byte) (int, error) {
-	if len(payload) < 5 {
-		return 0, errors.New("payload needs at least ctx, id, module, function, sync/async")
+	ctx, header, data, err := parseCall(payload)
+	if err != nil {
+		return 0, err
 	}
-
-	ctxId := payload[0]
-	ctx, ok := store.Contexts[ctxId]
-
-	if !ok {
-		return 0, errors.New("unkown call context " + strconv.Itoa(int(ctxId)))
-	}
-
-	id := payload[1]
 
 	ctx.ResponsesMutex.Lock()
-	_, used := ctx.Responses[id]
+	_, used := ctx.Responses[header.Id]
 	ctx.ResponsesMutex.Unlock()
 
 	if used {
 		return 0, errors.New("id already in use for another call")
 	}
 
-	header := types.CoreCallHeader{
+	return store.StoreResponse(ctx, header, processCall(ctx, header, data))
+}
+
+// CallWithResponse processes the call and returns its response payload
+// directly, the request id is not used so concurrent calls never collide
+func CallWithResponse(payload []byte) ([]byte, error) {
+	ctx, header, data, err := parseCall(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	return store.BuildResponse(ctx, processCall(ctx, header, data))
+}
+
+func parseCall(payload []byte) (*types.Context, types.CoreCallHeader, []types.DeserializedData, error) {
+	header := types.CoreCallHeader{}
+
+	if len(payload) < 5 {
+		return nil, header, nil, errors.New("payload needs at least ctx, id, module, function, sync/async")
+	}
+
+	ctxId := payload[0]
+	ctx, ok := store.GetContext(ctxId)
+
+	if !ok {
+		return nil, header, nil, errors.New("unkown call context " + strconv.Itoa(int(ctxId)))
+	}
+
+	header = types.CoreCallHeader{
 		Id:     payload[1],
 		Module: payload[2],
 		Fn:     payload[3],
@@ -80,28 +100,29 @@ func Call(payload []byte) (int, error) {
 	data, err := serialization.DeserializeAll(payload[5:])
 
 	if err != nil {
-		return 0, errors.New("failed to deserialize payload data")
+		return nil, header, nil, errors.New("failed to deserialize payload data")
 	}
 
+	return ctx, header, data, nil
+}
+
+func processCall(
+	ctx *types.Context,
+	header types.CoreCallHeader,
+	data []types.DeserializedData,
+) types.CoreCallResponse {
 	response := types.CoreCallResponse{}
 
 	coreError := callProcess(ctx, header, data, &response)
 
-	size := 0
 	if coreError != nil {
-		size, err = store.StoreResponse(ctx, header, types.CoreCallResponse{
+		return types.CoreCallResponse{
 			Type: types.CoreResponseError,
 			Data: coreError.Error(),
-		})
-	} else {
-		size, err = store.StoreResponse(ctx, header, response)
+		}
 	}
 
-	if err != nil {
-		return 0, err
-	}
-
-	return size, nil
+	return response
 }
 
 var modules = map[types.CoreModule]types.ModuleSwitch{

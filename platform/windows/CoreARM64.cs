@@ -28,7 +28,12 @@ namespace FullStacked
         [DllImport(dllName)]
         public static extern int call(void* buffer, int length);
 
-        //public static extern void freePtr(void* ptr);
+        [DllImport(dllName)]
+        public static extern void* callWithResponse(void* buffer, int length, int* size);
+
+        [DllImport(dllName)]
+        public static extern void freePtr(void* ptr);
+
         public override byte startCore(char* root, char* build) {
             return start(root, build);
         }
@@ -49,6 +54,12 @@ namespace FullStacked
         }
         public override int callCore(void* buffer, int length) {
             return call(buffer, length);
+        }
+        public override void* callWithResponseCore(void* buffer, int length, int* size) {
+            return callWithResponse(buffer, length, size);
+        }
+        public override void freePtrCore(void* ptr) {
+            freePtr(ptr);
         }
     }
 }

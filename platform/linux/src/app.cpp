@@ -23,17 +23,26 @@ void App::open(uint8_t ctx) {
     }
 
     Window *window = gui->createWindow(ctx);
-    activeWindows[ctx] = window;
+    {
+        std::lock_guard<std::mutex> lock(activeWindowsMutex);
+        activeWindows[ctx] = window;
+    }
     if (kiosk) {
         window->setFullscreen();
     }
 }
 
 void App::close(uint8_t ctx) {
-    auto it = activeWindows.find(ctx);
-    if (it != activeWindows.end()) {
-        Window *window = it->second;
-        activeWindows.erase(it);
+    bool found = false;
+    {
+        std::lock_guard<std::mutex> lock(activeWindowsMutex);
+        auto it = activeWindows.find(ctx);
+        if (it != activeWindows.end()) {
+            activeWindows.erase(it);
+            found = true;
+        }
+    }
+    if (found) {
         Core::stop(ctx);
     }
 }
@@ -47,10 +56,16 @@ void App::safeTrigger() {
         ctxs.push_back(pair.first);
     }
     for (uint8_t c : ctxs) {
-        auto it = activeWindows.find(c);
-        if (it != activeWindows.end()) {
-            Window *w = it->second;
-            activeWindows.erase(it);
+        Window *w = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(activeWindowsMutex);
+            auto it = activeWindows.find(c);
+            if (it != activeWindows.end()) {
+                w = it->second;
+                activeWindows.erase(it);
+            }
+        }
+        if (w) {
             w->close();
             delete w;
         }
@@ -78,6 +93,8 @@ void App::deepLink(const std::string &url) {
 
 void App::onStreamData(uint8_t ctx, uint8_t streamId,
                        const std::vector<uint8_t> &data) {
+    // held during the call so the window cannot be erased and deleted
+    std::lock_guard<std::mutex> lock(activeWindowsMutex);
     auto it = activeWindows.find(ctx);
     if (it != activeWindows.end()) {
         it->second->onStreamData(streamId, data);

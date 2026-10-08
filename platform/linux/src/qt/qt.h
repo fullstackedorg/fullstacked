@@ -84,7 +84,14 @@ class QtWindow : public Window {
         std::map<uint8_t, QWebEngineUrlRequestJob *> syncAwaitersResolve;
         std::map<uint8_t, std::vector<uint8_t>> syncAwaitersPayload;
 
+        // stream chunks received between two event loop iterations are
+        // evaluated in one script
+        std::mutex streamMutex;
+        std::string pendingStreamScript;
+        bool streamFlushScheduled = false;
+
         void init();
+        void flushStreamData();
 
     public:
         QtWindow(uint8_t ctx);

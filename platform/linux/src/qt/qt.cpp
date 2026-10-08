@@ -640,7 +640,7 @@ void QtWindow::handleSchemeRequest(QWebEngineUrlRequestJob *job) {
     // Static file serving via Core
     std::string pathStd = path.toStdString();
     std::vector<uint8_t> header = {ctx,
-                                   0, // req id
+                                   0, // req id, unused by callWithResponse
                                    0, // Core Module
                                    0, // Fn Static File
                                    0, // Async
@@ -687,14 +687,14 @@ void QtWindow::onBridgeMessage(const std::string &payloadB64) {
     if (isSync == 1) {
         resolveSyncAwaiter(id, response);
     } else {
-        std::string respB64 = base64_encode(response.data(), response.size());
-        QString script =
-            QString("if (window.fullstacked && window.fullstacked.respond) { "
-                    "window.fullstacked.respond(%1, `%2`); }")
-                .arg(id)
-                .arg(QString::fromStdString(respB64));
+        std::string script =
+            "if (window.fullstacked && window.fullstacked.respond) { "
+            "window.fullstacked.respond(" +
+            std::to_string(id) + ", `" +
+            base64_encode(response.data(), response.size()) + "`); }";
         if (webEngineView && webEngineView->page()) {
-            webEngineView->page()->runJavaScript(script);
+            webEngineView->page()->runJavaScript(
+                QString::fromStdString(script));
         }
     }
 }
@@ -716,23 +716,39 @@ void QtWindow::resolveSyncAwaiter(uint8_t id,
     }
 }
 
+// called from core threads, App holds the window while it runs
 void QtWindow::onStreamData(uint8_t streamId,
                             const std::vector<uint8_t> &data) {
-    if (!webEngineView) return;
-    std::string b64 = base64_encode(data.data(), data.size());
-    QMetaObject::invokeMethod(
-        webEngineView,
-        [this, streamId, b64]() {
-            if (!webEngineView || !webEngineView->page()) return;
-            QString script =
-                QString("if (window.fullstacked && "
-                        "window.fullstacked.onStreamData) { "
-                        "window.fullstacked.onStreamData(%1, `%2`); }")
-                    .arg(streamId)
-                    .arg(QString::fromStdString(b64));
-            webEngineView->page()->runJavaScript(script);
-        },
-        Qt::QueuedConnection);
+    QWebEngineView *view = webEngineView;
+    if (!view) return;
+    std::string script = "window.fullstacked.onStreamData(" +
+                         std::to_string(streamId) + ", `" +
+                         base64_encode(data.data(), data.size()) + "`);";
+    bool schedule = false;
+    {
+        std::lock_guard<std::mutex> lock(streamMutex);
+        pendingStreamScript += script;
+        schedule = !streamFlushScheduled;
+        streamFlushScheduled = true;
+    }
+    if (schedule) {
+        // dropped if the view is destroyed before it runs
+        QMetaObject::invokeMethod(
+            view, [this]() { flushStreamData(); }, Qt::QueuedConnection);
+    }
+}
+
+void QtWindow::flushStreamData() {
+    std::string script;
+    {
+        std::lock_guard<std::mutex> lock(streamMutex);
+        script.swap(pendingStreamScript);
+        streamFlushScheduled = false;
+    }
+    if (script.empty() || !webEngineView || !webEngineView->page()) return;
+    webEngineView->page()->runJavaScript(QString::fromStdString(
+        "if (window.fullstacked && window.fullstacked.onStreamData) { " +
+        script + " }"));
 }
 
 void QtWindow::evaluateJavaScript(const std::string &script) {
@@ -836,8 +852,9 @@ void QtWindow::close() {
     if (windowQt) {
         QMainWindow *win = windowQt;
         windowQt = nullptr;
-        webEngineView = nullptr;
+        // first, so no stream data reaches this window anymore
         App::instance->close(ctx);
+        webEngineView = nullptr;
         delete win;
     }
 }

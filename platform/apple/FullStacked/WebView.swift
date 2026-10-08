@@ -63,6 +63,14 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     
     public var isSafe = false
     
+    // core calls of this webview run in order, off the main thread
+    private let coreQueue = DispatchQueue(label: "org.fullstacked.core", qos: .userInitiated)
+    
+    // stream chunks received between two main thread ticks are evaluated in one script
+    private let streamLock = NSLock()
+    private var pendingStreamScript = ""
+    private var streamFlushScheduled = false
+    
     required init(from decoder: any Decoder) throws {
         fatalError("init(coder:) has not been implemented")
     }
@@ -140,8 +148,29 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     }
 
     func onStreamData(streamId: UInt8, buffer: Data){
-        DispatchQueue.main.async {
-            self.evaluateJavaScript("window.fullstacked.onStreamData(\(streamId),`\(buffer.base64EncodedString())`)")
+        let script = "window.fullstacked.onStreamData(\(streamId),`\(buffer.base64EncodedString())`);"
+        streamLock.lock()
+        pendingStreamScript.append(script)
+        let schedule = !streamFlushScheduled
+        streamFlushScheduled = true
+        streamLock.unlock()
+        
+        if schedule {
+            DispatchQueue.main.async { [weak self] in
+                self?.flushStreamData()
+            }
+        }
+    }
+    
+    private func flushStreamData() {
+        streamLock.lock()
+        let script = pendingStreamScript
+        pendingStreamScript = ""
+        streamFlushScheduled = false
+        streamLock.unlock()
+        
+        if !script.isEmpty {
+            self.evaluateJavaScript(script)
         }
     }
     
@@ -194,17 +223,26 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     }
     
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        let payload = Data(base64Encoded: message.body as! String)!
-        let response = coreCall(payload: payload)
+        guard let body = message.body as? String else { return }
         
-        // Sync
-        if(payload[payload.startIndex + 4] == 1) {
+        coreQueue.async { [weak self] in
+            guard let payload = Data(base64Encoded: body), payload.count >= 5 else { return }
+            let response = coreCall(payload: payload)
             let id = payload[payload.startIndex + 1]
-            self.requestHandler.resolveSyncAwaiter(id: id, payload: response)
-        }
-        // Async
-        else {
-            self.evaluateJavaScript("window.fullstacked.respond(\(payload[payload.startIndex + 1]),`\(response.base64EncodedString())`)")
+            
+            // Sync
+            if(payload[payload.startIndex + 4] == 1) {
+                DispatchQueue.main.async {
+                    self?.requestHandler.resolveSyncAwaiter(id: id, payload: response)
+                }
+            }
+            // Async
+            else {
+                let script = "window.fullstacked.respond(\(id),`\(response.base64EncodedString())`)"
+                DispatchQueue.main.async {
+                    self?.evaluateJavaScript(script)
+                }
+            }
         }
     }
     
@@ -252,15 +290,6 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
     private var syncAwaitersPayload: [UInt8:Data] = [:]
     private var stoppedTasks = Set<ObjectIdentifier>()
     private let tasksLock = NSLock()
-    
-    private static var nextReqId: UInt8 = 0
-    private static let reqIdLock = NSLock()
-    static func getNextReqId() -> UInt8 {
-        reqIdLock.lock()
-        defer { reqIdLock.unlock() }
-        nextReqId = nextReqId &+ 1
-        return nextReqId
-    }
     
     init(ctx: UInt8) {
         self.ctx = ctx
@@ -318,8 +347,6 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
             pathname = "/"
         }
         
-        print(pathname)
-        
         if(pathname == "platform") {
             let data = platform.data(using: .utf8)!
             self.send(urlSchemeTask: urlSchemeTask,
@@ -361,13 +388,12 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
             return
         }
         
-        // static file serving
+        // static file serving, read off the main thread, respond on it
         
         let pathnameData = pathname.data(using: .utf8)!
-        let reqId = RequestHandler.getNextReqId()
         var payload = Data([
             self.ctx,
-            reqId, // req id
+            0, // req id, unused by callWithResponse
             0, // Core Module
             0, // Fn Static File
             0, // Async
@@ -377,40 +403,34 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
         payload.append(NumberToUint4Bytes(num: pathnameData.count))
         payload.append(pathnameData)
         
-        let responseData = coreCall(payload: payload)
+        DispatchQueue.global(qos: .userInitiated).async {
+            let response = RequestHandler.staticFileResponse(coreCall(payload: payload))
+            DispatchQueue.main.async {
+                self.send(urlSchemeTask: urlSchemeTask,
+                          url: request.url!,
+                          statusCode: response.statusCode,
+                          mimeType: response.mimeType,
+                          data: response.data)
+            }
+        }
+    }
+    
+    static func staticFileResponse(_ responseData: Data) -> (statusCode: Int, mimeType: String, data: Data) {
+        let notFound = (statusCode: 404, mimeType: "text/plain", data: "Not Found".data(using: .utf8)!)
         guard responseData.count > 1 else {
-            send(urlSchemeTask: urlSchemeTask,
-                 url: request.url!,
-                 statusCode: 404,
-                 mimeType: "text/plain",
-                 data: "Not Found".data(using: .utf8)!)
-            return
+            return notFound
         }
         let (response, _) = Deserialize(buffer: responseData, index: 1)
         guard let responseDataPayload = response as? Data else {
-            send(urlSchemeTask: urlSchemeTask,
-                 url: request.url!,
-                 statusCode: 404,
-                 mimeType: "text/plain",
-                 data: "Not Found".data(using: .utf8)!)
-            return
+            return notFound
         }
         let args = DeserializeAll(buffer: responseDataPayload)
         
         guard args.count >= 2, let mimeType = args[0] as? String, let fileData = args[1] as? Data else {
-            send(urlSchemeTask: urlSchemeTask,
-                 url: request.url!,
-                 statusCode: 404,
-                 mimeType: "text/plain",
-                 data: "Not Found".data(using: .utf8)!)
-            return
+            return notFound
         }
         
-        send(urlSchemeTask: urlSchemeTask,
-             url: request.url!,
-             statusCode: 200,
-             mimeType: mimeType,
-             data: fileData)
+        return (statusCode: 200, mimeType: mimeType, data: fileData)
     }
     
     func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) {

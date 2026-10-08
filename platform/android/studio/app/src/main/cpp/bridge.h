@@ -10,6 +10,8 @@ extern "C" {
     int check(uint8_t ctxId);
     void stop(uint8_t ctxId);
     int call(void* buffer, int length);
+    void* callWithResponse(void* buffer, int length, int* size);
+    void freePtr(void* ptr);
     void getCorePayload(uint8_t ctx, uint8_t coreType, uint8_t id, void* ptr, int size);
     void setOnStreamData(void* cb);
 
@@ -27,6 +29,8 @@ extern "C" {
             (JNIEnv *, jobject, jbyteArray);
     JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_getCorePayload
             (JNIEnv *, jobject, jint, jint, jint, jint);
+    JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_callWithResponse
+            (JNIEnv *, jobject, jbyteArray);
     JNIEXPORT void JNICALL Java_org_fullstacked_Core_setOnStreamData
             (JNIEnv *, jobject);
 }

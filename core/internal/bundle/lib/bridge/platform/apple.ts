@@ -93,15 +93,19 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
 
     return {
         ctx,
+        Send(payload) {
+            globalThis.webkit.messageHandlers.bridge.postMessage(
+                fromByteArray(new Uint8Array(payload))
+            );
+        },
         async Async(payload) {
             const dataView = new DataView(payload);
             const id = dataView.getUint8(1);
             return new Promise<ArrayBuffer>((resolve) => {
                 asyncResponsePromises.set(id, resolve);
                 if (isWorker) {
-                    globalThis.postMessage(payload, {
-                        targetOrigin: "bridge"
-                    });
+                    // transfer, the payload is not used after
+                    globalThis.postMessage(payload, { transfer: [payload] });
                 } else {
                     const base64 = fromByteArray(new Uint8Array(payload));
                     globalThis.webkit.messageHandlers.bridge.postMessage(
@@ -114,9 +118,8 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
             const uint8array = new Uint8Array(payload);
             const id = uint8array[1];
             if (isWorker) {
-                globalThis.postMessage(payload, {
-                    targetOrigin: "bridge"
-                });
+                // transfer, the payload is not used after
+                globalThis.postMessage(payload, { transfer: [payload] });
             } else {
                 const base64 = fromByteArray(uint8array);
                 globalThis.webkit.messageHandlers.bridge.postMessage(base64);

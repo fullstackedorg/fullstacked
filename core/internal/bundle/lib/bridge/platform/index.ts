@@ -9,6 +9,10 @@ export interface PlatformBridge {
     ctx: number;
     Async: (payload: ArrayBuffer) => Promise<ArrayBuffer>;
     Sync: (payload: ArrayBuffer) => ArrayBuffer | void;
+    // posts a payload without waiting for its response, the worker relay
+    // uses it for the sync calls of workers which read their response
+    // themselves
+    Send?: (payload: ArrayBuffer) => void;
     GetResponseSync?: (id: number) => ArrayBuffer;
 }
 

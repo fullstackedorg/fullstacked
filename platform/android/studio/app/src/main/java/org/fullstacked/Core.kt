@@ -1,7 +1,5 @@
 package org.fullstacked
 
-import java.util.concurrent.atomic.AtomicInteger
-
 object Core {
     init {
         try {
@@ -39,6 +37,9 @@ object Core {
     @JvmStatic
     external fun getCorePayload(ctx: Int, coreType: Int, id: Int, size: Int): ByteArray
 
+    @JvmStatic
+    external fun callWithResponse(payload: ByteArray): ByteArray
+
     fun startMain(root: String, build: String, providedCtx: Int? = null, safe: Boolean = false): Int {
         return if (safe) {
             startSafe(root, build)
@@ -56,7 +57,7 @@ object Core {
         val urlBytes = url.toByteArray(Charsets.UTF_8)
         var payload = byteArrayOf(
             ctx.toByte(),
-            nextReqId(), // req id
+            0, // req id, unused by callWithResponse
             0, // Core Module
             6, // Fn DeepLink
             0, // Async
@@ -83,19 +84,10 @@ object Core {
         }
     }
 
-    private val nextReqId = AtomicInteger(0)
-
-    // Request id for calls made by the platform (static files, deeplinks): concurrent calls
-    // in the same context must not share an id, the core refuses an id already in use.
-    fun nextReqId(): Byte = nextReqId.updateAndGet { (it + 1) and 0xFF }.toByte()
-
-    fun coreCall(payload: ByteArray): ByteArray {
-        val responseSize = call(payload)
-        if (responseSize <= 0) return ByteArray(0)
-        val ctx = payload[0].toInt() and 0xFF
-        val id = payload[1].toInt() and 0xFF
-        return getCorePayload(ctx, 1, id, responseSize)
-    }
+    // Thread safe: the core synchronizes per context, responses are returned
+    // directly instead of being stored by request id, so concurrent calls
+    // (static files, bridge) never collide.
+    fun coreCall(payload: ByteArray): ByteArray = callWithResponse(payload)
 }
 
 fun coreCall(payload: ByteArray): ByteArray = Core.coreCall(payload)

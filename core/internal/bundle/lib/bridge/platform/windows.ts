@@ -50,15 +50,19 @@ export async function BridgeWindowsInit(): Promise<PlatformBridge> {
 
     return {
         ctx,
+        Send(payload) {
+            globalThis.chrome.webview.postMessage(
+                fromByteArray(new Uint8Array(payload))
+            );
+        },
         async Async(payload) {
             const dataView = new DataView(payload);
             const id = dataView.getUint8(1);
             return new Promise<ArrayBuffer>((resolve) => {
                 asyncResponsePromises.set(id, resolve);
                 if (isWorker) {
-                    globalThis.postMessage(payload, {
-                        targetOrigin: "bridge"
-                    });
+                    // transfer, the payload is not used after
+                    globalThis.postMessage(payload, { transfer: [payload] });
                 } else {
                     const base64 = fromByteArray(new Uint8Array(payload));
                     globalThis.chrome.webview.postMessage(base64);
@@ -69,9 +73,8 @@ export async function BridgeWindowsInit(): Promise<PlatformBridge> {
             const uint8array = new Uint8Array(payload);
             const id = uint8array[1];
             if (isWorker) {
-                globalThis.postMessage(payload, {
-                    targetOrigin: "bridge"
-                });
+                // transfer, the payload is not used after
+                globalThis.postMessage(payload, { transfer: [payload] });
             } else {
                 const base64 = fromByteArray(uint8array);
                 globalThis.chrome.webview.postMessage(base64);

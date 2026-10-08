@@ -12,6 +12,8 @@ namespace FullStacked
         public abstract void setOnStreamDataCore(CoreOnStreamData cb);
         public abstract void getCorePayloadCore(byte ctx, byte coreType, byte id, void* ptr, int size);
         public abstract int callCore(void* buffer, int length);
+        public abstract void* callWithResponseCore(void* buffer, int length, int* size);
+        public abstract void freePtrCore(void* ptr);
 
         public delegate void CoreOnStreamData(byte ctx, byte streamId, int size);
 
@@ -97,18 +99,23 @@ namespace FullStacked
                 System.Diagnostics.Debug.WriteLine($"Error in onStreamDataCore: {ex}");
             }
         }
+        // Thread safe: the core synchronizes per context, responses are returned
+        // directly instead of being stored by request id.
         public byte[] call(byte[] payload)
         {
-            int responseSize;
+            int responseSize = 0;
+            void* responsePtr;
             fixed (byte* payloadPtr = payload)
             {
-                responseSize = this.lib.callCore(payloadPtr, payload.Length);
+                responsePtr = this.lib.callWithResponseCore(payloadPtr, payload.Length, &responseSize);
+            }
+            if (responsePtr == null || responseSize <= 0)
+            {
+                return [];
             }
             byte[] response = new byte[responseSize];
-            fixed (byte* responsePtr = response)
-            {
-                this.lib.getCorePayloadCore(payload[0], 1, payload[1], responsePtr, responseSize);
-            }
+            Marshal.Copy((IntPtr)responsePtr, response, 0, responseSize);
+            this.lib.freePtrCore(responsePtr);
             return response;
         }
 
@@ -117,7 +124,7 @@ namespace FullStacked
         {
             byte[] header = [
                 ctx,
-                0, // req id
+                0, // req id, unused by callWithResponse
                 0, // Core Module
                 6, // Fn DeepLink
                 0, // Async

@@ -9,7 +9,7 @@ using Windows.ApplicationModel.Activation;
 namespace FullStacked
 {
 
-    unsafe public partial class App : Application
+    public partial class App : Application
     {
         public static Core core;
         public static App singleton;
@@ -17,6 +17,8 @@ namespace FullStacked
         public static DispatcherQueue dispatcherQueue;
 
         private readonly Dictionary<byte, WebView> webviews = new();
+        // webviews is changed on the UI thread, onStreamData reads it from core threads
+        private readonly object webviewsLock = new();
         public byte lastActiveCtx;
         private string appDataFolder;
         private string buildFolder;
@@ -178,24 +180,31 @@ namespace FullStacked
             }
 
             WebView webview = new(ctx);
-            this.webviews.Add(ctx, webview);
+            lock (this.webviewsLock)
+            {
+                this.webviews.Add(ctx, webview);
+            }
             webview.Closed += delegate (object sender, WindowEventArgs args)
             {
-                this.webviews.Remove(ctx);
+                lock (this.webviewsLock)
+                {
+                    this.webviews.Remove(ctx);
+                }
             };
         }
 
+        // called from core threads, the webview batches chunks for the UI thread
         private void onStreamData(byte ctx, byte streamId, byte[] data)
         {
-            if (dispatcherQueue != null && !dispatcherQueue.HasThreadAccess)
+            WebView webview;
+            lock (this.webviewsLock)
             {
-                dispatcherQueue.TryEnqueue(() => onStreamData(ctx, streamId, data));
-                return;
+                this.webviews.TryGetValue(ctx, out webview);
             }
 
-            if (this.webviews.ContainsKey(ctx))
+            if (webview != null)
             {
-                this.webviews[ctx].onStreamData(streamId, data);
+                webview.onStreamData(streamId, data);
             }
             else
             {

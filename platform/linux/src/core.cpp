@@ -13,6 +13,7 @@ extern void setOnStreamData(void *cb);
 extern void getCorePayload(uint8_t ctx, uint8_t coreType, uint8_t id, void *ptr,
                            int size);
 extern int call(void *buffer, int length);
+extern void *callWithResponse(void *buffer, int length, int *size);
 extern void freePtr(void *ptr);
 }
 
@@ -53,7 +54,7 @@ void Core::startWithCtx(const std::string &root, const std::string &build,
 
 void Core::deepLink(uint8_t ctxId, const std::string &url) {
     std::vector<uint8_t> payload = {ctxId,
-                                    0, // req id
+                                    0, // req id, unused by callWithResponse
                                     0, // Core Module
                                     6, // Fn DeepLink
                                     0, // Async
@@ -73,23 +74,24 @@ void Core::stop(uint8_t ctxId) {
     ::stop(ctxId);
 }
 
+// Thread safe: the core synchronizes per context, responses are returned
+// directly instead of being stored by request id.
 std::vector<uint8_t> Core::callCore(const std::vector<uint8_t> &payload) {
     if (payload.empty()) {
         return {};
     }
 
-    int responseSize =
-        ::call(const_cast<void *>(static_cast<const void *>(payload.data())),
-               static_cast<int>(payload.size()));
-    if (responseSize <= 0) {
+    int responseSize = 0;
+    void *responsePtr = ::callWithResponse(
+        const_cast<void *>(static_cast<const void *>(payload.data())),
+        static_cast<int>(payload.size()), &responseSize);
+    if (responsePtr == nullptr || responseSize <= 0) {
         return {};
     }
 
-    std::vector<uint8_t> response(responseSize);
-    uint8_t ctx = payload[0];
-    uint8_t id = payload[1];
-    getCorePayload(ctx, 1 /* CoreResponseData */, id, response.data(),
-                   responseSize);
+    const uint8_t *bytes = static_cast<const uint8_t *>(responsePtr);
+    std::vector<uint8_t> response(bytes, bytes + responseSize);
+    freePtr(responsePtr);
     return response;
 }
 

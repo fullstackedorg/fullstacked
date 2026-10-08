@@ -11,9 +11,6 @@ static inline void CallMyFunction(void *callback, uint8_t ctx, uint8_t id, int s
     ((Callback)callback)(ctx, id, size);
 }
 
-static inline void write_bytes_array(void *data, int size, void *ptr) {
-	memcpy(ptr, data, size);
-}
 */
 import "C"
 
@@ -66,7 +63,7 @@ func startSafe(
 func check(
 	ctxId C.uint8_t,
 ) C.int {
-	ctx, ok := store.Contexts[uint8(ctxId)]
+	ctx, ok := store.GetContext(uint8(ctxId))
 	if !ok || ctx.Exited {
 		return 0
 	}
@@ -115,9 +112,8 @@ func getCorePayload(
 		return
 	}
 
-	bytes := C.CBytes(response)
-	C.write_bytes_array(bytes, C.int(len(response)), ptr)
-	C.free(bytes)
+	// the host allocated size bytes at ptr
+	copy(unsafe.Slice((*byte)(ptr), int(size)), response)
 }
 
 //export call
@@ -130,6 +126,27 @@ func call(buffer unsafe.Pointer, length C.int) C.int {
 	}
 
 	return C.int(size)
+}
+
+// callWithResponse processes the call and returns its response in one
+// transition, without storing it by request id. The host owns the returned
+// buffer of *size bytes and frees it with freePtr. Returns nil and size 0
+// on error.
+//
+//export callWithResponse
+func callWithResponse(buffer unsafe.Pointer, length C.int, size *C.int) unsafe.Pointer {
+	response, err := router.CallWithResponse(C.GoBytes(buffer, length))
+
+	if err != nil || len(response) == 0 {
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+		*size = 0
+		return nil
+	}
+
+	*size = C.int(len(response))
+	return C.CBytes(response)
 }
 
 //export freePtr

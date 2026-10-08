@@ -25,6 +25,25 @@ class WebkitGTKWindow : public Window {
         std::map<uint8_t, WebKitURISchemeRequest *> syncAwaitersResolve;
         std::map<uint8_t, std::vector<uint8_t>> syncAwaitersPayload;
 
+        // core calls of this window run in order, off the main thread
+        GThreadPool *corePool = nullptr;
+
+        // stream chunks received between two main loop iterations are
+        // evaluated in one script
+        std::mutex streamMutex;
+        std::string pendingStreamScript;
+        bool streamFlushScheduled = false;
+
+        // results of work done off the main thread come back through the
+        // webview (ref'd), the window is looked up from it once on the main
+        // thread since it may have closed in between
+        static WebkitGTKWindow *fromWebView(WebKitWebView *view);
+        static void runBridgeTask(gpointer data, gpointer userData);
+        static gboolean dispatchBridgeResult(gpointer userData);
+        static void runStaticFileTask(gpointer data, gpointer userData);
+        static gboolean dispatchStaticFileResult(gpointer userData);
+        static gboolean flushStreamData(gpointer userData);
+
         static void onBridgeMessage(WebKitUserContentManager *manager,
                                     JSCValue *value, gpointer userData);
         static void onOpenMessage(WebKitUserContentManager *manager,

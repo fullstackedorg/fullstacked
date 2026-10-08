@@ -34,11 +34,21 @@ function _byteLength(_, validLen, placeHoldersLen) {
     return ((validLen + placeHoldersLen) * 3) / 4 - placeHoldersLen;
 }
 
+// native Uint8Array.fromBase64 / toBase64 (Safari 18.2, Chrome 140, Firefox 133)
+const nativeFromBase64: (b64: string) => Uint8Array<ArrayBuffer> =
+    typeof (Uint8Array as any).fromBase64 === "function"
+        ? (Uint8Array as any).fromBase64.bind(Uint8Array)
+        : null;
+const nativeToBase64 =
+    typeof (Uint8Array.prototype as any).toBase64 === "function";
+
 export function toByteArray(b64: string): Uint8Array<ArrayBuffer> {
-    //@ts-ignore
-    if (typeof Uint8Array.prototype.fromBase64 === "function") {
-        //@ts-ignore
-        return Uint8Array.fromBase64(b64);
+    if (nativeFromBase64) {
+        try {
+            return nativeFromBase64(b64);
+        } catch {
+            // URL-safe or malformed input, the lenient decoder below handles it
+        }
     }
 
     let tmp: any;
@@ -107,10 +117,8 @@ function encodeChunk(uint8, start, end) {
 }
 
 export function fromByteArray(uint8: Uint8Array): string {
-    //@ts-ignore
-    if (typeof uint8.toBase64 === "function") {
-        //@ts-ignore
-        return uint8.toBase64();
+    if (nativeToBase64) {
+        return (uint8 as any).toBase64();
     }
 
     let tmp;

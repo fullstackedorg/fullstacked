@@ -49,9 +49,22 @@ namespace FullStacked
         private Dictionary<byte, TaskCompletionSource<byte[]>> syncAwaitersResolve = [];
         private Dictionary<byte, byte[]> syncAwaitersPayload = [];
 
+        // core calls of this webview run in order, off the UI thread
+        private readonly object coreQueueLock = new();
+        private Task coreQueue = Task.CompletedTask;
+
+        // stream chunks received between two UI thread ticks are evaluated in one script
+        private readonly object streamLock = new();
+        private StringBuilder pendingStreamScript = new();
+        private bool streamFlushScheduled = false;
+
+        // captured on the UI thread, used to get back to it from core threads
+        private readonly DispatcherQueue uiQueue;
+
         public WebView(byte ctx)
         {
             this.ctx = ctx;
+            this.uiQueue = this.DispatcherQueue;
 
             this.Title = "FullStacked";
             this.AppWindow.SetIcon("Assets/Window-Icon.ico");
@@ -222,34 +235,13 @@ namespace FullStacked
                 coreWebView2.WebMessageReceived += delegate (CoreWebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
             {
                 string base64 = args.TryGetWebMessageAsString();
-                byte[] data = Convert.FromBase64String(base64);
-                byte[] response = App.core.call(data);
-
-
-                byte id = data[1];
-
-                // Sync
-                if (data[4] == 1)
+                lock (this.coreQueueLock)
                 {
-                    lock (this.syncLock)
-                    {
-                        if (this.syncAwaitersResolve.ContainsKey(id))
-                        {
-                            this.syncAwaitersResolve[id].SetResult(response);
-                        }
-                        else
-                        {
-                            this.syncAwaitersPayload[id] = response;
-                        }
-                    }
+                    this.coreQueue = this.coreQueue.ContinueWith(
+                        _ => this.handleBridgeMessage(base64),
+                        TaskScheduler.Default
+                    );
                 }
-                // Async
-                else
-                {
-                    _ = coreWebView2.ExecuteScriptAsync("window.fullstacked.respond(" + id + ",`" + Convert.ToBase64String(response) + "`)");
-                }
-
-
             };
             coreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
             coreWebView2.WebResourceRequested += async delegate (CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs args)
@@ -454,11 +446,11 @@ namespace FullStacked
                     return;
                 }
 
-                // static file serving
+                // static file serving, read off the UI thread, respond on it
 
                 byte[] header = [
                     this.ctx,
-                    0, // req id
+                    0, // req id, unused by callWithResponse
                     0, // Core Module
                     0, // Fn Static File
                     0, // Async
@@ -470,21 +462,29 @@ namespace FullStacked
                 byte[] pathnameLength = Serialization.NumberToUint4Bytes(pathnameData.Length);
                 byte[] payload = Serialization.MergeBuffers([header, pathnameLength, pathnameData]);
 
-                byte[] response = App.core.call(payload);
-
-                (DataValue argBuffer, _) = Serialization.Deserialize(response, 1);
-
-                List<DataValue> values = Serialization.DeserializeAll(argBuffer.buffer);
-
-                if (values.Count < 2)
+                using (args.GetDeferral())
                 {
-                    (stream, headers) = this.bufferToResponseStream(WebView.notFoundPayload);
-                    args.Response = this.environment.CreateWebResourceResponse(stream, 404, "OK", headers);
-                    return;
-                }
+                    List<DataValue> values = await Task.Run(() =>
+                    {
+                        byte[] response = App.core.call(payload);
+                        if (response.Length <= 1)
+                        {
+                            return new List<DataValue>();
+                        }
+                        (DataValue argBuffer, _) = Serialization.Deserialize(response, 1);
+                        return Serialization.DeserializeAll(argBuffer.buffer);
+                    });
 
-                (stream, headers) = this.bufferToResponseStream(values[1].buffer, values[0].str);
-                args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
+                    if (values.Count < 2)
+                    {
+                        (stream, headers) = this.bufferToResponseStream(WebView.notFoundPayload);
+                        args.Response = this.environment.CreateWebResourceResponse(stream, 404, "OK", headers);
+                        return;
+                    }
+
+                    (stream, headers) = this.bufferToResponseStream(values[1].buffer, values[0].str);
+                    args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
+                }
             };
 
             coreWebView2.NewWindowRequested += delegate (CoreWebView2 sender, CoreWebView2NewWindowRequestedEventArgs e)
@@ -506,15 +506,78 @@ namespace FullStacked
         }
     }
 
+    // runs on the core queue
+    private void handleBridgeMessage(string base64)
+    {
+        try
+        {
+            byte[] data = Convert.FromBase64String(base64);
+            byte[] response = App.core.call(data);
+
+            byte id = data[1];
+
+            // Sync
+            if (data[4] == 1)
+            {
+                lock (this.syncLock)
+                {
+                    if (this.syncAwaitersResolve.ContainsKey(id))
+                    {
+                        this.syncAwaitersResolve[id].SetResult(response);
+                    }
+                    else
+                    {
+                        this.syncAwaitersPayload[id] = response;
+                    }
+                }
+            }
+            // Async
+            else
+            {
+                string script = "window.fullstacked.respond(" + id + ",`" + Convert.ToBase64String(response) + "`)";
+                this.uiQueue.TryEnqueue(() =>
+                {
+                    _ = this.controller?.CoreWebView2?.ExecuteScriptAsync(script);
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error in core call: {ex}");
+        }
+    }
+
     public void onStreamData(byte streamId, byte[] data)
     {
-        this.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.High, () =>
+        string script = "window.fullstacked.onStreamData(" + streamId + ", `" + Convert.ToBase64String(data) + "`);";
+        bool schedule;
+        lock (this.streamLock)
         {
-            if (this.controller?.CoreWebView2 != null)
-            {
-                _ = this.controller.CoreWebView2.ExecuteScriptAsync("window.fullstacked.onStreamData(" + streamId + ", `" + Convert.ToBase64String(data) + "`)");
-            }
-        });
+            this.pendingStreamScript.Append(script);
+            schedule = !this.streamFlushScheduled;
+            this.streamFlushScheduled = true;
+        }
+
+        if (schedule)
+        {
+            this.uiQueue.TryEnqueue(DispatcherQueuePriority.High, this.flushStreamData);
+        }
+    }
+
+    private void flushStreamData()
+    {
+        string script;
+        lock (this.streamLock)
+        {
+            script = this.pendingStreamScript.ToString();
+            this.pendingStreamScript.Clear();
+            this.streamFlushScheduled = false;
+        }
+
+        if (script.Length > 0 && this.controller?.CoreWebView2 != null)
+        {
+            _ = this.controller.CoreWebView2.ExecuteScriptAsync(script);
+        }
     }
 
         private (IRandomAccessStream, string) bufferToResponseStream(byte[] buffer, string mimeType = "text/plain")

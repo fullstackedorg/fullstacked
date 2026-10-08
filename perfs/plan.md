@@ -365,6 +365,15 @@ Each stage is measured with `bench` on every platform before and after. A stage 
 
 **Exit:** no regressions on any suite; stream and concurrent suites improve on Apple, Windows, and GTK; no id collisions at `-c 255`.
 
+**Implementation notes:**
+
+- The `call` + `getCorePayload` merge (listed in Stage 4) was pulled into this stage as `callWithResponse(buffer, length, *size) → ptr`, freed with `freePtr`. Responses are no longer stored by request id, so host calls (static files, deeplinks) and JS calls can run concurrently without colliding, which is what makes removing the Apple lock safe. Every native host (Apple, Android, Windows, Linux GTK/Qt) uses it; Node keeps `call` since it runs on one thread. `getCorePayload` remains for stream chunks, with the single `copy`.
+- Off the UI thread uses a **serial queue per webview** (Apple `DispatchQueue`, Windows chained `Task`, GTK `GThreadPool` of one thread), not a concurrent pool: calls from one JS context keep their order (e.g. successive `Stream.Write` on a socket), contexts run in parallel. Static files go to a concurrent queue. Results are delivered on the UI thread. Qt and Android keep their current threading.
+- JS request ids are allocated in `bridge/ids.ts`: ids 1-255, skipping those in flight, async calls queue beyond 255 in flight, sync calls throw. The worker relay allocates main-thread ids for worker async calls and posts worker sync calls with `Send`.
+- Stream chunks are batched on Apple, Android, Windows, GTK and Qt: chunks received before the UI thread runs are evaluated in one script.
+- The native base64 decode path never ran (`fromBase64` is static on `Uint8Array`, not on its prototype); fixed with a fallback to the JS decoder for URL-safe input.
+- `EndContext` closes streams outside the locks and skips streams without `Close`; Linux `App::activeWindows` is guarded for the stream callback.
+
 ### Stage 3: Binary streaming responses
 
 **Goal:** take stream data off `evaluateJavaScript`. This is the largest single win: per-chunk cost drops and backpressure comes for free.
@@ -383,7 +392,7 @@ Each stage is measured with `bench` on every platform before and after. A stage 
 - `POST fs://call` (async) and `POST fs://sync` (sync) with raw bodies on Apple, Windows, GTK, and Qt. Handlers run off the UI thread.
 - Android: `addWebMessageListener` with ArrayBuffer messages for async calls. Keep `@JavascriptInterface` for main-thread sync. Gate on `WebViewFeature.isFeatureSupported` and fall back to the current path.
 - Delete the `/sync/{id}` awaiter machinery (`syncAwaitersResolve` and `syncAwaitersPayload`) from Swift, Kotlin, C#, GTK, and Qt.
-- Merge `call` and `getCorePayload` into one export that returns a Go-allocated buffer freed with the existing `freePtr`, saving one C transition and the store map round trip.
+- ~~Merge `call` and `getCorePayload` into one export~~ (done in Stage 2 as `callWithResponse`).
 
 **Exit:** `echo` suite MB/s at 64k and 1m improves on every native platform. `noop` latency is at or below Node's.
 

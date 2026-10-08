@@ -12,6 +12,7 @@ import type platformBridgeType from "./platform/index.ts";
 import fetchCore from "../fetch/index.ts";
 import WebSocketCore from "../websocket/index.ts";
 import parentWindow from "../parentWindow/index.ts";
+import { acquireId, releaseId, tryAcquireId } from "./ids.ts";
 
 import type { JSPlugin } from "../plugin/index.ts";
 
@@ -91,11 +92,8 @@ async function init() {
         return;
     }
 
-    let id = 0;
     const bridge: Bridge = (opts: BridgeOpts, sync?: boolean) => {
-        const preparePayload = () => {
-            id = (id + 1) % 256;
-
+        const preparePayload = (id: number) => {
             const data = opts.data
                 ? mergeUint8Arrays(...opts.data.map(serialize))
                 : null;
@@ -113,10 +111,20 @@ async function init() {
         };
 
         if (sync) {
-            const payload = preparePayload();
-            let responseBuffer = platformBridge.bridge.Sync(payload.buffer);
-            if (!responseBuffer && platformBridge.bridge.GetResponseSync) {
-                responseBuffer = platformBridge.bridge.GetResponseSync(id);
+            // a sync call cannot wait for an id to free up
+            const id = tryAcquireId();
+            if (id === null) {
+                throw new Error("too many bridge calls in flight");
+            }
+            let responseBuffer: ArrayBuffer | void;
+            try {
+                const payload = preparePayload(id);
+                responseBuffer = platformBridge.bridge.Sync(payload.buffer);
+                if (!responseBuffer && platformBridge.bridge.GetResponseSync) {
+                    responseBuffer = platformBridge.bridge.GetResponseSync(id);
+                }
+            } finally {
+                releaseId(id);
             }
             const response = processResponse(responseBuffer);
             if (response instanceof Error) {
@@ -126,10 +134,22 @@ async function init() {
         }
 
         return new Promise<SerializableData>(async (resolve, reject) => {
-            const payload = preparePayload();
-            const responseBuffer = await platformBridge.bridge.Async(
-                payload.buffer
-            );
+            let id = acquireId();
+            if (typeof id !== "number") {
+                id = await id;
+            }
+            let responseBuffer: ArrayBuffer;
+            try {
+                const payload = preparePayload(id);
+                responseBuffer = await platformBridge.bridge.Async(
+                    payload.buffer
+                );
+            } catch (e) {
+                reject(e);
+                return;
+            } finally {
+                releaseId(id);
+            }
             const response = processResponse(responseBuffer);
             if (response instanceof Error) {
                 reject(response);
