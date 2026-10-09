@@ -294,8 +294,8 @@ namespace FullStacked
                     // a sync XHR of the page, the same for the host
                     using (args.GetDeferral())
                     {
-                        byte[] payload = await readRequestBody(args.Request);
-                        byte[] response = await this.enqueueCoreCall(payload);
+                        byte[] body = await readRequestBody(args.Request);
+                        byte[] response = await this.enqueueCoreCall(body);
                         (stream, headers) = this.bufferToResponseStream(response, "application/octet-stream");
                         args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
                     }
