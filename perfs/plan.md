@@ -135,7 +135,8 @@ perfs/bench/[STAGE]-[COMMIT_HASH]/[PLATFORM].json
   - `stage2` (Cheap wins: copy removal, off-UI thread, lock fixes)
   - `stage3` (Binary streaming responses)
   - `stage4` (Binary request path)
-  - `stage5` (Unified bridge & packaging)
+  - `stage5` (Hybrid transport: messages for small calls, POST and frames for large payloads)
+  - `stage6` (Packaging: thin hosts, porting guide)
 - **`[COMMIT_HASH]`**: Short git commit hash of the code being evaluated (e.g. `5ffcd9c6` from `git rev-parse --short HEAD` or `process.versions.fullstacked.hash`).
 - **`[PLATFORM]`**: Target platform name:
   - `apple-macos`
@@ -453,16 +454,51 @@ Each stage is measured with `bench` on every platform before and after. A stage 
 - Workers: async calls still go through the main thread (`relayCall`), which records the streams they open to hand them their frames (a worker has no `/stream` reader). Sync calls of a worker post `POST /sync` themselves (a stream opened by a sync call of a worker was not forwarded before either).
 - Android: `shouldInterceptRequest` has no request body. Async calls are posted to a `WebViewCompat.addWebMessageListener` object (`fullstackedBridge`, origin `http://localhost`, main frame) as `ArrayBuffer` and answered `[id][response]` through the `JavaScriptReplyProxy`, run in order on a single thread executor per webview. Gated on `WEB_MESSAGE_LISTENER` and `WEB_MESSAGE_ARRAY_BUFFER` (androidx.webkit 1.14.0), otherwise the page keeps `android.coreCall`. Sync calls of the page stay on `@JavascriptInterface`; workers keep the relay and `/sync/{id}`, so the Kotlin awaiters stay for them.
 
-### Stage 5: Unify and package
+**Results** (`stage3-569565cc` → `stage4-2fa81d65`, Qt and Node not run yet):
 
-**Goal:** one bridge implementation, minimal per-platform glue, and new platforms that are cheap to add.
+| | noop async | concurrent x32 | echo async 64k | readFile 64k |
+|---|---|---|---|---|
+| macOS | 0.065 → 0.112 ms | 100k → 25k ops/s | 0.26 → 0.19 ms | 0.17 → 0.18 ms |
+| iOS | 0.135 → 0.223 ms | 36.7k → 13.8k ops/s | 0.47 → 0.35 ms | 0.34 → 0.46 ms |
+| Android | 0.44 → 1.02 ms | 2.5k → 3.7k ops/s | 7.3 → 3.1 ms | 6.1 → 3.5 ms |
+| GTK | 0.163 → 0.185 ms | 83k → 34k ops/s | 2.88 → 0.36 ms | 1.13 → 0.31 ms |
+| Windows | 0.38 → 2.11 ms | 25.3k → 985 ops/s | 3.3 → 4.8 ms | 2.6 → 4.6 ms |
 
-- Collapse `bridge/platform/{apple,android,windows,linux,node}.ts` into one transport module and remove the `/platform` probe from the hot path.
-- Move routing into Go with `handleRequest(method, path, body) → (status, mime, body)`. Hosts become thin adapters: load `libcore`, register one scheme handler, and forward requests.
-- Move Node to the same `/stream/{ctx}` framing and drop the WebSocket.
-- Write a short "porting guide" listing the adapter's responsibilities (about 100 lines per platform), and run `bench` in CI on the platforms that can run headless (Node, Linux GTK under Xvfb).
+- Large payloads win where the request path is cheap: GTK 64k echo 8×, Android 64k echo 2.4×, GTK file reads 3.6×, Android 1.7×, macOS 64k echo 1.4×.
+- Every async call is now its own custom-scheme request, whose fixed cost is larger than a small message: small async calls are slower on every platform and concurrency dropped on Apple and GTK (Android gained, its old path blocked the JS thread for the whole call).
+- Windows regressed on everything async: `WebResourceRequested` costs ~1.8 ms per request with little parallelism (the browser process calls into the app's UI thread through COM and a deferral), more than base64 and script evaluation cost even at 64k. Sync calls stayed where they were (~2 ms), they already went through it.
+- Streams are unchanged (Stage 3 path).
+- Exit criteria: 64k echo improves on every native platform except Windows; `noop` latency stays below Node's (0.575 ms) everywhere except Windows and Android.
+- This led to the revised Stage 5 below.
 
-**Exit:** a single JS transport; each native host's bridge code under about 150 lines; `bench` results committed under `perfs/bench/stage5-[COMMIT_HASH]/` for every platform, comparing results against `stage1-[COMMIT_HASH]`.
+### Stage 5: Hybrid transport (revised)
+
+**Why revised:** Stage 4 put every async call on its own custom-scheme request. Large payloads won (64k echo 8× on GTK, 2.4× on Android, file reads 2-3.6×), but each request carries a fixed cost that is larger than a small message: small async calls got slower everywhere (macOS noop 0.065 → 0.112 ms, Android 0.44 → 1.02 ms) and so did concurrency (macOS 100k → 25k ops/s, GTK 83k → 34k). On Windows `WebResourceRequested` costs ~1.8 ms per request with little parallelism, so even 64k lost (noop 0.38 → 2.11 ms, concurrent 25k → 985 ops/s). The original Stage 5 unified on that path and would have kept the regression.
+
+**Goal:** pick the path per call so small calls pay the least fixed cost and large payloads move as raw bytes.
+
+- **Small requests on a message channel** whose reply needs no script evaluation:
+  - Apple: `WKScriptMessageHandlerWithReply`, the page awaits `webkit.messageHandlers.call.postMessage(base64)`.
+  - GTK: `webkit_user_content_manager_register_script_message_handler_with_reply`, same JS.
+  - Windows: `chrome.webview.postMessage(base64)`, replies posted back with `PostWebMessageAsString`, batched per UI tick.
+  - Android: `@JavascriptInterface` hands the call to the core thread and returns at once, the reply is posted as an `ArrayBuffer` through the `JavaScriptReplyProxy` of the web message listener.
+- **Large requests** (16 KB and up) keep `POST /call` (Android: an `ArrayBuffer` message), except on Windows where POST lost at every size.
+- **Large responses on `/stream`:** the request does not predict the response size (`readFile` posts a few bytes and gets 64 KB back). `callMessage` is a core export like `callWithResponse`: when the response is 16 KB or more and a frame reader is attached, it queues it as a response frame (`[callId][3][len][response]`) and the message reply is empty; otherwise the reply is the response. The page takes the response from whichever arrives.
+- **Sync calls** stay on `POST /sync` (single hop, no regression anywhere).
+- Qt and Node keep their Stage 4 path for now.
+
+**Exit:** small async calls and concurrency at or better than Stage 3 on every platform, 64k echo and file reads at or better than Stage 4.
+
+### Stage 6: Package
+
+**Goal:** minimal per-platform glue, new platforms cheap to add.
+
+- Collapse `bridge/platform/{apple,android,windows,linux,node}.ts` around the transport module and remove the `/platform` probe from the hot path.
+- Move routing into Go with `handleRequest(method, path, body) → (status, mime, body)`. Hosts become thin adapters: load `libcore`, register one scheme handler and one message channel, forward requests.
+- Drop the Node WebSocket once `/stream` covers every case.
+- Write a short "porting guide" listing the adapter's responsibilities, and run `bench` in CI on the platforms that can run headless (Node, Linux GTK under Xvfb).
+
+**Exit:** each native host's bridge code under about 150 lines; `bench` results committed for every platform, compared against `stage1-[COMMIT_HASH]`.
 
 ---
 
