@@ -61,7 +61,13 @@ function verifyVersion(binLocation: string) {
         const packageJsonBin = JSON.parse(
             fs.readFileSync(packageJsonFileBin, { encoding: "utf-8" })
         );
-        return packageJsonBin.version === getPackageJson().version;
+        const version = getPackageJson().version;
+        // from source, package.json has no build number (set when packing)
+        return (
+            packageJsonBin.version === version ||
+            packageJsonBin.version.startsWith(`${version}.`) ||
+            packageJsonBin.version.startsWith(`${version}-`)
+        );
     } catch (e) {
         console.log(e);
         return false;

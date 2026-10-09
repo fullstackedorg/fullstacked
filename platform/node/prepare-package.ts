@@ -9,6 +9,8 @@ const packageJsonPath = path.resolve(currentDirectory, "package.json");
 
 const isInject = process.argv.includes("--inject");
 
+const version = getVersion(path.resolve(currentDirectory, "..", ".."));
+
 const platforms = [
     "darwin-arm64",
     "darwin-x64",
@@ -25,7 +27,6 @@ if (isInject) {
     });
 
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
-    const version = getVersion(path.resolve(currentDirectory, "..", ".."));
     const fullVersion = `${version.major}.${version.minor}.${version.patch}${version.patch.includes("-") ? "." : "-"}${version.build}`;
 
     packageJson.version = fullVersion;
@@ -37,6 +38,8 @@ if (isInject) {
     fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 4));
 } else {
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
+    // keep the committed version free of the build number
+    packageJson.version = `${version.major}.${version.minor}.${version.patch}`;
     delete packageJson.optionalDependencies;
     fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 4));
 }
