@@ -35,6 +35,12 @@ namespace FullStacked
         public static extern void* callMessage(void* buffer, int length, int* size);
 
         [DllImport(dllName)]
+        public static extern void setPlatform(byte* name, int binaryCalls);
+
+        [DllImport(dllName)]
+        public static extern void* handleRequest(byte ctx, byte* path, void* body, int length, int* status, int* size);
+
+        [DllImport(dllName)]
         public static extern void freePtr(void* ptr);
 
         [DllImport(dllName)]
@@ -72,6 +78,12 @@ namespace FullStacked
         }
         public override void* callMessageCore(void* buffer, int length, int* size) {
             return callMessage(buffer, length, size);
+        }
+        public override void setPlatformCore(byte* name, int binaryCalls) {
+            setPlatform(name, binaryCalls);
+        }
+        public override void* handleRequestCore(byte ctx, byte* path, void* body, int length, int* status, int* size) {
+            return handleRequest(ctx, path, body, length, status, size);
         }
         public override void freePtrCore(void* ptr) {
             freePtr(ptr);

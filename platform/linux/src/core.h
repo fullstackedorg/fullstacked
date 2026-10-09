@@ -30,6 +30,19 @@ class Core {
         callMessage(const std::vector<uint8_t> &payload, bool &framed);
         static void setStreamCallback(StreamDataCallback cb);
 
+        // the platform name the page reads at /platform, binaryCalls when the
+        // host reads the request bodies of POST /call and /sync
+        static void setPlatform(const std::string &name, bool binaryCalls);
+        struct Response {
+                int status;
+                std::string mimeType;
+                std::vector<uint8_t> data;
+        };
+        // A request of the page answered by the core: static files,
+        // /platform, /ctx, /bridge, POST /call and /sync, /stream/detach
+        static Response request(uint8_t ctxId, const std::string &path,
+                                const std::vector<uint8_t> &body);
+
         // Stream data of a context as binary frames for GET /stream, see
         // core/internal/frames. streamAttach returns the reader generation
         // (-1 for an unknown context), streamRead blocks until frames are

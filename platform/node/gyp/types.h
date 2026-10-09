@@ -11,6 +11,9 @@ typedef int (*StreamAttach)(uint8_t ctx);
 typedef void *(*StreamRead)(uint8_t ctx, int gen, int *size);
 typedef void (*StreamDetach)(uint8_t ctx, int gen);
 typedef void (*FreePtr)(void *ptr);
+typedef void (*SetPlatform)(char *name, int binaryCalls);
+typedef void *(*HandleRequest)(uint8_t ctx, char *path, void *body, int length,
+                               int *status, int *size);
 
 struct CoreLib {
         Start start;
@@ -23,4 +26,6 @@ struct CoreLib {
         StreamRead streamRead;
         StreamDetach streamDetach;
         FreePtr freePtr;
+        SetPlatform setPlatform;
+        HandleRequest handleRequest;
 };

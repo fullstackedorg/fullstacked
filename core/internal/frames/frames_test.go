@@ -160,3 +160,31 @@ func TestReattachKeepsQueuedFrames(t *testing.T) {
 		t.Fatal("still attached")
 	}
 }
+
+func TestKeepaliveRightAfterResponse(t *testing.T) {
+	delays := KeepaliveDelays
+	KeepaliveDelays = []time.Duration{time.Hour}
+	t.Cleanup(func() { KeepaliveDelays = delays })
+
+	q := NewQueue()
+	gen := q.Attach()
+	q.Read(gen)
+
+	// data: the keepalive waits for its delay
+	q.Push(1, FlagData, []byte("a"))
+	q.Read(gen)
+	read := make(chan []byte, 1)
+	go func() { read <- q.Read(gen) }()
+	select {
+	case b := <-read:
+		t.Fatalf("keepalive after data: %v", b)
+	case <-time.After(50 * time.Millisecond):
+	}
+	q.Push(1, FlagResponse, []byte("r"))
+	<-read
+
+	// a response: the keepalive comes right away
+	if b := q.Read(gen); len(b) != HeaderSize {
+		t.Fatalf("no keepalive right after the response: %v", b)
+	}
+}

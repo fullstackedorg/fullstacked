@@ -54,6 +54,11 @@ class WebViewExtended: WKWebView, WKUIDelegate  {
     override var safeAreaInsets: UIEdgeInsets {
         return .zero
     }
+
+    // no window to resize, GET /resize goes to the core (404)
+    func resizeRequest(_ size: String?) -> String? {
+        return nil
+    }
     
     override init(frame: CGRect, configuration: WKWebViewConfiguration) {
         self.clipboardHelper = ClipboardHelper()

@@ -14,6 +14,8 @@ namespace FullStacked
         public abstract int callCore(void* buffer, int length);
         public abstract void* callWithResponseCore(void* buffer, int length, int* size);
         public abstract void* callMessageCore(void* buffer, int length, int* size);
+        public abstract void setPlatformCore(byte* name, int binaryCalls);
+        public abstract void* handleRequestCore(byte ctx, byte* path, void* body, int length, int* status, int* size);
         public abstract void freePtrCore(void* ptr);
         public abstract int streamAttachCore(byte ctxId);
         public abstract void* streamReadCore(byte ctxId, int gen, int* size);
@@ -25,7 +27,7 @@ namespace FullStacked
 
     unsafe public class Core
     {
-        public static byte[] platform = Encoding.UTF8.GetBytes("windows");
+
         CoreImplementation lib;
         CoreCallbackDelegate onStreamData;
         private static CoreImplementation.CoreOnStreamData staticOnStreamDataDelegate;
@@ -48,6 +50,12 @@ namespace FullStacked
 
             staticOnStreamDataDelegate = onStreamDataCore;
             this.lib.setOnStreamDataCore(staticOnStreamDataDelegate);
+
+            // the page posts its calls to /call and /sync (WebResourceRequested reads bodies)
+            fixed (byte* name = this.strToBufferUTF8("windows"))
+            {
+                this.lib.setPlatformCore(name, 1);
+            }
         }
 
         private byte[] strToBufferUTF8(string str) {
@@ -121,6 +129,30 @@ namespace FullStacked
             Marshal.Copy((IntPtr)responsePtr, response, 0, responseSize);
             this.lib.freePtrCore(responsePtr);
             return response;
+        }
+
+        public record Response(int status, string mimeType, byte[] data);
+
+        // A request of the page answered by the core (static files, /platform, /ctx,
+        // POST /call and /sync...)
+        public Response request(byte ctx, string path, byte[] body)
+        {
+            int status = 0;
+            int size = 0;
+            void* responsePtr;
+            fixed (byte* pathPtr = this.strToBufferUTF8(path), bodyPtr = body)
+            {
+                responsePtr = this.lib.handleRequestCore(ctx, pathPtr, bodyPtr, body.Length, &status, &size);
+            }
+            byte[] response = new byte[size];
+            Marshal.Copy((IntPtr)responsePtr, response, 0, size);
+            this.lib.freePtrCore(responsePtr);
+            // "<mime type>\n<body>"
+            int newline = Array.IndexOf(response, (byte)'\n');
+            if (newline < 0) newline = response.Length;
+            string mimeType = Encoding.UTF8.GetString(response, 0, newline);
+            byte[] data = newline < response.Length ? response[(newline + 1)..] : [];
+            return new Response(status, mimeType, data);
         }
 
         // A call received on a message channel: the response, or null when the core

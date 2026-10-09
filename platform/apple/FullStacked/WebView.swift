@@ -2,7 +2,6 @@ import WebKit
 import SwiftUI
 import AuthenticationServices
 
-let platform = "apple"
 let downloadDirectory = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first! + "/downloads";
 
 func startMain(_ providedCtx: UInt8?, _ safe: Bool?) -> UInt8 {
@@ -35,56 +34,9 @@ class WeakMessageHandler: NSObject, WKScriptMessageHandler {
     }
 }
 
-// Small async calls of the page: the payload in base64, replied with the
-// response in base64, or an empty string when the core put a large response
-// on the frame stream. Run in order with the other calls of the page.
-class CallHandler: NSObject, WKScriptMessageHandlerWithReply {
-    weak var requestHandler: RequestHandler?
-    
-    init(_ requestHandler: RequestHandler) {
-        self.requestHandler = requestHandler
-    }
-    
-    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping (Any?, String?) -> Void) {
-        guard let body = message.body as? String,
-              let payload = Data(base64Encoded: body),
-              let requestHandler else {
-            replyHandler(nil, "invalid call")
-            return
-        }
-        requestHandler.coreQueue.async {
-            let response = coreCallMessage(payload: payload)?.base64EncodedString() ?? ""
-            DispatchQueue.main.async {
-                replyHandler(response, nil)
-            }
-        }
-    }
-}
-
-class WebViewOpen: NSObject, WKScriptMessageHandler {
-    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        let ctx = UInt8(truncating: message.body as! NSNumber)
-        WebViewStore.getInstance().addWebView(WebView(ctx))
-    }
-}
-
-class WebViewCloser: NSObject, WKScriptMessageHandler {
-    weak var webView: WebView?
-    
-    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        if let id = self.webView?.id {
-            WebViewStore.getInstance().removeWebView(id)
-            self.webView?.close()
-        }
-    }
-}
-
 class WebView: WebViewExtended, WKNavigationDelegate, WKDownloadDelegate, Codable, Identifiable, ASWebAuthenticationPresentationContextProviding {
     
     var id = UUID()
-    let open = WebViewOpen();
-    let closer = WebViewCloser();
-    
     public let requestHandler: RequestHandler
     
     public var isSafe = false
@@ -131,13 +83,29 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKDownloadDelegate, Codabl
         
         super.init(frame: CGRect(), configuration: wkWebViewConfig)
         
-        self.closer.webView = self
-        
         self.isInspectable = true
         self.navigationDelegate = self
         userContentController.addScriptMessageHandler(CallHandler(self.requestHandler), contentWorld: .page, name: "call")
-        userContentController.add(WeakMessageHandler(self.open), name: "open")
-        userContentController.add(WeakMessageHandler(self.closer), name: "exit")
+        // the UI endpoints of the page, see bridge/platform.ts
+        self.requestHandler.ui = { [weak self] path, query in
+            guard let self = self else { return nil }
+            switch path {
+            case "/open":
+                if let ctx = query["ctx"].flatMap({ UInt8($0) }) {
+                    WebViewStore.getInstance().addWebView(WebView(ctx))
+                }
+                return ""
+            case "/exit":
+                // answered first, closing stops the pending tasks
+                DispatchQueue.main.async {
+                    WebViewStore.getInstance().removeWebView(self.id)
+                    self.close()
+                }
+                return ""
+            default:
+                return self.resizeRequest(query["size"])
+            }
+        }
         
         self.load(URLRequest(url: URL(string: "fs://localhost")!))
     }
@@ -157,12 +125,9 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKDownloadDelegate, Codabl
         self.loadHTMLString("", baseURL: nil)
         self.removeFromSuperview()
         self.navigationDelegate = nil
-        self.configuration.userContentController.removeScriptMessageHandler(forName: "open")
-        self.configuration.userContentController.removeScriptMessageHandler(forName: "exit")
         self.configuration.userContentController.removeAllUserScripts()
         self.configuration.userContentController.removeAllScriptMessageHandlers()
         stop(self.requestHandler.ctx)
-        self.closer.webView = nil
         super.close()
     }
     
@@ -286,217 +251,6 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKDownloadDelegate, Codabl
     }
 }
 
-
-class RequestHandler: NSObject, WKURLSchemeHandler {
-    var ctx: UInt8
-    // core calls of this webview run in order, off the main thread
-    let coreQueue = DispatchQueue(label: "org.fullstacked.core", qos: .userInitiated)
-    private var stoppedTasks = Set<ObjectIdentifier>()
-    private let tasksLock = NSLock()
-    // GET /stream tasks and their reader generation, main thread only
-    private var frameStreams: [ObjectIdentifier: (ctx: UInt8, gen: Int32)] = [:]
-    
-    init(ctx: UInt8) {
-        self.ctx = ctx
-    }
-    
-    func reset(ctx: UInt8) {
-        self.ctx = ctx
-        tasksLock.lock()
-        stoppedTasks.removeAll()
-        tasksLock.unlock()
-    }
-    
-    func send(urlSchemeTask: WKURLSchemeTask,
-              url: URL,
-              statusCode: Int,
-              mimeType: String,
-              data: Data) {
-        tasksLock.lock()
-        let isStopped = stoppedTasks.contains(ObjectIdentifier(urlSchemeTask as AnyObject))
-        tasksLock.unlock()
-        if isStopped { return }
-        
-        let responseHTTP = HTTPURLResponse(
-            url: url,
-            statusCode: statusCode,
-            httpVersion: "HTTP/1.1",
-            headerFields: [
-                "Content-Type": mimeType,
-                "Content-Length": String(data.count),
-                "Cache-Control": "no-cache"
-            ]
-        )!
-        
-        urlSchemeTask.didReceive(responseHTTP)
-        urlSchemeTask.didReceive(data)
-        urlSchemeTask.didFinish()
-    }
-    
-    func webView(_ webView: WKWebView, start urlSchemeTask: any WKURLSchemeTask) {
-        let request = urlSchemeTask.request
-        var pathname = request.url!.pathComponents.filter({$0 != "/"}).joined(separator: "/")
-        
-        if(pathname.isEmpty) {
-            pathname = "/"
-        }
-        
-        if(pathname == "platform") {
-            let data = platform.data(using: .utf8)!
-            self.send(urlSchemeTask: urlSchemeTask,
-                      url: request.url!,
-                      statusCode: 200,
-                      mimeType: "text/plain",
-                      data: data)
-            return
-        } else if (pathname == "ctx") {
-            self.send(urlSchemeTask: urlSchemeTask,
-                      url: request.url!,
-                      statusCode: 200,
-                      mimeType: "text/plain",
-                      data: Data(String(self.ctx).utf8))
-            return
-        } else if (pathname == "stream") {
-            self.startFrameStream(urlSchemeTask: urlSchemeTask, url: request.url!)
-            return
-        } else if (pathname == "stream/detach") {
-            // the page did not get the hello frame, it keeps the evaluated chunks
-            streamDetach(self.ctx, 0)
-            self.send(urlSchemeTask: urlSchemeTask,
-                      url: request.url!,
-                      statusCode: 200,
-                      mimeType: "text/plain",
-                      data: Data())
-            return
-        } else if (pathname == "bridge") {
-            // the page posts its calls to /call and /sync
-            self.send(urlSchemeTask: urlSchemeTask,
-                      url: request.url!,
-                      statusCode: 200,
-                      mimeType: "text/plain",
-                      data: Data("binary".utf8))
-            return
-        } else if (pathname == "call" || pathname == "sync") {
-            // the body is the payload, the response the core response; sync is
-            // a sync XHR of the page, the same for the host
-            let payload = request.httpBody ?? Data()
-            coreQueue.async {
-                let response = coreCall(payload: payload)
-                DispatchQueue.main.async {
-                    self.send(urlSchemeTask: urlSchemeTask,
-                              url: request.url!,
-                              statusCode: 200,
-                              mimeType: "application/octet-stream",
-                              data: response)
-                }
-            }
-            return
-        }
-        
-        // static file serving, read off the main thread, respond on it
-        
-        let pathnameData = pathname.data(using: .utf8)!
-        var payload = Data([
-            self.ctx,
-            0, // req id, unused by callWithResponse
-            0, // Core Module
-            0, // Fn Static File
-            0, // Async
-            
-            SerializableDataType.STRING.rawValue,
-        ])
-        payload.append(NumberToUint4Bytes(num: pathnameData.count))
-        payload.append(pathnameData)
-        
-        DispatchQueue.global(qos: .userInitiated).async {
-            let response = RequestHandler.staticFileResponse(coreCall(payload: payload))
-            DispatchQueue.main.async {
-                self.send(urlSchemeTask: urlSchemeTask,
-                          url: request.url!,
-                          statusCode: response.statusCode,
-                          mimeType: response.mimeType,
-                          data: response.data)
-            }
-        }
-    }
-    
-    // Stream data of the context as binary frames (see core/internal/frames),
-    // read off the main thread and delivered on it until the context ends or
-    // the page goes away.
-    func startFrameStream(urlSchemeTask: any WKURLSchemeTask, url: URL) {
-        let ctx = self.ctx
-        let gen = streamAttach(ctx)
-        if gen < 0 {
-            send(urlSchemeTask: urlSchemeTask,
-                 url: url,
-                 statusCode: 404,
-                 mimeType: "text/plain",
-                 data: "Not Found".data(using: .utf8)!)
-            return
-        }
-        
-        let taskId = ObjectIdentifier(urlSchemeTask as AnyObject)
-        frameStreams[taskId] = (ctx: ctx, gen: gen)
-        
-        urlSchemeTask.didReceive(HTTPURLResponse(
-            url: url,
-            statusCode: 200,
-            httpVersion: "HTTP/1.1",
-            headerFields: [
-                "Content-Type": "application/octet-stream",
-                "Cache-Control": "no-cache"
-            ]
-        )!)
-        
-        Thread.detachNewThread { [weak self] in
-            while true {
-                var size: Int32 = 0
-                guard let ptr = streamRead(ctx, gen, &size), size > 0 else { break }
-                let data = Data(bytesNoCopy: ptr, count: Int(size), deallocator: .custom({ ptr, _ in
-                    freePtr(ptr)
-                }))
-                DispatchQueue.main.async {
-                    guard self?.frameStreams[taskId]?.gen == gen else { return }
-                    urlSchemeTask.didReceive(data)
-                }
-            }
-            DispatchQueue.main.async {
-                guard self?.frameStreams.removeValue(forKey: taskId)?.gen == gen else { return }
-                urlSchemeTask.didFinish()
-            }
-        }
-    }
-    
-    static func staticFileResponse(_ responseData: Data) -> (statusCode: Int, mimeType: String, data: Data) {
-        let notFound = (statusCode: 404, mimeType: "text/plain", data: "Not Found".data(using: .utf8)!)
-        guard responseData.count > 1 else {
-            return notFound
-        }
-        let (response, _) = Deserialize(buffer: responseData, index: 1)
-        guard let responseDataPayload = response as? Data else {
-            return notFound
-        }
-        let args = DeserializeAll(buffer: responseDataPayload)
-        
-        guard args.count >= 2, let mimeType = args[0] as? String, let fileData = args[1] as? Data else {
-            return notFound
-        }
-        
-        return (statusCode: 200, mimeType: mimeType, data: fileData)
-    }
-    
-    func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) {
-        let taskId = ObjectIdentifier(urlSchemeTask as AnyObject)
-        tasksLock.lock()
-        stoppedTasks.insert(taskId)
-        tasksLock.unlock()
-        
-        // the page went away, stream data goes back to evaluated chunks
-        if let stream = frameStreams.removeValue(forKey: taskId) {
-            streamDetach(stream.ctx, stream.gen)
-        }
-    }
-}
 
 extension String {
     func ptr() -> UnsafeMutablePointer<CChar>? {

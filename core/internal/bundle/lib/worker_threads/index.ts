@@ -1,4 +1,4 @@
-import "../bridge/platform/index.ts";
+import "../bridge/platform.ts";
 import { cwd } from "../process/index.ts";
 import events from "events";
 import { deserializeNumber } from "../bridge/serialization.ts";

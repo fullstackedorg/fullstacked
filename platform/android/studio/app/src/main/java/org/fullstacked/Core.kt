@@ -6,6 +6,8 @@ object Core {
             System.loadLibrary("core")
         } catch (_: Exception) { }
         System.loadLibrary("fullstacked-android")
+        // the WebView does not expose request bodies: calls go on messages
+        setPlatform("android", false)
         try {
             setOnStreamData()
         } catch (e: Exception) {
@@ -44,6 +46,26 @@ object Core {
     // response on the frame stream
     @JvmStatic
     external fun callMessage(payload: ByteArray): ByteArray?
+
+    @JvmStatic
+    external fun setPlatform(name: String, binaryCalls: Boolean)
+
+    // [status u16][mime type]\n[body]
+    @JvmStatic
+    external fun handleRequest(ctxId: Int, path: String): ByteArray
+
+    class Response(val status: Int, val mimeType: String, val data: ByteArray)
+
+    // a request of the page answered by the core (static files, /platform, /ctx...)
+    fun request(ctxId: Int, path: String): Response {
+        val response = handleRequest(ctxId, path)
+        val status = ((response[0].toInt() and 0xFF) shl 8) or (response[1].toInt() and 0xFF)
+        var newline = 2
+        while (newline < response.size && response[newline] != 10.toByte()) newline++
+        val mimeType = String(response, 2, newline - 2, Charsets.UTF_8)
+        val data = if (newline < response.size) response.copyOfRange(newline + 1, response.size) else ByteArray(0)
+        return Response(status, mimeType, data)
+    }
 
     // stream data of a context as binary frames for GET /stream, see core/internal/frames
     @JvmStatic

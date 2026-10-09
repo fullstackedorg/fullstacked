@@ -1,5 +1,6 @@
 #include "./core.h"
 #include "./utils.h"
+#include <algorithm>
 #include <iostream>
 #include <mutex>
 
@@ -19,6 +20,9 @@ extern int streamAttach(uint8_t ctxId);
 extern void *streamRead(uint8_t ctxId, int gen, int *size);
 extern void streamDetach(uint8_t ctxId, int gen);
 extern void freePtr(void *ptr);
+extern void setPlatform(char *name, int binaryCalls);
+extern void *handleRequest(uint8_t ctxId, char *path, void *body, int length,
+                           int *status, int *size);
 }
 
 static Core::StreamDataCallback s_streamCallback = nullptr;
@@ -143,4 +147,28 @@ std::vector<uint8_t> Core::callMessage(const std::vector<uint8_t> &payload,
 void Core::setStreamCallback(StreamDataCallback cb) {
     std::lock_guard<std::mutex> lock(s_callbackMutex);
     s_streamCallback = cb;
+}
+
+void Core::setPlatform(const std::string &name, bool binaryCalls) {
+    ::setPlatform(const_cast<char *>(name.c_str()), binaryCalls ? 1 : 0);
+}
+
+Core::Response Core::request(uint8_t ctxId, const std::string &path,
+                             const std::vector<uint8_t> &body) {
+    int status = 0;
+    int size = 0;
+    void *responsePtr = ::handleRequest(
+        ctxId, const_cast<char *>(path.c_str()),
+        const_cast<void *>(static_cast<const void *>(body.data())),
+        static_cast<int>(body.size()), &status, &size);
+    const uint8_t *bytes = static_cast<const uint8_t *>(responsePtr);
+    // "<mime type>\n<body>"
+    const uint8_t *end = bytes + size;
+    const uint8_t *newline = std::find(bytes, end, '\n');
+    Response response{status, std::string(bytes, newline), {}};
+    if (newline != end) {
+        response.data.assign(newline + 1, end);
+    }
+    freePtr(responsePtr);
+    return response;
 }

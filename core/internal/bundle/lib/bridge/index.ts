@@ -8,7 +8,7 @@ import {
     type SerializableData
 } from "../@types/index.ts";
 import onStreamData, { createDuplex } from "./duplex.ts";
-import type platformBridgeType from "./platform/index.ts";
+import type platformBridgeType from "./platform.ts";
 import fetchCore from "../fetch/index.ts";
 import WebSocketCore from "../websocket/index.ts";
 import parentWindow from "../parentWindow/index.ts";
@@ -25,12 +25,10 @@ type FullStacked = {
     bridge: Bridge;
     platformBridge: typeof platformBridgeType;
 
-    respond(id: number, responseBase64: string): void;
-
     onStreamData: (id: number, payload: ArrayBuffer | string) => void;
 
     // how stream data reaches this runtime: frames (GET /stream),
-    // shared-buffers (WebView2), evaluated (onStreamData), websocket (Node)
+    // shared-buffers (WebView2), evaluated (onStreamData)
     streamTransport?: string;
 
     workerStreams: Map<number, any>;
@@ -51,7 +49,6 @@ type FullStacked = {
     window: {
         resize?: (size: string) => void;
         getSize?: () => Promise<string>;
-        respondGetSize?: (response: any) => void;
     };
 
     fetch: typeof fetch;
@@ -89,7 +86,7 @@ async function init() {
     globalThis.fullstacked.workerStreams =
         globalThis.fullstacked.workerStreams || new Map();
 
-    const platformBridge = (await import("./platform/index.ts")).default;
+    const platformBridge = (await import("./platform.ts")).default;
     try {
         await platformBridge.ready;
     } catch {

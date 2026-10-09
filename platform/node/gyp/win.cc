@@ -15,6 +15,8 @@ CoreLib loadLibrary(std::string libPath) {
         (StreamRead)GetProcAddress(coreLib, "streamRead"),
         (StreamDetach)GetProcAddress(coreLib, "streamDetach"),
         (FreePtr)GetProcAddress(coreLib, "freePtr"),
+        (SetPlatform)GetProcAddress(coreLib, "setPlatform"),
+        (HandleRequest)GetProcAddress(coreLib, "handleRequest"),
     };
 
     return lib;

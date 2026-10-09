@@ -36,8 +36,10 @@ const (
 // Webviews (WebKit, Android WebView) hold the last bytes of a streaming
 // response until more bytes arrive, which leaves the end of a stream with the
 // host. Once the queue is idle after data, Read returns keepalive frames
-// (stream 0, empty, like hello) at these delays to push the tail through,
-// the first one soon since the tail waits for it.
+// (stream 0, empty, like hello) at these delays to push the tail through.
+// When the last frame read is a response, the first keepalive goes right
+// away instead: a large response that comes back alone would otherwise wait
+// for it. (Right away after stream ends too cost ~20% on 256k streams.)
 var KeepaliveDelays = []time.Duration{
 	1 * time.Millisecond,
 	10 * time.Millisecond,
@@ -55,6 +57,10 @@ type Queue struct {
 
 	// keepalives returned since the last data, see KeepaliveDelays
 	keepalives int
+	// flags of the last frame pushed, and whether the last data read ended
+	// with a response
+	lastFlags uint8
+	tailWaits bool
 	// incremented by each keepalive timer that fires
 	timeouts int
 }
@@ -131,8 +137,12 @@ func (q *Queue) Read(gen int) []byte {
 			continue
 		}
 
+		delay := KeepaliveDelays[q.keepalives]
+		if q.keepalives == 0 && q.tailWaits {
+			delay = 0
+		}
 		timeouts := q.timeouts
-		timer := time.AfterFunc(KeepaliveDelays[q.keepalives], func() {
+		timer := time.AfterFunc(delay, func() {
 			q.mu.Lock()
 			q.timeouts++
 			q.cond.Broadcast()
@@ -152,6 +162,7 @@ func (q *Queue) Read(gen int) []byte {
 	}
 
 	q.keepalives = 0
+	q.tailWaits = q.lastFlags == FlagResponse
 	out := q.buf
 	q.buf = nil
 	// wake producers waiting on a full queue
@@ -175,6 +186,7 @@ func (q *Queue) Push(streamId uint8, flags uint8, data []byte) bool {
 	}
 
 	q.buf = Encode(q.buf, streamId, flags, data)
+	q.lastFlags = flags
 	q.cond.Broadcast()
 	return true
 }

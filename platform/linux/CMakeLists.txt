@@ -53,7 +53,8 @@ qt_add_executable(${PROJECT_NAME}
     src/core.cpp 
     src/utils.cpp 
     src/base64.cpp 
-    src/qt/qt.cpp)
+    src/qt/qt.cpp
+    src/qt/bridge.cpp)
 set_target_properties(${PROJECT_NAME} PROPERTIES AUTOMOC ON)
 target_link_libraries(${PROJECT_NAME} PUBLIC 
     Qt6::Core Qt6::Widgets 

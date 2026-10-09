@@ -48,33 +48,13 @@ namespace FullStacked
             }
         }
 
-        private static byte[] notFoundPayload = Encoding.UTF8.GetBytes("Not Found");
-
-        // core calls of this webview run in order, off the UI thread
-        private readonly object coreQueueLock = new();
-        private Task coreQueue = Task.CompletedTask;
-
-        // replies to the call messages of the page, posted once per UI thread tick
-        private readonly object replyLock = new();
-        private StringBuilder pendingReplies = new();
-        private bool replyFlushScheduled = false;
-
-        // responses and stream chunks received between two UI thread ticks are
-        // evaluated in one script
-        private readonly object scriptLock = new();
-        private StringBuilder pendingScript = new();
-        private bool scriptFlushScheduled = false;
-
-        // captured on the UI thread, used to get back to it from core threads
-        private readonly DispatcherQueue uiQueue;
-
-        // reader generation of the stream frames posted to the page, UI thread only
-        private int frameStreamGen = -1;
+        // calls, stream frames and requests of the page (Bridge.cs)
+        public readonly Bridge bridge;
 
         public WebView(byte ctx)
         {
             this.ctx = ctx;
-            this.uiQueue = this.DispatcherQueue;
+            this.bridge = new Bridge(ctx, this.DispatcherQueue);
 
             this.Title = "FullStacked";
             this.AppWindow.SetIcon("Assets/Window-Icon.ico");
@@ -108,7 +88,7 @@ namespace FullStacked
             this.Closed += delegate (object sender, WindowEventArgs args)
             {
                 this.isClosed = true;
-                this.stopFrameStream();
+                this.bridge.Close();
                 this.controller?.Close();
                 this.controller = null;
                 this.coreWebView2 = null;
@@ -244,11 +224,7 @@ namespace FullStacked
 
                 var coreWebView2 = this.coreWebView2 = this.controller.CoreWebView2;
 
-            // async calls of the page, see bridge/platform/windows.ts
-            coreWebView2.WebMessageReceived += delegate (CoreWebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
-            {
-                this.enqueueMessageCall(args.TryGetWebMessageAsString());
-            };
+            this.bridge.Attach(coreWebView2, this.environment);
             coreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
             coreWebView2.WebResourceRequested += async delegate (CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs args)
             {
@@ -264,54 +240,7 @@ namespace FullStacked
                 IRandomAccessStream stream;
                 string headers;
 
-                if (pathname == "/platform")
-                {
-                    (stream, headers) = this.bufferToResponseStream(Core.platform);
-                    args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
-                    return;
-                }
-                else if (pathname == "/ctx")
-                {
-                    byte[] ctxBuffer = Encoding.UTF8.GetBytes(this.ctx.ToString());
-                    (stream, headers) = this.bufferToResponseStream(ctxBuffer);
-                    args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
-                    return;
-                }
-                else if (pathname == "/stream")
-                {
-                    this.startFrameStream();
-                    (stream, headers) = this.bufferToResponseStream([]);
-                    args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
-                    return;
-                }
-                else if (pathname == "/stream/detach")
-                {
-                    this.stopFrameStream();
-                    (stream, headers) = this.bufferToResponseStream([]);
-                    args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
-                    return;
-                }
-                else if (pathname == "/bridge")
-                {
-                    // the page posts its calls to /call and /sync
-                    (stream, headers) = this.bufferToResponseStream(Encoding.UTF8.GetBytes("binary"));
-                    args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
-                    return;
-                }
-                else if (pathname == "/call" || pathname == "/sync")
-                {
-                    // the body is the payload, the response the core response; sync is
-                    // a sync XHR of the page, the same for the host
-                    using (args.GetDeferral())
-                    {
-                        byte[] body = await readRequestBody(args.Request);
-                        byte[] response = await this.enqueueCoreCall(body);
-                        (stream, headers) = this.bufferToResponseStream(response, "application/octet-stream");
-                        args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
-                    }
-                    return;
-                }
-                else if (pathname.StartsWith("/resize")) {
+                if (pathname.StartsWith("/resize")) {
                     var queryParams = this.parseQueryParams(uri);
 
                     using (args.GetDeferral())
@@ -435,45 +364,7 @@ namespace FullStacked
                     return;
                 }
 
-                // static file serving, read off the UI thread, respond on it
-
-                byte[] header = [
-                    this.ctx,
-                    0, // req id, unused by callWithResponse
-                    0, // Core Module
-                    0, // Fn Static File
-                    0, // Async
-                    
-                    ((byte)SerializableDataType.STRING),
-                ];
-
-                byte[] pathnameData = Encoding.UTF8.GetBytes(pathname);
-                byte[] pathnameLength = Serialization.NumberToUint4Bytes(pathnameData.Length);
-                byte[] payload = Serialization.MergeBuffers([header, pathnameLength, pathnameData]);
-
-                using (args.GetDeferral())
-                {
-                    List<DataValue> values = await Task.Run(() =>
-                    {
-                        byte[] response = App.core.call(payload);
-                        if (response.Length <= 1)
-                        {
-                            return new List<DataValue>();
-                        }
-                        (DataValue argBuffer, _) = Serialization.Deserialize(response, 1);
-                        return Serialization.DeserializeAll(argBuffer.buffer);
-                    });
-
-                    if (values.Count < 2)
-                    {
-                        (stream, headers) = this.bufferToResponseStream(WebView.notFoundPayload);
-                        args.Response = this.environment.CreateWebResourceResponse(stream, 404, "OK", headers);
-                        return;
-                    }
-
-                    (stream, headers) = this.bufferToResponseStream(values[1].buffer, values[0].str);
-                    args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
-                }
+                await this.bridge.Request(args, pathname);
             };
 
             coreWebView2.NewWindowRequested += delegate (CoreWebView2 sender, CoreWebView2NewWindowRequestedEventArgs e)
@@ -495,194 +386,7 @@ namespace FullStacked
         }
     }
 
-    // calls of this webview run in order on the core queue, off the UI thread
-    private Task<byte[]> enqueueCoreCall(byte[] payload)
-    {
-        lock (this.coreQueueLock)
-        {
-            Task<byte[]> call = this.coreQueue.ContinueWith(_ => App.core.call(payload), TaskScheduler.Default);
-            this.coreQueue = call;
-            return call;
-        }
-    }
-
-    // A call message: the payload in base64, replied "<id>:<base64>", empty when the
-    // core put a large response on the frame stream
-    private void enqueueMessageCall(string base64)
-    {
-        lock (this.coreQueueLock)
-        {
-            this.coreQueue = this.coreQueue.ContinueWith(_ =>
-            {
-                try
-                {
-                    byte[] payload = Convert.FromBase64String(base64);
-                    byte[] response = App.core.callMessage(payload);
-                    this.queueReply(payload[1] + ":" + (response == null ? "" : Convert.ToBase64String(response)));
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Error in call message: {ex}");
-                }
-            }, TaskScheduler.Default);
-        }
-    }
-
-    private void queueReply(string reply)
-    {
-        bool schedule;
-        lock (this.replyLock)
-        {
-            if (this.pendingReplies.Length > 0)
-            {
-                this.pendingReplies.Append(';');
-            }
-            this.pendingReplies.Append(reply);
-            schedule = !this.replyFlushScheduled;
-            this.replyFlushScheduled = true;
-        }
-
-        if (schedule)
-        {
-            this.uiQueue.TryEnqueue(DispatcherQueuePriority.High, this.flushReplies);
-        }
-    }
-
-    private void flushReplies()
-    {
-        string replies;
-        lock (this.replyLock)
-        {
-            replies = this.pendingReplies.ToString();
-            this.pendingReplies.Clear();
-            this.replyFlushScheduled = false;
-        }
-
-        if (replies.Length > 0)
-        {
-            this.coreWebView2?.PostWebMessageAsString("R" + replies);
-        }
-    }
-
-    private static async Task<byte[]> readRequestBody(CoreWebView2WebResourceRequest request)
-    {
-        IRandomAccessStream content = request.Content;
-        if (content == null)
-        {
-            return [];
-        }
-        using Stream body = content.AsStreamForRead();
-        using MemoryStream buffer = new();
-        await body.CopyToAsync(buffer);
-        return buffer.ToArray();
-    }
-
-    public void onStreamData(byte streamId, byte[] data)
-    {
-        this.queueScript("window.fullstacked.onStreamData(" + streamId + ", `" + Convert.ToBase64String(data) + "`)");
-    }
-
-    // a statement that throws does not stop the others of the batch
-    private void queueScript(string statement)
-    {
-        bool schedule;
-        lock (this.scriptLock)
-        {
-            this.pendingScript.Append("try{").Append(statement).Append("}catch(e){console.error(e)};");
-            schedule = !this.scriptFlushScheduled;
-            this.scriptFlushScheduled = true;
-        }
-
-        if (schedule)
-        {
-            this.uiQueue.TryEnqueue(DispatcherQueuePriority.High, this.flushScripts);
-        }
-    }
-
-    private void flushScripts()
-    {
-        string script;
-        lock (this.scriptLock)
-        {
-            script = this.pendingScript.ToString();
-            this.pendingScript.Clear();
-            this.scriptFlushScheduled = false;
-        }
-
-        if (script.Length > 0 && this.coreWebView2 != null)
-        {
-            _ = this.coreWebView2.ExecuteScriptAsync(script);
-        }
-    }
-
-        // Stream data of the context as binary frames (see core/internal/frames). WebView2
-        // reads a response stream entirely before answering, so the frames are posted to
-        // the page in shared buffers instead (bridge/frames.ts readFrameSharedBuffers).
-        // A thread reads them from the core until the context ends or the page reloads.
-        private void startFrameStream()
-        {
-            this.stopFrameStream();
-
-            byte ctx = this.ctx;
-            int gen = App.core.streamAttach(ctx);
-            if (gen < 0)
-            {
-                return;
-            }
-            this.frameStreamGen = gen;
-
-            Thread reader = new(() =>
-            {
-                while (true)
-                {
-                    byte[] frames = App.core.streamRead(ctx, gen);
-                    if (frames == null)
-                    {
-                        break;
-                    }
-                    this.uiQueue.TryEnqueue(() => this.postFrames(gen, frames));
-                }
-            })
-            {
-                IsBackground = true,
-                Name = "FullStacked stream frames"
-            };
-            reader.Start();
-        }
-
-        private void stopFrameStream()
-        {
-            if (this.frameStreamGen < 0)
-            {
-                return;
-            }
-            App.core.streamDetach(this.ctx, this.frameStreamGen);
-            this.frameStreamGen = -1;
-        }
-
-        private void postFrames(int gen, byte[] frames)
-        {
-            if (gen != this.frameStreamGen || this.coreWebView2 == null || this.environment == null)
-            {
-                return;
-            }
-
-            try
-            {
-                // closing on this side does not affect the access of the page
-                using CoreWebView2SharedBuffer sharedBuffer = this.environment.CreateSharedBuffer((ulong)frames.Length);
-                // OpenStream is a WinRT stream, unbuffered adapter so the frames are written once
-                using (Stream stream = sharedBuffer.OpenStream().AsStreamForWrite(0))
-                {
-                    stream.Write(frames, 0, frames.Length);
-                }
-                this.coreWebView2.PostSharedBufferToScript(sharedBuffer, CoreWebView2SharedBufferAccess.ReadOnly, "{\"type\":\"frames\"}");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error posting stream frames: {ex}");
-            }
-        }
+    public void onStreamData(byte streamId, byte[] data) => this.bridge.OnStreamData(streamId, data);
 
         private (IRandomAccessStream, string) bufferToResponseStream(byte[] buffer, string mimeType = "text/plain")
         {

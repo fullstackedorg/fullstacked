@@ -1,20 +1,8 @@
 import http from "node:http";
 import net from "node:net";
-import { Duplex } from "node:stream";
 import open from "open";
-import { WebSocket, WebSocketServer } from "ws";
 import type { Core } from "./core.ts";
-import {
-    deserialize,
-    deserializeAll,
-    numberToUint4Bytes
-} from "../../../core/internal/bundle/lib/bridge/serialization.ts";
-import {
-    Core as CoreModule,
-    STRING
-} from "../../../core/internal/bundle/lib/@types/index.ts";
-import { StaticFile } from "../../../core/internal/bundle/lib/@types/router.ts";
-import { fromByteArray } from "../../../core/internal/bundle/lib/bridge/base64.ts";
+import { createBridge } from "./bridge.ts";
 
 const args = process.argv;
 const portIndex = args.findIndex((arg) => arg === "-p" || arg === "--port");
@@ -25,8 +13,6 @@ if (portIndex !== -1 && args[portIndex + 1]) {
         mainPort = 9000;
     }
 }
-
-const te = new TextEncoder();
 
 export type CreateWebViewOpts = {
     quiet?: boolean;
@@ -41,29 +27,26 @@ export async function createWebViewWithCore(
     opts?: CreateWebViewOpts
 ) {
     const port = await getNextAvailablePort(mainPort);
-    const server = http.createServer(createHandler(core, ctx));
+    const server = http.createServer();
     activeServers.add(server);
 
-    let close: () => void;
-    const wsManager = createWebSocketServer(core, ctx, server, () => close?.());
-    close = () => {
+    let closed = false;
+    const close = () => {
+        if (closed) return;
+        closed = true;
         core.stop(ctx);
-        wsManager.close();
+        bridge.close();
         server?.closeAllConnections?.();
         server.close();
         activeServers.delete(server);
+        opts?.didClose?.();
     };
-
-    const callback = (id: number, buffer: ArrayBuffer) => {
-        const payload = new Uint8Array(buffer.byteLength + 1);
-        payload[0] = id;
-        payload.set(new Uint8Array(buffer), 1);
-        wsManager.webSockets.forEach((ws) => ws.send(payload));
-    };
+    const bridge = createBridge(core, ctx, close);
+    server.on("request", createHandler(bridge, close));
 
     server.listen(port);
 
-    if (!opts.quiet) {
+    if (!opts?.quiet) {
         console.log(`Listening at http://localhost:${port}`);
     }
 
@@ -73,177 +56,39 @@ export async function createWebViewWithCore(
 
     return {
         close,
-        port,
-        callback
+        port
     };
 }
 
-let nextCallId = 0;
-
-async function coreCall(core: Core, req: http.IncomingMessage) {
-    const payload = await readBody(req);
-    if (payload.length >= 2) {
-        nextCallId = (nextCallId % 255) + 1;
-        payload[1] = nextCallId;
-    }
-    const data = core.call(payload.buffer);
-    return new Uint8Array(data);
-}
-
-const platform = te.encode("node");
-
-function createHandler(core: Core, ctx: number) {
+// the UI endpoints of the page, the rest goes to the bridge
+function createHandler(
+    bridge: ReturnType<typeof createBridge>,
+    close: () => void
+) {
     return async (req: http.IncomingMessage, res: http.ServerResponse) => {
-        let [pathname] = req.url.split("?");
-        pathname = decodeURI(pathname);
-
-        if (pathname === "/platform") {
-            res.writeHead(200, {
-                "content-type": "text/plain",
-                "content-length": platform.length
-            });
-            return res.end(platform);
-        } else if (pathname === "/ctx") {
-            const ctxStr = ctx.toString();
-            res.writeHead(200, {
-                "content-type": "text/plain",
-                "content-length": ctxStr.length
-            });
-            return res.end(ctxStr);
-        } else if (pathname === "/open") {
-            const newCtx = await readBody(req);
-            globalThis.fullstacked.open(newCtx[0]);
+        const url = new URL(req.url, "http://localhost");
+        if (url.pathname === "/open") {
+            const ctx = Number(url.searchParams.get("ctx"));
+            if (ctx) globalThis.fullstacked.open(ctx);
             return res.end();
-        } else if (pathname === "/stream") {
-            return streamFrames(core, ctx, res);
-        } else if (pathname === "/stream/detach") {
-            // the page did not get the hello frame, it keeps the WebSocket
-            core.streamDetach(ctx, 0);
-            return res.end();
-        } else if (pathname === "/call") {
-            const payload = await coreCall(core, req);
-            res.writeHead(200, {
-                "content-type": "application/octet-stream",
-                "content-length": payload.byteLength,
-                "cache-control": "no-cache"
-            });
-            return res.end(payload);
-        } else if (pathname === "/sync") {
-            const payload = await coreCall(core, req);
-            const b64 = fromByteArray(payload);
-            res.writeHead(200, {
-                "content-type": "application/octet-stream",
-                "content-length": b64.length,
-                "cache-control": "no-cache"
-            });
-            return res.end(b64);
         }
-
-        const staticFile = staticFileWithCore(core, ctx, pathname);
-
-        res.writeHead(staticFile.found ? 200 : 400, {
-            "content-type": staticFile.mimeType,
-            "content-length": staticFile.data.byteLength,
-            "cache-control": "no-cache"
-        });
-        res.end(staticFile.data);
-    };
-}
-
-// Stream data of the context as binary frames (see core/internal/frames)
-// until the context ends, the page reloads or goes away
-function streamFrames(core: Core, ctx: number, res: http.ServerResponse) {
-    const gen = core.streamAttach(ctx);
-    if (gen < 0) {
-        res.writeHead(404);
-        return res.end();
-    }
-
-    res.writeHead(200, {
-        "content-type": "application/octet-stream",
-        "cache-control": "no-cache"
-    });
-    res.flushHeaders();
-
-    let ended = false;
-    res.on("close", () => {
-        if (!ended) {
-            ended = true;
-            core.streamDetach(ctx, gen);
-        }
-    });
-
-    core.streamStart(ctx, gen, (frames) => {
-        if (frames === null) {
-            ended = true;
+        if (url.pathname === "/exit") {
             res.end();
-            return;
+            return close();
         }
-        res.write(new Uint8Array(frames));
-    });
-}
-
-export function staticFileWithCore(
-    core: Core,
-    ctx: number,
-    pathname: string
-): {
-    found: boolean;
-    mimeType: string;
-    data: Uint8Array;
-} {
-    const pathnameData = te.encode(pathname);
-    const payload = new Uint8Array([
-        ctx,
-        0, // id
-        CoreModule, // Module
-        StaticFile, // Fn
-        0, // Async
-
-        STRING,
-        ...numberToUint4Bytes(pathnameData.length), // arg length
-        ...pathnameData
-    ]);
-    const responseData = core.call(payload.buffer);
-    const response: { data: Uint8Array<ArrayBuffer> } = deserialize(
-        responseData.slice(1)
-    );
-
-    if (response.data.byteLength === 0) {
-        return {
-            found: false,
-            mimeType: "text/plain",
-            data: te.encode("not found")
-        };
-    }
-
-    const [mimeType, data] = deserializeAll(response.data.buffer);
-
-    return {
-        found: true,
-        mimeType,
-        data
+        return bridge.request(req, res, url.pathname);
     };
 }
 
-function readBody(req: http.IncomingMessage) {
-    return new Promise<Uint8Array<ArrayBuffer>>((resolve) => {
-        const contentLengthStr = req.headers["content-length"] || "0";
-        const contentLength = parseInt(contentLengthStr);
-        if (!contentLength) {
-            return resolve(new Uint8Array());
-        }
-
-        const body = new Uint8Array(contentLength);
-        let i = 0;
-        req.on("data", (chunk: Buffer) => {
-            for (let j = 0; j < chunk.byteLength; j++) {
-                body[j + i] = chunk[j];
-            }
-            i += chunk.length;
-        });
-        req.on("end", () => resolve(body));
-    });
+export function staticFileWithCore(core: Core, ctx: number, pathname: string) {
+    const [status, mimeType, data] = core.request(ctx, pathname);
+    return status === 200
+        ? { found: true, mimeType, data }
+        : {
+              found: false,
+              mimeType: "text/plain",
+              data: new TextEncoder().encode("not found")
+          };
 }
 
 function getNextAvailablePort(
@@ -285,57 +130,4 @@ function getNextAvailablePort(
 
         socket.connect(port, host);
     });
-}
-
-function createWebSocketServer(
-    core: Core,
-    ctx: number,
-    server: http.Server,
-    close: () => void
-) {
-    const webSockets = new Set<WebSocket>();
-    const wss = new WebSocketServer({ noServer: true });
-    let closeTimeout: NodeJS.Timeout | undefined;
-
-    const onClose = (ws: WebSocket) => {
-        webSockets.delete(ws);
-
-        if (!core.check(ctx)) {
-            close();
-        } else if (webSockets.size === 0) {
-            closeTimeout = setTimeout(close, 5000);
-        }
-    };
-    const handleUpgrade = (ws: WebSocket) => {
-        if (closeTimeout) {
-            clearTimeout(closeTimeout);
-            closeTimeout = undefined;
-        }
-
-        webSockets.add(ws);
-
-        ws.on("close", () => onClose(ws));
-    };
-    const onUpgrade = (...args: [InstanceType<any>, Duplex, Buffer]) => {
-        wss.handleUpgrade(...args, handleUpgrade);
-    };
-    server.on("upgrade", onUpgrade);
-    return {
-        webSockets,
-        close: () => {
-            if (closeTimeout) {
-                clearTimeout(closeTimeout);
-                closeTimeout = undefined;
-            }
-            for (const ws of webSockets) {
-                try {
-                    ws.terminate();
-                } catch {}
-            }
-            webSockets.clear();
-            try {
-                wss.close();
-            } catch {}
-        }
-    };
 }

@@ -122,6 +122,36 @@ JNIEXPORT void JNICALL Java_org_fullstacked_Core_streamDetach
     streamDetach(static_cast<uint8_t>(ctxId), gen);
 }
 
+JNIEXPORT void JNICALL Java_org_fullstacked_Core_setPlatform
+        (JNIEnv *env, jobject thiz, jstring name, jboolean binaryCalls) {
+    const char* namePtr = env->GetStringUTFChars(name, nullptr);
+    setPlatform(const_cast<char*>(namePtr), binaryCalls ? 1 : 0);
+    env->ReleaseStringUTFChars(name, namePtr);
+}
+
+// A request of the page answered by the core: [status u16][mime type]\n[body]
+JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_handleRequest
+        (JNIEnv *env, jobject thiz, jint ctxId, jstring path) {
+    const char* pathPtr = env->GetStringUTFChars(path, nullptr);
+    int status = 0;
+    int size = 0;
+    void* response = handleRequest(static_cast<uint8_t>(ctxId), const_cast<char*>(pathPtr), nullptr, 0, &status, &size);
+    env->ReleaseStringUTFChars(path, pathPtr);
+
+    jbyteArray result = env->NewByteArray(size + 2);
+    if (result != nullptr) {
+        jbyte statusBytes[2] = {static_cast<jbyte>(status >> 8), static_cast<jbyte>(status & 0xFF)};
+        env->SetByteArrayRegion(result, 0, 2, statusBytes);
+        if (response != nullptr && size > 0) {
+            env->SetByteArrayRegion(result, 2, size, static_cast<const jbyte*>(response));
+        }
+    }
+    if (response != nullptr) {
+        freePtr(response);
+    }
+    return result;
+}
+
 // A call received on a message channel: null when the core put a large
 // response on the frame stream
 JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_callMessage

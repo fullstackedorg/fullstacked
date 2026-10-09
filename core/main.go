@@ -149,6 +149,38 @@ func callWithResponse(buffer unsafe.Pointer, length C.int, size *C.int) unsafe.P
 	return C.CBytes(response)
 }
 
+// setPlatform tells the core the name of the host for GET /platform and
+// whether it reads request bodies (POST /call and /sync), once at start.
+//
+//export setPlatform
+func setPlatform(name *C.char, binaryCalls C.int) {
+	router.Platform = C.GoString(name)
+	router.BinaryCalls = binaryCalls != 0
+}
+
+// handleRequest answers a request of the page of the context (see
+// router.HandleRequest): *status is the HTTP status, the returned buffer of
+// *size bytes is "<mime type>\n<body>", freed with freePtr.
+//
+//export handleRequest
+func handleRequest(ctxId C.uint8_t, path *C.char, body unsafe.Pointer, length C.int, status *C.int, size *C.int) unsafe.Pointer {
+	var payload []byte
+	if body != nil && length > 0 {
+		payload = C.GoBytes(body, length)
+	}
+	code, mimeType, data := router.HandleRequest(uint8(ctxId), C.GoString(path), payload)
+	// written in place, the body is copied once
+	n := len(mimeType) + 1 + len(data)
+	ptr := C.malloc(C.size_t(n))
+	response := unsafe.Slice((*byte)(ptr), n)
+	copy(response, mimeType)
+	response[len(mimeType)] = '\n'
+	copy(response[len(mimeType)+1:], data)
+	*status = C.int(code)
+	*size = C.int(n)
+	return ptr
+}
+
 // callMessage processes a call received on a message channel (see
 // router.CallForMessage). Returns the response in a buffer of *size bytes
 // freed with freePtr, or nil with *size -1 when the response was queued on

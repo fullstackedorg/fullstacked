@@ -18,13 +18,8 @@ const core = await load(
             return;
         }
 
-        const webview = webviews.get(ctx);
-        if (webview) {
-            webview.callback(streamId, buffer);
-            return;
-        }
-
-        throw new Error(`Unknown context: ${ctx}`);
+        // the page of a webview reads its stream data on GET /stream, what
+        // comes while no page reads it (or once the webview closed) is lost
     }
 );
 

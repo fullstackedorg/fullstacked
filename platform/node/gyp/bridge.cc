@@ -120,26 +120,36 @@ void N_StreamDetach(const Napi::CallbackInfo &info) {
 }
 
 struct FramesChunk {
-        std::vector<uint8_t> data;
-        bool end;
+        void *data; // freed with freePtr, nullptr once the reader ended
+        int size;
 };
+
+// Large buffers (frames, response bodies) go to JS as external Buffers over
+// the core buffer, no copy. Small ones are copied: many small external
+// buffers cost more in finalizers than the copy (4k chunk streams ran at
+// half the speed).
+const int EXTERNAL_FRAMES_MIN_SIZE = 64 << 10;
 
 void CallFrames(Napi::Env env, Function callback, std::nullptr_t *context,
                 FramesChunk *chunk) {
-    if (env != nullptr && callback != nullptr) {
-        if (chunk->end) {
-            callback.Call({env.Null()});
-        } else {
-            Napi::ArrayBuffer buffer =
-                Napi::ArrayBuffer::New(env, chunk->data.size());
-            memcpy(buffer.Data(), chunk->data.data(), chunk->data.size());
-            callback.Call({buffer});
-        }
+    if (env == nullptr || callback == nullptr) {
+        if (chunk->data) lib.freePtr(chunk->data);
+    } else if (chunk->data == nullptr) {
+        callback.Call({env.Null()});
+    } else if (chunk->size < EXTERNAL_FRAMES_MIN_SIZE) {
+        auto frames = Napi::Buffer<uint8_t>::Copy(
+            env, static_cast<uint8_t *>(chunk->data), chunk->size);
+        lib.freePtr(chunk->data);
+        callback.Call({frames});
+    } else {
+        callback.Call({Napi::Buffer<uint8_t>::New(
+            env, static_cast<uint8_t *>(chunk->data), chunk->size,
+            [](Napi::Env, uint8_t *data) { lib.freePtr(data); })});
     }
     delete chunk;
 }
-using FramesTSFN = TypedThreadSafeFunction<std::nullptr_t, FramesChunk,
-                                           CallFrames>;
+using FramesTSFN =
+    TypedThreadSafeFunction<std::nullptr_t, FramesChunk, CallFrames>;
 
 // reads the frames on its own thread (streamRead blocks), calls back with
 // each batch and null once the reader ended
@@ -159,22 +169,71 @@ void N_StreamStart(const Napi::CallbackInfo &info) {
             int size = 0;
             void *frames = lib.streamRead(ctxId, gen, &size);
             if (frames == nullptr) break;
-            uint8_t *bytes = static_cast<uint8_t *>(frames);
-            auto *chunk = new FramesChunk{
-                std::vector<uint8_t>(bytes, bytes + size), false};
-            lib.freePtr(frames);
+            auto *chunk = new FramesChunk{frames, size};
             if (tsfn.BlockingCall(chunk) != napi_ok) {
+                lib.freePtr(frames);
                 delete chunk;
                 lib.streamDetach(ctxId, gen);
                 break;
             }
         }
-        auto *end = new FramesChunk{{}, true};
+        auto *end = new FramesChunk{nullptr, 0};
         if (tsfn.BlockingCall(end) != napi_ok) {
             delete end;
         }
         tsfn.Release();
     }).detach();
+}
+
+void N_SetPlatform(const Napi::CallbackInfo &info) {
+    std::string name = info[0].As<Napi::String>().Utf8Value();
+    lib.setPlatform(const_cast<char *>(name.c_str()),
+                    info[1].As<Napi::Boolean>().Value() ? 1 : 0);
+}
+
+// A request of the page answered by the core: [status, mime type, body]
+// with the body an external Buffer over the core response
+Napi::Value N_Request(const Napi::CallbackInfo &info) {
+    Napi::Env env = info.Env();
+    uint8_t ctxId =
+        static_cast<uint8_t>(info[0].As<Napi::Number>().Uint32Value());
+    std::string path = info[1].As<Napi::String>().Utf8Value();
+    void *body = nullptr;
+    size_t length = 0;
+    if (info.Length() > 2 && info[2].IsTypedArray()) {
+        Napi::TypedArray array = info[2].As<Napi::TypedArray>();
+        body = static_cast<uint8_t *>(array.ArrayBuffer().Data()) +
+               array.ByteOffset();
+        length = array.ByteLength();
+    }
+    int status = 0;
+    int size = 0;
+    uint8_t *response = static_cast<uint8_t *>(
+        lib.handleRequest(ctxId, const_cast<char *>(path.c_str()), body,
+                          static_cast<int>(length), &status, &size));
+    // "<mime type>\n<body>"
+    uint8_t *newline = static_cast<uint8_t *>(
+        memchr(response, '\n', static_cast<size_t>(size)));
+    size_t mimeLength = newline ? newline - response : size;
+    size_t offset = newline ? mimeLength + 1 : size;
+    Napi::Array result = Napi::Array::New(env, 3);
+    result.Set(0u, Napi::Number::New(env, status));
+    result.Set(1u, Napi::String::New(env, reinterpret_cast<char *>(response),
+                                     mimeLength));
+    size_t bodySize = static_cast<size_t>(size) - offset;
+    if (bodySize < EXTERNAL_FRAMES_MIN_SIZE) {
+        result.Set(
+            2u, Napi::Buffer<uint8_t>::Copy(env, response + offset, bodySize));
+        lib.freePtr(response);
+    } else {
+        result.Set(2u, Napi::Buffer<uint8_t>::New(
+                           env, response + offset, bodySize,
+                           [](Napi::Env, uint8_t *, uint8_t *response) {
+                               lib.freePtr(response);
+                           },
+                           response));
+    }
+    return result;
 }
 
 void N_Load(const Napi::CallbackInfo &info) {
@@ -209,6 +268,12 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
 
     exports.Set(Napi::String::New(env, "streamDetach"),
                 Napi::Function::New(env, N_StreamDetach));
+
+    exports.Set(Napi::String::New(env, "setPlatform"),
+                Napi::Function::New(env, N_SetPlatform));
+
+    exports.Set(Napi::String::New(env, "request"),
+                Napi::Function::New(env, N_Request));
 
     exports.Set(Napi::String::New(env, "end"), Napi::Function::New(env, N_End));
     return exports;

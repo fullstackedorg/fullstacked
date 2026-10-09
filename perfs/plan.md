@@ -32,30 +32,30 @@ Node is the only platform with a binary request path (`fetch POST /call`) and a 
 
 ## 2. Current transport per platform
 
-| Platform | JS → native | native → JS (async) | Sync | Streams |
-|---|---|---|---|---|
-| Apple (WKWebView) | base64 → `messageHandlers.bridge.postMessage` | `evaluateJavaScript` with base64 | postMessage + sync XHR `fs://…/sync/{id}` | `evaluateJavaScript` per chunk, main thread |
-| Android | base64 → `@JavascriptInterface coreCall` | `evaluateJavascript` via main Handler | direct return (main JS); workers: postMessage + XHR | `evaluateJavascript` per chunk |
-| Windows (WebView2) | base64 → `chrome.webview.postMessage` (UI thread) | `ExecuteScriptAsync` | postMessage + `WebResourceRequested /sync/{id}` | `ExecuteScriptAsync` per chunk |
-| Linux GTK | base64 → script message handler | `webkit_web_view_evaluate_javascript` | postMessage + URI scheme `/sync/{id}` | same, per chunk |
-| Linux Qt | base64 over QWebChannel (JSON framed) | `runJavaScript` | QWebChannel + scheme `/sync/{id}` | same, per chunk |
-| Node | `fetch POST /call`, binary | binary `arrayBuffer()` | sync XHR `POST /sync`, response base64 | WebSocket, binary |
+| Platform           | JS → native                                       | native → JS (async)                   | Sync                                                | Streams                                     |
+| ------------------ | ------------------------------------------------- | ------------------------------------- | --------------------------------------------------- | ------------------------------------------- |
+| Apple (WKWebView)  | base64 → `messageHandlers.bridge.postMessage`     | `evaluateJavaScript` with base64      | postMessage + sync XHR `fs://…/sync/{id}`           | `evaluateJavaScript` per chunk, main thread |
+| Android            | base64 → `@JavascriptInterface coreCall`          | `evaluateJavascript` via main Handler | direct return (main JS); workers: postMessage + XHR | `evaluateJavascript` per chunk              |
+| Windows (WebView2) | base64 → `chrome.webview.postMessage` (UI thread) | `ExecuteScriptAsync`                  | postMessage + `WebResourceRequested /sync/{id}`     | `ExecuteScriptAsync` per chunk              |
+| Linux GTK          | base64 → script message handler                   | `webkit_web_view_evaluate_javascript` | postMessage + URI scheme `/sync/{id}`               | same, per chunk                             |
+| Linux Qt           | base64 over QWebChannel (JSON framed)             | `runJavaScript`                       | QWebChannel + scheme `/sync/{id}`                   | same, per chunk                             |
+| Node               | `fetch POST /call`, binary                        | binary `arrayBuffer()`                | sync XHR `POST /sync`, response base64              | WebSocket, binary                           |
 
 ---
 
 ## 3. Where the time goes (one native round trip)
 
-| # | Step | Cost | Where |
-|---|---|---|---|
-| 1 | JS base64 encode (hand-rolled, 148 lines) | CPU, +33% size | `bridge/base64.ts` |
-| 2 | String across the webview IPC (UTF-16 in JSC/V8) | ~2.6× the raw bytes in memory | all native |
-| 3 | Native base64 decode | CPU, allocation | Swift/Kotlin/C#/C++ |
-| 4 | `C.GoBytes` copies the request into Go | copy | `core/main.go` `call` |
-| 5 | Two C calls per request (`call`, then `getCorePayload`) with a map store in between | locking, map churn | `core/internal/store/store.go` |
-| 6 | **Double copy** in `getCorePayload`: `C.CBytes` (malloc + copy) → `memcpy` into the host buffer → `free` | extra alloc + copy per response/chunk | `core/main.go:118-120` |
-| 7 | Native base64 encode of the response | CPU, allocation | all native |
-| 8 | **Response embedded in JS source and evaluated**: the webview lexes and parses a script as large as the payload | dominant for large payloads and streams | all native |
-| 9 | JS base64 decode | CPU, allocation | `bridge/base64.ts` |
+| #   | Step                                                                                                            | Cost                                    | Where                          |
+| --- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------- | ------------------------------ |
+| 1   | JS base64 encode (hand-rolled, 148 lines)                                                                       | CPU, +33% size                          | `bridge/base64.ts`             |
+| 2   | String across the webview IPC (UTF-16 in JSC/V8)                                                                | ~2.6× the raw bytes in memory           | all native                     |
+| 3   | Native base64 decode                                                                                            | CPU, allocation                         | Swift/Kotlin/C#/C++            |
+| 4   | `C.GoBytes` copies the request into Go                                                                          | copy                                    | `core/main.go` `call`          |
+| 5   | Two C calls per request (`call`, then `getCorePayload`) with a map store in between                             | locking, map churn                      | `core/internal/store/store.go` |
+| 6   | **Double copy** in `getCorePayload`: `C.CBytes` (malloc + copy) → `memcpy` into the host buffer → `free`        | extra alloc + copy per response/chunk   | `core/main.go:118-120`         |
+| 7   | Native base64 encode of the response                                                                            | CPU, allocation                         | all native                     |
+| 8   | **Response embedded in JS source and evaluated**: the webview lexes and parses a script as large as the payload | dominant for large payloads and streams | all native                     |
+| 9   | JS base64 decode                                                                                                | CPU, allocation                         | `bridge/base64.ts`             |
 
 Threading and contention:
 
@@ -92,9 +92,9 @@ The `bench` command (added to `./shell` in Stage 1) is designed for cross-platfo
 
 1. **Self-Detecting Environment Metadata:**
    The command automatically detects the host environment without requiring manual flags:
-   - **FullStacked Version & Git Commit:** Retrieved from `(process.versions as any).fullstacked`, which exposes `{ major, minor, patch, build, branch, hash }`. The short commit hash `hash.substring(0, 8)` is recorded automatically.
-   - **OS & Architecture:** Retrieved directly via `os.platform()` (e.g. `darwin`, `linux`, `win32`, `android`) and `os.arch()`.
-   - **Timestamp:** Recorded via `new Date().toISOString()`.
+    - **FullStacked Version & Git Commit:** Retrieved from `(process.versions as any).fullstacked`, which exposes `{ major, minor, patch, build, branch, hash }`. The short commit hash `hash.substring(0, 8)` is recorded automatically.
+    - **OS & Architecture:** Retrieved directly via `os.platform()` (e.g. `darwin`, `linux`, `win32`, `android`) and `os.arch()`.
+    - **Timestamp:** Recorded via `new Date().toISOString()`.
 
 2. **Live Progress in Terminal:**
    While executing benchmark suites (`noop`, `echo`, `concurrent`, `stream`, `fs`), `bench` writes real-time progress and interim latency/throughput figures directly to the terminal using `shell.writeln()`.
@@ -108,17 +108,17 @@ The `bench` command (added to `./shell` in Stage 1) is designed for cross-platfo
 bench -n 200 -s 1k,64k -t 4m -k 4k,256k -r 2
 ```
 
-| Flag | Description | Default / Example |
-|---|---|---|
-| `-n, --iterations` | Number of iterations per benchmark case | `200` |
-| `-s, --sizes` | Comma-separated payload sizes for echo tests | `1k,64k` |
-| `-t, --total` | Total bytes transferred in streaming benchmarks | `4m` |
-| `-k, --chunks` | Comma-separated chunk sizes for stream tests | `4k,256k` |
-| `-r, --runs` | Number of repeated runs to average | `2` |
-| `-o, --output` | Output JSON file path | `output.json` |
-| `--suites` | Specific suites to run (`noop`, `echo`, `concurrent`, `stream`, `fs`, `worker`) | all |
-| `--sync-only` | Run synchronous suites only | flag |
-| `--async-only` | Run asynchronous suites only | flag |
+| Flag               | Description                                                                     | Default / Example |
+| ------------------ | ------------------------------------------------------------------------------- | ----------------- |
+| `-n, --iterations` | Number of iterations per benchmark case                                         | `200`             |
+| `-s, --sizes`      | Comma-separated payload sizes for echo tests                                    | `1k,64k`          |
+| `-t, --total`      | Total bytes transferred in streaming benchmarks                                 | `4m`              |
+| `-k, --chunks`     | Comma-separated chunk sizes for stream tests                                    | `4k,256k`         |
+| `-r, --runs`       | Number of repeated runs to average                                              | `2`               |
+| `-o, --output`     | Output JSON file path                                                           | `output.json`     |
+| `--suites`         | Specific suites to run (`noop`, `echo`, `concurrent`, `stream`, `fs`, `worker`) | all               |
+| `--sync-only`      | Run synchronous suites only                                                     | flag              |
+| `--async-only`     | Run asynchronous suites only                                                    | flag              |
 
 ### 4.3. Reporting Results to the Repository
 
@@ -131,21 +131,21 @@ perfs/bench/[STAGE]-[COMMIT_HASH]/[PLATFORM].json
 #### Path Variables
 
 - **`[STAGE]`**: Optimization stage identifier:
-  - `stage1` (Baseline measurement before optimizations)
-  - `stage2` (Cheap wins: copy removal, off-UI thread, lock fixes)
-  - `stage3` (Binary streaming responses)
-  - `stage4` (Binary request path)
-  - `stage5` (Hybrid transport: messages for small calls, POST and frames for large payloads)
-  - `stage6` (Packaging: thin hosts, porting guide)
+    - `stage1` (Baseline measurement before optimizations)
+    - `stage2` (Cheap wins: copy removal, off-UI thread, lock fixes)
+    - `stage3` (Binary streaming responses)
+    - `stage4` (Binary request path)
+    - `stage5` (Hybrid transport: messages for small calls, POST and frames for large payloads)
+    - `stage6` (Packaging: thin hosts, porting guide)
 - **`[COMMIT_HASH]`**: Short git commit hash of the code being evaluated (e.g. `5ffcd9c6` from `git rev-parse --short HEAD` or `process.versions.fullstacked.hash`).
 - **`[PLATFORM]`**: Target platform name:
-  - `apple-macos`
-  - `apple-ios`
-  - `android`
-  - `windows`
-  - `linux-gtk`
-  - `linux-qt`
-  - `node`
+    - `apple-macos`
+    - `apple-ios`
+    - `android`
+    - `windows`
+    - `linux-gtk`
+    - `linux-qt`
+    - `node`
 
 #### Directory Layout Example
 
@@ -167,112 +167,113 @@ perfs/bench/
 
 ```json
 {
-  "meta": {
-    "commit": "5ffcd9c6",
-    "platform": "darwin",
-    "arch": "arm64",
-    "fullstackedVersion": "1.0.0-alpha.1810",
-    "timestamp": "2026-10-08T02:50:00Z",
-    "options": {
-      "iterations": 200,
-      "echoSizes": ["1k", "64k"],
-      "streamTotal": "4m",
-      "streamChunks": ["4k", "256k"],
-      "runs": 2
-    }
-  },
-  "results": [
-    {
-      "suite": "noop",
-      "name": "noop sync",
-      "meanMs": 2.06,
-      "p95Ms": 3.00,
-      "opsPerSec": 486
+    "meta": {
+        "commit": "5ffcd9c6",
+        "platform": "darwin",
+        "arch": "arm64",
+        "fullstackedVersion": "1.0.0-alpha.1810",
+        "timestamp": "2026-10-08T02:50:00Z",
+        "options": {
+            "iterations": 200,
+            "echoSizes": ["1k", "64k"],
+            "streamTotal": "4m",
+            "streamChunks": ["4k", "256k"],
+            "runs": 2
+        }
     },
-    {
-      "suite": "noop",
-      "name": "noop async",
-      "meanMs": 1.91,
-      "p95Ms": 2.60,
-      "opsPerSec": 523
-    },
-    {
-      "suite": "echo",
-      "name": "echo sync 64k",
-      "meanMs": 7.21,
-      "p95Ms": 9.40,
-      "opsPerSec": 139,
-      "mbPerSec": 17.3
-    },
-    {
-      "suite": "echo",
-      "name": "echo async 64k",
-      "meanMs": 4.50,
-      "p95Ms": 7.50,
-      "opsPerSec": 222,
-      "mbPerSec": 27.8
-    },
-    {
-      "suite": "concurrent",
-      "name": "concurrent noop x32",
-      "opsPerSec": 1449
-    },
-    {
-      "suite": "stream",
-      "name": "stream 4m / 4k chunks",
-      "durationMs": 73.8,
-      "chunksPerSec": 13875,
-      "mbPerSec": 54.2
-    },
-    {
-      "suite": "stream",
-      "name": "stream 4m / 256k chunks",
-      "durationMs": 39.5,
-      "chunksPerSec": 406,
-      "mbPerSec": 101.0
-    },
-    {
-      "suite": "fs",
-      "name": "readFileSync 64k",
-      "meanMs": 3.87,
-      "p95Ms": 5.40,
-      "opsPerSec": 258,
-      "mbPerSec": 16.1
-    }
-  ]
+    "results": [
+        {
+            "suite": "noop",
+            "name": "noop sync",
+            "meanMs": 2.06,
+            "p95Ms": 3.0,
+            "opsPerSec": 486
+        },
+        {
+            "suite": "noop",
+            "name": "noop async",
+            "meanMs": 1.91,
+            "p95Ms": 2.6,
+            "opsPerSec": 523
+        },
+        {
+            "suite": "echo",
+            "name": "echo sync 64k",
+            "meanMs": 7.21,
+            "p95Ms": 9.4,
+            "opsPerSec": 139,
+            "mbPerSec": 17.3
+        },
+        {
+            "suite": "echo",
+            "name": "echo async 64k",
+            "meanMs": 4.5,
+            "p95Ms": 7.5,
+            "opsPerSec": 222,
+            "mbPerSec": 27.8
+        },
+        {
+            "suite": "concurrent",
+            "name": "concurrent noop x32",
+            "opsPerSec": 1449
+        },
+        {
+            "suite": "stream",
+            "name": "stream 4m / 4k chunks",
+            "durationMs": 73.8,
+            "chunksPerSec": 13875,
+            "mbPerSec": 54.2
+        },
+        {
+            "suite": "stream",
+            "name": "stream 4m / 256k chunks",
+            "durationMs": 39.5,
+            "chunksPerSec": 406,
+            "mbPerSec": 101.0
+        },
+        {
+            "suite": "fs",
+            "name": "readFileSync 64k",
+            "meanMs": 3.87,
+            "p95Ms": 5.4,
+            "opsPerSec": 258,
+            "mbPerSec": 16.1
+        }
+    ]
 }
 ```
 
 ### 4.4. Manual Testing Workflow per Platform
 
 For each platform:
+
 1. Check out the stage branch / commit to evaluate.
 2. Launch FullStacked on the target platform or device.
 3. In the FullStacked shell, execute:
-   ```sh
-   bench -n 200 -s 1k,64k -t 4m -k 4k,256k -r 2
-   ```
+    ```sh
+    bench -n 200 -s 1k,64k -t 4m -k 4k,256k -r 2
+    ```
 4. Follow live benchmark progress in the terminal.
 5. When complete, `output.json` is generated in the working directory with all results and auto-detected metadata.
 6. Move or copy `output.json` into the repository under the appropriate stage and platform name:
-   ```sh
-   mkdir -p perfs/bench/[STAGE]-[COMMIT_HASH]
-   mv output.json perfs/bench/[STAGE]-[COMMIT_HASH]/[PLATFORM].json
-   ```
-   *(Or specify the output file directly via `bench ... -o perfs/bench/[STAGE]-[COMMIT_HASH]/[PLATFORM].json`).*
-   On a device (iOS, Android) or any host where the repository isn't the working directory, upload the file to your machine with `curl` instead (see 4.5).
+    ```sh
+    mkdir -p perfs/bench/[STAGE]-[COMMIT_HASH]
+    mv output.json perfs/bench/[STAGE]-[COMMIT_HASH]/[PLATFORM].json
+    ```
+    _(Or specify the output file directly via `bench ... -o perfs/bench/[STAGE]-[COMMIT_HASH]/[PLATFORM].json`)._
+    On a device (iOS, Android) or any host where the repository isn't the working directory, upload the file to your machine with `curl` instead (see 4.5).
 7. Commit the resulting JSON file(s) to git to record benchmark history for that stage.
 
 ### 4.5. Getting `output.json` off a Device with `curl`
 
 The shell's `curl` command follows the Unix `curl` arguments for uploads, so `output.json` can be sent to any server on the LAN that accepts POST or PUT uploads:
 
-| Option | Request |
-|---|---|
-| `-F, --form name=@file` | `POST` `multipart/form-data`, `name=@file;type=mime;filename=name` also supported |
-| `--data-binary @file` | `POST` with the raw file as the body |
-| `-d, --data @file` | `POST` `application/x-www-form-urlencoded`, CR/LF stripped like curl (avoid for JSON) |
-| `-T, --upload-file file` | `PUT` with the raw file, the file name is appended when the URL ends with `/` |
+| Option                   | Request                                                                               |
+| ------------------------ | ------------------------------------------------------------------------------------- |
+| `-F, --form name=@file`  | `POST` `multipart/form-data`, `name=@file;type=mime;filename=name` also supported     |
+| `--data-binary @file`    | `POST` with the raw file as the body                                                  |
+| `-d, --data @file`       | `POST` `application/x-www-form-urlencoded`, CR/LF stripped like curl (avoid for JSON) |
+| `-T, --upload-file file` | `PUT` with the raw file, the file name is appended when the URL ends with `/`         |
 
 Requests go through the Go core's `fetch`, so platform rules for plain-HTTP traffic (iOS ATS, Android cleartext) don't apply. On iOS, accept the Local Network permission prompt the first time.
 
@@ -321,14 +322,14 @@ Properties:
 
 Per-platform mechanism and caveats:
 
-| Platform | Request in | Response / stream out | Caveat |
-|---|---|---|---|
-| Apple | `WKURLSchemeHandler`, `request.httpBody` | `urlSchemeTask.didReceive(data)` repeatedly, `didFinish` at end | `httpBody` works for custom schemes, `httpBodyStream` does not. Call `urlSchemeTask` on the main thread: compute off-thread, respond on main. |
-| Android | `shouldInterceptRequest` **does not expose POST bodies** | `WebResourceResponse` with a blocking `InputStream` (streaming works) | For requests, use `androidx.webkit` `WebViewCompat.addWebMessageListener` with `WebMessageCompat` `TYPE_ARRAY_BUFFER` (feature `WEB_MESSAGE_ARRAY_BUFFER`). It is binary both ways and replies via `JavaScriptReplyProxy.postMessage(byte[])`. Keep `@JavascriptInterface` for main-thread sync. |
-| Windows | `WebResourceRequested`, `Request.Content` | `CreateWebResourceResponse` with an `IStream` | Confirm that WebView2 delivers a custom `IStream` incrementally. If it buffers, use `PostSharedBufferToScript` for large pushes (zero-copy). |
-| Linux GTK | `webkit_uri_scheme_request_get_http_body` (WebKitGTK ≥ 2.40) | `webkit_uri_scheme_request_finish` with a `GInputStream` | Check the minimum WebKitGTK version shipped by target distros. |
-| Linux Qt | `QWebEngineUrlRequestJob::requestBody()` (Qt ≥ 6.7) | `job->reply(mime, QIODevice*)` with a sequential device | Drop QWebChannel from the data path. |
-| Node | already HTTP | already streaming-capable | Replace the WebSocket with the same `GET /stream/{ctx}` framing to unify. |
+| Platform  | Request in                                                   | Response / stream out                                                 | Caveat                                                                                                                                                                                                                                                                                           |
+| --------- | ------------------------------------------------------------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Apple     | `WKURLSchemeHandler`, `request.httpBody`                     | `urlSchemeTask.didReceive(data)` repeatedly, `didFinish` at end       | `httpBody` works for custom schemes, `httpBodyStream` does not. Call `urlSchemeTask` on the main thread: compute off-thread, respond on main.                                                                                                                                                    |
+| Android   | `shouldInterceptRequest` **does not expose POST bodies**     | `WebResourceResponse` with a blocking `InputStream` (streaming works) | For requests, use `androidx.webkit` `WebViewCompat.addWebMessageListener` with `WebMessageCompat` `TYPE_ARRAY_BUFFER` (feature `WEB_MESSAGE_ARRAY_BUFFER`). It is binary both ways and replies via `JavaScriptReplyProxy.postMessage(byte[])`. Keep `@JavascriptInterface` for main-thread sync. |
+| Windows   | `WebResourceRequested`, `Request.Content`                    | `CreateWebResourceResponse` with an `IStream`                         | Confirm that WebView2 delivers a custom `IStream` incrementally. If it buffers, use `PostSharedBufferToScript` for large pushes (zero-copy).                                                                                                                                                     |
+| Linux GTK | `webkit_uri_scheme_request_get_http_body` (WebKitGTK ≥ 2.40) | `webkit_uri_scheme_request_finish` with a `GInputStream`              | Check the minimum WebKitGTK version shipped by target distros.                                                                                                                                                                                                                                   |
+| Linux Qt  | `QWebEngineUrlRequestJob::requestBody()` (Qt ≥ 6.7)          | `job->reply(mime, QIODevice*)` with a sequential device               | Drop QWebChannel from the data path.                                                                                                                                                                                                                                                             |
+| Node      | already HTTP                                                 | already streaming-capable                                             | Replace the WebSocket with the same `GET /stream/{ctx}` framing to unify.                                                                                                                                                                                                                        |
 
 Constraint to keep in mind: per spec, a main-thread sync XHR cannot set `responseType = "arraybuffer"`. Options are `overrideMimeType("text/plain; charset=x-user-defined")` for a binary-safe string, or keeping base64 for main-thread sync only. Workers are unrestricted. Sync calls should become rare once async is cheap.
 
@@ -357,9 +358,9 @@ Each stage is measured with `bench` on every platform before and after. A stage 
 - Run `coreCall` off the UI thread on Apple, Windows, and GTK. Dispatch to a background queue and deliver the result on the main thread. Drop the global `coreCallLock` on Apple, because the core is already safe with per-context mutexes.
 - Fix the `router.Call` race: read `store.Contexts` under `ctxMutex`.
 - Fix request ids:
-  - Use a per-context id allocator, or widen the header id to 16 bits. That needs a protocol version byte.
-  - Never use id `0` from the host (Windows and Linux `deepLink`).
-  - Reject or queue calls in JS beyond 255 in flight instead of colliding.
+    - Use a per-context id allocator, or widen the header id to 16 bits. That needs a protocol version byte.
+    - Never use id `0` from the host (Windows and Linux `deepLink`).
+    - Reject or queue calls in JS beyond 255 in flight instead of colliding.
 - Batch stream chunks per event-loop tick on the native side before one `evaluateJavaScript`.
 - Use native `Uint8Array.prototype.toBase64` / `fromBase64` where available, with the current code as a fallback.
 - In workers, use `postMessage(buffer, [buffer])` (transfer instead of copy).
@@ -419,16 +420,16 @@ Each stage is measured with `bench` on every platform before and after. A stage 
 
 **Results** (`stage3-f7a070a7`, Linux, medians of 6 runs; saved files are the run closest to the median):
 
-| Case | GTK s2 | GTK s3 | Qt s3 |
-|---|---|---|---|
-| noop sync | 0.21 ms | 0.18 ms | 0.40 ms |
-| noop async | 0.17 ms | 0.23 ms | 0.23 ms |
-| echo sync 64k | 2.83 ms | 3.01 ms | 1.86 ms |
-| echo async 64k | 3.01 ms | 3.55 ms | 1.74 ms |
-| concurrent noop x32 | 29k ops/s | 32k ops/s | 41k ops/s |
-| stream 4m / 4k | 65 MB/s | 216 MB/s | 321 MB/s |
-| stream 4m / 256k | 70 MB/s | 238 MB/s | 392 MB/s |
-| stream 64m / 1k-1m (stress) | | 370-570 MB/s | 490-810 MB/s |
+| Case                        | GTK s2    | GTK s3       | Qt s3        |
+| --------------------------- | --------- | ------------ | ------------ |
+| noop sync                   | 0.21 ms   | 0.18 ms      | 0.40 ms      |
+| noop async                  | 0.17 ms   | 0.23 ms      | 0.23 ms      |
+| echo sync 64k               | 2.83 ms   | 3.01 ms      | 1.86 ms      |
+| echo async 64k              | 3.01 ms   | 3.55 ms      | 1.74 ms      |
+| concurrent noop x32         | 29k ops/s | 32k ops/s    | 41k ops/s    |
+| stream 4m / 4k              | 65 MB/s   | 216 MB/s     | 321 MB/s     |
+| stream 4m / 256k            | 70 MB/s   | 238 MB/s     | 392 MB/s     |
+| stream 64m / 1k-1m (stress) |           | 370-570 MB/s | 490-810 MB/s |
 
 - Streams: 3.3× on GTK. The 4 MB cases last 10-20 ms and vary ±40% from run to run; 64 MB streams are steadier.
 - Against Node in Stage 2 (164 MB/s at 4k, 800 MB/s at 256k): 4k is above Node on both hosts; 256k is 3.4× below on GTK and 2× below on Qt at 4 MB, and 1.4-2.2× (GTK) and 1-1.6× (Qt) below at 64 MB. Node has no Stage 3 run on this machine yet.
@@ -457,15 +458,15 @@ Each stage is measured with `bench` on every platform before and after. A stage 
 
 **Results** (`stage3-569565cc` → `stage4-2fa81d65`):
 
-| | noop async | concurrent x32 | echo async 64k | readFile 64k |
-|---|---|---|---|---|
-| macOS | 0.065 → 0.112 ms | 100k → 25k ops/s | 0.26 → 0.19 ms | 0.17 → 0.18 ms |
-| iOS | 0.135 → 0.223 ms | 36.7k → 13.8k ops/s | 0.47 → 0.35 ms | 0.34 → 0.46 ms |
-| Android | 0.44 → 1.02 ms | 2.5k → 3.7k ops/s | 7.3 → 3.1 ms | 6.1 → 3.5 ms |
-| GTK | 0.163 → 0.185 ms | 83k → 34k ops/s | 2.88 → 0.36 ms | 1.13 → 0.31 ms |
-| Windows | 0.38 → 2.11 ms | 25.3k → 985 ops/s | 3.3 → 4.8 ms | 2.6 → 4.6 ms |
-| Qt (6.7+) | 0.185 → 0.374 ms | 45.4k → 8.3k ops/s | 3.63 → 0.74 ms | 1.32 → 0.52 ms |
-| Node | 0.575 → 0.587 ms | 2.1k → 3.0k ops/s | 1.85 → 0.75 ms | 0.86 → 0.80 ms |
+|           | noop async       | concurrent x32      | echo async 64k | readFile 64k   |
+| --------- | ---------------- | ------------------- | -------------- | -------------- |
+| macOS     | 0.065 → 0.112 ms | 100k → 25k ops/s    | 0.26 → 0.19 ms | 0.17 → 0.18 ms |
+| iOS       | 0.135 → 0.223 ms | 36.7k → 13.8k ops/s | 0.47 → 0.35 ms | 0.34 → 0.46 ms |
+| Android   | 0.44 → 1.02 ms   | 2.5k → 3.7k ops/s   | 7.3 → 3.1 ms   | 6.1 → 3.5 ms   |
+| GTK       | 0.163 → 0.185 ms | 83k → 34k ops/s     | 2.88 → 0.36 ms | 1.13 → 0.31 ms |
+| Windows   | 0.38 → 2.11 ms   | 25.3k → 985 ops/s   | 3.3 → 4.8 ms   | 2.6 → 4.6 ms   |
+| Qt (6.7+) | 0.185 → 0.374 ms | 45.4k → 8.3k ops/s  | 3.63 → 0.74 ms | 1.32 → 0.52 ms |
+| Node      | 0.575 → 0.587 ms | 2.1k → 3.0k ops/s   | 1.85 → 0.75 ms | 0.86 → 0.80 ms |
 
 - Large payloads win where the request path is cheap: GTK 64k echo 8×, Qt 4.9×, Android 2.4×, macOS 1.4×, file reads 3.6× on GTK, 2.5× on Qt, 1.7× on Android.
 - Every async call is now its own custom-scheme request, whose fixed cost is larger than a small message: small async calls are slower on every platform and concurrency dropped on Apple, GTK and Qt (Android gained, its old path blocked the JS thread for the whole call).
@@ -481,10 +482,10 @@ Each stage is measured with `bench` on every platform before and after. A stage 
 **Goal:** pick the path per call so small calls pay the least fixed cost and large payloads move as raw bytes.
 
 - **Small requests on a message channel** whose reply needs no script evaluation:
-  - Apple: `WKScriptMessageHandlerWithReply`, the page awaits `webkit.messageHandlers.call.postMessage(base64)`.
-  - GTK: `webkit_user_content_manager_register_script_message_handler_with_reply`, same JS.
-  - Windows: `chrome.webview.postMessage(base64)`, replies posted back with `PostWebMessageAsString`, batched per UI tick.
-  - Android: `@JavascriptInterface` hands the call to the core thread and returns at once, the reply is posted as an `ArrayBuffer` through the `JavaScriptReplyProxy` of the web message listener.
+    - Apple: `WKScriptMessageHandlerWithReply`, the page awaits `webkit.messageHandlers.call.postMessage(base64)`.
+    - GTK: `webkit_user_content_manager_register_script_message_handler_with_reply`, same JS.
+    - Windows: `chrome.webview.postMessage(base64)`, replies posted back with `PostWebMessageAsString`, batched per UI tick.
+    - Android: `@JavascriptInterface` hands the call to the core thread and returns at once, the reply is posted as an `ArrayBuffer` through the `JavaScriptReplyProxy` of the web message listener.
 - **Large requests** (16 KB and up) keep `POST /call` (Android: an `ArrayBuffer` message), except on Windows where POST lost at every size.
 - **Large responses on `/stream`:** the request does not predict the response size (`readFile` posts a few bytes and gets 64 KB back). `callMessage` is a core export like `callWithResponse`: when the response is 16 KB or more and a frame reader is attached, it queues it as a response frame (`[callId][3][len][response]`) and the message reply is empty; otherwise the reply is the response. The page takes the response from whichever arrives.
 - **Sync calls** stay on `POST /sync` (single hop, no regression anywhere).
@@ -504,42 +505,89 @@ Each stage is measured with `bench` on every platform before and after. A stage 
 
 **First runs** (macOS and Android measured here, the other platforms to bench):
 
-| | Stage 3 | Stage 4 | Stage 5 |
-|---|---|---|---|
-| macOS noop async | 0.065 ms | 0.112 ms | 0.057-0.075 ms |
-| macOS concurrent x32 | 100k | 25k | 75-83k ops/s |
-| macOS echo async 64k | 0.26 ms | 0.19 ms | 0.20-0.22 ms |
-| macOS readFile 64k | 0.17 ms | 0.18 ms | 0.14-0.15 ms |
-| Android noop async | 0.44 ms | 1.02 ms | 0.65-0.68 ms |
-| Android concurrent x32 | 2.5k | 3.7k | 2.7-3.0k ops/s |
-| Android echo async 64k | 17 MB/s | ~42 MB/s | 45-48 MB/s |
-| Android readFile 64k | 10.5 MB/s | ~19 MB/s | 28-30 MB/s |
+|                        | Stage 3   | Stage 4  | Stage 5        |
+| ---------------------- | --------- | -------- | -------------- |
+| macOS noop async       | 0.065 ms  | 0.112 ms | 0.057-0.075 ms |
+| macOS concurrent x32   | 100k      | 25k      | 75-83k ops/s   |
+| macOS echo async 64k   | 0.26 ms   | 0.19 ms  | 0.20-0.22 ms   |
+| macOS readFile 64k     | 0.17 ms   | 0.18 ms  | 0.14-0.15 ms   |
+| Android noop async     | 0.44 ms   | 1.02 ms  | 0.65-0.68 ms   |
+| Android concurrent x32 | 2.5k      | 3.7k     | 2.7-3.0k ops/s |
+| Android echo async 64k | 17 MB/s   | ~42 MB/s | 45-48 MB/s     |
+| Android readFile 64k   | 10.5 MB/s | ~19 MB/s | 28-30 MB/s     |
 
 - Android small async calls stay above Stage 3: Stage 3 ran the core call on the JavaBridge thread while the page waited, which blocked JavaScript for slow calls; the Stage 5 call returns at once and the reply goes through the proxy.
+
+**Results** (`stage4-9ee228ad` → `stage5-6b1d635a`, Stage 3 in parentheses):
+
+|         | noop async               | concurrent x32              | echo async 64k           | readFile 64k             |
+| ------- | ------------------------ | --------------------------- | ------------------------ | ------------------------ |
+| macOS   | 0.123 → 0.065 ms (0.065) | 23.6k → 150k ops/s (100k)   | 0.195 → 0.213 ms (0.258) | 0.193 → 0.143 ms (0.167) |
+| iOS     | 0.25 → 0.138 ms (0.135)  | 13.9k → 34.3k ops/s (36.7k) | 0.383 → 0.353 ms (0.465) | 0.42 → 0.35 ms (0.343)   |
+| Android | 0.804 → 0.768 ms (0.439) | 3.2k → 2.9k ops/s (2.5k)    | 4.35 → 2.69 ms (7.34)    | 4.89 → 1.70 ms (6.12)    |
+| Windows | 1.842 → 0.181 ms (0.381) | 836 → 12.3k ops/s (25.3k)   | 4.0 → 1.76 ms (3.32)     | 3.35 → 1.21 ms (2.61)    |
+| GTK     | 0.205 → 0.16 ms (0.163)  | 37.5k → 83.3k ops/s (83.3k) | 0.313 → 0.308 ms (2.875) | 0.288 → 1.652 ms (1.13)  |
+| Qt      | 0.374 → 0.166 ms (0.185) | 8.3k → 75.7k ops/s (45.4k)  | 0.742 → 0.775 ms (3.632) | 0.518 → 0.339 ms (1.322) |
+| Node    | 0.587 → 0.553 ms         | 3.0k → 2.9k ops/s           | 0.75 → 1.655 ms          | 0.80 → 0.753 ms          |
+
+- Small async calls are back at Stage 3 or better everywhere but Android, Windows has its fastest small calls of all stages (0.181 ms).
+- Large payloads keep the Stage 4 gains (64k echo and file reads 2-10× Stage 3), Windows now gains on them too.
+- GTK `readFile 64k` regressed: a small request whose large response comes back as a frame waits for the first keepalive (1 ms), WebKitGTK holds the tail of the response until then.
+- Android small async calls stay above Stage 3 (non-blocking call path, see the notes).
+- Node 256k streams are at ~240 MB/s on frames against 800 MB/s on the WebSocket (Stage 1-2).
 
 ### Stage 6: Package
 
 **Goal:** minimal per-platform glue, new platforms cheap to add.
 
-- Collapse `bridge/platform/{apple,android,windows,linux,node}.ts` around the transport module and remove the `/platform` probe from the hot path.
-- Move routing into Go with `handleRequest(method, path, body) → (status, mime, body)`. Hosts become thin adapters: load `libcore`, register one scheme handler and one message channel, forward requests.
-- Drop the Node WebSocket once `/stream` covers every case.
-- Write a short "porting guide" listing the adapter's responsibilities, and run `bench` in CI on the platforms that can run headless (Node, Linux GTK under Xvfb).
+- Core: one export answers the requests of the page, `handleRequest(ctx, path, body, length, *status, *size)`, returning `<mime>\n<body>`: `/platform`, `/ctx`, `/bridge`, `/call`, `/sync`, `/stream/detach` and static files (404 when not found). The host tells the core its platform name and whether it reads request bodies once with `setPlatform(name, binaryCalls)`. Hosts keep `/stream` (a long-lived response is host specific), their own UI endpoints (resize, open, exit) and their message channel; they forward everything else, `/call` and `/sync` on their serial core queue, the rest on a concurrent one.
+- Hosts: the bridge code of each host moves out of its window code into one file (Apple `Bridge.swift`, Android `Bridge.kt`, Windows `Bridge.cs`, GTK `gtk/bridge.cpp`, Qt `qt/bridge.cpp`, Node `src/bridge.ts`).
+- Node: drop the WebSocket, stream data on `GET /stream` only, and bring 256k streams back to the WebSocket's throughput (copies in the reader path).
+- JS: one `bridge/platform.ts` for every host (section 5), feature-detected, no `GET /platform` switch; `apple.ts`, `android.ts`, `windows.ts`, `linux.ts`, `node.ts` and `transport.ts` are gone, with the `respond` and `respondGetSize` globals.
+- GTK `readFile 64k` (Stage 5): the first keepalive goes right after data instead of 1 ms later.
+- A porting guide (`perfs/porting.md`) lists what a host implements, and a Node `bench` runs headless (`perfs/bench-node.ts`, puppeteer) for CI; Linux GTK under Xvfb next.
 
-**Exit:** each native host's bridge code under about 150 lines; `bench` results committed for every platform, compared against `stage1-[COMMIT_HASH]`.
+**Exit:** each native host's bridge file under about 150 lines; no regression against Stage 5; `bench` results committed for every platform, compared against `stage1-[COMMIT_HASH]`.
+
+**Implementation notes:**
+
+- Core: `router.HandleRequest` (`core/internal/router/request.go`) answers `/platform`, `/ctx`, `/bridge`, `POST /call`, `POST /sync`, `/stream/detach` and the static files (the build directory first, then the root); `handleRequest` writes `<mime>\n<body>` into one C buffer. `setPlatform(name, binaryCalls)` replaces the `/platform` and `/bridge` strings of the hosts (Qt: `binaryCalls` is `QT_VERSION >= 6.7`).
+- Hosts, one bridge file each: Apple `Core.swift` (`coreRequest`, `RequestHandler`, `CallHandler`; a new file would need a pbxproj edit, `WebView.swift` keeps the window and UI endpoints), Android `Bridge.kt` (`fullstackedCore` JS interface, `fullstackedBridge` listener, `GET /stream`, `request(path)`), Windows `Bridge.cs` (`Attach`, `Request`, `OnStreamData`, shared buffers), GTK `gtk/bridge.{h,cpp}` (`GtkBridge`), Qt `qt/bridge.{h,cpp}` (`QtBridge` registered on the QWebChannel, `FrameDevice`), Node `src/bridge.ts`. The window files lost 300-350 lines each (Windows `WebView.cs` 718 → 422, `gtk.cpp` 919 → 610, `qt.cpp` 1054 → 722). The bridges are 200-250 lines, not 150: a serial core queue, a message channel, a frame stream with its own thread, and the request forwarding each take their share.
+- Node: the WebSocket is gone (`ws` stays a dependency of the runtime's own WebSocket support), stream data comes on `GET /stream` only and the addon (`gyp/bridge.cc`) hands the frames and the response bodies to JS as external Buffers over the core buffer, no copy, from 64 KB up; smaller ones are copied, many small external buffers cost more in finalizers than the copy (4k chunk streams ran at half the speed with external buffers everywhere). `core.request(ctx, path, body)` returns `[status, mime, body]`.
+- JS: `bridge/platform.ts` (one file, ~370 lines) replaces the five platform files and `transport.ts`. It detects the message channel of the host (`webkit.messageHandlers.call`, `chrome.webview`, `fullstackedBridge`, the Qt `bridge` object) and whether the host reads request bodies (`GET /bridge`), and posts everything otherwise; the UI goes through `/open?ctx=`, `/exit` and `/resize` on every host (Apple lost its `open`/`exit`/`resize` message handlers, Android its `android` JavascriptInterface, Qt answers its channel with the return value instead of `fullstacked.respond`, Node closes the webview on `/exit`). `window.resize`/`getSize` exist when `GET /resize` answers 200, so `parentWindow` keeps skipping mobile. The Android pre-WebMessageListener path (WebView < 98) is gone: the page fails at init without the listener.
+- GTK `readFile 64k`: the immediate keepalive goes only after a response frame (`frames.Queue.tailWaits`), an immediate keepalive after every stream end cost ~20% on 256k streams (A/B on macOS). Not measured on GTK yet (no Linux build here).
+- `perfs/bench-node.ts` runs the shell `bench` in headless Chrome (puppeteer) against the Node host and writes the JSON; `perfs/porting.md` is the porting guide.
+
+**Results so far** (headless Node, `bench-node.ts`, Stage 5 worktree against Stage 6, median of 3):
+
+| Node headless        | noop async | concurrent x32 | echo async 64k | readFile 64k | stream 64m 4k | stream 64m 256k |
+| -------------------- | ---------- | -------------- | -------------- | ------------ | ------------- | --------------- |
+| Stage 5 (`6b1d635a`) | 3739 ops/s | 7.0k ops/s     | 69.7 MB/s      | 153 MB/s     | 1149 MB/s     | 1680 MB/s       |
+| Stage 6              | 3705 ops/s | 6.6k ops/s     | 67.7 MB/s      | 160 MB/s     | 1059 MB/s     | 1636 MB/s       |
+
+- Parity within run noise. The committed `stage5-6b1d635a/node.json` (noop async 1811 ops/s, 256k streams 242 MB/s) was run in a regular Chrome window, headless Chrome is about 2× faster on every row, so the "Node 256k regression" of Stage 5 was the browser, not the frames: the same build gives 1680 MB/s headless.
+- macOS and Android with the final build (Stage 5 `6b1d635a` → Stage 6, one run each, same device):
+
+|         | noop async                   | concurrent x32    | echo async 64k          | readFile 64k              | stream 4m 256k |
+| ------- | ---------------------------- | ----------------- | ----------------------- | ------------------------- | -------------- |
+| macOS   | 0.065 → 0.073 ms             | 150k → 125k ops/s | 0.213 → 0.218 ms        | 0.143 → 0.15 ms           | 1166 MB/s      |
+| Android | 0.768 → 0.63 ms (1586 ops/s) | 2.9k → 3.1k ops/s | 2.69 → 2.9 ms (44 MB/s) | 1.70 → 2.2 ms (28.5 MB/s) | 175 MB/s       |
+
+- No regression beyond run-to-run noise (macOS concurrent moves between 83k and 150k across runs of the same build). Windows, GTK and Qt are to be benched on their machines; Windows and Linux were not compiled here (no `dotnet`, no Linux toolchain), the C++ was syntax checked where it does not need the platform headers (`core.cpp`).
+- With the single JS bridge (`bridge/platform.ts`, final build): macOS noop async 0.068 ms, concurrent 75k ops/s, echo async 64k 0.203 ms, readFile 64k 0.178 ms, 256k streams 1500 MB/s; Android noop async 0.61 ms (1630 ops/s), concurrent 2.9k ops/s, echo async 64k 46.8 MB/s, readFile 64k 29 MB/s; Node headless noop async 3828 ops/s, concurrent 10k ops/s, readFile 64k 162 MB/s. Same as above within noise: the detection costs two requests at init (`/bridge`, `/resize`) and nothing per call.
 
 ---
 
 ## 7. Expected impact (to be confirmed by Stage 1 numbers)
 
-| Change | Affects | Expected effect |
-|---|---|---|
-| Remove the Go double copy | all | small, one alloc + copy per response/chunk |
-| Core calls off the UI thread | Apple, Windows, GTK | UI stays responsive under load; better concurrency |
-| Streaming responses instead of per-chunk `evaluateJavaScript` | all native | largest win for streams and small chunks; backpressure |
-| Binary call path (no base64, no script eval) | all native | large win for payloads ≥ 64k; lower latency for small calls |
-| Single-hop sync | Apple, Windows, Linux, Android workers | about half the IPC per sync call |
-| Unified bridge | all | less code, one place to optimize, simpler porting |
+| Change                                                        | Affects                                | Expected effect                                             |
+| ------------------------------------------------------------- | -------------------------------------- | ----------------------------------------------------------- |
+| Remove the Go double copy                                     | all                                    | small, one alloc + copy per response/chunk                  |
+| Core calls off the UI thread                                  | Apple, Windows, GTK                    | UI stays responsive under load; better concurrency          |
+| Streaming responses instead of per-chunk `evaluateJavaScript` | all native                             | largest win for streams and small chunks; backpressure      |
+| Binary call path (no base64, no script eval)                  | all native                             | large win for payloads ≥ 64k; lower latency for small calls |
+| Single-hop sync                                               | Apple, Windows, Linux, Android workers | about half the IPC per sync call                            |
+| Unified bridge                                                | all                                    | less code, one place to optimize, simpler porting           |
 
 ## 8. Not recommended
 

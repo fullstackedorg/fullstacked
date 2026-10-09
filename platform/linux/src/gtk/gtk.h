@@ -5,10 +5,11 @@
 #include <gtkmm/application.h>
 #include <gtkmm/window.h>
 #include <map>
-#include <mutex>
 #include <string>
 #include <vector>
 #include <webkit/webkit.h>
+
+class GtkBridge;
 
 class WebkitGTKWindow : public Window {
         friend class WebkitGTKGUI;
@@ -21,37 +22,9 @@ class WebkitGTKWindow : public Window {
         Gtk::Window *authWindowGTK = nullptr;
         bool authResolved = false;
 
-        // core calls of this window run in order, off the main thread
-        GThreadPool *corePool = nullptr;
+        // calls, stream frames and requests of the page (bridge.cpp)
+        GtkBridge *bridge = nullptr;
 
-        // responses and stream chunks received between two main loop
-        // iterations are evaluated in one script
-        std::mutex scriptMutex;
-        std::string pendingScript;
-        bool scriptFlushScheduled = false;
-        void queueScript(const std::string &statement);
-
-        // results of work done off the main thread come back through the
-        // webview (ref'd), the window is looked up from it once on the main
-        // thread since it may have closed in between
-        static WebkitGTKWindow *fromWebView(WebKitWebView *view);
-        // core pool and main loop tasks are std::function<void()>
-        static void runCoreTask(gpointer data, gpointer userData);
-        static gboolean runMainTask(gpointer data);
-        void pushCoreTask(std::function<void()> task);
-        static void runOnMain(std::function<void()> task);
-        static gboolean onCallMessage(WebKitUserContentManager *manager,
-                                      JSCValue *value,
-                                      WebKitScriptMessageReply *reply,
-                                      gpointer userData);
-        static void runStaticFileTask(gpointer data, gpointer userData);
-        static gboolean dispatchStaticFileResult(gpointer userData);
-        static gboolean flushScripts(gpointer userData);
-
-        static void onOpenMessage(WebKitUserContentManager *manager,
-                                  JSCValue *value, gpointer userData);
-        static void onExitMessage(WebKitUserContentManager *manager,
-                                  JSCValue *value, gpointer userData);
         static void onAuthMessage(WebKitUserContentManager *manager,
                                   JSCValue *value, gpointer userData);
         static void onCloseMessage(WebKitUserContentManager *manager,
@@ -77,8 +50,6 @@ class WebkitGTKWindow : public Window {
 
         void initWindow();
         void handleSchemeRequest(WebKitURISchemeRequest *request);
-        void startFrameStream(WebKitURISchemeRequest *request);
-        void handleCall(WebKitURISchemeRequest *request);
 
         GtkWidget *createAuthWebView(WebKitNavigationAction *navigation_action);
         void closeAuthWindow(bool canceled = false);

@@ -15,6 +15,8 @@ CoreLib loadLibrary(std::string libPath) {
         (StreamRead)(dlsym(coreLib, "streamRead")),
         (StreamDetach)(dlsym(coreLib, "streamDetach")),
         (FreePtr)(dlsym(coreLib, "freePtr")),
+        (SetPlatform)(dlsym(coreLib, "setPlatform")),
+        (HandleRequest)(dlsym(coreLib, "handleRequest")),
     };
 
     return lib;

@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
     fun onStreamData(ctx: Int, id: Int, size: Int) {
         val targetWebView = stackedWebViews.firstOrNull { (it.ctxId.toInt() and 0xFF) == ctx } ?: return
         val buffer = Core.getCorePayload(ctx, 2, id, size)
-        targetWebView.onStreamData(id, buffer)
+        targetWebView.bridge.onStreamData(id, buffer)
     }
 
     private fun setDirectories() {

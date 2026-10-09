@@ -16,17 +16,28 @@ export interface Core {
     check(ctx: number): boolean;
     stop(ctx: number): void;
     call(payload: ArrayBuffer): ArrayBuffer;
+    // the platform name the page reads at /platform, binaryCalls when the
+    // host reads the request bodies of POST /call and /sync
+    setPlatform(name: string, binaryCalls: boolean): void;
+    // a request of the page answered by the core (static files, /platform,
+    // /ctx, POST /call and /sync...): [status, mime type, body]
+    request(
+        ctx: number,
+        path: string,
+        body?: Uint8Array
+    ): [status: number, mimeType: string, body: Buffer];
     setOnStreamData(
         cb: (ctx: number, streamId: number, buffer: ArrayBuffer) => void
     ): void;
     // stream data of a context as binary frames for GET /stream, see
     // core/internal/frames
     streamAttach(ctx: number): number;
-    // calls back with each batch of frames, null once the reader ended
+    // calls back with each batch of frames (over the core buffer, no copy),
+    // null once the reader ended
     streamStart(
         ctx: number,
         gen: number,
-        cb: (frames: ArrayBuffer | null) => void
+        cb: (frames: Buffer | null) => void
     ): void;
     streamDetach(ctx: number, gen: number): void;
     end(): void;
@@ -75,6 +86,7 @@ export async function load(
     core = require(bindingPath);
     core.load(libPath);
     core.setOnStreamData(onStreamData);
+    core.setPlatform("node", true);
 
     return core;
 }

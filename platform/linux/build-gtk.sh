@@ -38,6 +38,7 @@ $CXX -std=c++20 -DGTK=1 \
     src/utils.cpp \
     src/core.cpp \
     src/gtk/gtk.cpp \
+    src/gtk/bridge.cpp \
     src/app.cpp \
     src/main.cpp \
     src/base64.cpp \
