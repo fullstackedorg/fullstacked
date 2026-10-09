@@ -2,10 +2,13 @@ import type { PlatformBridge } from "./index.ts";
 import { fromByteArray, toByteArray } from "../base64.ts";
 import { isWorker } from "../isWorker.ts";
 import { readFrameStream } from "../frames.ts";
+import { responseFrame } from "../responses.ts";
+import { POST_MIN_SIZE } from "./transport.ts";
 
 declare global {
     var android: {
         coreCall?: (payloadBase64: string) => string;
+        callAsync?: (payloadBase64: string) => void;
         open?: (ctx: number) => void;
         exit?: () => void;
         openUrl?: (url: string) => void;
@@ -13,12 +16,16 @@ declare global {
 }
 
 // Injected by the host with WebViewCompat.addWebMessageListener when the
-// WebView supports ArrayBuffer messages: async calls go there as raw bytes
-// and come back as [id][response], no base64 and no evaluated script.
+// WebView supports ArrayBuffer messages. Its replies carry the responses of
+// async calls as [id][response] ([id] alone when the host put a large one on
+// the frame stream), no evaluated script. Small calls are handed over with
+// android.callAsync(base64), cheaper than a message, large ones are posted
+// to it as an ArrayBuffer. The page posts "init" first so the host keeps the
+// reply proxy.
 declare global {
     var fullstackedBridge: {
-        postMessage(message: ArrayBuffer): void;
-        onmessage: (event: MessageEvent<ArrayBuffer>) => void;
+        postMessage(message: ArrayBuffer | string): void;
+        onmessage: (event: MessageEvent<ArrayBuffer | string>) => void;
     };
 }
 
@@ -67,12 +74,57 @@ export async function BridgeAndroidInit(): Promise<PlatformBridge> {
         await readFrameStream();
     }
 
-    const messageBridge = isWorker ? null : globalThis.fullstackedBridge;
+    let messageBridge = isWorker ? null : globalThis.fullstackedBridge;
     if (messageBridge) {
-        messageBridge.onmessage = (event) => {
-            const id = new Uint8Array(event.data)[0];
-            asyncResponsePromises.get(id)?.(event.data.slice(1));
-            asyncResponsePromises.delete(id);
+        const ready = new Promise<boolean>((resolve) => {
+            messageBridge.onmessage = (event) => {
+                if (typeof event.data === "string") {
+                    resolve(event.data === "ready");
+                    return;
+                }
+                const id = new Uint8Array(event.data)[0];
+                asyncResponsePromises.get(id)?.(event.data.slice(1));
+                asyncResponsePromises.delete(id);
+            };
+            setTimeout(() => resolve(false), 3000);
+        });
+        messageBridge.postMessage("init");
+        if (!(await ready)) {
+            messageBridge = null;
+        }
+    }
+
+    if (messageBridge) {
+        const bridge = messageBridge;
+        return {
+            ctx,
+            // sync calls of workers, they read the response with /sync/{id}
+            Send(payload) {
+                globalThis.android?.coreCall?.(
+                    fromByteArray(new Uint8Array(payload))
+                );
+            },
+            async Async(payload) {
+                const id = new Uint8Array(payload)[1];
+                const response = await new Promise<ArrayBuffer>((resolve) => {
+                    asyncResponsePromises.set(id, resolve);
+                    if (payload.byteLength >= POST_MIN_SIZE) {
+                        bridge.postMessage(payload);
+                    } else {
+                        globalThis.android.callAsync(
+                            fromByteArray(new Uint8Array(payload))
+                        );
+                    }
+                });
+                return response.byteLength ? response : responseFrame(id);
+            },
+            Sync(payload) {
+                return toByteArray(
+                    globalThis.android?.coreCall?.(
+                        fromByteArray(new Uint8Array(payload))
+                    ) || ""
+                ).buffer;
+            }
         };
     }
 

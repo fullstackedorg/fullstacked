@@ -873,13 +873,15 @@ void QtWindow::onBridgeMessage(const std::string &payloadB64) {
     std::vector<uint8_t> payload(payloadRaw.begin(), payloadRaw.end());
     if (payload.empty()) return;
 
-    auto response = Core::callCore(payload);
     uint8_t id = payload.size() > 1 ? payload[1] : 0;
     uint8_t isSync = payload.size() > 4 ? payload[4] : 0;
 
     if (isSync == 1) {
-        resolveSyncAwaiter(id, response);
+        resolveSyncAwaiter(id, Core::callCore(payload));
     } else {
+        // an empty response when the core put a large one on the frame stream
+        bool framed = false;
+        auto response = Core::callMessage(payload, framed);
         std::string script =
             "if (window.fullstacked && window.fullstacked.respond) { "
             "window.fullstacked.respond(" +

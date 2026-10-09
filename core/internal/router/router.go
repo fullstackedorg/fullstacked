@@ -8,6 +8,7 @@ import (
 	"fullstackedorg/fullstacked/internal/dgram"
 	"fullstackedorg/fullstacked/internal/dns"
 	"fullstackedorg/fullstacked/internal/fetch"
+	"fullstackedorg/fullstacked/internal/frames"
 	"fullstackedorg/fullstacked/internal/fs"
 	"fullstackedorg/fullstacked/internal/git"
 	"fullstackedorg/fullstacked/internal/net"
@@ -74,6 +75,35 @@ func CallWithResponse(payload []byte) ([]byte, error) {
 	}
 
 	return store.BuildResponse(ctx, processCall(ctx, header, data))
+}
+
+// Responses from this size go on the frame stream when the call came on a
+// message channel: messages carry strings (base64) the page then decodes,
+// frames carry bytes.
+const ResponseFrameMinSize = 16 << 10
+
+// CallForMessage processes a call received on a message channel. A large
+// response is queued as a response frame when a frame reader is attached,
+// then framed is true and the message reply carries nothing. Errors come
+// back as error responses so a reply is only empty when framed.
+func CallForMessage(payload []byte) (response []byte, framed bool) {
+	ctx, header, data, err := parseCall(payload)
+	if err == nil {
+		response, err = store.BuildResponse(ctx, processCall(ctx, header, data))
+	}
+	if err != nil {
+		response, _ = store.BuildResponse(nil, types.CoreCallResponse{
+			Type: types.CoreResponseError,
+			Data: err.Error(),
+		})
+		return response, false
+	}
+
+	if len(response) >= ResponseFrameMinSize && ctx.Frames.Push(header.Id, frames.FlagResponse, response) {
+		return nil, true
+	}
+
+	return response, false
 }
 
 func parseCall(payload []byte) (*types.Context, types.CoreCallHeader, []types.DeserializedData, error) {

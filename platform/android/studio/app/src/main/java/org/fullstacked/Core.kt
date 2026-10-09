@@ -40,6 +40,11 @@ object Core {
     @JvmStatic
     external fun callWithResponse(payload: ByteArray): ByteArray
 
+    // a call received on a message channel: null when the core put a large
+    // response on the frame stream
+    @JvmStatic
+    external fun callMessage(payload: ByteArray): ByteArray?
+
     // stream data of a context as binary frames for GET /stream, see core/internal/frames
     @JvmStatic
     external fun streamAttach(ctxId: Int): Int

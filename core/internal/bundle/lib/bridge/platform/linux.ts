@@ -4,7 +4,7 @@ import { isWorker } from "../isWorker.ts";
 import { readFrameStream } from "../frames.ts";
 import {
     hostSupportsBinaryCalls,
-    postCall,
+    hybridCall,
     postSync,
     relayCall
 } from "./transport.ts";
@@ -88,12 +88,40 @@ export async function BridgeLinuxInit(): Promise<PlatformBridge> {
         await readFrameStream();
     }
 
+    // A small call on the message channel of the host (QWebChannel on Qt),
+    // answered with window.fullstacked.respond, empty when the host put a
+    // large response on the frame stream
+    const bridgeMessageCall = (payload: ArrayBuffer) => {
+        const id = new Uint8Array(payload)[1];
+        return new Promise<ArrayBuffer | null>((resolve) => {
+            asyncResponsePromises.set(id, (response) =>
+                resolve(response.byteLength ? response : null)
+            );
+            if (isWorker) {
+                // transfer, the payload is not used after
+                globalThis.postMessage(payload, { transfer: [payload] });
+            } else {
+                postBridgeMessage(fromByteArray(new Uint8Array(payload)));
+            }
+        });
+    };
+
     // GTK and Qt >= 6.7 read the request body of POST /call and /sync, older
     // Qt keeps the messages over QWebChannel
     if (await hostSupportsBinaryCalls()) {
+        // GTK answers small calls on a message handler with reply
+        const callHandler = globalThis.webkit?.messageHandlers?.call;
+        const messageCall = callHandler
+            ? async (payload: ArrayBuffer) => {
+                  const response: string = await callHandler.postMessage(
+                      fromByteArray(new Uint8Array(payload))
+                  );
+                  return response ? toByteArray(response).buffer : null;
+              }
+            : bridgeMessageCall;
         return {
             ctx,
-            Async: isWorker ? relayCall : postCall,
+            Async: isWorker ? relayCall : hybridCall(messageCall),
             Sync: postSync
         };
     }
@@ -103,20 +131,7 @@ export async function BridgeLinuxInit(): Promise<PlatformBridge> {
         Send(payload) {
             postBridgeMessage(fromByteArray(new Uint8Array(payload)));
         },
-        async Async(payload) {
-            const dataView = new DataView(payload);
-            const id = dataView.getUint8(1);
-            return new Promise<ArrayBuffer>((resolve) => {
-                asyncResponsePromises.set(id, resolve);
-                if (isWorker) {
-                    // transfer, the payload is not used after
-                    globalThis.postMessage(payload, { transfer: [payload] });
-                } else {
-                    const base64 = fromByteArray(new Uint8Array(payload));
-                    postBridgeMessage(base64);
-                }
-            });
-        },
+        Async: hybridCall(bridgeMessageCall, Infinity),
         Sync(payload) {
             const uint8array = new Uint8Array(payload);
             const id = uint8array[1];

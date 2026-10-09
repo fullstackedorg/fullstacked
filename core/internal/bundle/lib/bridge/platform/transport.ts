@@ -3,6 +3,7 @@
 // and no evaluated script. Hosts run the calls of a page in order.
 
 import { isWorker } from "../isWorker.ts";
+import { responseFrame } from "../responses.ts";
 
 // the bridge replaces globalThis.fetch with the core fetch
 const nativeFetch = globalThis.fetch.bind(globalThis);
@@ -49,6 +50,30 @@ export function postSync(payload: ArrayBuffer): ArrayBuffer {
         bytes[i] = text.charCodeAt(i);
     }
     return bytes.buffer;
+}
+
+// A message channel of the host: resolves the response, or null when the
+// host put it on the frame stream (large responses)
+export type MessageCall = (payload: ArrayBuffer) => Promise<ArrayBuffer | null>;
+
+// requests from this size are posted to POST /call
+export const POST_MIN_SIZE = 16 << 10;
+
+// Small requests pay less on a message channel than on a request, large ones
+// move as raw bytes with POST /call. Calls of both sizes can reach the host in
+// another order than they were made, like any two calls not awaited in turn.
+export function hybridCall(
+    messageCall: MessageCall,
+    postMinSize = POST_MIN_SIZE
+) {
+    return async (payload: ArrayBuffer): Promise<ArrayBuffer> => {
+        if (payload.byteLength >= postMinSize) {
+            return postCall(payload);
+        }
+        const id = new Uint8Array(payload)[1];
+        const response = await messageCall(payload);
+        return response ?? responseFrame(id);
+    };
 }
 
 // Async calls of a worker go through the main thread (worker_threads relay)

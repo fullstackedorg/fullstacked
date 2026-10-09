@@ -2,13 +2,15 @@
 // context (GET /stream) instead of a script evaluated per chunk.
 //
 // Frame: [streamId u8][flags u8][length u32 big endian][data]
-// flags: 0 data, 1 end, 2 error (data is the error message)
+// flags: 0 data, 1 end, 2 error (data is the error message), 3 response of a
+// call (the id is the call id, see responses.ts)
 //
 // The host sends a hello frame (stream 0, empty) once it reads the frames
 // of the context. Without it the host keeps evaluating stream chunks with
 // window.fullstacked.onStreamData, which stays registered.
 
 import { onStreamFrame } from "./duplex.ts";
+import { onResponseFrame } from "./responses.ts";
 
 export const FRAME_HEADER_SIZE = 6;
 
@@ -85,8 +87,15 @@ export class FrameParser {
     }
 }
 
-// Hands a frame to its duplex, stream 0 is hello and keepalives
+export const FLAG_RESPONSE = 3;
+
+// Hands a frame to its duplex, or a response frame to its call (the id is the
+// call id), stream 0 is hello and keepalives
 function dispatchFrame(streamId: number, flags: number, data: Uint8Array) {
+    if (flags === FLAG_RESPONSE) {
+        onResponseFrame(streamId, data);
+        return;
+    }
     if (streamId === 0) return;
     // a throwing listener must not stop the reader of every stream
     try {

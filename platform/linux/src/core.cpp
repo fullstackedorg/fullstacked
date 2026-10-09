@@ -14,6 +14,7 @@ extern void getCorePayload(uint8_t ctx, uint8_t coreType, uint8_t id, void *ptr,
                            int size);
 extern int call(void *buffer, int length);
 extern void *callWithResponse(void *buffer, int length, int *size);
+extern void *callMessage(void *buffer, int length, int *size);
 extern int streamAttach(uint8_t ctxId);
 extern void *streamRead(uint8_t ctxId, int gen, int *size);
 extern void streamDetach(uint8_t ctxId, int gen);
@@ -112,6 +113,31 @@ void Core::streamDetach(uint8_t ctxId, int gen) {
 
 void Core::freeBuffer(void *ptr) {
     freePtr(ptr);
+}
+
+std::vector<uint8_t> Core::callMessage(const std::vector<uint8_t> &payload,
+                                       bool &framed) {
+    framed = false;
+    if (payload.empty()) {
+        return {};
+    }
+
+    int responseSize = 0;
+    void *responsePtr = ::callMessage(
+        const_cast<void *>(static_cast<const void *>(payload.data())),
+        static_cast<int>(payload.size()), &responseSize);
+    if (responseSize < 0) {
+        framed = true;
+        return {};
+    }
+    if (responsePtr == nullptr) {
+        return {};
+    }
+
+    const uint8_t *bytes = static_cast<const uint8_t *>(responsePtr);
+    std::vector<uint8_t> response(bytes, bytes + responseSize);
+    freePtr(responsePtr);
+    return response;
 }
 
 void Core::setStreamCallback(StreamDataCallback cb) {

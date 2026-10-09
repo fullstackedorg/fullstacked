@@ -166,20 +166,39 @@ class FullStackedWebView(
     // async calls of the page, in order, off the UI thread
     private val coreExecutor = Executors.newSingleThreadExecutor()
 
-    // An async call posted to fullstackedBridge (see createWebView): the payload
-    // as an ArrayBuffer, answered with [id][response], no base64 and no evaluated
-    // script
+    // replies to the async calls of the page, kept from its "init" message
+    @Volatile private var replyProxy: JavaScriptReplyProxy? = null
+
+    // A message posted to fullstackedBridge (see createWebView): "init" to keep the
+    // reply proxy, or a large async call as an ArrayBuffer
     fun onCallMessage(message: WebMessageCompat, replyProxy: JavaScriptReplyProxy) {
+        if (message.type == WebMessageCompat.TYPE_STRING && message.data == "init") {
+            this.replyProxy = replyProxy
+            replyProxy.postMessage("ready")
+            return
+        }
         if (message.type != WebMessageCompat.TYPE_ARRAY_BUFFER) return
-        val payload = message.arrayBuffer
+        callAsync(message.arrayBuffer, replyProxy)
+    }
+
+    // A small async call, handed over without waiting for the core
+    @JavascriptInterface
+    fun callAsync(payloadBase64: String) {
+        val proxy = replyProxy ?: return
+        callAsync(Base64.getDecoder().decode(payloadBase64), proxy)
+    }
+
+    // Answered with [id][response], [id] alone when the core put a large response
+    // on the frame stream, no base64 and no evaluated script
+    private fun callAsync(payload: ByteArray, proxy: JavaScriptReplyProxy) {
         if (payload.size < 5) return
         val id = payload[1]
         coreExecutor.execute {
-            val response = Core.coreCall(payload)
-            val reply = ByteArray(response.size + 1)
+            val response = Core.callMessage(payload)
+            val reply = ByteArray((response?.size ?: 0) + 1)
             reply[0] = id
-            System.arraycopy(response, 0, reply, 1, response.size)
-            mainHandler.post { replyProxy.postMessage(reply) }
+            response?.copyInto(reply, 1)
+            mainHandler.post { proxy.postMessage(reply) }
         }
     }
 

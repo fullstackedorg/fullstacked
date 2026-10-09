@@ -13,6 +13,7 @@ namespace FullStacked
         public abstract void getCorePayloadCore(byte ctx, byte coreType, byte id, void* ptr, int size);
         public abstract int callCore(void* buffer, int length);
         public abstract void* callWithResponseCore(void* buffer, int length, int* size);
+        public abstract void* callMessageCore(void* buffer, int length, int* size);
         public abstract void freePtrCore(void* ptr);
         public abstract int streamAttachCore(byte ctxId);
         public abstract void* streamReadCore(byte ctxId, int gen, int* size);
@@ -113,6 +114,30 @@ namespace FullStacked
                 responsePtr = this.lib.callWithResponseCore(payloadPtr, payload.Length, &responseSize);
             }
             if (responsePtr == null || responseSize <= 0)
+            {
+                return [];
+            }
+            byte[] response = new byte[responseSize];
+            Marshal.Copy((IntPtr)responsePtr, response, 0, responseSize);
+            this.lib.freePtrCore(responsePtr);
+            return response;
+        }
+
+        // A call received on a message channel: the response, or null when the core
+        // queued it on the frame stream (large responses).
+        public byte[] callMessage(byte[] payload)
+        {
+            int responseSize = 0;
+            void* responsePtr;
+            fixed (byte* payloadPtr = payload)
+            {
+                responsePtr = this.lib.callMessageCore(payloadPtr, payload.Length, &responseSize);
+            }
+            if (responseSize < 0)
+            {
+                return null;
+            }
+            if (responsePtr == null || responseSize == 0)
             {
                 return [];
             }

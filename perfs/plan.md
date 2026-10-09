@@ -455,7 +455,7 @@ Each stage is measured with `bench` on every platform before and after. A stage 
 - Workers: async calls still go through the main thread (`relayCall`), which records the streams they open to hand them their frames (a worker has no `/stream` reader). Sync calls of a worker post `POST /sync` themselves (a stream opened by a sync call of a worker was not forwarded before either).
 - Android: `shouldInterceptRequest` has no request body. Async calls are posted to a `WebViewCompat.addWebMessageListener` object (`fullstackedBridge`, origin `http://localhost`, main frame) as `ArrayBuffer` and answered `[id][response]` through the `JavaScriptReplyProxy`, run in order on a single thread executor per webview. Gated on `WEB_MESSAGE_LISTENER` and `WEB_MESSAGE_ARRAY_BUFFER` (androidx.webkit 1.14.0), otherwise the page keeps `android.coreCall`. Sync calls of the page stay on `@JavascriptInterface`; workers keep the relay and `/sync/{id}`, so the Kotlin awaiters stay for them.
 
-**Results** (`stage3-569565cc` → `stage4-2fa81d65`, Qt and Node not run yet):
+**Results** (`stage3-569565cc` → `stage4-2fa81d65`):
 
 | | noop async | concurrent x32 | echo async 64k | readFile 64k |
 |---|---|---|---|---|
@@ -464,11 +464,13 @@ Each stage is measured with `bench` on every platform before and after. A stage 
 | Android | 0.44 → 1.02 ms | 2.5k → 3.7k ops/s | 7.3 → 3.1 ms | 6.1 → 3.5 ms |
 | GTK | 0.163 → 0.185 ms | 83k → 34k ops/s | 2.88 → 0.36 ms | 1.13 → 0.31 ms |
 | Windows | 0.38 → 2.11 ms | 25.3k → 985 ops/s | 3.3 → 4.8 ms | 2.6 → 4.6 ms |
+| Qt (6.7+) | 0.185 → 0.374 ms | 45.4k → 8.3k ops/s | 3.63 → 0.74 ms | 1.32 → 0.52 ms |
+| Node | 0.575 → 0.587 ms | 2.1k → 3.0k ops/s | 1.85 → 0.75 ms | 0.86 → 0.80 ms |
 
-- Large payloads win where the request path is cheap: GTK 64k echo 8×, Android 64k echo 2.4×, GTK file reads 3.6×, Android 1.7×, macOS 64k echo 1.4×.
-- Every async call is now its own custom-scheme request, whose fixed cost is larger than a small message: small async calls are slower on every platform and concurrency dropped on Apple and GTK (Android gained, its old path blocked the JS thread for the whole call).
+- Large payloads win where the request path is cheap: GTK 64k echo 8×, Qt 4.9×, Android 2.4×, macOS 1.4×, file reads 3.6× on GTK, 2.5× on Qt, 1.7× on Android.
+- Every async call is now its own custom-scheme request, whose fixed cost is larger than a small message: small async calls are slower on every platform and concurrency dropped on Apple, GTK and Qt (Android gained, its old path blocked the JS thread for the whole call).
 - Windows regressed on everything async: `WebResourceRequested` costs ~1.8 ms per request with little parallelism (the browser process calls into the app's UI thread through COM and a deferral), more than base64 and script evaluation cost even at 64k. Sync calls stayed where they were (~2 ms), they already went through it.
-- Streams are unchanged (Stage 3 path).
+- Streams are unchanged (Stage 3 path). Node did not change in this stage (it already posted its calls), its differences are run to run variation.
 - Exit criteria: 64k echo improves on every native platform except Windows; `noop` latency stays below Node's (0.575 ms) everywhere except Windows and Android.
 - This led to the revised Stage 5 below.
 
@@ -486,9 +488,34 @@ Each stage is measured with `bench` on every platform before and after. A stage 
 - **Large requests** (16 KB and up) keep `POST /call` (Android: an `ArrayBuffer` message), except on Windows where POST lost at every size.
 - **Large responses on `/stream`:** the request does not predict the response size (`readFile` posts a few bytes and gets 64 KB back). `callMessage` is a core export like `callWithResponse`: when the response is 16 KB or more and a frame reader is attached, it queues it as a response frame (`[callId][3][len][response]`) and the message reply is empty; otherwise the reply is the response. The page takes the response from whichever arrives.
 - **Sync calls** stay on `POST /sync` (single hop, no regression anywhere).
-- Qt and Node keep their Stage 4 path for now.
+- Qt: small requests on its QWebChannel message (its Stage 3 path, 0.185 ms noop against 0.374 ms posted), large ones posted (Qt ≥ 6.7). Node keeps its Stage 4 path.
 
 **Exit:** small async calls and concurrency at or better than Stage 3 on every platform, 64k echo and file reads at or better than Stage 4.
+
+**Implementation notes:**
+
+- Core: `callMessage(buffer, length, *size)` (`router.CallForMessage`) processes a call received on a message channel. A response of 16 KB or more is queued as a response frame (flag 3, the frame id is the call id) when a frame reader is attached and `*size` is -1: the host replies empty. Errors come back as error responses, so an empty reply always means "on the frame stream".
+- JS: `bridge/responses.ts` holds the response frames until the call takes them (the frame and the empty reply travel on different channels). `transport.ts` `hybridCall(messageCall, postMinSize)` sends requests under 16 KB on the message channel and posts larger ones; calls of both sizes can reach the host in another order than they were made, like any two calls not awaited in turn.
+- Apple: `CallHandler` is a `WKScriptMessageHandlerWithReply` named `call`, the call runs on the `RequestHandler` core queue and the base64 reply resolves the page's `postMessage` promise.
+- GTK: `call` is registered with `webkit_user_content_manager_register_script_message_handler_with_reply`, the reply is a `JSCValue` string returned on the main loop. The single-thread core pool now runs generic tasks for both POST and message calls.
+- Windows: `chrome.webview.postMessage(base64)` → `WebMessageReceived` → core queue → replies batched per UI tick in one `PostWebMessageAsString("R<id>:<base64>;...")`. Every async call takes this path, POST lost at every size there. Sync calls stay on `POST /sync`.
+- Qt: async messages over QWebChannel use `callMessage` (empty `respond` when framed); Qt ≥ 6.7 posts requests of 16 KB and more, older Qt sends everything as messages.
+- Android: the page posts `init` to the web message listener so the host keeps its `JavaScriptReplyProxy`, then small calls go to `android.callAsync(base64)` (returns at once, the call runs on the core thread) and large ones are posted to the listener as an `ArrayBuffer`. Replies are `[id][response]` through the proxy, `[id]` alone when framed. Replying from the core thread instead of the UI thread made no difference (tried). Without the listener the page keeps the Stage 3 path.
+
+**First runs** (macOS and Android measured here, the other platforms to bench):
+
+| | Stage 3 | Stage 4 | Stage 5 |
+|---|---|---|---|
+| macOS noop async | 0.065 ms | 0.112 ms | 0.057-0.075 ms |
+| macOS concurrent x32 | 100k | 25k | 75-83k ops/s |
+| macOS echo async 64k | 0.26 ms | 0.19 ms | 0.20-0.22 ms |
+| macOS readFile 64k | 0.17 ms | 0.18 ms | 0.14-0.15 ms |
+| Android noop async | 0.44 ms | 1.02 ms | 0.65-0.68 ms |
+| Android concurrent x32 | 2.5k | 3.7k | 2.7-3.0k ops/s |
+| Android echo async 64k | 17 MB/s | ~42 MB/s | 45-48 MB/s |
+| Android readFile 64k | 10.5 MB/s | ~19 MB/s | 28-30 MB/s |
+
+- Android small async calls stay above Stage 3: Stage 3 ran the core call on the JavaBridge thread while the page waited, which blocked JavaScript for slow calls; the Stage 5 call returns at once and the reply goes through the proxy.
 
 ### Stage 6: Package
 

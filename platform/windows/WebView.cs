@@ -54,6 +54,11 @@ namespace FullStacked
         private readonly object coreQueueLock = new();
         private Task coreQueue = Task.CompletedTask;
 
+        // replies to the call messages of the page, posted once per UI thread tick
+        private readonly object replyLock = new();
+        private StringBuilder pendingReplies = new();
+        private bool replyFlushScheduled = false;
+
         // responses and stream chunks received between two UI thread ticks are
         // evaluated in one script
         private readonly object scriptLock = new();
@@ -239,6 +244,11 @@ namespace FullStacked
 
                 var coreWebView2 = this.coreWebView2 = this.controller.CoreWebView2;
 
+            // async calls of the page, see bridge/platform/windows.ts
+            coreWebView2.WebMessageReceived += delegate (CoreWebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
+            {
+                this.enqueueMessageCall(args.TryGetWebMessageAsString());
+            };
             coreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
             coreWebView2.WebResourceRequested += async delegate (CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs args)
             {
@@ -493,6 +503,64 @@ namespace FullStacked
             Task<byte[]> call = this.coreQueue.ContinueWith(_ => App.core.call(payload), TaskScheduler.Default);
             this.coreQueue = call;
             return call;
+        }
+    }
+
+    // A call message: the payload in base64, replied "<id>:<base64>", empty when the
+    // core put a large response on the frame stream
+    private void enqueueMessageCall(string base64)
+    {
+        lock (this.coreQueueLock)
+        {
+            this.coreQueue = this.coreQueue.ContinueWith(_ =>
+            {
+                try
+                {
+                    byte[] payload = Convert.FromBase64String(base64);
+                    byte[] response = App.core.callMessage(payload);
+                    this.queueReply(payload[1] + ":" + (response == null ? "" : Convert.ToBase64String(response)));
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error in call message: {ex}");
+                }
+            }, TaskScheduler.Default);
+        }
+    }
+
+    private void queueReply(string reply)
+    {
+        bool schedule;
+        lock (this.replyLock)
+        {
+            if (this.pendingReplies.Length > 0)
+            {
+                this.pendingReplies.Append(';');
+            }
+            this.pendingReplies.Append(reply);
+            schedule = !this.replyFlushScheduled;
+            this.replyFlushScheduled = true;
+        }
+
+        if (schedule)
+        {
+            this.uiQueue.TryEnqueue(DispatcherQueuePriority.High, this.flushReplies);
+        }
+    }
+
+    private void flushReplies()
+    {
+        string replies;
+        lock (this.replyLock)
+        {
+            replies = this.pendingReplies.ToString();
+            this.pendingReplies.Clear();
+            this.replyFlushScheduled = false;
+        }
+
+        if (replies.Length > 0)
+        {
+            this.coreWebView2?.PostWebMessageAsString("R" + replies);
         }
     }
 

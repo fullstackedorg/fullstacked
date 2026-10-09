@@ -1,8 +1,18 @@
 import type { PlatformBridge } from "./index.ts";
-import { toByteArray } from "../base64.ts";
+import { fromByteArray, toByteArray } from "../base64.ts";
 import { isWorker } from "../isWorker.ts";
 import { readFrameStream } from "../frames.ts";
-import { postCall, postSync, relayCall } from "./transport.ts";
+import { hybridCall, postSync, relayCall } from "./transport.ts";
+
+// Small async calls: WKScriptMessageHandlerWithReply resolves the reply,
+// the response in base64, empty when the host put it on the frame stream
+async function messageCall(payload: ArrayBuffer) {
+    const response: string =
+        await globalThis.webkit.messageHandlers.call.postMessage(
+            fromByteArray(new Uint8Array(payload))
+        );
+    return response ? toByteArray(response).buffer : null;
+}
 
 const clipboardResponsePromises = new Map<number, (response: string) => void>();
 
@@ -75,7 +85,7 @@ export async function BridgeAppleInit(): Promise<PlatformBridge> {
 
     return {
         ctx,
-        Async: isWorker ? relayCall : postCall,
+        Async: isWorker ? relayCall : hybridCall(messageCall),
         Sync: postSync
     };
 }

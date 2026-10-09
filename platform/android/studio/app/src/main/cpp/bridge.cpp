@@ -122,6 +122,34 @@ JNIEXPORT void JNICALL Java_org_fullstacked_Core_streamDetach
     streamDetach(static_cast<uint8_t>(ctxId), gen);
 }
 
+// A call received on a message channel: null when the core put a large
+// response on the frame stream
+JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_callMessage
+        (JNIEnv *env, jobject thiz, jbyteArray payload) {
+    int length = env->GetArrayLength(payload);
+    jbyte* buffer = env->GetByteArrayElements(payload, nullptr);
+
+    int size = 0;
+    void* response = callMessage(static_cast<void*>(buffer), length, &size);
+
+    env->ReleaseByteArrayElements(payload, buffer, JNI_ABORT);
+
+    if (size < 0) {
+        return nullptr;
+    }
+    if (response == nullptr || size == 0) {
+        return env->NewByteArray(0);
+    }
+
+    jbyteArray result = env->NewByteArray(size);
+    if (result != nullptr) {
+        env->SetByteArrayRegion(result, 0, size, static_cast<const jbyte*>(response));
+    }
+    freePtr(response);
+
+    return result;
+}
+
 JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_getCorePayload
         (JNIEnv *env, jobject thiz, jint ctx, jint coreType, jint id, jint size) {
     jbyteArray response = env->NewByteArray(size);

@@ -35,6 +35,32 @@ class WeakMessageHandler: NSObject, WKScriptMessageHandler {
     }
 }
 
+// Small async calls of the page: the payload in base64, replied with the
+// response in base64, or an empty string when the core put a large response
+// on the frame stream. Run in order with the other calls of the page.
+class CallHandler: NSObject, WKScriptMessageHandlerWithReply {
+    weak var requestHandler: RequestHandler?
+    
+    init(_ requestHandler: RequestHandler) {
+        self.requestHandler = requestHandler
+    }
+    
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping (Any?, String?) -> Void) {
+        guard let body = message.body as? String,
+              let payload = Data(base64Encoded: body),
+              let requestHandler else {
+            replyHandler(nil, "invalid call")
+            return
+        }
+        requestHandler.coreQueue.async {
+            let response = coreCallMessage(payload: payload)?.base64EncodedString() ?? ""
+            DispatchQueue.main.async {
+                replyHandler(response, nil)
+            }
+        }
+    }
+}
+
 class WebViewOpen: NSObject, WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         let ctx = UInt8(truncating: message.body as! NSNumber)
@@ -109,6 +135,7 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKDownloadDelegate, Codabl
         
         self.isInspectable = true
         self.navigationDelegate = self
+        userContentController.addScriptMessageHandler(CallHandler(self.requestHandler), contentWorld: .page, name: "call")
         userContentController.add(WeakMessageHandler(self.open), name: "open")
         userContentController.add(WeakMessageHandler(self.closer), name: "exit")
         
@@ -263,7 +290,7 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKDownloadDelegate, Codabl
 class RequestHandler: NSObject, WKURLSchemeHandler {
     var ctx: UInt8
     // core calls of this webview run in order, off the main thread
-    private let coreQueue = DispatchQueue(label: "org.fullstacked.core", qos: .userInitiated)
+    let coreQueue = DispatchQueue(label: "org.fullstacked.core", qos: .userInitiated)
     private var stoppedTasks = Set<ObjectIdentifier>()
     private let tasksLock = NSLock()
     // GET /stream tasks and their reader generation, main thread only

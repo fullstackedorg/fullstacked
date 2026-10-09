@@ -3,7 +3,8 @@
 // evaluating a script per chunk.
 //
 // Frame: [streamId u8][flags u8][length u32 big endian][data]
-// flags: 0 data, 1 end, 2 error (data is the error message)
+// flags: 0 data, 1 end, 2 error (data is the error message), 3 response of
+// a call (the frame id is the call id)
 //
 // The host attaches a reader with Attach, which returns a generation and
 // queues a hello frame (stream 0, empty) so the page knows data flows. Read
@@ -22,6 +23,9 @@ const (
 	FlagData  uint8 = 0
 	FlagEnd   uint8 = 1
 	FlagError uint8 = 2
+	// the response of a call sent on a message channel, the frame id is
+	// the call id (see router.CallForMessage)
+	FlagResponse uint8 = 3
 
 	HeaderSize = 6
 

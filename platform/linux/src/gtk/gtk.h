@@ -35,8 +35,15 @@ class WebkitGTKWindow : public Window {
         // webview (ref'd), the window is looked up from it once on the main
         // thread since it may have closed in between
         static WebkitGTKWindow *fromWebView(WebKitWebView *view);
-        static void runCallTask(gpointer data, gpointer userData);
-        static gboolean dispatchCallResult(gpointer userData);
+        // core pool and main loop tasks are std::function<void()>
+        static void runCoreTask(gpointer data, gpointer userData);
+        static gboolean runMainTask(gpointer data);
+        void pushCoreTask(std::function<void()> task);
+        static void runOnMain(std::function<void()> task);
+        static gboolean onCallMessage(WebKitUserContentManager *manager,
+                                      JSCValue *value,
+                                      WebKitScriptMessageReply *reply,
+                                      gpointer userData);
         static void runStaticFileTask(gpointer data, gpointer userData);
         static gboolean dispatchStaticFileResult(gpointer userData);
         static gboolean flushScripts(gpointer userData);

@@ -149,6 +149,22 @@ func callWithResponse(buffer unsafe.Pointer, length C.int, size *C.int) unsafe.P
 	return C.CBytes(response)
 }
 
+// callMessage processes a call received on a message channel (see
+// router.CallForMessage). Returns the response in a buffer of *size bytes
+// freed with freePtr, or nil with *size -1 when the response was queued on
+// the frame stream: the reply carries nothing then.
+//
+//export callMessage
+func callMessage(buffer unsafe.Pointer, length C.int, size *C.int) unsafe.Pointer {
+	response, framed := router.CallForMessage(C.GoBytes(buffer, length))
+	if framed {
+		*size = -1
+		return nil
+	}
+	*size = C.int(len(response))
+	return C.CBytes(response)
+}
+
 // streamAttach makes the caller the reader of the stream frames of the
 // context (GET /stream), see package frames. Returns the reader generation
 // to pass to streamRead and streamDetach, or -1 for an unknown context.

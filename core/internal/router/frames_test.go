@@ -116,3 +116,47 @@ func TestStreamFramesEndContext(t *testing.T) {
 		t.Fatal("reader should end with the context")
 	}
 }
+
+func echoPayload(t *testing.T, ctx uint8, id uint8, data []byte) []byte {
+	payload := []byte{ctx, id, types.Test, test.BenchEcho, 0}
+	serialized, err := serialization.Serialize(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return append(payload, serialized...)
+}
+
+// a large response of a message call goes on the frame stream when a reader
+// is attached, small ones and errors come back in the reply
+func TestCallForMessage(t *testing.T) {
+	ctxId := store.NewContext(t.TempDir(), t.TempDir(), true)
+	defer store.EndContext(ctxId)
+	ctx, _ := store.GetContext(ctxId)
+
+	small, framed := CallForMessage(echoPayload(t, ctxId, 7, []byte("hi")))
+	if framed || small[0] != types.CoreResponseData {
+		t.Fatalf("small response %v framed %v", small, framed)
+	}
+
+	big := make([]byte, ResponseFrameMinSize)
+	inline, framed := CallForMessage(echoPayload(t, ctxId, 8, big))
+	if framed || len(inline) < len(big) {
+		t.Fatalf("without a reader the response is inline, framed %v", framed)
+	}
+
+	gen := ctx.Frames.Attach()
+	ctx.Frames.Read(gen)
+	reply, framed := CallForMessage(echoPayload(t, ctxId, 9, big))
+	if !framed || reply != nil {
+		t.Fatalf("large response not framed: %d bytes", len(reply))
+	}
+	buf := ctx.Frames.Read(gen)
+	if buf[0] != 9 || buf[1] != frames.FlagResponse || !bytes.Equal(buf[frames.HeaderSize:], inline) {
+		t.Fatalf("response frame %v", buf[:frames.HeaderSize])
+	}
+
+	failed, framed := CallForMessage([]byte{ctxId, 10})
+	if framed || failed[0] != types.CoreResponseError {
+		t.Fatalf("error response %v", failed)
+	}
+}

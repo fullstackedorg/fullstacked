@@ -24,6 +24,10 @@ class Core {
         static void stop(uint8_t ctxId);
         static std::vector<uint8_t>
         callCore(const std::vector<uint8_t> &payload);
+        // a call received on a message channel: framed is true when the
+        // core put a large response on the frame stream, the reply is empty
+        static std::vector<uint8_t>
+        callMessage(const std::vector<uint8_t> &payload, bool &framed);
         static void setStreamCallback(StreamDataCallback cb);
 
         // Stream data of a context as binary frames for GET /stream, see

@@ -14,6 +14,22 @@ func coreCall(payload: Data) -> Data {
     }))
 }
 
+// A call received on a message channel: the response, or nil when the core
+// queued it on the frame stream (large responses).
+func coreCallMessage(payload: Data) -> Data? {
+    var size: Int32 = 0
+    let responsePtr = callMessage(payload.ptr(), Int32(payload.count), &size)
+    if size < 0 {
+        return nil
+    }
+    guard let responsePtr, size > 0 else {
+        return Data()
+    }
+    return Data(bytesNoCopy: responsePtr, count: Int(size), deallocator: .custom({ ptr, _ in
+        freePtr(ptr)
+    }))
+}
+
 // Calls Core Fn DeepLink in ctx: the deeplink plugins of ctx receive url.
 // Returns how many plugins were called.
 func coreDeepLink(ctx: UInt8, url: String) -> Int {
