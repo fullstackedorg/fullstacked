@@ -584,7 +584,7 @@ gboolean WebkitGTKWindow::onCallMessage(WebKitUserContentManager *manager,
                                         gpointer userData) {
     auto *win = static_cast<WebkitGTKWindow *>(userData);
     char *message = jsc_value_to_string(value);
-    std::string decoded = base64_decode(message ? message : "");
+    std::string decoded = base64_decode(std::string(message ? message : ""));
     g_free(message);
     std::vector<uint8_t> payload(decoded.begin(), decoded.end());
 
