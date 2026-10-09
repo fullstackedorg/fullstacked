@@ -1,4 +1,5 @@
-// Receives bench results uploaded from devices with the shell's curl.
+// Receives bench results uploaded from devices with the shell's curl, and
+// serves the results viewer (perfs/viewer) at http://localhost:<port>/.
 //
 //   node perfs/server.ts [port]
 //
@@ -15,6 +16,7 @@ import url from "node:url";
 
 const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
 const benchDirectory = path.resolve(currentDirectory, "bench");
+const viewerDirectory = path.resolve(currentDirectory, "viewer");
 const port = parseInt(process.argv[2] ?? process.env.PORT ?? "8000");
 const maxBodySize = 50 * 1024 * 1024;
 
@@ -79,14 +81,83 @@ function resolveTarget(requestUrl: string) {
     return target;
 }
 
+const mimeTypes: Record<string, string> = {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".json": "application/json"
+};
+
+// stages and platform files under perfs/bench, for the viewer
+function benchIndex() {
+    if (!fs.existsSync(benchDirectory)) return { stages: [] };
+    const stages = fs
+        .readdirSync(benchDirectory, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => {
+            const [stage, commit] = entry.name.split("-");
+            const files = fs
+                .readdirSync(path.join(benchDirectory, entry.name))
+                .filter((file) => file.endsWith(".json"))
+                .sort();
+            return { id: entry.name, stage, commit: commit ?? "", files };
+        })
+        .filter((stage) => stage.files.length > 0);
+    return { stages };
+}
+
+function resolveStatic(requestUrl: string) {
+    const pathname = decodeURIComponent(
+        new URL(requestUrl, "http://localhost").pathname
+    );
+    if (pathname === "/" || pathname === "/index.html") {
+        return path.join(viewerDirectory, "index.html");
+    }
+    const root = pathname.startsWith("/bench/")
+        ? benchDirectory
+        : pathname.startsWith("/viewer/")
+          ? viewerDirectory
+          : null;
+    if (!root) return null;
+    const target = path.resolve(root, "." + pathname.replace(/^\/[^/]+/, ""));
+    if (!target.startsWith(root + path.sep)) return null;
+    return target;
+}
+
+function serveGet(req: http.IncomingMessage, res: http.ServerResponse) {
+    const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
+    if (pathname === "/bench/index.json") {
+        res.writeHead(200, {
+            "Content-Type": mimeTypes[".json"],
+            "Cache-Control": "no-store"
+        });
+        return res.end(JSON.stringify(benchIndex()));
+    }
+    const target = resolveStatic(req.url ?? "/");
+    if (!target || !fs.existsSync(target) || !fs.statSync(target).isFile()) {
+        res.writeHead(404, { "Content-Type": "text/plain" });
+        return res.end("not found\n");
+    }
+    res.writeHead(200, {
+        "Content-Type":
+            mimeTypes[path.extname(target)] ?? "application/octet-stream",
+        "Cache-Control": "no-store"
+    });
+    fs.createReadStream(target).pipe(res);
+}
+
 const server = http.createServer((req, res) => {
     const reply = (status: number, message: string) => {
         res.writeHead(status, { "Content-Type": "text/plain" });
         res.end(message + "\n");
     };
 
+    if (req.method === "GET" || req.method === "HEAD") {
+        return serveGet(req, res);
+    }
+
     if (req.method !== "POST" && req.method !== "PUT") {
-        return reply(405, "use POST or PUT");
+        return reply(405, "use GET, POST or PUT");
     }
 
     const chunks: Buffer[] = [];
@@ -134,6 +205,7 @@ server.listen(port, "0.0.0.0", () => {
     console.log(
         `Receiving bench results into ${path.relative(process.cwd(), benchDirectory) || "."}`
     );
+    console.log(`Results viewer at http://localhost:${port}/`);
     if (addresses.length === 0) {
         console.log(`No private IPv4 address found, listening on port ${port}`);
     }

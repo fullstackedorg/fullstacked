@@ -300,6 +300,20 @@ curl -F file=@output.json http://192.168.1.10:8000/stage1-5ffcd9c6/android.json
 
 The file lands in `perfs/bench/stage1-5ffcd9c6/android.json`, ready to commit.
 
+### 4.6. Viewing Results Across Stages
+
+The same server serves a small viewer for everything under `perfs/bench/`:
+
+```sh
+node perfs/server.ts
+```
+
+Open `http://localhost:8000/`. The viewer (`perfs/viewer/`, plain HTML/CSS/JS, no dependencies) reads `GET /bench/index.json` and the result files, then shows:
+
+- one line chart per benchmark with a line per platform across stages, pick the metric (ops/s, MB/s, mean, p95, ...) at the top
+- platform toggles, and a baseline/compare stage pair that drives the per-platform summary tiles (geometric mean of the improvement over all benchmarks) and the Δ column
+- click a chart for a larger version with a per-stage table
+
 ---
 
 ## 5. Target architecture: one transport
