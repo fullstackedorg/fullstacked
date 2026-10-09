@@ -7,9 +7,15 @@ import { isWorker } from "../isWorker.ts";
 // the bridge replaces globalThis.fetch with the core fetch
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
+// Qt (6.8) reads a request body past its end unless the host reads exactly
+// its size, which it gets from this header (no Content-Length reaches the
+// scheme handler). Other hosts ignore it.
+const BODY_SIZE_HEADER = "X-Body-Size";
+
 export async function postCall(payload: ArrayBuffer): Promise<ArrayBuffer> {
     const response = await nativeFetch("/call", {
         method: "POST",
+        headers: { [BODY_SIZE_HEADER]: String(payload.byteLength) },
         body: payload,
         cache: "no-store"
     });
@@ -22,6 +28,7 @@ export async function postCall(payload: ArrayBuffer): Promise<ArrayBuffer> {
 export function postSync(payload: ArrayBuffer): ArrayBuffer {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/sync", false);
+    xhr.setRequestHeader(BODY_SIZE_HEADER, String(payload.byteLength));
     // a sync XHR of a page cannot ask for an arraybuffer, x-user-defined
     // maps each byte to one char
     if (isWorker) {

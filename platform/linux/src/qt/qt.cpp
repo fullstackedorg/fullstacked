@@ -23,6 +23,7 @@
 #include <QWebEngineScriptCollection>
 #include <QWebEngineSettings>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <thread>
 
@@ -111,12 +112,47 @@ qint64 FrameDevice::readData(char *data, qint64 maxSize) {
     return n;
 }
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+// The body device is handed over closed, and its size and atEnd say
+// nothing. Past a first read, a read restarts from the start of the body
+// and only ends once the bytes read add up to the body size, so a body read
+// in chunks comes back wrong or without end (Qt 6.8). Read all of it at
+// once with the size the page sends in X-Body-Size. Empty when missing or
+// short.
+static QByteArray readRequestBody(QWebEngineUrlRequestJob *job) {
+    QIODevice *device = job->requestBody();
+    if (!device ||
+        (!device->isOpen() && !device->open(QIODevice::ReadOnly))) {
+        return {};
+    }
+
+    bool ok = false;
+    qint64 size = job->requestHeaders().value("X-Body-Size").toLongLong(&ok);
+    if (!ok || size <= 0 || size > std::numeric_limits<int>::max()) {
+        return {};
+    }
+
+    QByteArray body(static_cast<qsizetype>(size), Qt::Uninitialized);
+    qint64 read = 0;
+    // one read per element of the body, one for an ArrayBuffer
+    while (read < size) {
+        qint64 n = device->read(body.data() + read, size - read);
+        if (n <= 0) return {};
+        read += n;
+    }
+    return body;
+}
+#endif
+
 // POST /call and /sync: the body is the payload, the response the core
 // response; sync is a sync XHR of the page, the same for the host
 void QtWindow::handleCall(QWebEngineUrlRequestJob *job) {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
-    QByteArray body = job->requestBody() ? job->requestBody()->readAll()
-                                         : QByteArray();
+    QByteArray body = readRequestBody(job);
+    if (body.isEmpty()) {
+        job->fail(QWebEngineUrlRequestJob::RequestFailed);
+        return;
+    }
     QPointer<QWebEngineUrlRequestJob> target(job);
     corePool->start([body, target]() {
         std::vector<uint8_t> payload(body.begin(), body.end());
