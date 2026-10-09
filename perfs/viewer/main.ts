@@ -1,7 +1,40 @@
-// Bench results viewer. Served by `node perfs/server.ts`, which exposes
-// GET /bench/index.json (stages and platform files) and the JSON files.
+// Bench results viewer. Runs as a FullStacked project rooted at perfs/
+// (`npm start -- fullstacked perfs`) and reads the results from perfs/bench with fs.
 
-const PLATFORMS = [
+import fs from "node:fs";
+
+type Platform = { id: string; label: string };
+
+type Metric = {
+    label: string;
+    unit?: string;
+    higher?: boolean;
+};
+
+type Stage = {
+    id: string;
+    stage: string;
+    commit: string;
+    files: string[];
+    order: number;
+};
+
+type BenchResult = { name: string; suite: string; [key: string]: unknown };
+
+type BenchFile = { results?: BenchResult[] };
+
+type Benchmark = { name: string; suite: string; metrics: Set<string> };
+
+type Series = {
+    platform: Platform;
+    slot: number;
+    values: (number | null)[];
+    plot: (number | null)[];
+};
+
+const benchDirectory = "/bench";
+
+const PLATFORMS: Platform[] = [
     { id: "apple-macos", label: "macOS" },
     { id: "apple-ios", label: "iOS" },
     { id: "android", label: "Android" },
@@ -11,7 +44,7 @@ const PLATFORMS = [
     { id: "node", label: "Node" }
 ];
 
-const METRICS = {
+const METRICS: Record<string, Metric> = {
     auto: { label: "Auto (ops/s, MB/s for streams)" },
     opsPerSec: { label: "Throughput (ops/s)", unit: "ops/s", higher: true },
     mbPerSec: { label: "Throughput (MB/s)", unit: "MB/s", higher: true },
@@ -25,10 +58,15 @@ const METRICS = {
     durationMs: { label: "Duration (ms)", unit: "ms", higher: false }
 };
 
-const AUTO_METRIC = { stream: "mbPerSec" };
+const AUTO_METRIC: Record<string, string> = { stream: "mbPerSec" };
 
-const $ = (id) => document.getElementById(id);
-const el = (tag, attrs = {}, children = []) => {
+const $ = <T extends HTMLElement = HTMLElement>(id: string) =>
+    document.getElementById(id) as T;
+const el = (
+    tag: string,
+    attrs: Record<string, any> = {},
+    children: (Node | string | null) | (Node | string | null)[] = []
+) => {
     const node = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs)) {
         if (k === "class") node.className = v;
@@ -44,34 +82,57 @@ const el = (tag, attrs = {}, children = []) => {
     }
     return node;
 };
-const svgEl = (tag, attrs = {}) => {
+const svgEl = (tag: string, attrs: Record<string, string | number> = {}) => {
     const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
-    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
     return node;
 };
 
 const state = {
-    stages: [], // [{ id, stage, commit, order }]
-    data: {}, // data[stageId][platformId] = parsed json
-    benchmarks: [], // [{ name, suite, metrics: Set }]
+    stages: [] as Stage[],
+    data: {} as Record<string, Record<string, BenchFile>>, // data[stageId][platformId]
+    benchmarks: [] as Benchmark[],
     metric: "auto",
     scale: "absolute", // absolute | relative (× vs baseline stage)
-    baseline: null,
-    compare: null,
+    baseline: null as string | null,
+    compare: null as string | null,
     enabled: new Set(PLATFORMS.map((p) => p.id)),
-    detail: null
+    detail: null as Benchmark | null
 };
 
 // ---------- loading ----------
 
-async function load() {
-    const index = await fetchJson("/bench/index.json");
-    state.stages = index.stages
-        .map((s) => ({
-            ...s,
-            order: parseInt(s.stage.replace(/\D/g, "")) || 0
-        }))
+// stages and platform files under perfs/bench
+async function benchIndex(): Promise<Stage[]> {
+    const entries = await fs.promises.readdir(benchDirectory, {
+        withFileTypes: true
+    });
+    const stages = await Promise.all(
+        entries
+            .filter((entry) => entry.isDirectory())
+            .map(async (entry) => {
+                const [stage, commit] = entry.name.split("-");
+                const files = (
+                    await fs.promises.readdir(`${benchDirectory}/${entry.name}`)
+                )
+                    .filter((file) => file.endsWith(".json"))
+                    .sort();
+                return {
+                    id: entry.name,
+                    stage,
+                    commit: commit ?? "",
+                    files,
+                    order: parseInt(stage.replace(/\D/g, "")) || 0
+                };
+            })
+    );
+    return stages
+        .filter((stage) => stage.files.length > 0)
         .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+}
+
+async function load() {
+    state.stages = await benchIndex();
 
     await Promise.all(
         state.stages.map(async (stage) => {
@@ -80,8 +141,8 @@ async function load() {
                 stage.files.map(async (file) => {
                     const platform = file.replace(/\.json$/, "");
                     try {
-                        state.data[stage.id][platform] = await fetchJson(
-                            `/bench/${stage.id}/${file}`
+                        state.data[stage.id][platform] = await readJson(
+                            `${benchDirectory}/${stage.id}/${file}`
                         );
                     } catch (e) {
                         console.warn(`skipping ${stage.id}/${file}: ${e}`);
@@ -91,7 +152,7 @@ async function load() {
         })
     );
 
-    const seen = new Map();
+    const seen = new Map<string, Benchmark>();
     for (const stage of state.stages) {
         for (const json of Object.values(state.data[stage.id])) {
             for (const r of json.results ?? []) {
@@ -113,27 +174,32 @@ async function load() {
     state.compare = state.stages[state.stages.length - 1]?.id ?? null;
 }
 
-async function fetchJson(url) {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url}`);
-    return res.json();
+async function readJson(file: string) {
+    return JSON.parse(
+        await fs.promises.readFile(file, { encoding: "utf8" })
+    ) as BenchFile;
 }
 
 // ---------- data access ----------
 
-function metricFor(benchmark) {
+function metricFor(benchmark: Benchmark) {
     if (state.metric !== "auto") return state.metric;
     return AUTO_METRIC[benchmark.suite] ?? "opsPerSec";
 }
 
-function value(stageId, platformId, benchmarkName, metric) {
+function value(
+    stageId: string,
+    platformId: string,
+    benchmarkName: string,
+    metric: string
+) {
     const json = state.data[stageId]?.[platformId];
     const r = json?.results?.find((r) => r.name === benchmarkName);
     const v = r?.[metric];
     return typeof v === "number" ? v : null;
 }
 
-function seriesFor(benchmark, metric) {
+function seriesFor(benchmark: Benchmark, metric: string): Series[] {
     const baseIndex = state.stages.findIndex((s) => s.id === state.baseline);
     return PLATFORMS.filter((p) => state.enabled.has(p.id)).map((p) => {
         const values = state.stages.map((s) =>
@@ -149,7 +215,11 @@ function seriesFor(benchmark, metric) {
 }
 
 // ratio > 1 means compare is better than baseline, whatever the metric direction
-function improvement(baselineValue, compareValue, metric) {
+function improvement(
+    baselineValue: number | null,
+    compareValue: number | null,
+    metric: string
+) {
     if (baselineValue == null || compareValue == null) return null;
     if (baselineValue === 0 || compareValue === 0) return null;
     return METRICS[metric].higher
@@ -159,7 +229,7 @@ function improvement(baselineValue, compareValue, metric) {
 
 // ---------- formatting ----------
 
-function fmt(v, unit) {
+function fmt(v: number | null, unit: string) {
     if (v == null) return "–";
     if (unit === "ms")
         return v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2);
@@ -170,33 +240,33 @@ function fmt(v, unit) {
     return v.toFixed(1);
 }
 
-function fmtTick(v, unit) {
+function fmtTick(v: number, unit: string) {
     if (state.scale === "relative") return `${+v.toFixed(2)}×`;
     if (unit === "ms") return fmt(v, unit);
     if (v >= 1000) return (v / 1000).toFixed(v % 1000 === 0 ? 0 : 1) + "K";
     return String(v);
 }
 
-function fmtDelta(ratio) {
+function fmtDelta(ratio: number | null) {
     if (ratio == null) return "–";
     const pct = (ratio - 1) * 100;
     const sign = pct > 0 ? "+" : "";
     return `${sign}${pct.toFixed(pct > 100 || pct < -100 ? 0 : 1)}%`;
 }
 
-function deltaClass(ratio) {
+function deltaClass(ratio: number | null) {
     if (ratio == null) return "delta";
     if (ratio > 1.02) return "delta up";
     if (ratio < 0.98) return "delta down";
     return "delta";
 }
 
-function stageLabel(stage) {
+function stageLabel(stage: Stage) {
     return stage.stage;
 }
 
 // round tick step (1, 2, 2.5, 5 × 10^n) giving about `count` ticks up to max
-function niceTicks(max, count = 4) {
+function niceTicks(max: number, count = 4) {
     if (!(max > 0)) max = 1;
     const raw = max / count;
     const exp = Math.pow(10, Math.floor(Math.log10(raw)));
@@ -211,7 +281,12 @@ function niceTicks(max, count = 4) {
 
 // ---------- line chart ----------
 
-function renderLineChart(container, benchmark, metric, large) {
+function renderLineChart(
+    container: HTMLElement,
+    benchmark: Benchmark,
+    metric: string,
+    large: boolean
+) {
     container.replaceChildren();
     const series = seriesFor(benchmark, metric);
     const unit = METRICS[metric].unit;
@@ -231,8 +306,9 @@ function renderLineChart(container, benchmark, metric, large) {
     const scale = niceTicks(Math.max(...all));
     const yMax = scale.max;
     const n = state.stages.length;
-    const x = (i) => pad.left + (n === 1 ? plotW / 2 : (i * plotW) / (n - 1));
-    const y = (v) => pad.top + plotH - (v / yMax) * plotH;
+    const x = (i: number) =>
+        pad.left + (n === 1 ? plotW / 2 : (i * plotW) / (n - 1));
+    const y = (v: number) => pad.top + plotH - (v / yMax) * plotH;
 
     const svg = svgEl("svg", {
         viewBox: `0 0 ${width} ${height}`,
@@ -341,8 +417,8 @@ function renderLineChart(container, benchmark, metric, large) {
         for (let i = 1; i < n; i++) {
             if (Math.abs(x(i) - px) < Math.abs(x(best) - px)) best = i;
         }
-        crosshair.setAttribute("x1", x(best));
-        crosshair.setAttribute("x2", x(best));
+        crosshair.setAttribute("x1", String(x(best)));
+        crosshair.setAttribute("x2", String(x(best)));
         crosshair.setAttribute("visibility", "visible");
         showTooltip(e, benchmark, metric, series, best);
     });
@@ -356,7 +432,13 @@ function renderLineChart(container, benchmark, metric, large) {
 
 // ---------- tooltip ----------
 
-function showTooltip(e, benchmark, metric, series, stageIndex) {
+function showTooltip(
+    e: PointerEvent,
+    benchmark: Benchmark,
+    metric: string,
+    series: Series[],
+    stageIndex: number
+) {
     const tip = $("tooltip");
     const stage = state.stages[stageIndex];
     const unit = METRICS[metric].unit;
@@ -407,17 +489,17 @@ function hideTooltip() {
 // ---------- views ----------
 
 function renderFilters() {
-    const metric = $("metric");
+    const metric = $<HTMLSelectElement>("metric");
     metric.replaceChildren(
         ...Object.entries(METRICS).map(([id, m]) =>
             el("option", { value: id }, m.label)
         )
     );
     metric.value = state.metric;
-    $("scale").value = state.scale;
+    $<HTMLSelectElement>("scale").value = state.scale;
 
-    for (const id of ["baseline", "compare"]) {
-        const select = $(id);
+    for (const id of ["baseline", "compare"] as const) {
+        const select = $<HTMLSelectElement>(id);
         select.replaceChildren(
             ...state.stages.map((s) => el("option", { value: s.id }, s.id))
         );
@@ -510,7 +592,7 @@ function renderGrid() {
                 role: "button",
                 tabindex: "0",
                 onclick: () => openDetail(b),
-                onkeydown: (e) => {
+                onkeydown: (e: KeyboardEvent) => {
                     if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
                         openDetail(b);
@@ -530,7 +612,7 @@ function renderGrid() {
     }
 }
 
-function openDetail(benchmark) {
+function openDetail(benchmark: Benchmark) {
     state.detail = benchmark;
     renderDetail();
     $("detail").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -613,14 +695,14 @@ function initTheme() {
     });
 }
 
-async function main() {
+export async function main() {
     initTheme();
     try {
         await load();
     } catch (e) {
         $("subtitle").textContent = "Could not load results.";
         const err = $("error");
-        err.textContent = `${e.message}\n\nServe this page with:  node perfs/server.ts\nthen open http://localhost:8000/`;
+        err.textContent = `${(e as Error).message}\n\nRun this project from the repository root with:  npm start -- fullstacked perfs`;
         err.hidden = false;
         return;
     }
@@ -630,19 +712,19 @@ async function main() {
 
     renderFilters();
     $("metric").addEventListener("change", (e) => {
-        state.metric = e.target.value;
+        state.metric = (e.target as HTMLSelectElement).value;
         renderAll();
     });
     $("scale").addEventListener("change", (e) => {
-        state.scale = e.target.value;
+        state.scale = (e.target as HTMLSelectElement).value;
         renderAll();
     });
     $("baseline").addEventListener("change", (e) => {
-        state.baseline = e.target.value;
+        state.baseline = (e.target as HTMLSelectElement).value;
         renderAll();
     });
     $("compare").addEventListener("change", (e) => {
-        state.compare = e.target.value;
+        state.compare = (e.target as HTMLSelectElement).value;
         renderAll();
     });
     $("detail-close").addEventListener("click", () => {
@@ -650,7 +732,7 @@ async function main() {
         renderDetail();
     });
 
-    let resizeTimer;
+    let resizeTimer: ReturnType<typeof setTimeout>;
     window.addEventListener("resize", () => {
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(() => {
@@ -661,5 +743,3 @@ async function main() {
 
     renderAll();
 }
-
-main();
