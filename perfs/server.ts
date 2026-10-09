@@ -116,8 +116,8 @@ function resolveStatic(requestUrl: string) {
     const root = pathname.startsWith("/bench/")
         ? benchDirectory
         : pathname.startsWith("/viewer/")
-          ? viewerDirectory
-          : null;
+            ? viewerDirectory
+            : null;
     if (!root) return null;
     const target = path.resolve(root, "." + pathname.replace(/^\/[^/]+/, ""));
     if (!target.startsWith(root + path.sep)) return null;
@@ -176,7 +176,7 @@ const server = http.createServer((req, res) => {
         try {
             const target = resolveTarget(req.url ?? "/");
             const contentType = req.headers["content-type"] ?? "";
-            let body = Buffer.concat(chunks);
+            let body: Buffer = Buffer.concat(chunks);
             if (contentType.startsWith("multipart/form-data")) {
                 body = multipartFile(body, contentType);
             }
