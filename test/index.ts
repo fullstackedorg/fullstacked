@@ -30,6 +30,7 @@ let tests = [
     "./deeplink/index.ts",
     "./fullstacked/index.ts",
     "./shim/index.ts",
+    "./dompurify/index.ts",
     ...pluginTests()
 ];
 

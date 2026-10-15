@@ -1857,8 +1857,10 @@ suite("shim stream - pipe, pipeline, finished details", () => {
         } catch (e) {
             bad = errorCode(e);
         }
+        // the byte default is platform-dependent in Node (16 KiB on
+        // Windows, 64 KiB elsewhere): only its shape is compared
         return [
-            defaults,
+            [Number.isInteger(defaults[0]) && defaults[0] > 0, defaults[1]],
             changed,
             error,
             bad,

@@ -176,6 +176,16 @@ async function init() {
 
     await Promise.all([import("timers"), import("buffer")]);
 
+    // workers and Node (fullstacked --file) have no DOMParser:
+    // lib/DOMParser's parser and DOM become their globals
+    if (!globalThis.DOMParser) {
+        const dom = await import("../DOMParser/index.ts");
+        Object.entries(dom).forEach(
+            ([key, value]) =>
+                ((globalThis as Record<string, unknown>)[key] = value)
+        );
+    }
+
     if (!globalThis.process) {
         globalThis.process = (await import("process")).default;
     }

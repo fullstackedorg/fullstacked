@@ -1087,12 +1087,17 @@ function insertParserError(doc: XMLDocument, input: string, error: ParseError) {
 //   sections as text and xlink:, xml: and xmlns attributes in their
 //   namespaces, back to HTML inside foreignObject, desc and title.
 //
-// Not done, as in xmldom: the implied <html>, <head>, <body> and <tbody>
-// are not created and nothing is moved between them: the document's
-// children are the top-level nodes of the markup, several elements, text
-// and the whitespace between them included (the browser drops the
-// whitespace before <html> and moves <title> or <script> to <head>). Nor
-// are the browser's repairs: text misplaced in a table stays where it is, a
+// Then the implied <html>, <head> and <body> (implyStructure, after the
+// parse): what the markup does not have is created, the head elements
+// (title, meta, link, script, style...) that come before the content go
+// into <head>, the rest into <body>, and the whitespace before the content
+// is dropped, as in the browser; the DOCTYPE and the comments before the
+// content stay on the document.
+//
+// Not done: the implied <tbody>, and an element of the head after the
+// content stays where it is (the browser keeps it there too, but moves a
+// <title> or <meta> written between <head> and <body>). Nor are the
+// browser's repairs: text misplaced in a table stays where it is, a
 // <td> outside a table is an element, misnested formatting (<b><i></b></i>)
 // is not reconstructed, an HTML element in SVG does not end the SVG, SVG
 // names are not case-corrected (<svg><Foo> stays Foo where the browser
@@ -1263,14 +1268,98 @@ function unquote(literal: string | undefined) {
     return literal === undefined ? "" : literal.slice(1, -1);
 }
 
-export function parseHTML(input: string): HTMLDocument {
+// fragment: the top-level nodes of the markup on the document, without the
+// implied elements (innerHTML, html.ts parseFragment)
+export function parseHTML(input: string, fragment = false): HTMLDocument {
     if (input.indexOf("\r") !== -1) input = input.replace(/\r\n?/g, "\n");
     if (typeof input.isWellFormed === "function" && !input.isWellFormed()) {
         input = input.toWellFormed();
     }
     const doc = new HTMLDocument();
     new HTMLParser(input, doc).run();
+    if (!fragment) implyStructure(doc);
     return doc;
+}
+
+// the elements that go into an implied <head> when they come first
+const HEAD_ELEMENTS = new Set([
+    "base",
+    "basefont",
+    "bgsound",
+    "link",
+    "meta",
+    "noscript",
+    "script",
+    "style",
+    "template",
+    "title"
+]);
+
+function isHTMLElement(node: Node | null, names: Set<string> | string) {
+    return (
+        node instanceof Element &&
+        node.namespaceURI === XHTML_NS &&
+        (typeof names === "string"
+            ? node.localName === names
+            : names.has(node.localName))
+    );
+}
+
+function isBlankText(node: Node) {
+    return (
+        node.constructor === Text && /^[\t\n\f ]*$/.test((node as Text).data)
+    );
+}
+
+// <html> with <head> and <body>, for the markup that lacks them
+function implyStructure(doc: HTMLDocument) {
+    let html = doc.documentElement;
+    if (!isHTMLElement(html, "html")) {
+        html = doc.createElement("html");
+        const top = [...doc.childNodes];
+        let i = 0;
+        for (; i < top.length; i++) {
+            const node = top[i];
+            if (node instanceof DocumentType || node instanceof Comment) {
+                continue;
+            }
+            if (!isBlankText(node)) break;
+            doc.removeChild(node);
+        }
+        for (; i < top.length; i++) {
+            // a DOCTYPE after the content stays on the document
+            if (!(top[i] instanceof DocumentType)) html.appendChild(top[i]);
+        }
+        doc.appendChild(html);
+    }
+    let head: Element | null = null;
+    let body: Element | null = null;
+    for (const child of html.childNodes) {
+        if (isHTMLElement(child, "head")) head ??= child as Element;
+        else if (isHTMLElement(child, "body")) body ??= child as Element;
+    }
+    if (head === null) {
+        head = doc.createElement("head");
+        const lead: Node[] = [];
+        for (let n = html.firstChild; n !== null; n = n.nextSibling) {
+            if (isHTMLElement(n, HEAD_ELEMENTS) || isBlankText(n)) {
+                lead.push(n);
+            } else break;
+        }
+        html.insertBefore(head, html.firstChild);
+        if (lead.some((n) => n instanceof Element)) {
+            for (const node of lead) head.appendChild(node);
+        }
+    }
+    if (body === null) {
+        body = doc.createElement("body");
+        const rest: Node[] = [];
+        for (let n = head.nextSibling; n !== null; n = n.nextSibling) {
+            rest.push(n);
+        }
+        html.appendChild(body);
+        for (const node of rest) body.appendChild(node);
+    }
 }
 
 class HTMLParser {

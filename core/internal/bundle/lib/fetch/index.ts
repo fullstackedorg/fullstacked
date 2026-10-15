@@ -49,16 +49,6 @@ async function fetchCore(
     request: string | URL | Request,
     init?: RequestInit
 ): Promise<Response> {
-    // workers have no DOMParser: lib/DOMParser's parser and DOM become
-    // their globals
-    if (!globalThis.DOMParser) {
-        const dom = await import("../DOMParser/index.ts");
-        Object.entries(dom).forEach(
-            ([key, value]) =>
-                ((globalThis as Record<string, unknown>)[key] = value)
-        );
-    }
-
     const requestUrl =
         request instanceof Request
             ? request.url

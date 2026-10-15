@@ -6,7 +6,12 @@ import bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 import { startServer } from "./server.ts";
 import { execSync } from "node:child_process";
 import net from "node:net";
-import { algorithmMatrix, prepareServer, trySsh } from "./ssh-algorithms.ts";
+import {
+    algorithmMatrix,
+    prepareKeys,
+    prepareServer,
+    trySsh
+} from "./ssh-algorithms.ts";
 import { KNOWN_FAILURES } from "../shim/known-failures.ts";
 
 suite("net - integration", () => {
@@ -128,17 +133,40 @@ suite("net - integration", () => {
             const content = await page.getTextContent("body");
             assert.deepEqual(content, "SUCCESS");
 
+            // the core's stream data of a webview goes to one page: the
+            // sample page left open would take the next pages' sockets
+            await page.page.close();
+            prepareServer(containerName);
+            const keys = prepareKeys(containerName);
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            // what packages use ssh2 for in the webview: key formats,
+            // exec, shell, SFTP streams, port forwarding
+            const featuresPage = await sshBrowser.createPage(
+                `http://localhost:${sshBrowser.webview.port}/?port=${sshPort}&features=${encodeURIComponent(btoa(JSON.stringify(keys)))}`
+            );
+            let features: Record<string, string>;
+            try {
+                await featuresPage.page.waitForFunction(
+                    'document.body.classList.contains("done")',
+                    { timeout: 120000, polling: 500 }
+                );
+                features = JSON.parse(
+                    await featuresPage.getTextContent("body")
+                );
+            } finally {
+                await featuresPage.page.close().catch(() => {});
+            }
+            for (const [name, result] of Object.entries(features)) {
+                await t.test(name, () => assert.equal(result, "ok", name));
+            }
+            assert.ok(Object.keys(features).length >= 10, "feature cases ran");
+
             // the ssh2 matrix in the webview (crypto shim) against Node's
             // ssh2 on the same server: what Node completes, the webview must.
             // One page per case: a JS key exchange can hold the page longer
-            // than a CDP call waits. Opt-in (SSH_MATRIX=all or a name
-            // filter): it takes minutes with the JS key exchanges of Stage 1.
-            if (!process.env.SSH_MATRIX) return;
-            // the core's stream data of a webview goes to one page: the
-            // sample page left open would take the matrix pages' sockets
-            await page.page.close();
-            prepareServer(containerName);
-            await new Promise((resolve) => setTimeout(resolve, 1000));
+            // than a CDP call waits. SSH_MATRIX=<text> keeps the cases whose
+            // name contains it.
             for (const c of algorithmMatrix()) {
                 const node = await trySsh(sshPort, c);
                 let webview: string;

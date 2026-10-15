@@ -16,15 +16,18 @@
 // - NodeList, HTMLCollection and NamedNodeMap are Array subclasses (indexes,
 //   length, item(), iteration), so Array.isArray() is true for them and
 //   attributes has no named properties (use getNamedItem);
-// - no querySelector(All), no innerHTML/outerHTML, no events, no
+// - no querySelector(All), no events, no TreeWalker,
 //   compareDocumentPosition or isEqualNode.
 //
 // HTML documents (DOMParser's "text/html", parse.ts parseHTML) are an
 // HTMLDocument: as in the browser, the tagName of an element of the XHTML
 // namespace is uppercase (its localName is lowercase), and createElement,
 // getElementsByTagName and the attribute methods taking a name lowercase it
-// for such elements. There is no HTMLElement interface (no body, head,
-// innerHTML, dataset...): the elements are the Element of an XML document.
+// for such elements. The document has head, body and title, and the
+// elements innerHTML and outerHTML (html.ts), what sanitizers such as
+// DOMPurify use with createNodeIterator; there is no HTMLElement interface
+// (no dataset, style, events...): the elements are the Element of an XML
+// document.
 
 export const XML_NS = "http://www.w3.org/XML/1998/namespace";
 export const XMLNS_NS = "http://www.w3.org/2000/xmlns/";
@@ -42,6 +45,13 @@ const COMMENT_NODE = 8;
 const DOCUMENT_NODE = 9;
 const DOCUMENT_TYPE_NODE = 10;
 const DOCUMENT_FRAGMENT_NODE = 11;
+
+// innerHTML and outerHTML need the parsers and the serializer, which need
+// this module: html.ts (loaded by index.ts) sets these
+export const fragments = {} as {
+    serialize(element: Element, childrenOnly: boolean): string;
+    parse(context: Element, markup: string): DocumentFragment;
+};
 
 function domError(name: string, message: string) {
     return new DOMException(message, name);
@@ -262,18 +272,21 @@ export class Node {
         this._owner = owner;
     }
 
+    // each kind of node has its own; these are the browser's getters on
+    // Node.prototype, which work for any node (DOMPurify calls them so,
+    // safe from a clobbered property)
     get nodeType(): number {
-        return 0;
+        return ownGetter(this, "nodeType") ?? 0;
     }
     get nodeName(): string {
-        return "";
+        return ownGetter(this, "nodeName") ?? "";
     }
     get nodeValue(): string | null {
-        return null;
+        return ownGetter(this, "nodeValue") ?? null;
     }
     set nodeValue(_value: string | null) {}
     get textContent(): string | null {
-        return null;
+        return ownGetter(this, "textContent") ?? null;
     }
     set textContent(_value: string | null) {}
 
@@ -427,6 +440,19 @@ export class Node {
     }
 }
 
+// the getter of name below Node.prototype in the chain of node
+function ownGetter(node: Node, name: string) {
+    for (
+        let proto = Object.getPrototypeOf(node);
+        proto !== Node.prototype;
+        proto = Object.getPrototypeOf(proto)
+    ) {
+        const getter = Object.getOwnPropertyDescriptor(proto, name)?.get;
+        if (getter) return getter.call(node);
+    }
+    return undefined;
+}
+
 // the constants on instances too: node.ELEMENT_NODE
 for (const [key, value] of Object.entries(Node)) {
     if (key.endsWith("_NODE")) {
@@ -557,6 +583,8 @@ function insertNode(parent: Node, node: Node, reference: Node | null) {
 }
 
 function removeNode(node: Node) {
+    const iterators = node._owner?._iterators;
+    if (iterators) beforeRemove(iterators, node);
     const children = node._parent._children;
     children.splice(children.indexOf(node), 1);
     if (node._prev) node._prev._next = node._next;
@@ -843,6 +871,9 @@ export class Document extends ParentNode {
         standalone: boolean | null;
     } | null = null;
     _implementation: DOMImplementation | null = null;
+    // the NodeIterators made on this document, to move off a node removed
+    // under them; weak, as nothing tells when one is done
+    _iterators: Set<WeakRef<NodeIterator>> | null = null;
 
     constructor() {
         super(null);
@@ -864,6 +895,29 @@ export class Document extends ParentNode {
             if (child instanceof DocumentType) return child;
         }
         return null;
+    }
+    // the <head> and <body> of an <html> root element
+    get head(): Element | null {
+        return htmlChild(this, "head");
+    }
+    get body(): Element | null {
+        return htmlChild(this, "body");
+    }
+    get title(): string {
+        const title = this.getElementsByTagName("title")[0];
+        return title
+            ? title.textContent.replace(/[\t\n\f\r ]+/g, " ").trim()
+            : "";
+    }
+    createNodeIterator(
+        root: Node,
+        whatToShow = 0xffffffff,
+        filter: NodeFilterArg = null
+    ): NodeIterator {
+        checkNode(root);
+        const iterator = new NodeIterator(root, whatToShow >>> 0, filter);
+        (this._iterators ??= new Set()).add(new WeakRef(iterator));
+        return iterator;
     }
     get xmlVersion() {
         return "1.0";
@@ -1113,6 +1167,33 @@ export class Element extends ParentNode {
     }
     set textContent(value: string | null) {
         replaceAllText(this, value);
+    }
+    get innerHTML(): string {
+        return fragments.serialize(this, true);
+    }
+    set innerHTML(value: string) {
+        const fragment = fragments.parse(this, value);
+        for (const child of [...(this._children ?? [])]) removeNode(child);
+        insertNode(this, fragment, null);
+    }
+    get outerHTML(): string {
+        return fragments.serialize(this, false);
+    }
+    set outerHTML(value: string) {
+        const parent = this._parent;
+        if (parent === null) return;
+        if (parent instanceof Document) {
+            throw domError(
+                "NoModificationAllowedError",
+                "Failed to set the 'outerHTML' property on 'Element': This element's parent is of type '#document'."
+            );
+        }
+        const context =
+            parent instanceof Element
+                ? parent
+                : this._owner.createElement("body");
+        insertNode(parent, fragments.parse(context, value), this);
+        removeNode(this);
     }
 
     get attributes(): NamedNodeMap {
@@ -1530,6 +1611,19 @@ export class DOMImplementation {
                   : "application/xml";
         return doc;
     }
+    // <!DOCTYPE html><html><head><title>title</title></head><body></body></html>
+    createHTMLDocument(title?: string): HTMLDocument {
+        const doc = new HTMLDocument();
+        doc.appendChild(new DocumentType(doc, "html", "", ""));
+        const html = doc.appendChild(doc.createElement("html"));
+        const head = html.appendChild(doc.createElement("head"));
+        if (title !== undefined) {
+            head.appendChild(doc.createElement("title")).textContent =
+                String(title);
+        }
+        html.appendChild(doc.createElement("body"));
+        return doc;
+    }
     createDocumentType(
         qualifiedName: string,
         publicId: string,
@@ -1548,5 +1642,157 @@ export class DOMImplementation {
     }
     get [Symbol.toStringTag]() {
         return "DOMImplementation";
+    }
+}
+
+function htmlChild(doc: Document, name: string): Element | null {
+    const html = doc.documentElement;
+    if (html?.localName !== "html" || html.namespaceURI !== XHTML_NS) {
+        return null;
+    }
+    for (const child of html._children ?? []) {
+        if (
+            child instanceof Element &&
+            child.localName === name &&
+            child.namespaceURI === XHTML_NS
+        ) {
+            return child;
+        }
+    }
+    return null;
+}
+
+// DOM traversal: NodeFilter's constants and the NodeIterator of
+// createNodeIterator (no TreeWalker)
+export const NodeFilter = Object.freeze({
+    FILTER_ACCEPT: 1,
+    FILTER_REJECT: 2,
+    FILTER_SKIP: 3,
+    SHOW_ALL: 0xffffffff,
+    SHOW_ELEMENT: 0x1,
+    SHOW_ATTRIBUTE: 0x2,
+    SHOW_TEXT: 0x4,
+    SHOW_CDATA_SECTION: 0x8,
+    SHOW_ENTITY_REFERENCE: 0x10,
+    SHOW_ENTITY: 0x20,
+    SHOW_PROCESSING_INSTRUCTION: 0x40,
+    SHOW_COMMENT: 0x80,
+    SHOW_DOCUMENT: 0x100,
+    SHOW_DOCUMENT_TYPE: 0x200,
+    SHOW_DOCUMENT_FRAGMENT: 0x400,
+    SHOW_NOTATION: 0x800
+});
+
+type NodeFilterArg =
+    ((node: Node) => number) | { acceptNode(node: Node): number } | null;
+
+// the node after node in tree order, within root
+function following(node: Node, root: Node): Node | null {
+    if (node._children?.length) return node._children[0];
+    for (let n = node; n !== root; n = n._parent) {
+        if (n._next) return n._next;
+    }
+    return null;
+}
+
+// the node before node in tree order, within root
+function preceding(node: Node, root: Node): Node | null {
+    if (node === root) return null;
+    let n = node._prev;
+    if (n === null) return node._parent;
+    while (n._children?.length) n = n._children[n._children.length - 1];
+    return n;
+}
+
+export class NodeIterator {
+    readonly root: Node;
+    readonly whatToShow: number;
+    readonly filter: NodeFilterArg;
+    referenceNode: Node;
+    pointerBeforeReferenceNode = true;
+
+    constructor(root: Node, whatToShow: number, filter: NodeFilterArg) {
+        this.root = root;
+        this.whatToShow = whatToShow;
+        this.filter = filter;
+        this.referenceNode = root;
+    }
+    nextNode(): Node | null {
+        return this._traverse(true);
+    }
+    previousNode(): Node | null {
+        return this._traverse(false);
+    }
+    detach() {}
+    _traverse(next: boolean): Node | null {
+        let node = this.referenceNode;
+        let before = this.pointerBeforeReferenceNode;
+        for (;;) {
+            if (next === before) {
+                before = !next;
+            } else {
+                node = next
+                    ? following(node, this.root)
+                    : preceding(node, this.root);
+                if (node === null) return null;
+            }
+            if (this._accepts(node)) break;
+        }
+        this.referenceNode = node;
+        this.pointerBeforeReferenceNode = before;
+        return node;
+    }
+    _accepts(node: Node) {
+        if (!((this.whatToShow >>> (node.nodeType - 1)) & 1)) return false;
+        const filter = this.filter;
+        if (filter === null) return true;
+        const result =
+            typeof filter === "function"
+                ? filter(node)
+                : filter.acceptNode(node);
+        return result === NodeFilter.FILTER_ACCEPT;
+    }
+    get [Symbol.toStringTag]() {
+        return "NodeIterator";
+    }
+}
+
+// DOM "NodeIterator pre-removing steps": an iterator whose reference node
+// is in the removed subtree moves to the node next to it
+function beforeRemove(iterators: Set<WeakRef<NodeIterator>>, removed: Node) {
+    for (const ref of iterators) {
+        const iterator = ref.deref();
+        if (!iterator) {
+            iterators.delete(ref);
+            continue;
+        }
+        if (
+            removed === iterator.root ||
+            !removed.contains(iterator.referenceNode)
+        ) {
+            continue;
+        }
+        if (iterator.pointerBeforeReferenceNode) {
+            let next: Node | null = null;
+            for (let n: Node = removed; n !== iterator.root; n = n._parent) {
+                if (n._next) {
+                    next = n._next;
+                    break;
+                }
+            }
+            if (next) {
+                iterator.referenceNode = next;
+                continue;
+            }
+            iterator.pointerBeforeReferenceNode = false;
+        }
+        let reference = removed._prev;
+        if (reference === null) reference = removed._parent;
+        else {
+            while (reference._children?.length) {
+                reference = reference._children[reference._children.length - 1];
+            }
+        }
+        iterator.referenceNode = reference;
     }
 }

@@ -1,8 +1,16 @@
 import test, { suite, before, after } from "node:test";
 import assert from "node:assert";
 import puppeteer, { type Browser, type Page } from "puppeteer";
+import { fileURLToPath } from "node:url";
+import createDOMPurify from "dompurify";
 import * as lib from "../../../core/internal/bundle/lib/DOMParser/index.ts";
 import { check, normalize } from "../common.ts";
+import {
+    COMMON,
+    PAYLOADS,
+    sanitizeAll,
+    unsafeParts
+} from "../../dompurify/corpus.ts";
 
 // Node has no DOMParser: the oracle is the browser's, where the webview's
 // main thread gets its parser. Each case is a function of the DOM globals,
@@ -15,6 +23,7 @@ import { check, normalize } from "../common.ts";
 type Dom = {
     DOMParser: typeof DOMParser;
     XMLSerializer: typeof XMLSerializer;
+    Node: typeof Node;
     dump: (node: Node) => unknown;
 };
 type Case = (dom: Dom, arg?: any) => unknown;
@@ -56,7 +65,7 @@ async function inBrowser(fn: Case, arg: unknown) {
         try {
             return {
                 value: (${fn.toString()})(
-                    { DOMParser, XMLSerializer, dump },
+                    { DOMParser, XMLSerializer, Node, dump },
                     ${JSON.stringify(arg)}
                 )
             };
@@ -89,12 +98,86 @@ const parseEach: Case = ({ DOMParser, XMLSerializer, dump }, inputs) =>
         return [dump(doc), new XMLSerializer().serializeToString(doc)];
     });
 
+// malformed input: whether it is a parse error, the parsed tree when it is
+// not. The parsererror document itself (libxml's message, how much it
+// recovered) changes with the browser's version and is left aside.
+const parseOrError: Case = ({ DOMParser, XMLSerializer, dump }, inputs) =>
+    inputs.map((xml: string) => {
+        const doc = new DOMParser().parseFromString(xml, "text/xml");
+        if (doc.getElementsByTagName("parsererror").length > 0) {
+            return "parsererror";
+        }
+        return [dump(doc), new XMLSerializer().serializeToString(doc)];
+    });
+
 suite("shim DOMParser (the TypeScript parser against the browser)", () => {
     before(async () => {
         browser = await puppeteer.launch({ headless: true });
         page = await browser.newPage();
     });
     after(() => browser?.close());
+
+    // DOMPurify given the DOM of lib/DOMParser as a window, as a worker or a
+    // fullstacked --file script would (test/dompurify), against DOMPurify on
+    // the browser's DOM: the same output for the same input and options, and
+    // nothing of the payloads left that the browser would run
+    suite("DOMPurify", () => {
+        let browserResults: Record<string, string>;
+        let ourResults: Record<string, string>;
+        const cases = [...COMMON, ...PAYLOADS];
+        before(async () => {
+            await page.addScriptTag({
+                path: fileURLToPath(
+                    new URL(
+                        "../../../node_modules/dompurify/dist/purify.min.js",
+                        import.meta.url
+                    )
+                )
+            });
+            browserResults = (await page.evaluate(
+                `(${sanitizeAll.toString()})(DOMPurify, ${JSON.stringify(cases)})`
+            )) as Record<string, string>;
+            const document = new lib.DOMParser().parseFromString(
+                "<!DOCTYPE html>",
+                "text/html"
+            );
+            const purify = createDOMPurify({ ...lib, document } as any);
+            assert.equal(purify.isSupported, true);
+            ourResults = sanitizeAll(purify, cases);
+        });
+        for (const c of COMMON) {
+            check("DOMPurify", `same output: ${c.name}`, () =>
+                assert.equal(ourResults[c.name], browserResults[c.name])
+            );
+        }
+        for (const c of PAYLOADS) {
+            check("DOMPurify", `safe: ${c.name}`, async () => {
+                const found = await page.evaluate(
+                    `(${unsafeParts.toString()})(${JSON.stringify(ourResults[c.name])}, DOMParser)`
+                );
+                assert.deepEqual(found, [], ourResults[c.name]);
+                assert.deepEqual(
+                    unsafeParts(ourResults[c.name], lib.DOMParser),
+                    [],
+                    ourResults[c.name]
+                );
+            });
+        }
+        test("payloads: the browser's output, mostly", (t) => {
+            const differ = PAYLOADS.filter(
+                (c) => ourResults[c.name] !== browserResults[c.name]
+            );
+            // where the trees differ (no form named properties to clobber,
+            // noscript's content in the lenient parser) both are safe
+            // (above); the output is the browser's for the rest
+            for (const c of differ) {
+                t.diagnostic(
+                    `${c.name}: ${ourResults[c.name]} (browser: ${browserResults[c.name]})`
+                );
+            }
+            assert.ok(differ.length <= PAYLOADS.length / 4);
+        });
+    });
 
     test("browser oracle is reachable", async () => {
         assert.equal(await page.evaluate("typeof DOMParser"), "function");
@@ -362,11 +445,18 @@ suite("shim DOMParser (the TypeScript parser against the browser)", () => {
     same("DOCTYPE skipped", parseEach, [
         `<!DOCTYPE r><r/>`,
         `<!DOCTYPE r SYSTEM "r.dtd"><r/>`,
-        `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html/>`,
-        // the declarations are not applied (Chrome applies ATTLIST defaults
-        // and ENTITY definitions): only those without effect here
-        `<?xml version="1.0"?>\n<!DOCTYPE r [\n  <!ELEMENT r (#PCDATA)>\n  <!-- ] -->\n  <?pi ]?>\n  <!ENTITY % p "]>">\n]>\n<r>t</r>`
+        `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html/>`
     ]);
+    // an internal subset is skipped; its declarations are not applied
+    // (Chrome applies ATTLIST defaults and ENTITY definitions, and where a
+    // comment in it lands depends on its version): the root element only
+    same("DOCTYPE internal subset skipped", ({ DOMParser, dump }) => {
+        const doc = new DOMParser().parseFromString(
+            `<?xml version="1.0"?>\n<!DOCTYPE r [\n  <!ELEMENT r (#PCDATA)>\n  <!-- ] -->\n  <?pi ]?>\n  <!ENTITY % p "]>">\n]>\n<r>t</r>`,
+            "text/xml"
+        );
+        return [doc.doctype?.name, dump(doc.documentElement)];
+    });
     same("whitespace and markup around the root element", parseEach, [
         `\n\n<r/>\n\n`,
         `<!-- before --><?p before?>\n<r/>\n<!-- after --><?p after?>`
@@ -682,7 +772,7 @@ suite("shim DOMParser (the TypeScript parser against the browser)", () => {
             doc.documentElement?.nodeName
         ];
     });
-    same("malformed: tags", parseEach, [
+    same("malformed: tags", parseOrError, [
         `<r><a></r>`,
         `<r>\n  <a>\n    <b>t</c>\n</r>`,
         `<a><b><c></a>`,
@@ -697,7 +787,7 @@ suite("shim DOMParser (the TypeScript parser against the browser)", () => {
         `< r/>`,
         `<r></>`
     ]);
-    same("malformed: attributes", parseEach, [
+    same("malformed: attributes", parseOrError, [
         `<r a=1/>`,
         `<r a="1" a="2"/>`,
         `<r><s xmlns:p="u" xmlns:q="u" p:a="1" q:a="2"/></r>`,
@@ -707,7 +797,7 @@ suite("shim DOMParser (the TypeScript parser against the browser)", () => {
         `<r a="x`,
         `<r><s a='&foo;'/></r>`
     ]);
-    same("malformed: references and characters", parseEach, [
+    same("malformed: references and characters", parseOrError, [
         `<r>&foo;</r>`,
         `<r>a &amp b</r>`,
         `<r>&;</r>`,
@@ -722,11 +812,12 @@ suite("shim DOMParser (the TypeScript parser against the browser)", () => {
         `<r>é😀&x;</r>`,
         `<r>\r\n\r\n  &x;</r>`
     ]);
-    same("malformed: outside the root element", parseEach, [
+    // a BOM before the root and <xml:r/> are left out: libxml's versions
+    // disagree on them
+    same("malformed: outside the root element", parseOrError, [
         ``,
         `  `,
         `abc`,
-        `\uFEFF<r/>`,
         `<r>x</r>junk`,
         `<r/>&amp;`,
         `<!-- c -->`,
@@ -737,7 +828,7 @@ suite("shim DOMParser (the TypeScript parser against the browser)", () => {
         `<r/><!DOCTYPE r>`,
         `<!-- c --><?p?><!DOCTYPE r><r a=1/>`
     ]);
-    same("malformed: markup", parseEach, [
+    same("malformed: markup", parseOrError, [
         `<r><!-- a -- b --></r>`,
         `<r><!-- x</r>`,
         `<r><![CDATA[x</r>`,
@@ -747,11 +838,10 @@ suite("shim DOMParser (the TypeScript parser against the browser)", () => {
         `<!doctype r><r/>`,
         `<?xml encoding="UTF-8"?><r/>`
     ]);
-    same("malformed: namespaces", parseEach, [
+    same("malformed: namespaces", parseOrError, [
         `<r><x:a/></r>`,
         `<r x:a="1"/>`,
         `<r xmlns:p=""/>`,
-        `<xml:r/>`,
         `<r xmlns:xmlns="u"/>`,
         `<r xmlns="http://www.w3.org/2000/xmlns/"/>`,
         `<r><:a/></r>`,
@@ -763,8 +853,8 @@ suite("shim DOMParser (the TypeScript parser against the browser)", () => {
 
     // "text/html": the lenient parser at the level of xmldom's HTML mode
     // (lib/DOMParser/parse.ts parseHTML). Its own behavior is pinned with the
-    // expected values; the browser is the oracle for what both do alike,
-    // its implied <html>, <head>, <body> and <tbody> left aside.
+    // expected values (the content of <body>, with the DOCTYPE); the browser
+    // is the oracle for what both do alike, its implied <tbody> left aside.
     suite("text/html", () => {
         const XHTML = "http://www.w3.org/1999/xhtml";
         const X = ` xmlns="${XHTML}"`;
@@ -772,10 +862,16 @@ suite("shim DOMParser (the TypeScript parser against the browser)", () => {
             new ours.DOMParser().parseFromString(html, "text/html");
         const serialize = (node: Node) =>
             new ours.XMLSerializer().serializeToString(node);
+        // the DOCTYPE and the content of <body>, serialized
+        const bodyMarkup = (doc: Document) =>
+            [doc.doctype, ...doc.body.childNodes]
+                .filter((node) => node !== null)
+                .map(serialize)
+                .join("");
         // input -> serialization of the document
         const serializations = (cases: [string, string][]) => {
             for (const [html, expected] of cases) {
-                assert.equal(serialize(parse(html)), expected, html);
+                assert.equal(bodyMarkup(parse(html)), expected, html);
             }
         };
 
@@ -871,7 +967,7 @@ suite("shim DOMParser (the TypeScript parser against the browser)", () => {
                     `<pre>\nkept\n</pre><xmp><b>&amp;</b></xmp></div><plaintext><b>&amp;</b></div>`
             );
             assert.deepEqual(
-                Array.from(doc.getElementsByTagName("*")).map((e) => [
+                Array.from(doc.body.getElementsByTagName("*")).map((e) => [
                     e.localName,
                     e.childNodes.length,
                     e.textContent
@@ -931,7 +1027,7 @@ suite("shim DOMParser (the TypeScript parser against the browser)", () => {
             assert.equal(
                 parse(
                     `<a href="?a=1&copy=2&lang=en&amp;b&copy;c&copy d">`
-                ).documentElement.getAttribute("href"),
+                ).body.firstElementChild.getAttribute("href"),
                 "?a=1&copy=2&lang=en&b©c© d"
             );
         });
@@ -939,7 +1035,7 @@ suite("shim DOMParser (the TypeScript parser against the browser)", () => {
         test("attributes", () => {
             const input = parse(
                 `<INPUT Type=Text value='a "b"' disabled data-x="1" DATA-X="2" title=a&amp;b/c x= y/>`
-            ).documentElement;
+            ).body.firstElementChild;
             assert.deepEqual(
                 Array.from(input.attributes).map((a) => [
                     a.name,
@@ -963,18 +1059,47 @@ suite("shim DOMParser (the TypeScript parser against the browser)", () => {
 
         test("names, namespace and document", () => {
             const doc = parse(`<DIV Class=A><x:y>t</x:y><Span>s</Span></DIV>`);
-            const div = doc.documentElement;
+            const div = doc.body.firstElementChild;
             assert.deepEqual(dump(doc), [
                 9,
                 [
                     [
                         1,
-                        "DIV",
+                        "HTML",
                         XHTML,
-                        [["class", null, null, "class", "A"]],
+                        [],
                         [
-                            [1, "X:Y", XHTML, [], [[3, "#text", "t"]]],
-                            [1, "SPAN", XHTML, [], [[3, "#text", "s"]]]
+                            [1, "HEAD", XHTML, [], []],
+                            [
+                                1,
+                                "BODY",
+                                XHTML,
+                                [],
+                                [
+                                    [
+                                        1,
+                                        "DIV",
+                                        XHTML,
+                                        [["class", null, null, "class", "A"]],
+                                        [
+                                            [
+                                                1,
+                                                "X:Y",
+                                                XHTML,
+                                                [],
+                                                [[3, "#text", "t"]]
+                                            ],
+                                            [
+                                                1,
+                                                "SPAN",
+                                                XHTML,
+                                                [],
+                                                [[3, "#text", "s"]]
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                            ]
                         ]
                     ]
                 ]
@@ -1028,9 +1153,9 @@ suite("shim DOMParser (the TypeScript parser against the browser)", () => {
                 `<!DOCTYPE html>\n<!-- c --><html${X} lang="en"><head><title>t</title></head><body><p>x</p></body></html>\n` +
                     `<!--?xml version="1.0"?--><!--x--><!-- y--><!---->`
             );
-            // several elements and text at the top: what the markup has
+            // several elements and text at the top: in <body>
             assert.deepEqual(
-                Array.from(parse(`a<p>b</p>c<p>d`).childNodes).map((n) => [
+                Array.from(parse(`a<p>b</p>c<p>d`).body.childNodes).map((n) => [
                     n.nodeName,
                     n.textContent
                 ]),
@@ -1055,6 +1180,16 @@ suite("shim DOMParser (the TypeScript parser against the browser)", () => {
                             "html",
                             "-//W3C//DTD HTML 4.01//EN",
                             "http://www.w3.org/TR/html4/strict.dtd"
+                        ],
+                        [
+                            1,
+                            "HTML",
+                            XHTML,
+                            [],
+                            [
+                                [1, "HEAD", XHTML, [], []],
+                                [1, "BODY", XHTML, [], []]
+                            ]
                         ]
                     ]
                 ]
@@ -1066,7 +1201,7 @@ suite("shim DOMParser (the TypeScript parser against the browser)", () => {
                 `<div><svg viewBox="0 0 1 1"><use xlink:href="#a"/><linearGradient id=g /><foreignObject><p>x</p></foreignObject><![CDATA[a<b]]></svg><math><mi>x</mi></math></div>`
             );
             assert.equal(
-                serialize(doc),
+                serialize(doc.body.firstChild),
                 `<div${X}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#a"/><linearGradient id="g"/><foreignObject><p${X}>x</p></foreignObject>a&lt;b</svg><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi></math></div>`
             );
             const use = doc.getElementsByTagName("use")[0];
@@ -1258,6 +1393,154 @@ suite("shim DOMParser (the TypeScript parser against the browser)", () => {
                 (doc.cloneNode(false) as Document).contentType
             ];
         });
+    });
+
+    // what HTML libraries use beyond parsing: the document's head, body and
+    // title, innerHTML and outerHTML, createHTMLDocument, NodeIterator
+    same("head, body and title", ({ DOMParser }) =>
+        [
+            `<title> A  b </title><p>x`,
+            `<!DOCTYPE html><html><head><meta charset=utf-8></head><body class=c>y</body></html>`,
+            `<html><p>z`,
+            `<!-- c -->\n  <link rel=x><script>s</script>\n<p>w</p>`,
+            ``
+        ].map((html) => {
+            const doc = new DOMParser().parseFromString(html, "text/html");
+            return [
+                doc.title,
+                doc.head.childNodes.length,
+                Array.from(doc.head.childNodes).map((n) => n.nodeName),
+                doc.body.innerHTML,
+                doc.documentElement.childNodes.length,
+                doc.childNodes.length
+            ];
+        })
+    );
+    same("innerHTML and outerHTML", ({ DOMParser }) => {
+        const doc = new DOMParser().parseFromString(
+            `<div id=d class="a b" title='x"y&amp;z<w>'>a &amp; b&nbsp;<br><img src=x.png alt=""><!--c--><script>if (a<b) x="&amp;"</script><style>a>b{}</style><textarea>&lt;t&gt;</textarea><svg viewBox="0 0 1 1"><circle r="1"/></svg><p>x</p></div>`,
+            "text/html"
+        );
+        const div = doc.body.firstElementChild;
+        const before = [div.innerHTML, div.outerHTML];
+        div.innerHTML = `<b>new</b> text<i>i`;
+        const set = [div.innerHTML, div.childNodes.length];
+        div.firstElementChild.outerHTML = `<u>u</u><s>s</s>`;
+        const replaced = div.innerHTML;
+        const script = doc.createElement("script");
+        script.innerHTML = `<b>raw</b>`;
+        return [
+            before,
+            set,
+            replaced,
+            script.childNodes.length,
+            script.innerHTML
+        ];
+    });
+    same("innerHTML in an XML document", ({ DOMParser }) => {
+        const doc = new DOMParser().parseFromString(
+            `<r xmlns="urn:r"><a b="1">t &amp; <c/></a></r>`,
+            "text/xml"
+        );
+        const r = doc.documentElement;
+        const before = r.innerHTML;
+        r.innerHTML = `<n>x</n>`;
+        let error = null;
+        try {
+            r.innerHTML = `<unclosed>`;
+        } catch (e) {
+            error = (e as Error).name;
+        }
+        return [
+            before,
+            (r.firstChild as Element).namespaceURI,
+            r.innerHTML,
+            error
+        ];
+    });
+    same("createHTMLDocument", ({ DOMParser }) => {
+        const impl = new DOMParser().parseFromString(
+            "",
+            "text/html"
+        ).implementation;
+        const doc = impl.createHTMLDocument("T");
+        const blank = impl.createHTMLDocument();
+        doc.body.innerHTML = `<p>x</p>`;
+        return [
+            doc.documentElement.outerHTML,
+            doc.title,
+            doc.doctype.name,
+            blank.head.childNodes.length,
+            Object.prototype.toString.call(doc)
+        ];
+    });
+    same(
+        "createNodeIterator, with nodes removed and added",
+        ({ DOMParser }) => {
+            const doc = new DOMParser().parseFromString(
+                `<div><p>a<b>b</b></p><!--c--><i>i<u>u</u></i>t<s>s</s></div>`,
+                "text/html"
+            );
+            const div = doc.body.firstChild as Element;
+            const names = (whatToShow: number, filter: any) => {
+                const it = doc.createNodeIterator(div, whatToShow, filter);
+                const out = [];
+                for (let n = it.nextNode(); n; n = it.nextNode())
+                    out.push(n.nodeName);
+                const back = [];
+                for (let n = it.previousNode(); n; n = it.previousNode()) {
+                    back.push(n.nodeName);
+                }
+                return [out, back];
+            };
+            // what DOMPurify does: remove the current node, its content moved
+            // after it
+            const it = doc.createNodeIterator(div, 0x1 | 0x4 | 0x80, null);
+            const seen = [];
+            for (let n: any = it.nextNode(); n; n = it.nextNode()) {
+                seen.push(n.nodeName);
+                if (n.nodeName === "I") {
+                    for (const child of Array.from(n.childNodes)) {
+                        n.parentNode.insertBefore(child, n.nextSibling);
+                    }
+                    n.remove();
+                }
+                if (n.nodeName === "S") n.parentNode.removeChild(n);
+            }
+            return [
+                names(0xffffffff, null),
+                names(0x1, null),
+                names(0x4 | 0x80, null),
+                names(0x1, (n: Node) => (n.nodeName === "B" ? 3 : 1)),
+                names(0x1, {
+                    acceptNode: (n: Node) => (n.nodeName === "P" ? 2 : 1)
+                }),
+                seen,
+                div.innerHTML,
+                [
+                    it.root === div,
+                    it.whatToShow,
+                    it.filter,
+                    it.referenceNode.nodeName
+                ]
+            ];
+        }
+    );
+    same("Node.prototype getters on any node", ({ DOMParser, Node }) => {
+        const doc = new DOMParser().parseFromString(
+            `<p a=1>t<!--c--></p>`,
+            "text/html"
+        );
+        const p = doc.body.firstChild as Element;
+        const get = (proto: object, name: string, node: unknown) =>
+            Object.getOwnPropertyDescriptor(proto, name).get.call(node);
+        const nodes = [p, p.firstChild, p.lastChild, doc, p.attributes[0]];
+        return nodes.map((n) => [
+            get(Node.prototype, "nodeType", n),
+            get(Node.prototype, "nodeName", n),
+            get(Node.prototype, "nodeValue", n),
+            get(Node.prototype, "textContent", n)
+        ]);
     });
 
     // no selector engine on the worker's DOM (improvements/shim/plan.md 5.4)

@@ -92,13 +92,36 @@ export function check(
     return test(name, reason ? { todo: reason } : {}, fn);
 }
 
-// `same(name, fn)` checks fn(shim) against fn(node)
-export function sameFor<M>(module: string, shim: M, node: M) {
+// every error shape in an outcome as just "thrown": for the modules whose
+// error codes follow OpenSSL or the Node patch release (crypto), where
+// what matters is that the shim throws when Node does
+export function thrownOnly(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(thrownOnly);
+    if (value && typeof value === "object") {
+        const keys = Object.keys(value).sort().join();
+        if (keys === "code,name" || keys === "thrown") return "<thrown>";
+        return Object.fromEntries(
+            Object.entries(value).map(([k, v]) => [k, thrownOnly(v)])
+        );
+    }
+    return value;
+}
+
+// `same(name, fn)` checks fn(shim) against fn(node); with
+// `{ errors: "thrown" }`, errors compare by being thrown, not by code
+export function sameFor<M>(
+    module: string,
+    shim: M,
+    node: M,
+    options: { errors?: "code" | "thrown" } = {}
+) {
+    const compared =
+        options.errors === "thrown" ? thrownOnly : (v: unknown) => v;
     return (name: string, fn: (m: M) => unknown) =>
         check(module, name, async () => {
             const ours = await outcome(() => fn(shim));
             const theirs = await outcome(() => fn(node));
-            assert.deepStrictEqual(ours, theirs);
+            assert.deepStrictEqual(compared(ours), compared(theirs));
         });
 }
 

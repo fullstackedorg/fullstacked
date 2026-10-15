@@ -91,6 +91,8 @@ export function prepareServer(container: string) {
             .join(",");
     const lines = [
         "PerSourcePenalties no",
+        // the forwardOut feature case
+        "AllowTcpForwarding yes",
         // the default ("delayed"), stated for the compression cases
         "Compression yes",
         `Ciphers ${both("cipher", constants.SUPPORTED_CIPHER)}`,
@@ -104,6 +106,37 @@ export function prepareServer(container: string) {
     sh(
         `{ printf '%s\\n' ${lines.map((l) => `'${l}'`).join(" ")}; cat ${config}; } > ${config}.new && mv ${config}.new ${config} && /usr/sbin/sshd.pam -t -f ${config} && kill -HUP $(pgrep -o -f /usr/sbin/sshd)`
     );
+}
+
+// The keys of the feature cases (test/net/sample/ssh): generated in the
+// container by ssh-keygen, in the formats ssh2 parses (OpenSSH, PEM,
+// encrypted with bcrypt-pbkdf), authorized for testuser.
+export type SshKey = { key: string; passphrase?: string };
+
+export function prepareKeys(container: string): Record<string, SshKey> {
+    const sh = (cmd: string) =>
+        execFileSync("docker", ["exec", container, "sh", "-c", cmd], {
+            encoding: "utf8"
+        });
+    const kinds: Record<string, [string, string?]> = {
+        ed25519: ["-t ed25519"],
+        "rsa (PEM)": ["-t rsa -b 2048 -m PEM"],
+        "rsa (OpenSSH)": ["-t rsa -b 2048"],
+        "ecdsa nistp256": ["-t ecdsa -b 256"],
+        "ed25519 with passphrase": ["-t ed25519", "secret"]
+    };
+    const keys: Record<string, SshKey> = {};
+    Object.entries(kinds).forEach(([name, [args, passphrase]], i) => {
+        const file = `/tmp/key${i}`;
+        sh(
+            `rm -f ${file} ${file}.pub && ssh-keygen -q ${args} -N '${passphrase ?? ""}' -f ${file} && cat ${file}.pub >> /config/.ssh/authorized_keys`
+        );
+        keys[name] = { key: sh(`cat ${file}`), passphrase };
+    });
+    sh(
+        "chown testuser:testuser /config/.ssh/authorized_keys && chmod 600 /config/.ssh/authorized_keys"
+    );
+    return keys;
 }
 
 // one connection, one command; "ok" or the error message

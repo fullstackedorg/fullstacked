@@ -1,18 +1,19 @@
-// DOMParser, XMLSerializer and the DOM they work on, for workers: the
-// webview has no DOMParser there, so lib/fetch installs these exports on
-// globalThis when it is missing (the main thread keeps the browser's).
-// Everything exported here becomes a global of the worker.
+// DOMParser, XMLSerializer and the DOM they work on, for workers and Node
+// (fullstacked --file): there is no DOMParser there, so lib/bridge installs
+// these exports on globalThis when it is missing (the webview's main thread
+// keeps the browser's). Everything exported here becomes a global.
 //
 // The XML types get the non-validating XML parser, with Chrome's parsererror
 // on malformed input. "text/html" gets a lenient HTML parser at the level of
 // xmldom's HTML mode, which served DOMParser here before Stage 6: names
 // lowercased, void and implicitly closed elements, raw text, the common
-// named references, never an error, but no implied <html>/<head>/<body>
+// named references, never an error, the implied <html>, <head> and <body>
 // (see parseHTML in parse.ts). querySelector is not provided
-// (improvements/shim/plan.md 5.4). See dom.ts for the DOM and parse.ts for
-// the parsers.
+// (improvements/shim/plan.md 5.4). See dom.ts for the DOM, parse.ts for
+// the parsers and html.ts for innerHTML.
 
 import { parseHTML, parseXML } from "./parse.ts";
+import "./html.ts";
 import type { HTMLDocument, XMLDocument } from "./dom.ts";
 
 const XML_TYPES = [
@@ -53,6 +54,8 @@ export {
     HTMLDocument,
     NamedNodeMap,
     Node,
+    NodeFilter,
+    NodeIterator,
     NodeList,
     ProcessingInstruction,
     Text,

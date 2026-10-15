@@ -33,6 +33,76 @@ import {
 } from "./common.ts";
 import promises from "./promises.ts";
 import { resolve } from "../path/index.ts";
+import * as allConstants from "../constants/index.ts";
+
+// fs.constants: the fs part of the constants table (macOS values), for
+// packages that test modes and flags (ssh2's SFTP Stats.isDirectory)
+const FS_CONSTANTS = [
+    "UV_FS_SYMLINK_DIR",
+    "UV_FS_SYMLINK_JUNCTION",
+    "O_RDONLY",
+    "O_WRONLY",
+    "O_RDWR",
+    "UV_DIRENT_UNKNOWN",
+    "UV_DIRENT_FILE",
+    "UV_DIRENT_DIR",
+    "UV_DIRENT_LINK",
+    "UV_DIRENT_FIFO",
+    "UV_DIRENT_SOCKET",
+    "UV_DIRENT_CHAR",
+    "UV_DIRENT_BLOCK",
+    "S_IFMT",
+    "S_IFREG",
+    "S_IFDIR",
+    "S_IFCHR",
+    "S_IFBLK",
+    "S_IFIFO",
+    "S_IFLNK",
+    "S_IFSOCK",
+    "O_CREAT",
+    "O_EXCL",
+    "UV_FS_O_FILEMAP",
+    "O_NOCTTY",
+    "O_TRUNC",
+    "O_APPEND",
+    "O_DIRECTORY",
+    "O_NOFOLLOW",
+    "O_SYNC",
+    "O_DSYNC",
+    "O_SYMLINK",
+    "O_NONBLOCK",
+    "S_IRWXU",
+    "S_IRUSR",
+    "S_IWUSR",
+    "S_IXUSR",
+    "S_IRWXG",
+    "S_IRGRP",
+    "S_IWGRP",
+    "S_IXGRP",
+    "S_IRWXO",
+    "S_IROTH",
+    "S_IWOTH",
+    "S_IXOTH",
+    "F_OK",
+    "R_OK",
+    "W_OK",
+    "X_OK",
+    "UV_FS_COPYFILE_EXCL",
+    "COPYFILE_EXCL",
+    "UV_FS_COPYFILE_FICLONE",
+    "COPYFILE_FICLONE",
+    "UV_FS_COPYFILE_FICLONE_FORCE",
+    "COPYFILE_FICLONE_FORCE"
+] as const;
+
+export const constants = Object.freeze(
+    Object.fromEntries(
+        FS_CONSTANTS.map((name) => [
+            name,
+            (allConstants as unknown as Record<string, number>)[name]
+        ])
+    )
+) as Record<(typeof FS_CONSTANTS)[number], number>;
 
 export function existsSync(path: PathLike): boolean {
     return globalThis.fullstacked.bridge(
@@ -544,5 +614,6 @@ export default {
     createReadStream,
     WriteStream,
     ReadStream,
+    constants,
     promises
 };

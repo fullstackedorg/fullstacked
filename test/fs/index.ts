@@ -16,6 +16,25 @@ suite("fs - e2e", () => {
         );
     });
 
+    test("constants", () => {
+        // the values are macOS's: compared there, the names elsewhere
+        for (const name of [
+            "F_OK",
+            "O_RDONLY",
+            "S_IFMT",
+            "S_IFDIR",
+            "S_IFREG"
+        ]) {
+            assert.equal(typeof (fs.constants as any)[name], "number", name);
+        }
+        if (globalThis.process.platform === "darwin") {
+            assert.deepEqual({ ...fs.constants }, { ...nodeFs.constants });
+        }
+        const mode = fs.statSync("package.json").mode;
+        assert.equal(mode & fs.constants.S_IFMT, fs.constants.S_IFREG);
+        assert.equal(fs.default.constants, fs.constants);
+    });
+
     test("statSync", () => {
         const stats = fs.statSync("package.json");
         const nodeStats = nodeFs.statSync("package.json");

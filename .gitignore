@@ -23,3 +23,5 @@ shell/user_data
 *.tar.xz
 
 improvements/perfs/*.ts.js
+test/dompurify/sample/worker.ts.js
+test/dompurify/out
