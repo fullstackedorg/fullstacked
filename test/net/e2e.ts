@@ -7,6 +7,7 @@ import { Worker } from "node:worker_threads";
 import { NodeSSH } from "node-ssh";
 import { execSync } from "node:child_process";
 import net from "node:net";
+import { prepareServer, runMatrix } from "./ssh-algorithms.ts";
 
 suite("net - e2e", () => {
     let server: Worker;
@@ -57,7 +58,7 @@ suite("net - e2e", () => {
         assert.deepEqual(received, data);
     });
 
-    test("ssh", async () => {
+    test("ssh", { timeout: 300000 }, async () => {
         containerName = `openssh-server-test-${Date.now()}`;
 
         // Start openssh-server container with password authentication enabled
@@ -140,6 +141,31 @@ suite("net - e2e", () => {
             assert.deepEqual(result.stdout.trim(), "SSH E2E WORKING");
 
             ssh.dispose();
+
+            // every cipher, MAC, kex and host key of ssh2, alone, over
+            // sockets of the core: what the server accepts with node:crypto
+            prepareServer(containerName);
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            const matrix = await runMatrix(port, async () => {
+                const s = new netGo.Socket();
+                await new Promise<void>((resolve, reject) => {
+                    s.once("connect", resolve);
+                    s.once("error", reject);
+                    s.connect(port, "127.0.0.1");
+                });
+                return s;
+            });
+            // what the server must accept (the ones SSH_MATRIX keeps)
+            for (const name of [
+                "cipher aes128-gcm@openssh.com",
+                "cipher aes128-ctr",
+                "mac hmac-sha2-256",
+                "kex curve25519-sha256",
+                "host key ssh-ed25519",
+                "compress zlib@openssh.com"
+            ]) {
+                if (name in matrix) assert.equal(matrix[name], "ok", name);
+            }
         } finally {
             if (containerName) {
                 try {

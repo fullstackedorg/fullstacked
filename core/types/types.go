@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fullstackedorg/fullstacked/internal/frames"
 	"sync"
 	"time"
 )
@@ -25,6 +26,8 @@ const (
 	Plugin    CoreModule = 14
 	WebSocket CoreModule = 15
 	Config    CoreModule = 16
+	Crypto    CoreModule = 17
+	Zlib      CoreModule = 18
 )
 
 type ModuleSwitch = func(*Context, CoreCallHeader, []DeserializedData, *CoreCallResponse) error
@@ -122,7 +125,20 @@ type Context struct {
 	Streams      map[uint8]*StoredStream
 	StreamsMutex *sync.Mutex
 
+	// stream data for the host reader of GET /stream, see package frames
+	Frames *frames.Queue
+
 	NextStreamId uint8
+
+	// crypto handles (hashes, ciphers), see package crypto
+	Crypto       map[uint32]any
+	CryptoMutex  *sync.Mutex
+	NextCryptoId uint32
+
+	// zlib streams, see package zlib
+	Zlib       map[uint32]any
+	ZlibMutex  *sync.Mutex
+	NextZlibId uint32
 
 	PluginStreamId uint8
 	Plugins        map[uint8]*ContextPlugin

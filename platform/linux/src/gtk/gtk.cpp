@@ -1,6 +1,6 @@
 #include "./gtk.h"
+#include "./bridge.h"
 #include "../app.h"
-#include "../base64.h"
 #include "../core.h"
 #include "../utils.h"
 #include <gio/gio.h>
@@ -22,6 +22,8 @@ int WebkitGTKGUI::run(int &argc, char **argv, std::function<void()> onReady,
     // --kiosk are passed through since the app handles its command line.
     app = Gtk::Application::create(
         "org.fullstacked", Gio::Application::Flags::HANDLES_COMMAND_LINE);
+    // the page posts its calls to /call and /sync (see bridge.cpp)
+    Core::setPlatform("linux", true);
     WebKitWebContext *context = webkit_web_context_get_default();
     webkit_web_context_register_uri_scheme(
         context, "fs", WebkitGTKWindow::webKitURISchemeRequestCallback, nullptr,
@@ -60,19 +62,6 @@ WebkitGTKWindow::~WebkitGTKWindow() {
     close();
 }
 
-static void sendGtkResponse(WebKitURISchemeRequest *request, const void *data,
-                            size_t length, const std::string &mimeType) {
-    void *copy = g_malloc(length > 0 ? length : 1);
-    if (length > 0 && data) {
-        memcpy(copy, data, length);
-    }
-    GInputStream *inputStream =
-        g_memory_input_stream_new_from_data(copy, length, g_free);
-    webkit_uri_scheme_request_finish(request, inputStream, length,
-                                     mimeType.c_str());
-    g_object_unref(inputStream);
-}
-
 void WebkitGTKWindow::webKitURISchemeRequestCallback(
     WebKitURISchemeRequest *request, gpointer userData) {
     WebKitWebView *wv = webkit_uri_scheme_request_get_web_view(request);
@@ -88,29 +77,6 @@ void WebkitGTKWindow::webKitURISchemeRequestCallback(
     if (win) {
         win->handleSchemeRequest(request);
     }
-}
-
-void WebkitGTKWindow::onBridgeMessage(WebKitUserContentManager *manager,
-                                      JSCValue *value, gpointer userData) {
-    auto *win = static_cast<WebkitGTKWindow *>(userData);
-    char *valStr = jsc_value_to_string(value);
-    std::string payload(valStr ? valStr : "");
-    g_free(valStr);
-    win->handleBridgeMessage(payload);
-}
-
-void WebkitGTKWindow::onOpenMessage(WebKitUserContentManager *manager,
-                                    JSCValue *value, gpointer userData) {
-    if (jsc_value_is_number(value)) {
-        uint8_t targetCtx = static_cast<uint8_t>(jsc_value_to_int32(value));
-        App::instance->open(targetCtx);
-    }
-}
-
-void WebkitGTKWindow::onExitMessage(WebKitUserContentManager *manager,
-                                    JSCValue *value, gpointer userData) {
-    auto *win = static_cast<WebkitGTKWindow *>(userData);
-    win->close();
 }
 
 void WebkitGTKWindow::onAuthMessage(WebKitUserContentManager *manager,
@@ -405,21 +371,11 @@ void WebkitGTKWindow::initWindow() {
                                                                   true);
     webkit_settings_set_enable_webgl(settings, true);
 
+    bridge = new GtkBridge(ctx, webview);
+
     WebKitUserContentManager *ucm =
         webkit_web_view_get_user_content_manager(webview);
-    webkit_user_content_manager_register_script_message_handler(ucm, "bridge",
-                                                                NULL);
-    webkit_user_content_manager_register_script_message_handler(ucm, "open",
-                                                                NULL);
-    webkit_user_content_manager_register_script_message_handler(ucm, "exit",
-                                                                NULL);
 
-    g_signal_connect(ucm, "script-message-received::bridge",
-                     G_CALLBACK(WebkitGTKWindow::onBridgeMessage), this);
-    g_signal_connect(ucm, "script-message-received::open",
-                     G_CALLBACK(WebkitGTKWindow::onOpenMessage), this);
-    g_signal_connect(ucm, "script-message-received::exit",
-                     G_CALLBACK(WebkitGTKWindow::onExitMessage), this);
     g_signal_connect(webviewWidget, "decide-policy",
                      G_CALLBACK(WebkitGTKWindow::navigationDecidePolicy), this);
     g_signal_connect(webviewWidget, "create",
@@ -450,87 +406,16 @@ void WebkitGTKWindow::initWindow() {
     webkit_web_view_load_uri(webview, "fs://localhost");
 }
 
-void WebkitGTKWindow::handleBridgeMessage(const std::string &payloadB64) {
-    std::string payloadRaw = base64_decode(payloadB64);
-    std::vector<uint8_t> payload(payloadRaw.begin(), payloadRaw.end());
-    if (payload.empty()) return;
-
-    auto response = Core::callCore(payload);
-    uint8_t id = payload.size() > 1 ? payload[1] : 0;
-    uint8_t isSync = payload.size() > 4 ? payload[4] : 0;
-
-    if (isSync == 1) {
-        resolveSyncAwaiter(id, response);
-    } else {
-        std::string respB64 = base64_encode(response.data(), response.size());
-        std::string script =
-            "if (window.fullstacked && window.fullstacked.respond) { "
-            "window.fullstacked.respond(" +
-            std::to_string(id) + ", `" + respB64 + "`); }";
-        webkit_web_view_evaluate_javascript(
-            webview, script.c_str(), static_cast<gssize>(script.size()),
-            nullptr, nullptr, nullptr, nullptr, nullptr);
-    }
-}
-
-void WebkitGTKWindow::resolveSyncAwaiter(uint8_t id,
-                                         const std::vector<uint8_t> &payload) {
-    std::lock_guard<std::mutex> lock(syncMutex);
-    auto it = syncAwaitersResolve.find(id);
-    if (it != syncAwaitersResolve.end()) {
-        WebKitURISchemeRequest *req = it->second;
-        syncAwaitersResolve.erase(it);
-        std::string b64 = base64_encode(payload.data(), payload.size());
-        sendGtkResponse(req, b64.data(), b64.size(),
-                        "application/octet-stream");
-        g_object_unref(req);
-    } else {
-        syncAwaitersPayload[id] = payload;
-    }
-}
-
 void WebkitGTKWindow::handleSchemeRequest(WebKitURISchemeRequest *request) {
     const char *pathC = webkit_uri_scheme_request_get_path(request);
     std::string path = pathC ? pathC : "";
-    if (path.empty() || path == "/") {
-        path = "/index.html";
-    }
-
-    if (path == "/platform") {
-        std::string platformStr = "linux";
-        sendGtkResponse(request, platformStr.data(), platformStr.size(),
-                        "text/plain");
-        return;
-    }
-
-    if (path == "/ctx") {
-        std::string ctxStr = std::to_string(ctx);
-        sendGtkResponse(request, ctxStr.data(), ctxStr.size(), "text/plain");
-        return;
-    }
-
-    if (path.rfind("/sync/", 0) == 0) {
-        std::string idStr = path.substr(6);
-        uint8_t id = static_cast<uint8_t>(std::stoi(idStr));
-
-        std::lock_guard<std::mutex> lock(syncMutex);
-        auto it = syncAwaitersPayload.find(id);
-        if (it != syncAwaitersPayload.end()) {
-            auto payload = it->second;
-            syncAwaitersPayload.erase(it);
-            std::string b64 = base64_encode(payload.data(), payload.size());
-            sendGtkResponse(request, b64.data(), b64.size(),
-                            "application/octet-stream");
-        } else {
-            g_object_ref(request);
-            syncAwaitersResolve[id] = request;
-        }
-        return;
+    if (path.empty()) {
+        path = "/";
     }
 
     if (path == "/exit") {
         close();
-        sendGtkResponse(request, "", 0, "text/plain");
+        GtkBridge::respond(request, 200, "text/plain", "", 0);
         return;
     }
 
@@ -553,11 +438,11 @@ void WebkitGTKWindow::handleSchemeRequest(WebKitURISchemeRequest *request) {
                     return G_SOURCE_REMOVE;
                 },
                 new std::pair<WebkitGTKWindow *, std::string>(this, sizeVal));
-            sendGtkResponse(request, "", 0, "text/plain");
+            GtkBridge::respond(request, 200, "text/plain", "", 0);
         } else {
             std::string sizeStr = getSize();
-            sendGtkResponse(request, sizeStr.data(), sizeStr.size(),
-                            "text/plain");
+            GtkBridge::respond(request, 200, "text/plain", sizeStr.data(),
+                               sizeStr.size());
         }
         return;
     }
@@ -571,77 +456,21 @@ void WebkitGTKWindow::handleSchemeRequest(WebKitURISchemeRequest *request) {
                 static_cast<uint8_t>(std::stoi(uriStr.substr(queryPos + 4)));
             App::instance->open(targetCtx);
         }
-        sendGtkResponse(request, "", 0, "text/plain");
+        GtkBridge::respond(request, 200, "text/plain", "", 0);
         return;
     }
 
-    // Static file serving via Core
-    std::vector<uint8_t> header = {ctx,
-                                   0, // req id
-                                   0, // Core Module
-                                   0, // Fn Static File
-                                   0, // Async
-                                   static_cast<uint8_t>(STRING)};
-
-    uint8_t pathLen[4];
-    numberToUint4Bytes(path.size(), pathLen);
-
-    std::vector<uint8_t> payload = header;
-    payload.insert(payload.end(), pathLen, pathLen + 4);
-    payload.insert(payload.end(), path.begin(), path.end());
-
-    auto responseData = Core::callCore(payload);
-    if (responseData.size() <= 1) {
-        std::string notFound = "Not Found";
-        sendGtkResponse(request, notFound.data(), notFound.size(),
-                        "text/plain");
-        return;
+    if (bridge) {
+        bridge->request(request, path);
+    } else {
+        GtkBridge::respond(request, 404, "text/plain", "Not Found", 9);
     }
-
-    auto [argBuffer, _] = deserialize(responseData, 1);
-    std::vector<DataValue> values = deserializeAll(argBuffer.buffer);
-
-    if (values.size() < 2) {
-        std::string notFound = "Not Found";
-        sendGtkResponse(request, notFound.data(), notFound.size(),
-                        "text/plain");
-        return;
-    }
-
-    sendGtkResponse(request, values[1].buffer.data(), values[1].buffer.size(),
-                    values[0].str);
 }
 
-struct GtkStreamDataPayload {
-        WebKitWebView *webview;
-        uint8_t streamId;
-        std::string b64;
-};
-
-static gboolean dispatchStreamDataGtk(gpointer userData) {
-    auto *payload = static_cast<GtkStreamDataPayload *>(userData);
-    if (payload->webview && WEBKIT_IS_WEB_VIEW(payload->webview)) {
-        std::string script =
-            "if (window.fullstacked && window.fullstacked.onStreamData) { "
-            "window.fullstacked.onStreamData(" +
-            std::to_string(payload->streamId) + ", `" + payload->b64 + "`); }";
-        webkit_web_view_evaluate_javascript(payload->webview, script.c_str(),
-                                            static_cast<gssize>(script.size()),
-                                            nullptr, nullptr, nullptr, nullptr,
-                                            nullptr);
-    }
-    delete payload;
-    return G_SOURCE_REMOVE;
-}
-
+// called from core threads, App holds the window while it runs
 void WebkitGTKWindow::onStreamData(uint8_t streamId,
                                    const std::vector<uint8_t> &data) {
-    if (!webview) return;
-    auto *payload = new GtkStreamDataPayload();
-    payload->webview = webview;
-    payload->streamId = streamId;
-    payload->b64 = base64_encode(data.data(), data.size());
-    g_idle_add(dispatchStreamDataGtk, payload);
+    if (bridge) bridge->onStreamData(streamId, data);
 }
 
 struct GtkEvalScriptPayload {
@@ -746,11 +575,14 @@ void WebkitGTKWindow::close() {
     if (windowGTK) {
         Gtk::Window *win = windowGTK;
         windowGTK = nullptr;
+        // first, so no stream data reaches this window anymore
+        App::instance->close(ctx);
+        delete bridge;
+        bridge = nullptr;
         if (webview) {
             g_object_set_data(G_OBJECT(webview), "fullstacked_window", nullptr);
             webview = nullptr;
         }
-        App::instance->close(ctx);
         delete win;
     }
 }

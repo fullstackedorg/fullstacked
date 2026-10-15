@@ -5,10 +5,11 @@
 #include <gtkmm/application.h>
 #include <gtkmm/window.h>
 #include <map>
-#include <mutex>
 #include <string>
 #include <vector>
 #include <webkit/webkit.h>
+
+class GtkBridge;
 
 class WebkitGTKWindow : public Window {
         friend class WebkitGTKGUI;
@@ -21,16 +22,9 @@ class WebkitGTKWindow : public Window {
         Gtk::Window *authWindowGTK = nullptr;
         bool authResolved = false;
 
-        std::mutex syncMutex;
-        std::map<uint8_t, WebKitURISchemeRequest *> syncAwaitersResolve;
-        std::map<uint8_t, std::vector<uint8_t>> syncAwaitersPayload;
+        // calls, stream frames and requests of the page (bridge.cpp)
+        GtkBridge *bridge = nullptr;
 
-        static void onBridgeMessage(WebKitUserContentManager *manager,
-                                    JSCValue *value, gpointer userData);
-        static void onOpenMessage(WebKitUserContentManager *manager,
-                                  JSCValue *value, gpointer userData);
-        static void onExitMessage(WebKitUserContentManager *manager,
-                                  JSCValue *value, gpointer userData);
         static void onAuthMessage(WebKitUserContentManager *manager,
                                   JSCValue *value, gpointer userData);
         static void onCloseMessage(WebKitUserContentManager *manager,
@@ -56,9 +50,6 @@ class WebkitGTKWindow : public Window {
 
         void initWindow();
         void handleSchemeRequest(WebKitURISchemeRequest *request);
-        void handleBridgeMessage(const std::string &payloadB64);
-        void resolveSyncAwaiter(uint8_t id,
-                                const std::vector<uint8_t> &payload);
 
         GtkWidget *createAuthWebView(WebKitNavigationAction *navigation_action);
         void closeAuthWindow(bool canceled = false);

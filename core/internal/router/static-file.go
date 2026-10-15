@@ -14,26 +14,9 @@ import (
 // adapters needs to receive both mime type and file content
 // buffer of size 0 means not found
 func staticFile(ctx *types.Context, pathname string) []byte {
-	pathname, _ = url.PathUnescape(pathname)
-	pathname = strings.TrimLeft(pathname, "/")
-	pathname = strings.TrimRight(pathname, "/")
-
-	foundPath, contents, err := resolveFile(filepath.Join(ctx.Directories.Build, pathname))
-	if err != nil {
-		foundPath, contents, err = resolveFile(filepath.Join(ctx.Directories.Root, pathname))
-	}
-	pathname = foundPath
-
-	if err != nil {
+	mimeType, contents, ok := resolveStaticFile(ctx, pathname)
+	if !ok {
 		return []byte{}
-	}
-
-	ext := filepath.Ext(pathname)
-
-	mimeType := mime.TypeByExtension(ext)
-
-	if mimeType == "" {
-		mimeType = "text/plain"
 	}
 
 	mimeTypeSerialized, err := serialization.Serialize(mimeType)
@@ -55,6 +38,30 @@ func staticFile(ctx *types.Context, pathname string) []byte {
 	}
 
 	return merged
+}
+
+// the file of a page path in the build directory, then the root directory
+func resolveStaticFile(ctx *types.Context, pathname string) (string, []byte, bool) {
+	pathname, _ = url.PathUnescape(pathname)
+	pathname = strings.TrimLeft(pathname, "/")
+	pathname = strings.TrimRight(pathname, "/")
+
+	foundPath, contents, err := resolveFile(filepath.Join(ctx.Directories.Build, pathname))
+	if err != nil {
+		foundPath, contents, err = resolveFile(filepath.Join(ctx.Directories.Root, pathname))
+	}
+
+	if err != nil {
+		return "", nil, false
+	}
+
+	mimeType := mime.TypeByExtension(filepath.Ext(foundPath))
+
+	if mimeType == "" {
+		mimeType = "text/plain"
+	}
+
+	return mimeType, contents, true
 }
 
 func resolveFile(pathname string) (string, []byte, error) {

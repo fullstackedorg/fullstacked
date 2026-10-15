@@ -67,6 +67,119 @@ JNIEXPORT jint JNICALL Java_org_fullstacked_Core_call
     return responseSize;
 }
 
+// Thread safe: the core synchronizes per context, responses are returned
+// directly instead of being stored by request id.
+JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_callWithResponse
+        (JNIEnv *env, jobject thiz, jbyteArray payload) {
+    int length = env->GetArrayLength(payload);
+    jbyte* buffer = env->GetByteArrayElements(payload, nullptr);
+
+    int size = 0;
+    void* response = callWithResponse(static_cast<void*>(buffer), length, &size);
+
+    env->ReleaseByteArrayElements(payload, buffer, JNI_ABORT);
+
+    if (response == nullptr || size <= 0) {
+        return env->NewByteArray(0);
+    }
+
+    jbyteArray result = env->NewByteArray(size);
+    if (result != nullptr) {
+        env->SetByteArrayRegion(result, 0, size, static_cast<const jbyte*>(response));
+    }
+    freePtr(response);
+
+    return result;
+}
+
+// Stream data of a context as binary frames for GET /stream, see
+// core/internal/frames
+JNIEXPORT jint JNICALL Java_org_fullstacked_Core_streamAttach
+        (JNIEnv *env, jobject thiz, jint ctxId) {
+    return streamAttach(static_cast<uint8_t>(ctxId));
+}
+
+// Blocks until frames are queued, null once the reader ended
+JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_streamRead
+        (JNIEnv *env, jobject thiz, jint ctxId, jint gen) {
+    int size = 0;
+    void* frames = streamRead(static_cast<uint8_t>(ctxId), gen, &size);
+    if (frames == nullptr || size <= 0) {
+        return nullptr;
+    }
+
+    jbyteArray result = env->NewByteArray(size);
+    if (result != nullptr) {
+        env->SetByteArrayRegion(result, 0, size, static_cast<const jbyte*>(frames));
+    }
+    freePtr(frames);
+
+    return result;
+}
+
+JNIEXPORT void JNICALL Java_org_fullstacked_Core_streamDetach
+        (JNIEnv *env, jobject thiz, jint ctxId, jint gen) {
+    streamDetach(static_cast<uint8_t>(ctxId), gen);
+}
+
+JNIEXPORT void JNICALL Java_org_fullstacked_Core_setPlatform
+        (JNIEnv *env, jobject thiz, jstring name, jboolean binaryCalls) {
+    const char* namePtr = env->GetStringUTFChars(name, nullptr);
+    setPlatform(const_cast<char*>(namePtr), binaryCalls ? 1 : 0);
+    env->ReleaseStringUTFChars(name, namePtr);
+}
+
+// A request of the page answered by the core: [status u16][mime type]\n[body]
+JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_handleRequest
+        (JNIEnv *env, jobject thiz, jint ctxId, jstring path) {
+    const char* pathPtr = env->GetStringUTFChars(path, nullptr);
+    int status = 0;
+    int size = 0;
+    void* response = handleRequest(static_cast<uint8_t>(ctxId), const_cast<char*>(pathPtr), nullptr, 0, &status, &size);
+    env->ReleaseStringUTFChars(path, pathPtr);
+
+    jbyteArray result = env->NewByteArray(size + 2);
+    if (result != nullptr) {
+        jbyte statusBytes[2] = {static_cast<jbyte>(status >> 8), static_cast<jbyte>(status & 0xFF)};
+        env->SetByteArrayRegion(result, 0, 2, statusBytes);
+        if (response != nullptr && size > 0) {
+            env->SetByteArrayRegion(result, 2, size, static_cast<const jbyte*>(response));
+        }
+    }
+    if (response != nullptr) {
+        freePtr(response);
+    }
+    return result;
+}
+
+// A call received on a message channel: null when the core put a large
+// response on the frame stream
+JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_callMessage
+        (JNIEnv *env, jobject thiz, jbyteArray payload) {
+    int length = env->GetArrayLength(payload);
+    jbyte* buffer = env->GetByteArrayElements(payload, nullptr);
+
+    int size = 0;
+    void* response = callMessage(static_cast<void*>(buffer), length, &size);
+
+    env->ReleaseByteArrayElements(payload, buffer, JNI_ABORT);
+
+    if (size < 0) {
+        return nullptr;
+    }
+    if (response == nullptr || size == 0) {
+        return env->NewByteArray(0);
+    }
+
+    jbyteArray result = env->NewByteArray(size);
+    if (result != nullptr) {
+        env->SetByteArrayRegion(result, 0, size, static_cast<const jbyte*>(response));
+    }
+    freePtr(response);
+
+    return result;
+}
+
 JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_getCorePayload
         (JNIEnv *env, jobject thiz, jint ctx, jint coreType, jint id, jint size) {
     jbyteArray response = env->NewByteArray(size);

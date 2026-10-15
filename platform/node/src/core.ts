@@ -16,9 +16,30 @@ export interface Core {
     check(ctx: number): boolean;
     stop(ctx: number): void;
     call(payload: ArrayBuffer): ArrayBuffer;
+    // the platform name the page reads at /platform, binaryCalls when the
+    // host reads the request bodies of POST /call and /sync
+    setPlatform(name: string, binaryCalls: boolean): void;
+    // a request of the page answered by the core (static files, /platform,
+    // /ctx, POST /call and /sync...): [status, mime type, body]
+    request(
+        ctx: number,
+        path: string,
+        body?: Uint8Array
+    ): [status: number, mimeType: string, body: Buffer];
     setOnStreamData(
         cb: (ctx: number, streamId: number, buffer: ArrayBuffer) => void
     ): void;
+    // stream data of a context as binary frames for GET /stream, see
+    // core/internal/frames
+    streamAttach(ctx: number): number;
+    // calls back with each batch of frames (over the core buffer, no copy),
+    // null once the reader ended
+    streamStart(
+        ctx: number,
+        gen: number,
+        cb: (frames: Buffer | null) => void
+    ): void;
+    streamDetach(ctx: number, gen: number): void;
     end(): void;
 }
 
@@ -40,7 +61,13 @@ function verifyVersion(binLocation: string) {
         const packageJsonBin = JSON.parse(
             fs.readFileSync(packageJsonFileBin, { encoding: "utf-8" })
         );
-        return packageJsonBin.version === getPackageJson().version;
+        const version = getPackageJson().version;
+        // from source, package.json has no build number (set when packing)
+        return (
+            packageJsonBin.version === version ||
+            packageJsonBin.version.startsWith(`${version}.`) ||
+            packageJsonBin.version.startsWith(`${version}-`)
+        );
     } catch (e) {
         console.log(e);
         return false;
@@ -65,6 +92,7 @@ export async function load(
     core = require(bindingPath);
     core.load(libPath);
     core.setOnStreamData(onStreamData);
+    core.setPlatform("node", true);
 
     return core;
 }

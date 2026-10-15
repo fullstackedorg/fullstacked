@@ -5,7 +5,7 @@ import plugin from "../plugin/index.ts";
 import packages from "../packages/index.ts";
 import path from "../path/index.ts";
 import fs from "../fs/index.ts";
-import version from "../process/version.json" with { type: "json" };
+import { versions } from "../process/index.ts";
 import os from "../os/index.ts";
 import {
     getActiveInterfaces,
@@ -576,6 +576,7 @@ export async function execute(
     const showHelp = hasArgFlag(["-h", "--help"], args);
 
     if (showVersion) {
+        const version = versions.fullstacked;
         writeOut(
             `FullStacked v${version.major}.${version.minor}.${version.patch} (build ${version.build}), branch ${version.branch}, hash ${version.hash.slice(0, 8)}`
         );

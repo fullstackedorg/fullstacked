@@ -15,11 +15,10 @@
 #include <QWebEngineUrlSchemeHandler>
 #include <QWebEngineView>
 #include <map>
-#include <mutex>
 #include <string>
 #include <vector>
 
-class Bridge;
+class QtBridge;
 class QtWindow;
 class AuthWindow;
 
@@ -78,11 +77,9 @@ class QtWindow : public Window {
     private:
         QMainWindow *windowQt = nullptr;
         QWebEngineView *webEngineView = nullptr;
-        Bridge *bridge = nullptr;
-
-        std::mutex syncMutex;
-        std::map<uint8_t, QWebEngineUrlRequestJob *> syncAwaitersResolve;
-        std::map<uint8_t, std::vector<uint8_t>> syncAwaitersPayload;
+        // calls, stream frames and requests of the page (bridge.cpp),
+        // deleted with the page
+        QtBridge *bridge = nullptr;
 
         void init();
 
@@ -103,19 +100,7 @@ class QtWindow : public Window {
         QMainWindow *getQMainWindow() const {
             return windowQt;
         }
-        void onBridgeMessage(const std::string &payloadB64);
-        void resolveSyncAwaiter(uint8_t id,
-                                const std::vector<uint8_t> &payload);
         void handleSchemeRequest(QWebEngineUrlRequestJob *job);
-};
-
-class Bridge : public QObject {
-        Q_OBJECT
-    public:
-        QtWindow *window = nullptr;
-
-    public slots:
-        void postMessage(const QString &message);
 };
 
 class QtGUI : public GUI {

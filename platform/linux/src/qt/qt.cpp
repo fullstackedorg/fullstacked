@@ -1,6 +1,6 @@
 #include "./qt.h"
+#include "./bridge.h"
 #include "../app.h"
-#include "../base64.h"
 #include "../core.h"
 #include "../utils.h"
 #include <QBuffer>
@@ -11,11 +11,11 @@
 #include <QGuiApplication>
 #include <QKeyEvent>
 #include <QKeySequence>
+#include <QPointer>
 #include <QScreen>
 #include <QShortcut>
 #include <QUrl>
 #include <QUrlQuery>
-#include <QWebChannel>
 #include <QWebEnginePage>
 #include <QWebEngineProfile>
 #include <QWebEngineScript>
@@ -63,12 +63,6 @@ void SchemeHandler::requestStarted(QWebEngineUrlRequestJob *job) {
         win->handleSchemeRequest(job);
     } else {
         job->fail(QWebEngineUrlRequestJob::UrlNotFound);
-    }
-}
-
-void Bridge::postMessage(const QString &message) {
-    if (window) {
-        window->onBridgeMessage(message.toStdString());
     }
 }
 
@@ -267,12 +261,17 @@ int QtGUI::run(int &argc, char **argv, std::function<void()> onReady,
     QWebEngineUrlScheme scheme("fs");
     scheme.setSyntax(QWebEngineUrlScheme::Syntax::HostAndPort);
     scheme.setDefaultPort(80);
-    scheme.setFlags(QWebEngineUrlScheme::SecureScheme |
-                    QWebEngineUrlScheme::LocalAccessAllowed |
-                    QWebEngineUrlScheme::ViewSourceAllowed |
-                    QWebEngineUrlScheme::ContentSecurityPolicyIgnored |
-                    QWebEngineUrlScheme::CorsEnabled |
-                    QWebEngineUrlScheme::FetchApiAllowed);
+    QWebEngineUrlScheme::Flags schemeFlags =
+        QWebEngineUrlScheme::SecureScheme |
+        QWebEngineUrlScheme::LocalAccessAllowed |
+        QWebEngineUrlScheme::ViewSourceAllowed |
+        QWebEngineUrlScheme::ContentSecurityPolicyIgnored |
+        QWebEngineUrlScheme::CorsEnabled;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
+    // Qt < 6.6 (Ubuntu 24.04 ships 6.4) has no FetchApiAllowed
+    schemeFlags |= QWebEngineUrlScheme::FetchApiAllowed;
+#endif
+    scheme.setFlags(schemeFlags);
     QWebEngineUrlScheme::registerScheme(scheme);
 
     app = new QApplication(argc, argv);
@@ -317,6 +316,7 @@ int QtGUI::run(int &argc, char **argv, std::function<void()> onReady,
     schemeHandler = new SchemeHandler(app);
     QWebEngineProfile::defaultProfile()->installUrlSchemeHandler("fs",
                                                                  schemeHandler);
+    Core::setPlatform("linux", QtBridge::binaryCalls);
 
     QTimer::singleShot(0, onReady);
     return app->exec();
@@ -425,8 +425,8 @@ static const char *s_qwebchannel_js =
     "}\n"
     "window._pendingBridge = window._pendingBridge || [];\n"
     "window.bridge = window.bridge || {\n"
-    "    postMessage: function(msg) {\n"
-    "        window._pendingBridge.push(msg);\n"
+    "    postMessage: function(msg, cb) {\n"
+    "        window._pendingBridge.push([msg, cb]);\n"
     "    }\n"
     "};\n"
     "(function initChannel() {\n"
@@ -436,7 +436,8 @@ static const char *s_qwebchannel_js =
     "            while (window._pendingBridge && window._pendingBridge.length) "
     "{\n"
     "                "
-    "window.bridge.postMessage(window._pendingBridge.shift());\n"
+    "window.bridge.postMessage.apply(window.bridge, "
+                "window._pendingBridge.shift());\n"
     "            }\n"
     "        });\n"
     "    } else {\n"
@@ -535,11 +536,7 @@ void QtWindow::init() {
         QWebEngineSettings::Accelerated2dCanvasEnabled, true);
     webEngineView->setPage(page);
 
-    auto *channel = new QWebChannel(page);
-    bridge = new Bridge();
-    bridge->window = this;
-    channel->registerObject("bridge", bridge);
-    page->setWebChannel(channel);
+    bridge = new QtBridge(ctx, page);
 
     QObject::connect(windowQt, &QMainWindow::destroyed, [this]() { close(); });
 
@@ -553,43 +550,8 @@ void QtWindow::init() {
 void QtWindow::handleSchemeRequest(QWebEngineUrlRequestJob *job) {
     QUrl url = job->requestUrl();
     QString path = url.path();
-    if (path.isEmpty() || path == "/") {
-        path = "/index.html";
-    }
-
-    if (path == "/platform") {
-        auto *buffer = new QBuffer();
-        buffer->setData("linux");
-        buffer->open(QIODevice::ReadOnly);
-        job->reply("text/plain", buffer);
-        return;
-    }
-
-    if (path == "/ctx") {
-        auto *buffer = new QBuffer();
-        buffer->setData(QByteArray::number(ctx));
-        buffer->open(QIODevice::ReadOnly);
-        job->reply("text/plain", buffer);
-        return;
-    }
-
-    if (path.startsWith("/sync/")) {
-        uint8_t id = static_cast<uint8_t>(path.mid(6).toUInt());
-        std::lock_guard<std::mutex> lock(syncMutex);
-        auto it = syncAwaitersPayload.find(id);
-        if (it != syncAwaitersPayload.end()) {
-            auto payload = it->second;
-            syncAwaitersPayload.erase(it);
-            std::string b64 = base64_encode(payload.data(), payload.size());
-            auto *buffer = new QBuffer();
-            buffer->setData(
-                QByteArray(b64.data(), static_cast<int>(b64.size())));
-            buffer->open(QIODevice::ReadOnly);
-            job->reply("application/octet-stream", buffer);
-        } else {
-            syncAwaitersResolve[id] = job;
-        }
-        return;
+    if (path.isEmpty()) {
+        path = "/";
     }
 
     if (path == "/exit") {
@@ -637,102 +599,17 @@ void QtWindow::handleSchemeRequest(QWebEngineUrlRequestJob *job) {
         return;
     }
 
-    // Static file serving via Core
-    std::string pathStd = path.toStdString();
-    std::vector<uint8_t> header = {ctx,
-                                   0, // req id
-                                   0, // Core Module
-                                   0, // Fn Static File
-                                   0, // Async
-                                   static_cast<uint8_t>(STRING)};
-
-    uint8_t pathLen[4];
-    numberToUint4Bytes(pathStd.size(), pathLen);
-
-    std::vector<uint8_t> payload = header;
-    payload.insert(payload.end(), pathLen, pathLen + 4);
-    payload.insert(payload.end(), pathStd.begin(), pathStd.end());
-
-    auto responseData = Core::callCore(payload);
-    if (responseData.size() <= 1) {
-        job->fail(QWebEngineUrlRequestJob::UrlNotFound);
-        return;
-    }
-
-    auto [argBuffer, _] = deserialize(responseData, 1);
-    std::vector<DataValue> values = deserializeAll(argBuffer.buffer);
-
-    if (values.size() < 2) {
-        job->fail(QWebEngineUrlRequestJob::UrlNotFound);
-        return;
-    }
-
-    auto *buffer = new QBuffer();
-    buffer->setData(
-        QByteArray(reinterpret_cast<const char *>(values[1].buffer.data()),
-                   static_cast<int>(values[1].buffer.size())));
-    buffer->open(QIODevice::ReadOnly);
-    job->reply(QByteArray::fromStdString(values[0].str), buffer);
-}
-
-void QtWindow::onBridgeMessage(const std::string &payloadB64) {
-    std::string payloadRaw = base64_decode(payloadB64);
-    std::vector<uint8_t> payload(payloadRaw.begin(), payloadRaw.end());
-    if (payload.empty()) return;
-
-    auto response = Core::callCore(payload);
-    uint8_t id = payload.size() > 1 ? payload[1] : 0;
-    uint8_t isSync = payload.size() > 4 ? payload[4] : 0;
-
-    if (isSync == 1) {
-        resolveSyncAwaiter(id, response);
+    if (bridge) {
+        bridge->request(job, path);
     } else {
-        std::string respB64 = base64_encode(response.data(), response.size());
-        QString script =
-            QString("if (window.fullstacked && window.fullstacked.respond) { "
-                    "window.fullstacked.respond(%1, `%2`); }")
-                .arg(id)
-                .arg(QString::fromStdString(respB64));
-        if (webEngineView && webEngineView->page()) {
-            webEngineView->page()->runJavaScript(script);
-        }
+        job->fail(QWebEngineUrlRequestJob::UrlNotFound);
     }
 }
 
-void QtWindow::resolveSyncAwaiter(uint8_t id,
-                                  const std::vector<uint8_t> &payload) {
-    std::lock_guard<std::mutex> lock(syncMutex);
-    auto it = syncAwaitersResolve.find(id);
-    if (it != syncAwaitersResolve.end()) {
-        QWebEngineUrlRequestJob *job = it->second;
-        syncAwaitersResolve.erase(it);
-        std::string b64 = base64_encode(payload.data(), payload.size());
-        auto *buffer = new QBuffer();
-        buffer->setData(QByteArray(b64.data(), static_cast<int>(b64.size())));
-        buffer->open(QIODevice::ReadOnly);
-        job->reply("application/octet-stream", buffer);
-    } else {
-        syncAwaitersPayload[id] = payload;
-    }
-}
-
+// called from core threads, App holds the window while it runs
 void QtWindow::onStreamData(uint8_t streamId,
                             const std::vector<uint8_t> &data) {
-    if (!webEngineView) return;
-    std::string b64 = base64_encode(data.data(), data.size());
-    QMetaObject::invokeMethod(
-        webEngineView,
-        [this, streamId, b64]() {
-            if (!webEngineView || !webEngineView->page()) return;
-            QString script =
-                QString("if (window.fullstacked && "
-                        "window.fullstacked.onStreamData) { "
-                        "window.fullstacked.onStreamData(%1, `%2`); }")
-                    .arg(streamId)
-                    .arg(QString::fromStdString(b64));
-            webEngineView->page()->runJavaScript(script);
-        },
-        Qt::QueuedConnection);
+    if (bridge) bridge->onStreamData(streamId, data);
 }
 
 void QtWindow::evaluateJavaScript(const std::string &script) {
@@ -836,8 +713,11 @@ void QtWindow::close() {
     if (windowQt) {
         QMainWindow *win = windowQt;
         windowQt = nullptr;
-        webEngineView = nullptr;
+        // first, so no stream data reaches this window anymore
         App::instance->close(ctx);
+        // deleted with the page
+        bridge = nullptr;
+        webEngineView = nullptr;
         delete win;
     }
 }

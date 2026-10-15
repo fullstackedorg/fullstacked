@@ -26,20 +26,20 @@ var lib embed.FS
 
 var libModules = map[string]string{
 	"auth":                "/lib/auth/index.ts",
-	"assert":              "/lib/assert/index.js",
+	"assert":              "/lib/assert/index.ts",
 	"async_hooks":         "/lib/unavailable/index.ts",
 	"buffer":              "/lib/buffer/index.ts",
 	"bundle":              "/lib/bundle/index.ts",
 	"child_process":       "/lib/unavailable/index.ts",
 	"console":             "/lib/console/index.ts",
-	"constants":           "/lib/constants/index.json",
+	"constants":           "/lib/constants/index.ts",
 	"config":              "/lib/config/index.ts",
 	"crypto":              "/lib/crypto/index.ts",
-	"diagnostics_channel": "/lib/diagnostics_channel/index.js",
+	"diagnostics_channel": "/lib/diagnostics_channel/index.ts",
 	"dgram":               "/lib/dgram/index.ts",
 	"dns":                 "/lib/dns/index.ts",
 	"dns/promises":        "/lib/dns/promises.ts",
-	"events":              "/lib/events/index.js",
+	"events":              "/lib/events/index.ts",
 	"fetch":               "/lib/fetch/index.ts",
 	"fs":                  "/lib/fs/index.ts",
 	"fs/promises":         "/lib/fs/promises.ts",
@@ -61,18 +61,20 @@ var libModules = map[string]string{
 	"readline":            "/lib/readline/index.ts",
 	"readline/promises":   "/lib/readline/promises.ts",
 	"run":                 "/lib/run/index.ts",
-	"stream":              "/lib/stream/index.js",
-	"stream/web":          "/lib/unavailable/index.js",
-	"string_decoder":      "/lib/string_decoder/index.js",
-	"sqlite":              "/lib/unavailable/index.js",
+	"stream":              "/lib/stream/index.ts",
+	"stream/consumers":    "/lib/stream/consumers.ts",
+	"stream/promises":     "/lib/stream/promises.ts",
+	"stream/web":          "/lib/stream/web.ts",
+	"string_decoder":      "/lib/string_decoder/index.ts",
+	"sqlite":              "/lib/unavailable/index.ts",
 	"timers":              "/lib/timers/index.ts",
 	"timers/promises":     "/lib/timers/promises.ts",
 	"tls":                 "/lib/tls/index.ts",
 	"tunnel":              "/lib/tunnel/index.ts",
 	"tty":                 "/lib/tty/index.ts",
 	"url":                 "/lib/url/index.ts",
-	"util":                "/lib/util/index.js",
-	"util/types":          "/lib/util/types/index.js",
+	"util":                "/lib/util/index.ts",
+	"util/types":          "/lib/util/types.ts",
 	"vm":                  "/lib/unavailable/index.ts",
 	"v8":                  "/lib/unavailable/index.ts",
 	"worker_threads":      "/lib/worker_threads/index.ts",
@@ -156,6 +158,17 @@ func EsbuildVersionFn() string {
 
 	return ""
 }
+
+// FullStackedVersion is the version.json written in the lib at build time,
+// read from the embedded lib so it reports the running core's version
+var FullStackedVersion = sync.OnceValue(func() map[string]string {
+	version := map[string]string{}
+	contents, err := lib.ReadFile("lib/process/version.json")
+	if err == nil {
+		json.Unmarshal(contents, &version)
+	}
+	return version
+})
 
 type EsbuildResult struct {
 	OutputFiles []string
@@ -474,9 +487,33 @@ var esbuildPluginsLib = []esbuild.Plugin{
 					return esbuild.OnResolveResult{}, nil
 				}
 
+				// require() gets what Node's require gets, see libRequireAdapter
+				if args.Kind == esbuild.ResolveJSRequireCall && libRequireDefault[args.Path] {
+					return esbuild.OnResolveResult{
+						Namespace: "lib-require",
+						Path:      libModulePath,
+					}, nil
+				}
+
 				return esbuild.OnResolveResult{
 					Namespace: "lib",
 					Path:      libModulePath,
+				}, nil
+			})
+
+			// the module an adapter requires
+			build.OnResolve(esbuild.OnResolveOptions{Namespace: "lib-require", Filter: ".*"}, func(args esbuild.OnResolveArgs) (esbuild.OnResolveResult, error) {
+				return esbuild.OnResolveResult{
+					Path:      args.Path,
+					Namespace: "lib",
+				}, nil
+			})
+
+			build.OnLoad(esbuild.OnLoadOptions{Namespace: "lib-require", Filter: ".*"}, func(args esbuild.OnLoadArgs) (esbuild.OnLoadResult, error) {
+				contents := libRequireAdapter(args.Path)
+				return esbuild.OnLoadResult{
+					Loader:   esbuild.LoaderJS,
+					Contents: &contents,
 				}, nil
 			})
 
@@ -520,6 +557,35 @@ var esbuildPluginsLib = []esbuild.Plugin{
 			})
 		},
 	},
+}
+
+// The lib modules that export "module.exports" (see libRequireAdapter).
+// Only these go through the adapter: an adapter is evaluated once, and a
+// module required while it is still initializing (a CommonJS shim bundle
+// requiring its own module name) would be cached half-built.
+var libRequireDefault = map[string]bool{
+	"assert":              true,
+	"buffer":              true,
+	"constants":           true,
+	"diagnostics_channel": true,
+	"events":              true,
+	"querystring":         true,
+	"stream":              true,
+	"string_decoder":      true,
+	"util":                true,
+	"util/types":          true,
+}
+
+// A lib module written in TypeScript is an ES module: required, esbuild
+// hands out its namespace object, where Node's require of a built-in gives
+// the module itself (events: the EventEmitter function, assert: the assert
+// function). A module that exports "module.exports" (Node's own convention
+// for require of an ES module) is required as that value, any other as its
+// namespace, as before.
+func libRequireAdapter(libModulePath string) string {
+	path, _ := json.Marshal(libModulePath)
+	return "var m = require(" + string(path) + ");\n" +
+		"module.exports = m && m[\"module.exports\"] !== undefined ? m[\"module.exports\"] : m;\n"
 }
 
 func addCatchAllSourceFilePlugin(buildOptions *esbuild.BuildOptions, sourceFiles *[]string) {

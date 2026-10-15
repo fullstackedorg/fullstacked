@@ -13,7 +13,7 @@ suite("events - e2e", () => {
             { foo: "testing" }
         ];
 
-        const received = [];
+        const received: unknown[] = [];
         await new Promise<void>((res) => {
             const emitter = t.eventEmitter(0, ...data);
             emitter.on("event", received.push.bind(received));
@@ -32,7 +32,7 @@ suite("events - e2e", () => {
             { foo: "testing" }
         ];
 
-        const received = [];
+        const received: unknown[] = [];
         await new Promise<void>((res) => {
             const emitter = t.eventEmitter(100, ...data);
             emitter.on("event", received.push.bind(received));

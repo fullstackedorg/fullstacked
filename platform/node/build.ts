@@ -97,23 +97,8 @@ esbuild.buildSync({
     platform: "node"
 });
 
-const packageJsonFile = path.resolve(currentDirectory, "package.json");
-const packageJson = JSON.parse(
-    fs.readFileSync(packageJsonFile, { encoding: "utf-8" })
-);
-
 const version = getVersion(path.resolve(currentDirectory, "..", ".."));
 const fullVersion = `${version.major}.${version.minor}.${version.patch}${version.patch.includes("-") ? "." : "-"}${version.build}`;
-
-packageJson.version = fullVersion;
-
-if (packageJson.optionalDependencies) {
-    Object.keys(packageJson.optionalDependencies).forEach((key) => {
-        packageJson.optionalDependencies[key] = fullVersion;
-    });
-}
-
-fs.writeFileSync(packageJsonFile, JSON.stringify(packageJson, null, 4));
 
 const binPackageJson = {
     name: `@fullstacked/${environment}`,

@@ -564,10 +564,7 @@ func install(
 				if isGit {
 					err = git.CloneRepo(ctx, gitUrl, tDir, nil)
 					if err == nil {
-						fs.RmFn(filepath.Join(tDir, ".git"))
-						fs.RmFn(filepath.Join(tDir, ".gitignore"))
-						fs.RmFn(filepath.Join(tDir, ".npmignore"))
-						fs.RmFn(filepath.Join(tDir, "package-lock.json"))
+						packGitCheckout(tDir)
 					}
 				} else {
 					err = downloadAndExtract(resolvedURL, tDir, pkgName, func(prog float64) {
@@ -751,10 +748,7 @@ func install(
 			if isGit {
 				err = git.CloneRepo(ctx, gitUrl, tDir, nil)
 				if err == nil {
-					fs.RmFn(filepath.Join(tDir, ".git"))
-					fs.RmFn(filepath.Join(tDir, ".gitignore"))
-					fs.RmFn(filepath.Join(tDir, ".npmignore"))
-					fs.RmFn(filepath.Join(tDir, "package-lock.json"))
+					packGitCheckout(tDir)
 				}
 			} else {
 				err = downloadAndExtract(ver.Resolved, tDir, pFlat, func(p float64) {

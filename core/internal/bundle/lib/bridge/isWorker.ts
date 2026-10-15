@@ -1,3 +1,6 @@
+// WorkerGlobalScope exists in workers only, lib.dom does not declare it
+const WorkerScope = (globalThis as { WorkerGlobalScope?: Function })
+    .WorkerGlobalScope;
+
 export const isWorker =
-    typeof globalThis.WorkerGlobalScope !== "undefined" &&
-    self instanceof globalThis.WorkerGlobalScope;
+    typeof WorkerScope !== "undefined" && self instanceof WorkerScope;

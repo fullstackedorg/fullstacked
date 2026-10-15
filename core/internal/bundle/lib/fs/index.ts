@@ -2,6 +2,7 @@
 
 import {
     Copy,
+    CreateReadStream,
     CreateWriteStream,
     Exists,
     type GoFileInfo,
@@ -15,7 +16,8 @@ import {
     AppendFile
 } from "../@types/fs.ts";
 import { Fs } from "../@types/index.ts";
-import { Writable } from "stream";
+import { Readable, Writable } from "stream";
+import { Buffer } from "buffer";
 import type { Duplex } from "../bridge/duplex.ts";
 import {
     convertGoFileInfo,
@@ -398,6 +400,119 @@ export function createWriteStream(path: PathLike, options?: any): WriteStream {
     return new WriteStream(formatPathLike(path), options);
 }
 
+type ReadStreamOptions = {
+    encoding?: BufferEncoding | null;
+    start?: number;
+    end?: number;
+    highWaterMark?: number;
+    autoClose?: boolean;
+    emitClose?: boolean;
+    signal?: AbortSignal;
+};
+
+// the code Node gives an open error, from the message of the Go error
+function systemError(message: string, path: string) {
+    const codes: [RegExp, string][] = [
+        [/no such file or directory|cannot find/i, "ENOENT"],
+        [/permission denied|access is denied/i, "EACCES"],
+        [/is a directory/i, "EISDIR"]
+    ];
+    const code = codes.find(([re]) => re.test(message))?.[1];
+    const error = new Error(
+        code ? `${code}: ${message}, open '${path}'` : message
+    ) as NodeJS.ErrnoException;
+    if (code) {
+        error.code = code;
+        error.syscall = "open";
+        error.path = path;
+    }
+    return error;
+}
+
+// A Readable over a stream of the core (Fs CreateReadStream), which reads
+// the file in chunks of highWaterMark bytes and ends with the last one.
+// The core holds its reading while the page is behind (frames backpressure).
+export class ReadStream extends Readable {
+    path: string;
+    bytesRead = 0;
+    pending = true;
+    private duplex: Duplex | null = null;
+
+    constructor(path: string, options?: ReadStreamOptions | BufferEncoding) {
+        const opts: ReadStreamOptions =
+            typeof options === "string"
+                ? { encoding: options }
+                : (options ?? {});
+        const highWaterMark = opts.highWaterMark ?? 64 * 1024;
+        super({
+            highWaterMark,
+            encoding: opts.encoding ?? undefined,
+            emitClose: opts.emitClose ?? true,
+            autoDestroy: opts.autoClose ?? true,
+            signal: opts.signal
+        });
+        this.path = path;
+        const start = opts.start ?? 0;
+        const end =
+            opts.end === undefined || opts.end === Infinity ? -1 : opts.end;
+
+        (
+            globalThis.fullstacked.bridge({
+                mod: Fs,
+                fn: CreateReadStream,
+                data: [path, start, end, highWaterMark]
+            }) as Promise<Duplex>
+        )
+            .then(async (d) => {
+                if (this.destroyed) {
+                    d.end();
+                    return;
+                }
+                this.duplex = d;
+                d.on("data", (data) => {
+                    if (this.destroyed) return;
+                    // the core sends bytes
+                    const chunk = data as Uint8Array;
+                    this.bytesRead += chunk.byteLength;
+                    this.push(
+                        Buffer.from(
+                            chunk.buffer,
+                            chunk.byteOffset,
+                            chunk.byteLength
+                        )
+                    );
+                });
+                d.on("close", () => {
+                    if (!this.destroyed) this.push(null);
+                });
+                await d.open();
+                this.pending = false;
+                this.emit("open");
+                this.emit("ready");
+            })
+            .catch((err: any) => {
+                this.destroy(
+                    systemError(err?.message ?? String(err), this.path)
+                );
+            });
+    }
+
+    // the core pushes the chunks as they are read
+    _read() {}
+
+    _destroy(error: Error | null, callback: (error?: Error | null) => void) {
+        this.duplex?.end();
+        callback(error);
+    }
+}
+
+export function createReadStream(
+    path: PathLike,
+    options?: ReadStreamOptions | BufferEncoding
+): ReadStream {
+    return new ReadStream(formatPathLike(path), options);
+}
+
 export type { Stats, Dirent } from "./common.ts";
 
 export * as promises from "./promises.ts";
@@ -426,5 +541,8 @@ export default {
     cpSync,
     cp,
     createWriteStream,
+    createReadStream,
+    WriteStream,
+    ReadStream,
     promises
 };

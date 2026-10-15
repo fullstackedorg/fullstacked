@@ -3,7 +3,7 @@ import SwiftUI
 
 // MacOS
 
-class ResizeHelper: NSObject, WKScriptMessageHandler {
+class ResizeHelper: NSObject {
     /// Weak reference to avoid a retain cycle with the owning WebViewExtended.
     weak var webView: WebViewExtended?
     private weak var observedWindow: NSWindow?
@@ -126,8 +126,8 @@ class ResizeHelper: NSObject, WKScriptMessageHandler {
         return NSRect(x: x, y: y, width: width, height: height)
     }
 
-    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        let body = message.body as! String
+    // GET /resize: "get" answers the size, else sets it (see bridge/platform.ts)
+    func handle(_ body: String) -> String {
         
         if let activeWindow = self.webView?.window {
             observeWindow(activeWindow)
@@ -147,15 +147,14 @@ class ResizeHelper: NSObject, WKScriptMessageHandler {
                 } else {
                     responseStr = "\(frame.size.width):\(frame.size.height):\(frame.origin.x):\(frame.origin.y)"
                 }
-                self.webView?.evaluateJavaScript("window.fullstacked.window.respondGetSize(\"\(responseStr)\")")
-                return
+                return responseStr
             }
             
             if body == "kiosk" {
                 if !activeWindow.styleMask.contains(.fullScreen) {
                     activeWindow.toggleFullScreen(nil)
                 }
-                return
+                return ""
             }
             
             if activeWindow.styleMask.contains(.fullScreen) {
@@ -167,7 +166,7 @@ class ResizeHelper: NSObject, WKScriptMessageHandler {
                 lastRequestedWidth = nil
                 lastRequestedHeight = nil
                 activeWindow.setFrame(visibleFrame, display: true)
-                return
+                return ""
             }
             
             let components = body.split(separator: ":")
@@ -208,6 +207,7 @@ class ResizeHelper: NSObject, WKScriptMessageHandler {
                 activeWindow.setFrame(frame, display: true)
             }
         }
+        return ""
     }
 }
 
@@ -219,11 +219,13 @@ class WebViewExtended: WKWebView, WKUIDelegate {
         
         super.init(frame: frame, configuration: configuration)
         
-        configuration.userContentController.add(WeakMessageHandler(self.resizeHelper), name: "resize")
-        
         self.resizeHelper.webView = self
         
         self.uiDelegate = self
+    }
+
+    func resizeRequest(_ size: String?) -> String? {
+        return resizeHelper.handle(size ?? "get")
     }
     
     required init?(coder: NSCoder) {
@@ -250,7 +252,6 @@ class WebViewExtended: WKWebView, WKUIDelegate {
     func close() {
         self.resizeHelper.stopObservingWindow()
         self.resizeHelper.webView = nil
-        self.configuration.userContentController.removeScriptMessageHandler(forName: "resize")
         self.uiDelegate = nil
         self.window?.close()
     }

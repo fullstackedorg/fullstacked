@@ -68,7 +68,7 @@ export function deserializeUndefined(buffer: ArrayBuffer, index = 0) {
         throw new Error("wrong data type for undefined");
     }
 
-    return { data: undefined, size: 1 };
+    return { data: undefined as undefined, size: 1 };
 }
 
 export function serializeBoolean(bool: boolean) {

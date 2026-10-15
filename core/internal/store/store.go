@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"fullstackedorg/fullstacked/internal/config"
+	"fullstackedorg/fullstacked/internal/frames"
 	"fullstackedorg/fullstacked/internal/serialization"
 	"fullstackedorg/fullstacked/types"
 	"path/filepath"
@@ -65,7 +66,17 @@ func NewContextWithCtxId(
 		Streams:      map[uint8]*types.StoredStream{},
 		StreamsMutex: &sync.Mutex{},
 
+		Frames: frames.NewQueue(),
+
 		NextStreamId: 1,
+
+		Crypto:       map[uint32]any{},
+		CryptoMutex:  &sync.Mutex{},
+		NextCryptoId: 1,
+
+		Zlib:       map[uint32]any{},
+		ZlibMutex:  &sync.Mutex{},
+		NextZlibId: 1,
 
 		PendingDeepLinksMutex: &sync.Mutex{},
 	}
@@ -99,18 +110,25 @@ func ExitContext(ctxId uint8) {
 	}()
 }
 
+// GetContext reads Contexts under ctxMutex, calls run concurrently with
+// NewContext and EndContext
+func GetContext(ctxId uint8) (*types.Context, bool) {
+	ctxMutex.Lock()
+	defer ctxMutex.Unlock()
+	ctx, ok := Contexts[ctxId]
+	return ctx, ok
+}
+
 func EndContext(ctxId uint8) {
 	ctxMutex.Lock()
 
 	ctx, ok := Contexts[ctxId]
 
 	if ok {
-		for i := range ctx.Streams {
-			ctx.Streams[i].Close(ctx, i)
-		}
-
+		ctx.ResponsesMutex.Lock()
 		ctx.Responses = nil
-		ctx.Streams = nil
+		ctx.ResponsesMutex.Unlock()
+
 		ctx.Env = nil
 		ctx.Plugins = nil
 		ctx.GitAuths = nil
@@ -119,6 +137,41 @@ func EndContext(ctxId uint8) {
 	delete(Contexts, ctxId)
 
 	ctxMutex.Unlock()
+
+	if !ok {
+		return
+	}
+
+	ctx.Frames.Close()
+
+	// crypto handles hold no resources outside of memory
+	ctx.CryptoMutex.Lock()
+	ctx.Crypto = nil
+	ctx.CryptoMutex.Unlock()
+
+	// zlib decompression streams have a goroutine to stop
+	ctx.ZlibMutex.Lock()
+	zlibStreams := ctx.Zlib
+	ctx.Zlib = nil
+	ctx.ZlibMutex.Unlock()
+
+	for _, s := range zlibStreams {
+		if closer, ok := s.(interface{ Close() }); ok {
+			closer.Close()
+		}
+	}
+
+	// close streams outside of the locks, Close callbacks may stream
+	ctx.StreamsMutex.Lock()
+	streams := ctx.Streams
+	ctx.Streams = nil
+	ctx.StreamsMutex.Unlock()
+
+	for i, stream := range streams {
+		if stream.Close != nil {
+			stream.Close(ctx, i)
+		}
+	}
 }
 
 func SetEnvironmentData(ctxId uint8, data map[string]string) {
@@ -133,42 +186,23 @@ func SetEnvironmentData(ctxId uint8, data map[string]string) {
 	ctx.Env = data
 }
 
+// StoreResponse keeps the response payload until the host fetches it with
+// GetCorePayload, keyed by the request id
 func StoreResponse(
 	ctx *types.Context,
 	header types.CoreCallHeader,
 	response types.CoreCallResponse,
 ) (int, error) {
-	switch response.Type {
-	case types.CoreResponseError:
-		return storeResponseData(ctx, header, response)
-	case types.CoreResponseData:
-		return storeResponseData(ctx, header, response)
-	case types.CoreResponseStream:
-		return storeResponseStream(ctx, header, response)
+	payload, err := BuildResponse(ctx, response)
+	if err != nil {
+		return 0, err
 	}
 
-	return 0, errors.New("unknown core response type")
-}
-
-func storeResponseData(
-	ctx *types.Context,
-	header types.CoreCallHeader,
-	response types.CoreCallResponse,
-) (int, error) {
 	ctx.ResponsesMutex.Lock()
 	defer ctx.ResponsesMutex.Unlock()
 
-	payload := []byte{response.Type}
-
-	if response.Data != nil {
-		data, err := serialization.Serialize(response.Data)
-		if err != nil {
-			return 0, err
-		}
-		payload, err = serialization.MergeBuffers(payload, data)
-		if err != nil {
-			return 0, err
-		}
+	if ctx.Responses == nil {
+		return 0, errors.New("context ended")
 	}
 
 	ctx.Responses[header.Id] = payload
@@ -176,17 +210,57 @@ func storeResponseData(
 	return len(payload), nil
 }
 
-func storeResponseStream(
+// BuildResponse serializes the response payload, registering the stream
+// of a stream response
+func BuildResponse(
 	ctx *types.Context,
-	header types.CoreCallHeader,
 	response types.CoreCallResponse,
-) (int, error) {
+) ([]byte, error) {
+	switch response.Type {
+	case types.CoreResponseError:
+		return buildResponseData(response)
+	case types.CoreResponseData:
+		return buildResponseData(response)
+	case types.CoreResponseStream:
+		return buildResponseStream(ctx, response)
+	}
+
+	return nil, errors.New("unknown core response type")
+}
+
+func buildResponseData(
+	response types.CoreCallResponse,
+) ([]byte, error) {
+	payload := []byte{response.Type}
+
+	if response.Data != nil {
+		data, err := serialization.Serialize(response.Data)
+		if err != nil {
+			return nil, err
+		}
+		payload, err = serialization.MergeBuffers(payload, data)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return payload, nil
+}
+
+func buildResponseStream(
+	ctx *types.Context,
+	response types.CoreCallResponse,
+) ([]byte, error) {
 	ctx.StreamsMutex.Lock()
 	defer ctx.StreamsMutex.Unlock()
 
 	if response.Stream == nil {
 		debug.PrintStack()
-		return 0, errors.New("cannot store response stream with stream nil")
+		return nil, errors.New("cannot store response stream with stream nil")
+	}
+
+	if ctx.Streams == nil {
+		return nil, errors.New("context ended")
 	}
 
 	streamId := ctx.NextStreamId
@@ -219,19 +293,9 @@ func storeResponseStream(
 	payload := []byte{response.Type}
 	storedStreamIdSerialized, err := serialization.Serialize(float64(storedStreamId))
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	payload, err = serialization.MergeBuffers(payload, storedStreamIdSerialized)
-	if err != nil {
-		return 0, err
-	}
-
-	ctx.ResponsesMutex.Lock()
-	defer ctx.ResponsesMutex.Unlock()
-
-	ctx.Responses[header.Id] = payload
-
-	return len(payload), nil
+	return serialization.MergeBuffers(payload, storedStreamIdSerialized)
 }
 
 /*
@@ -247,10 +311,7 @@ func GetCorePayload(
 	id uint8,
 	size int,
 ) ([]byte, error) {
-	ctxMutex.Lock()
-	ctx, ok := Contexts[ctxId]
-	ctxMutex.Unlock()
-
+	ctx, ok := GetContext(ctxId)
 	if !ok {
 		return nil, errors.New("unkown context")
 	}
@@ -349,6 +410,14 @@ func StreamError(
 	} else {
 		errMsg = "unknown error"
 	}
+
+	if ctx.Frames.Attached() {
+		delete(ctx.Streams, storedStreamId)
+		ctx.StreamsMutex.Unlock()
+		ctx.Frames.Push(storedStreamId, frames.FlagError, []byte(errMsg))
+		return
+	}
+
 	stream.Buffer = []byte(errMsg)
 
 	if OnStreamData == nil {
@@ -377,9 +446,12 @@ func StreamChunk(
 	ctx.StreamsMutex.Lock()
 
 	stream, ok := ctx.Streams[storedStreamId]
+	framesAttached := ctx.Frames.Attached()
 
 	if !ok {
-		if len(buffer) > 0 || !end {
+		// a nil map means the context ended while streaming, frames delete
+		// ended streams right away so late chunks are dropped
+		if ctx.Streams != nil && !framesAttached && (len(buffer) > 0 || !end) {
 			panic("no stream for id")
 		} else {
 			ctx.StreamsMutex.Unlock()
@@ -389,6 +461,19 @@ func StreamChunk(
 
 	if !stream.Opened {
 		panic("streaming chunk for stream not opened")
+	}
+
+	// the host reads the frames, nothing is kept for GetCorePayload
+	if framesAttached {
+		flags := frames.FlagData
+		if end {
+			flags = frames.FlagEnd
+			delete(ctx.Streams, storedStreamId)
+		}
+		ctx.StreamsMutex.Unlock()
+		// waits while the reader catches up, outside of the streams lock
+		ctx.Frames.Push(storedStreamId, flags, buffer)
+		return
 	}
 
 	size := 0

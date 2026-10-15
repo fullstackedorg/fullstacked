@@ -12,11 +12,11 @@ import {
 import fs from "../fs/index.ts";
 
 const cache = {
-    platform: null,
-    arch: null,
-    endianness: null,
+    platform: null as string,
+    arch: null as string,
+    endianness: null as string,
     uname: null as UnameInfo,
-    hostname: null
+    hostname: null as string
 };
 
 export function platform(): string {

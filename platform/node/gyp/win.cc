@@ -11,6 +11,12 @@ CoreLib loadLibrary(std::string libPath) {
         (SetOnStreamData)GetProcAddress(coreLib, "setOnStreamData"),
         (Call)GetProcAddress(coreLib, "call"),
         (GetCorePayload)GetProcAddress(coreLib, "getCorePayload"),
+        (StreamAttach)GetProcAddress(coreLib, "streamAttach"),
+        (StreamRead)GetProcAddress(coreLib, "streamRead"),
+        (StreamDetach)GetProcAddress(coreLib, "streamDetach"),
+        (FreePtr)GetProcAddress(coreLib, "freePtr"),
+        (SetPlatform)GetProcAddress(coreLib, "setPlatform"),
+        (HandleRequest)GetProcAddress(coreLib, "handleRequest"),
     };
 
     return lib;

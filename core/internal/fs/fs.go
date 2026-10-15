@@ -5,12 +5,14 @@ import (
 	"fullstackedorg/fullstacked/internal/path"
 	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/types"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 )
 
 type FsFn = uint8
@@ -27,6 +29,7 @@ const (
 	Copy              FsFn = 8
 	CreateWriteStream FsFn = 9
 	AppendFile        FsFn = 10
+	CreateReadStream  FsFn = 11
 )
 
 func Switch(
@@ -147,6 +150,52 @@ func Switch(
 					file.Close()
 					file = nil
 				}
+			},
+		}
+		return nil
+	case CreateReadStream:
+		// path, start, end (inclusive, -1 for the end of the file), chunk
+		// size. The file is opened here so that an error rejects the call:
+		// the stream carries the bytes only.
+		if len(data) < 4 {
+			return errors.New("createReadStream requires path, start, end and chunk size")
+		}
+		filePath := path.ResolveWithContext(ctx, data[0].Data.(string))
+		start := int64(data[1].Data.(float64))
+		end := int64(data[2].Data.(float64))
+		chunkSize := int(data[3].Data.(float64))
+		if chunkSize <= 0 {
+			chunkSize = 64 * 1024
+		}
+
+		file, err := os.Open(filePath)
+		if err != nil {
+			return err
+		}
+		if start > 0 {
+			if _, err := file.Seek(start, io.SeekStart); err != nil {
+				file.Close()
+				return err
+			}
+		}
+
+		reading := &fileReading{}
+		closeFile := sync.OnceFunc(func() { file.Close() })
+
+		response.Type = types.CoreResponseStream
+		response.Stream = &types.ResponseStream{
+			Open: func(ctx *types.Context, streamId uint8) {
+				defer closeFile()
+				readFileStream(ctx, streamId, file, start, end, chunkSize, reading)
+			},
+			// the core removes the stream right after: once this returns,
+			// the reader pushes nothing more (a chunk for a removed stream
+			// is a panic of store.StreamChunk)
+			Close: func(ctx *types.Context, streamId uint8) {
+				reading.mu.Lock()
+				reading.closed = true
+				reading.mu.Unlock()
+				closeFile()
 			},
 		}
 		return nil
@@ -341,4 +390,56 @@ func copyFileFn(src string, dst string) error {
 	}
 
 	return os.WriteFile(dst, data, srcStat.Mode())
+}
+
+// streams the bytes [start, end] of an open file in chunks of chunkSize,
+// the end with the last chunk; the frames backpressure blocks it while the
+// page is behind, closed stops it when the page destroys the stream. A read
+// error ends the stream early (the page sees fewer bytes).
+func readFileStream(
+	ctx *types.Context,
+	streamId uint8,
+	file *os.File,
+	start int64,
+	end int64,
+	chunkSize int,
+	reading *fileReading,
+) {
+	remaining := int64(-1)
+	if end >= 0 {
+		remaining = end - max(start, 0) + 1
+		if remaining <= 0 {
+			store.StreamChunk(ctx, streamId, nil, true)
+			return
+		}
+	}
+
+	chunk := make([]byte, chunkSize)
+	for {
+		size := chunkSize
+		if remaining >= 0 && int64(size) > remaining {
+			size = int(remaining)
+		}
+		n, err := io.ReadFull(file, chunk[:size])
+		if remaining >= 0 {
+			remaining -= int64(n)
+		}
+		last := err != nil || remaining == 0
+		reading.mu.Lock()
+		if reading.closed {
+			reading.mu.Unlock()
+			return
+		}
+		store.StreamChunk(ctx, streamId, chunk[:n], last)
+		reading.mu.Unlock()
+		if last {
+			return
+		}
+	}
+}
+
+// closed by the page (the stream's Close), under the lock of the pushes
+type fileReading struct {
+	mu     sync.Mutex
+	closed bool
 }

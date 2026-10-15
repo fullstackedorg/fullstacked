@@ -1,6 +1,6 @@
 // source : https://github.com/beatgammit/base64-js/tree/master
-const lookup = [];
-const revLookup = [];
+const lookup: string[] = [];
+const revLookup: number[] = [];
 
 var code = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 for (let i = 0, len = code.length; i < len; ++i) {
@@ -13,7 +13,7 @@ for (let i = 0, len = code.length; i < len; ++i) {
 revLookup["-".charCodeAt(0)] = 62;
 revLookup["_".charCodeAt(0)] = 63;
 
-function getLens(b64) {
+function getLens(b64: string) {
     var len = b64.length;
 
     // if (len % 4 > 0) {
@@ -30,15 +30,25 @@ function getLens(b64) {
     return [validLen, placeHoldersLen];
 }
 
-function _byteLength(_, validLen, placeHoldersLen) {
+function _byteLength(_: string, validLen: number, placeHoldersLen: number) {
     return ((validLen + placeHoldersLen) * 3) / 4 - placeHoldersLen;
 }
 
+// native Uint8Array.fromBase64 / toBase64 (Safari 18.2, Chrome 140, Firefox 133)
+const nativeFromBase64: (b64: string) => Uint8Array<ArrayBuffer> =
+    typeof (Uint8Array as any).fromBase64 === "function"
+        ? (Uint8Array as any).fromBase64.bind(Uint8Array)
+        : null;
+const nativeToBase64 =
+    typeof (Uint8Array.prototype as any).toBase64 === "function";
+
 export function toByteArray(b64: string): Uint8Array<ArrayBuffer> {
-    //@ts-ignore
-    if (typeof Uint8Array.prototype.fromBase64 === "function") {
-        //@ts-ignore
-        return Uint8Array.fromBase64(b64);
+    if (nativeFromBase64) {
+        try {
+            return nativeFromBase64(b64);
+        } catch {
+            // URL-safe or malformed input, the lenient decoder below handles it
+        }
     }
 
     let tmp: any;
@@ -84,7 +94,7 @@ export function toByteArray(b64: string): Uint8Array<ArrayBuffer> {
     return arr;
 }
 
-function tripletToBase64(num) {
+function tripletToBase64(num: number) {
     return (
         lookup[(num >> 18) & 0x3f] +
         lookup[(num >> 12) & 0x3f] +
@@ -93,7 +103,7 @@ function tripletToBase64(num) {
     );
 }
 
-function encodeChunk(uint8, start, end) {
+function encodeChunk(uint8: Uint8Array, start: number, end: number) {
     var tmp;
     var output = [];
     for (var i = start; i < end; i += 3) {
@@ -107,10 +117,8 @@ function encodeChunk(uint8, start, end) {
 }
 
 export function fromByteArray(uint8: Uint8Array): string {
-    //@ts-ignore
-    if (typeof uint8.toBase64 === "function") {
-        //@ts-ignore
-        return uint8.toBase64();
+    if (nativeToBase64) {
+        return (uint8 as any).toBase64();
     }
 
     let tmp;

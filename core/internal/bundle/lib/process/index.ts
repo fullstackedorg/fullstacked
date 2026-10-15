@@ -1,71 +1,43 @@
 import { Core } from "../@types/index.ts";
-import { Chdir, Cwd, Exit, GetEnv } from "../@types/router.ts";
+import { Chdir, Cwd, Exit, GetEnv, Version } from "../@types/router.ts";
 import { isWorker } from "../bridge/isWorker.ts";
-import fullstacked from "./version.json" with { type: "json" };
-import { setTimeout, clearTimeout } from "../timers/index.ts";
 
-// Shims from process.browser.js
-class Item {
-    fun: Function;
-    array: any[];
-    constructor(fun: Function, array: any[]) {
-        this.fun = fun;
-        this.array = array;
-    }
-    run() {
-        this.fun.apply(null, this.array);
-    }
-}
+// process.nextTick: a queue drained on one microtask, as close to Node's
+// nextTick queue as a page allows (the queue runs in order, ticks queued
+// while it drains run in the same drain, a throwing callback leaves the rest
+// for the next microtask). It used to be a setTimeout(0): browsers clamp
+// chained timers to 4 ms and throttle them in hidden pages, which made every
+// npm package that defers with nextTick (browserify-zlib did) wait per chunk.
+type Tick = { fn: Function; args: any[] };
+let ticks: Tick[] = [];
+let tickIndex = 0;
+let tickScheduled = false;
+// a resolved promise's reactions: on V8 a queueMicrotask costs about 8
+// times as much
+const resolved = Promise.resolve();
 
-let queue: Item[] = [];
-let draining = false;
-let currentQueue: Item[] | null = null;
-let queueIndex = -1;
-
-function runTimeout(fun: Function) {
-    return setTimeout(fun as any, 0);
-}
-
-function runClearTimeout(marker: any) {
-    return clearTimeout(marker);
-}
-
-function cleanUpNextTick() {
-    if (!draining || !currentQueue) {
-        return;
-    }
-    draining = false;
-    if (currentQueue.length) {
-        queue = currentQueue.concat(queue);
-    } else {
-        queueIndex = -1;
-    }
-    if (queue.length) {
-        drainQueue();
-    }
-}
-
-function drainQueue() {
-    if (draining) {
-        return;
-    }
-    const timeout = runTimeout(cleanUpNextTick);
-    draining = true;
-    let len = queue.length;
-    while (len) {
-        currentQueue = queue;
-        queue = [];
-        while (++queueIndex < len) {
-            if (currentQueue) {
-                currentQueue[queueIndex].run();
-            }
+function drainTicks() {
+    try {
+        while (tickIndex < ticks.length) {
+            const tick = ticks[tickIndex++];
+            tick.fn.apply(null, tick.args);
         }
-        queueIndex = -1;
-        len = queue.length;
+    } catch (error) {
+        // reported as uncaught (a throw in a promise reaction would be an
+        // unhandled rejection), then the rest runs on the next microtask
+        queueMicrotask(() => {
+            throw error;
+        });
+        if (tickIndex < ticks.length) {
+            ticks = ticks.slice(tickIndex);
+            tickIndex = 0;
+            resolved.then(drainTicks);
+            return;
+        }
     }
-    currentQueue = null;
-    draining = false;
-    runClearTimeout(timeout);
+    ticks = [];
+    tickIndex = 0;
+    tickScheduled = false;
 }
 
 // Polyfill for window.performance.now
@@ -104,8 +76,42 @@ if (queryArgv.length > 0) {
     argv.push(...queryArgv);
 }
 export const version = "";
+
+// the version comes from the running core, not bundled in,
+// so pre-bundled code reports the version it actually runs on
+let fullstackedVersion: Record<string, string> = null;
+function getFullStackedVersion() {
+    if (!fullstackedVersion) {
+        fullstackedVersion =
+            globalThis.fullstacked.bridge(
+                {
+                    mod: Core,
+                    fn: Version
+                },
+                true
+            ) || {};
+    }
+    return fullstackedVersion;
+}
+
 export const versions = {
-    fullstacked
+    fullstacked: new Proxy(
+        {},
+        {
+            get(target, prop) {
+                return (getFullStackedVersion() as any)[prop];
+            },
+            ownKeys() {
+                return Reflect.ownKeys(getFullStackedVersion());
+            },
+            getOwnPropertyDescriptor(target, prop) {
+                return Reflect.getOwnPropertyDescriptor(
+                    getFullStackedVersion(),
+                    prop
+                );
+            }
+        }
+    ) as Record<string, string>
 };
 export const env = new Proxy(
     {},
@@ -167,14 +173,15 @@ export function exit() {
     return true;
 }
 
-export function nextTick(fun: Function, ...args: any[]) {
-    queue.push(new Item(fun, args));
-    if (queue.length === 1 && !draining) {
-        runTimeout(drainQueue);
+export function nextTick(fn: Function, ...args: any[]) {
+    ticks.push({ fn, args });
+    if (!tickScheduled) {
+        tickScheduled = true;
+        resolved.then(drainTicks);
     }
 }
 
-export function listeners(name: string) {
+export function listeners(name: string): Function[] {
     return [];
 }
 

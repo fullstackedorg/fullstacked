@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 
 #ifdef GTK
@@ -24,6 +25,9 @@ class App {
     public:
         inline static App *instance = nullptr;
         std::map<uint8_t, Window *> activeWindows;
+        // activeWindows is changed on the main thread and read from core
+        // threads by onStreamData, never hold it while calling the core
+        std::mutex activeWindowsMutex;
         std::string rootDir;
         std::string buildDir;
         // fullstacked:// link the app was launched with

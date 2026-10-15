@@ -112,13 +112,19 @@ async function connect(): Promise<void> {
 
                     if (registeredPlugin.type === PluginTypeBuild) {
                         const remappedResult: (string | Uint8Array)[] = [];
-                        result.forEach(({ outputName, contents }) => {
-                            contents =
-                                typeof contents === "string"
-                                    ? te.encode(contents)
-                                    : contents;
-                            remappedResult.push(outputName, contents);
-                        });
+                        type BuildOutput = {
+                            outputName: string;
+                            contents: string | Uint8Array;
+                        };
+                        result.forEach(
+                            ({ outputName, contents }: BuildOutput) => {
+                                contents =
+                                    typeof contents === "string"
+                                        ? te.encode(contents)
+                                        : contents;
+                                remappedResult.push(outputName, contents);
+                            }
+                        );
                         result = remappedResult;
                     }
                 } else {

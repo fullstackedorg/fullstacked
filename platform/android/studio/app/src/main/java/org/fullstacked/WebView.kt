@@ -6,31 +6,19 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.view.ViewGroup
-import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
+import java.io.ByteArrayInputStream
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import java.io.ByteArrayInputStream
-import java.io.PipedInputStream
-import java.io.PipedOutputStream
-import java.nio.charset.StandardCharsets
-import java.util.Base64
-import java.util.concurrent.ConcurrentHashMap
 
 class FullStackedWebView(
     val ctx: MainActivity,
     val ctxId: Byte = 0,
     val isSafe: Boolean = false
 ) : WebViewClient() {
-    var firstContact = false
-    val messageToBeSent = mutableListOf<Pair<String, String>>()
-
-    private val syncAwaitersResolve = ConcurrentHashMap<Int, (String) -> Unit>()
-    private val syncAwaitersPayload = ConcurrentHashMap<Int, String>()
-
     init {
         val c = ctxId.toInt() and 0xFF
         if (Core.check(c) == 0) {
@@ -38,102 +26,12 @@ class FullStackedWebView(
         }
     }
 
+    val bridge = Bridge(ctxId.toInt() and 0xFF) { webView }
+
     val webView: WebView = createWebView(this)
 
-    fun resolveSyncAwaiter(id: Int, payloadBase64: String) {
-        val resolve = syncAwaitersResolve.remove(id)
-        if (resolve != null) {
-            resolve(payloadBase64)
-        } else {
-            syncAwaitersPayload[id] = payloadBase64
-        }
-    }
-
-    @JavascriptInterface
-    fun bridge(payloadBase64: String): String {
-        return coreCall(payloadBase64)
-    }
-
-    @JavascriptInterface
-    fun coreCall(payloadBase64: String): String {
-        if (!this.firstContact) {
-            this.firstContact = true
-            this.messageToBeSent.forEach { this.onMessage(it.first, it.second) }
-            this.messageToBeSent.clear()
-        }
-
-        val payload = Base64.getDecoder().decode(payloadBase64)
-        val response = Core.coreCall(payload)
-
-        val id = payload[1].toInt() and 0xFF
-        val isSync = payload[4] == 1.toByte()
-        val responseBase64 = Base64.getEncoder().encodeToString(response)
-
-        if (isSync) {
-            this.resolveSyncAwaiter(id, responseBase64)
-            return responseBase64
-        } else {
-            val mainLooper = Looper.getMainLooper()
-            val handler = Handler(mainLooper)
-            handler.post {
-                this.webView.evaluateJavascript("window.fullstacked.respond($id, `$responseBase64`)", null)
-            }
-            return ""
-        }
-    }
-
-    @JavascriptInterface
-    fun open(targetCtxId: Int) {
-        val mainLooper = Looper.getMainLooper()
-        val handler = Handler(mainLooper)
-        handler.post {
-            ctx.openContextWindow(targetCtxId)
-        }
-    }
-
-    @JavascriptInterface
-    fun openUrl(url: String) {
-        val mainLooper = Looper.getMainLooper()
-        val handler = Handler(mainLooper)
-        handler.post {
-            ctx.openUrl(this, url)
-        }
-    }
-
-    @JavascriptInterface
-    fun exit() {
-        val mainLooper = Looper.getMainLooper()
-        val handler = Handler(mainLooper)
-        handler.post {
-            ctx.removeStackedProject(this)
-        }
-    }
-
-    fun onMessage(messageType: String, message: String) {
-        if (!this.firstContact) {
-            this.messageToBeSent.add(Pair(messageType, message))
-            return
-        }
-        val mainLooper = Looper.getMainLooper()
-        val handler = Handler(mainLooper)
-        val messageEscaped = message
-            .replace("\\", "\\\\")
-            .replace("`", "\\`")
-        handler.post {
-            this.webView.evaluateJavascript("window.oncoremessage(`$messageType`, `$messageEscaped`)", null)
-        }
-    }
-
-    fun onStreamData(streamId: Int, buffer: ByteArray) {
-        val mainLooper = Looper.getMainLooper()
-        val handler = Handler(mainLooper)
-        val b64 = Base64.getEncoder().encodeToString(buffer)
-        handler.post {
-            this.webView.evaluateJavascript("window.fullstacked.onStreamData($streamId, `$b64`)", null)
-        }
-    }
-
     fun destroyView() {
+        bridge.destroy()
         AuthManager.clearAuthSession(ctx, this)
         val c = ctxId.toInt() and 0xFF
         Core.stop(c)
@@ -156,108 +54,23 @@ class FullStackedWebView(
             return super.shouldInterceptRequest(view, request)
         }
 
-        val path = url.path ?: ""
-
-        if (path == "/platform") {
-            return WebResourceResponse(
-                "text/plain",
-                "UTF-8",
-                ByteArrayInputStream("android".toByteArray())
-            )
-        } else if (path == "/ctx") {
-            val c = ctxId.toInt() and 0xFF
-            return WebResourceResponse(
-                "text/plain",
-                "UTF-8",
-                ByteArrayInputStream(c.toString().toByteArray())
-            )
-        } else if (path.startsWith("/sync/")) {
-            val idStr = path.removePrefix("/sync/")
-            val id = idStr.toIntOrNull()
-            if (id != null) {
-                val outputStream = PipedOutputStream()
-                val inputStream = PipedInputStream(outputStream)
-
-                val sendCallback: (String) -> Unit = { payload ->
-                    try {
-                        outputStream.write(payload.toByteArray(StandardCharsets.UTF_8))
-                        outputStream.flush()
-                        outputStream.close()
-                    } catch (_: Exception) { }
-                }
-
-                val existingPayload = syncAwaitersPayload.remove(id)
-                if (existingPayload != null) {
-                    sendCallback(existingPayload)
-                } else {
-                    syncAwaitersResolve[id] = sendCallback
-                }
-
-                return WebResourceResponse(
-                    "text/plain",
-                    "UTF-8",
-                    inputStream
-                )
+        val path = url.path?.ifEmpty { "/" } ?: "/"
+        // the UI endpoints of the page, the rest goes to the bridge
+        when (path) {
+            "/open" -> {
+                url.getQueryParameter("ctx")?.toIntOrNull()?.let { ctx.openContextWindow(it) }
+                return emptyResponse()
+            }
+            "/exit" -> {
+                Handler(Looper.getMainLooper()).post { ctx.removeStackedProject(this) }
+                return emptyResponse()
             }
         }
-
-        // Static file serving via Core Fn StaticFile (Async payload)
-        val pathnameBytes = path.toByteArray(StandardCharsets.UTF_8)
-        var payload = byteArrayOf(
-            ctxId,
-            Core.nextReqId(), // req id
-            0, // Core Module
-            0, // Fn Static File
-            0, // Async
-            DataType.STRING.type // 2
-        )
-        payload += numberToBytes(pathnameBytes.size)
-        payload += pathnameBytes
-
-        val responseData = Core.coreCall(payload)
-
-        if (responseData.size > 1) {
-            val outerArgBuffer = sliceByteArray(responseData, 1, responseData.size - 1)
-            val outerArgs = deserializeArgs(outerArgBuffer)
-
-            val staticFileBuffer = if (outerArgs.isNotEmpty() && outerArgs[0] is ByteArray) {
-                outerArgs[0] as ByteArray
-            } else {
-                outerArgBuffer
-            }
-
-            if (staticFileBuffer.isNotEmpty()) {
-                val args = deserializeArgs(staticFileBuffer)
-
-                if (args.size >= 2 && args[0] is String && args[1] is ByteArray) {
-                    val rawMimeType = args[0] as String
-                    val fileBytes = args[1] as ByteArray
-
-                    val cleanMimeType = rawMimeType.substringBefore(";").trim()
-                    val encoding = if (rawMimeType.contains("charset=", ignoreCase = true)) {
-                        rawMimeType.substringAfter("charset=", "").substringBefore(";").trim().ifEmpty { "UTF-8" }
-                    } else {
-                        "UTF-8"
-                    }
-
-                    return WebResourceResponse(
-                        cleanMimeType,
-                        encoding,
-                        ByteArrayInputStream(fileBytes)
-                    )
-                }
-            }
-        }
-
-        return WebResourceResponse(
-            "text/plain",
-            "UTF-8",
-            404,
-            "Not Found",
-            mapOf("Access-Control-Allow-Origin" to "*"),
-            ByteArrayInputStream("Not Found".toByteArray())
-        )
+        return bridge.request(path)
     }
+
+    private fun emptyResponse() =
+        WebResourceResponse("text/plain", "UTF-8", ByteArrayInputStream(ByteArray(0)))
 }
 
 @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
@@ -309,7 +122,7 @@ fun createWebView(delegate: FullStackedWebView): WebView {
     webView.settings.javaScriptCanOpenWindowsAutomatically = true
     webView.settings.setSupportMultipleWindows(true)
     webView.settings.domStorageEnabled = true
-    webView.addJavascriptInterface(delegate, "android")
+    delegate.bridge.attach(webView)
     webView.loadUrl("http://localhost")
 
     return webView

@@ -9,7 +9,11 @@
         "allowImportingTsExtensions": true,
         "noEmit": true,
         "noUnusedLocals": true,
-        "strictNullChecks": false
+        "strictNullChecks": false,
+        "paths": {
+            "fullstacked": ["./core/internal/bundle/lib/fullstacked/index.ts"],
+            "fullstacked/*": ["./core/internal/bundle/lib/*/index.ts"]
+        }
     },
     "exclude": [
         "out",

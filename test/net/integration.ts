@@ -6,6 +6,8 @@ import bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 import { startServer } from "./server.ts";
 import { execSync } from "node:child_process";
 import net from "node:net";
+import { algorithmMatrix, prepareServer, trySsh } from "./ssh-algorithms.ts";
+import { KNOWN_FAILURES } from "../shim/known-failures.ts";
 
 suite("net - integration", () => {
     let browser: Browser, server: Worker;
@@ -37,7 +39,7 @@ suite("net - integration", () => {
         await test();
     });
 
-    test("ssh", { timeout: 15000 }, async () => {
+    test("ssh", { timeout: 900000 }, async (t) => {
         containerName = `openssh-server-test-${Date.now()}`;
 
         // Start openssh-server container with password authentication enabled
@@ -125,6 +127,48 @@ suite("net - integration", () => {
 
             const content = await page.getTextContent("body");
             assert.deepEqual(content, "SUCCESS");
+
+            // the ssh2 matrix in the webview (crypto shim) against Node's
+            // ssh2 on the same server: what Node completes, the webview must.
+            // One page per case: a JS key exchange can hold the page longer
+            // than a CDP call waits. Opt-in (SSH_MATRIX=all or a name
+            // filter): it takes minutes with the JS key exchanges of Stage 1.
+            if (!process.env.SSH_MATRIX) return;
+            // the core's stream data of a webview goes to one page: the
+            // sample page left open would take the matrix pages' sockets
+            await page.page.close();
+            prepareServer(containerName);
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            for (const c of algorithmMatrix()) {
+                const node = await trySsh(sshPort, c);
+                let webview: string;
+                const matrixPage = await sshBrowser.createPage(
+                    `http://localhost:${sshBrowser.webview.port}/?port=${sshPort}&matrix=${encodeURIComponent(btoa(JSON.stringify([c])))}`
+                );
+                try {
+                    await matrixPage.page.waitForFunction(
+                        'document.body.classList.contains("done")',
+                        { timeout: 40000, polling: 500 }
+                    );
+                    webview = JSON.parse(
+                        await matrixPage.getTextContent("body")
+                    )[c.name];
+                } catch (e) {
+                    webview = `no result: ${(e as Error).message.split("\n")[0]}`;
+                } finally {
+                    await matrixPage.page.close().catch(() => {});
+                }
+                const reason = KNOWN_FAILURES.ssh2?.[c.name];
+                await t.test(c.name, reason ? { todo: reason } : {}, () => {
+                    if (node !== "ok") {
+                        t.diagnostic(
+                            `${c.name}: refused by the server (${node})`
+                        );
+                        return;
+                    }
+                    assert.equal(webview, "ok", `${c.name}: ${webview}`);
+                });
+            }
         } finally {
             sshBrowser.end();
             if (containerName) {

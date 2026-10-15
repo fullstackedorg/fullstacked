@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Windows.Storage.Streams;
 
@@ -22,10 +23,14 @@ namespace FullStacked
         public void postAuthResult(string query)
         {
             string escaped = query.Replace("\\", "\\\\").Replace("`", "\\`");
-            _ = this.controller?.CoreWebView2?.ExecuteScriptAsync(
+            _ = this.coreWebView2?.ExecuteScriptAsync(
                 "window.postMessage(Object.fromEntries(new URLSearchParams(`" + escaped + "`)), \"*\")");
         }
         private CoreWebView2Controller controller;
+        // held for the lifetime of the window: CsWinRT drops the event handlers of a
+        // collected projection, so once the GC runs WebResourceRequested stops firing
+        // (requests fall through to the network) or crashes with an AccessViolation
+        private CoreWebView2 coreWebView2;
         private CoreWebView2Environment environment;
         private bool isClosed = false;
 
@@ -43,15 +48,13 @@ namespace FullStacked
             }
         }
 
-        private static byte[] notFoundPayload = Encoding.UTF8.GetBytes("Not Found");
-
-        private readonly object syncLock = new();
-        private Dictionary<byte, TaskCompletionSource<byte[]>> syncAwaitersResolve = [];
-        private Dictionary<byte, byte[]> syncAwaitersPayload = [];
+        // calls, stream frames and requests of the page (Bridge.cs)
+        public readonly Bridge bridge;
 
         public WebView(byte ctx)
         {
             this.ctx = ctx;
+            this.bridge = new Bridge(ctx, this.DispatcherQueue);
 
             this.Title = "FullStacked";
             this.AppWindow.SetIcon("Assets/Window-Icon.ico");
@@ -85,8 +88,10 @@ namespace FullStacked
             this.Closed += delegate (object sender, WindowEventArgs args)
             {
                 this.isClosed = true;
+                this.bridge.Close();
                 this.controller?.Close();
                 this.controller = null;
+                this.coreWebView2 = null;
             };
 
             this.InitWebView();
@@ -217,40 +222,9 @@ namespace FullStacked
                     }
                 };
 
-                var coreWebView2 = this.controller.CoreWebView2;
+                var coreWebView2 = this.coreWebView2 = this.controller.CoreWebView2;
 
-                coreWebView2.WebMessageReceived += delegate (CoreWebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
-            {
-                string base64 = args.TryGetWebMessageAsString();
-                byte[] data = Convert.FromBase64String(base64);
-                byte[] response = App.core.call(data);
-
-
-                byte id = data[1];
-
-                // Sync
-                if (data[4] == 1)
-                {
-                    lock (this.syncLock)
-                    {
-                        if (this.syncAwaitersResolve.ContainsKey(id))
-                        {
-                            this.syncAwaitersResolve[id].SetResult(response);
-                        }
-                        else
-                        {
-                            this.syncAwaitersPayload[id] = response;
-                        }
-                    }
-                }
-                // Async
-                else
-                {
-                    _ = coreWebView2.ExecuteScriptAsync("window.fullstacked.respond(" + id + ",`" + Convert.ToBase64String(response) + "`)");
-                }
-
-
-            };
+            this.bridge.Attach(coreWebView2, this.environment);
             coreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
             coreWebView2.WebResourceRequested += async delegate (CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs args)
             {
@@ -266,71 +240,7 @@ namespace FullStacked
                 IRandomAccessStream stream;
                 string headers;
 
-                if (pathname == "/platform")
-                {
-                    (stream, headers) = this.bufferToResponseStream(Core.platform);
-                    args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
-                    return;
-                }
-                else if (pathname == "/ctx")
-                {
-                    byte[] ctxBuffer = Encoding.UTF8.GetBytes(this.ctx.ToString());
-                    (stream, headers) = this.bufferToResponseStream(ctxBuffer);
-                    args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
-                    return;
-                }
-                else if (pathname.StartsWith("/sync"))
-                {
-                    string idStr = pathname.Split("/").Last();
-                    byte id = byte.Parse(idStr);
-
-
-                    Action<byte[]> sendCallback = (byte[] payload) =>
-                    {
-                        string b64 = Convert.ToBase64String(payload);
-                        byte[] b64Buffer = Encoding.UTF8.GetBytes(b64);
-                        (stream, headers) = this.bufferToResponseStream(b64Buffer, "application/octet-stream");
-                        args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
-                    };
-
-
-                    byte[] cachedPayload = null;
-                    lock (this.syncLock)
-                    {
-                        if (this.syncAwaitersPayload.ContainsKey(id))
-                        {
-                            cachedPayload = this.syncAwaitersPayload[id];
-                            this.syncAwaitersPayload.Remove(id);
-                        }
-                    }
-
-                    if (cachedPayload != null)
-                    {
-                        sendCallback(cachedPayload);
-                    }
-                    else
-                    {
-                        using (args.GetDeferral())
-                        {
-                            TaskCompletionSource<byte[]> resolve = new(TaskCreationOptions.RunContinuationsAsynchronously);
-                            lock (this.syncLock)
-                            {
-                                this.syncAwaitersResolve[id] = resolve;
-                            }
-
-                            byte[] awaitedPayload = await resolve.Task;
-
-                            lock (this.syncLock)
-                            {
-                                this.syncAwaitersResolve.Remove(id);
-                            }
-
-                            sendCallback(awaitedPayload);
-                        }
-                    }
-
-                    return;
-                } else if (pathname.StartsWith("/resize")) {
+                if (pathname.StartsWith("/resize")) {
                     var queryParams = this.parseQueryParams(uri);
 
                     using (args.GetDeferral())
@@ -454,37 +364,7 @@ namespace FullStacked
                     return;
                 }
 
-                // static file serving
-
-                byte[] header = [
-                    this.ctx,
-                    0, // req id
-                    0, // Core Module
-                    0, // Fn Static File
-                    0, // Async
-                    
-                    ((byte)SerializableDataType.STRING),
-                ];
-
-                byte[] pathnameData = Encoding.UTF8.GetBytes(pathname);
-                byte[] pathnameLength = Serialization.NumberToUint4Bytes(pathnameData.Length);
-                byte[] payload = Serialization.MergeBuffers([header, pathnameLength, pathnameData]);
-
-                byte[] response = App.core.call(payload);
-
-                (DataValue argBuffer, _) = Serialization.Deserialize(response, 1);
-
-                List<DataValue> values = Serialization.DeserializeAll(argBuffer.buffer);
-
-                if (values.Count < 2)
-                {
-                    (stream, headers) = this.bufferToResponseStream(WebView.notFoundPayload);
-                    args.Response = this.environment.CreateWebResourceResponse(stream, 404, "OK", headers);
-                    return;
-                }
-
-                (stream, headers) = this.bufferToResponseStream(values[1].buffer, values[0].str);
-                args.Response = this.environment.CreateWebResourceResponse(stream, 200, "OK", headers);
+                await this.bridge.Request(args, pathname);
             };
 
             coreWebView2.NewWindowRequested += delegate (CoreWebView2 sender, CoreWebView2NewWindowRequestedEventArgs e)
@@ -506,16 +386,7 @@ namespace FullStacked
         }
     }
 
-    public void onStreamData(byte streamId, byte[] data)
-    {
-        this.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.High, () =>
-        {
-            if (this.controller?.CoreWebView2 != null)
-            {
-                _ = this.controller.CoreWebView2.ExecuteScriptAsync("window.fullstacked.onStreamData(" + streamId + ", `" + Convert.ToBase64String(data) + "`)");
-            }
-        });
-    }
+    public void onStreamData(byte streamId, byte[] data) => this.bridge.OnStreamData(streamId, data);
 
         private (IRandomAccessStream, string) bufferToResponseStream(byte[] buffer, string mimeType = "text/plain")
         {

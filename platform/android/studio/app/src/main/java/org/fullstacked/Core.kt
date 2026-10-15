@@ -1,13 +1,13 @@
 package org.fullstacked
 
-import java.util.concurrent.atomic.AtomicInteger
-
 object Core {
     init {
         try {
             System.loadLibrary("core")
         } catch (_: Exception) { }
         System.loadLibrary("fullstacked-android")
+        // the WebView does not expose request bodies: calls go on messages
+        setPlatform("android", false)
         try {
             setOnStreamData()
         } catch (e: Exception) {
@@ -39,6 +39,45 @@ object Core {
     @JvmStatic
     external fun getCorePayload(ctx: Int, coreType: Int, id: Int, size: Int): ByteArray
 
+    @JvmStatic
+    external fun callWithResponse(payload: ByteArray): ByteArray
+
+    // a call received on a message channel: null when the core put a large
+    // response on the frame stream
+    @JvmStatic
+    external fun callMessage(payload: ByteArray): ByteArray?
+
+    @JvmStatic
+    external fun setPlatform(name: String, binaryCalls: Boolean)
+
+    // [status u16][mime type]\n[body]
+    @JvmStatic
+    external fun handleRequest(ctxId: Int, path: String): ByteArray
+
+    class Response(val status: Int, val mimeType: String, val data: ByteArray)
+
+    // a request of the page answered by the core (static files, /platform, /ctx...)
+    fun request(ctxId: Int, path: String): Response {
+        val response = handleRequest(ctxId, path)
+        val status = ((response[0].toInt() and 0xFF) shl 8) or (response[1].toInt() and 0xFF)
+        var newline = 2
+        while (newline < response.size && response[newline] != 10.toByte()) newline++
+        val mimeType = String(response, 2, newline - 2, Charsets.UTF_8)
+        val data = if (newline < response.size) response.copyOfRange(newline + 1, response.size) else ByteArray(0)
+        return Response(status, mimeType, data)
+    }
+
+    // stream data of a context as binary frames for GET /stream, see core/internal/frames
+    @JvmStatic
+    external fun streamAttach(ctxId: Int): Int
+
+    // blocks until frames are queued, null once the reader ended
+    @JvmStatic
+    external fun streamRead(ctxId: Int, gen: Int): ByteArray?
+
+    @JvmStatic
+    external fun streamDetach(ctxId: Int, gen: Int)
+
     fun startMain(root: String, build: String, providedCtx: Int? = null, safe: Boolean = false): Int {
         return if (safe) {
             startSafe(root, build)
@@ -56,7 +95,7 @@ object Core {
         val urlBytes = url.toByteArray(Charsets.UTF_8)
         var payload = byteArrayOf(
             ctx.toByte(),
-            nextReqId(), // req id
+            0, // req id, unused by callWithResponse
             0, // Core Module
             6, // Fn DeepLink
             0, // Async
@@ -83,19 +122,10 @@ object Core {
         }
     }
 
-    private val nextReqId = AtomicInteger(0)
-
-    // Request id for calls made by the platform (static files, deeplinks): concurrent calls
-    // in the same context must not share an id, the core refuses an id already in use.
-    fun nextReqId(): Byte = nextReqId.updateAndGet { (it + 1) and 0xFF }.toByte()
-
-    fun coreCall(payload: ByteArray): ByteArray {
-        val responseSize = call(payload)
-        if (responseSize <= 0) return ByteArray(0)
-        val ctx = payload[0].toInt() and 0xFF
-        val id = payload[1].toInt() and 0xFF
-        return getCorePayload(ctx, 1, id, responseSize)
-    }
+    // Thread safe: the core synchronizes per context, responses are returned
+    // directly instead of being stored by request id, so concurrent calls
+    // (static files, bridge) never collide.
+    fun coreCall(payload: ByteArray): ByteArray = callWithResponse(payload)
 }
 
 fun coreCall(payload: ByteArray): ByteArray = Core.coreCall(payload)

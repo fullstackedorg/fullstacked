@@ -2,7 +2,6 @@ import WebKit
 import SwiftUI
 import AuthenticationServices
 
-let platform = "apple"
 let downloadDirectory = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first! + "/downloads";
 
 func startMain(_ providedCtx: UInt8?, _ safe: Bool?) -> UInt8 {
@@ -35,33 +34,18 @@ class WeakMessageHandler: NSObject, WKScriptMessageHandler {
     }
 }
 
-class WebViewOpen: NSObject, WKScriptMessageHandler {
-    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        let ctx = UInt8(truncating: message.body as! NSNumber)
-        WebViewStore.getInstance().addWebView(WebView(ctx))
-    }
-}
-
-class WebViewCloser: NSObject, WKScriptMessageHandler {
-    weak var webView: WebView?
-    
-    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        if let id = self.webView?.id {
-            WebViewStore.getInstance().removeWebView(id)
-            self.webView?.close()
-        }
-    }
-}
-
-class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WKDownloadDelegate, Codable, Identifiable, ASWebAuthenticationPresentationContextProviding {
+class WebView: WebViewExtended, WKNavigationDelegate, WKDownloadDelegate, Codable, Identifiable, ASWebAuthenticationPresentationContextProviding {
     
     var id = UUID()
-    let open = WebViewOpen();
-    let closer = WebViewCloser();
-    
     public let requestHandler: RequestHandler
     
     public var isSafe = false
+    
+    // responses and stream chunks received between two main thread ticks are
+    // evaluated in one script
+    private let scriptLock = NSLock()
+    private var pendingScript = ""
+    private var scriptFlushScheduled = false
     
     required init(from decoder: any Decoder) throws {
         fatalError("init(coder:) has not been implemented")
@@ -99,13 +83,29 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         
         super.init(frame: CGRect(), configuration: wkWebViewConfig)
         
-        self.closer.webView = self
-        
         self.isInspectable = true
         self.navigationDelegate = self
-        userContentController.add(WeakMessageHandler(self), name: "bridge")
-        userContentController.add(WeakMessageHandler(self.open), name: "open")
-        userContentController.add(WeakMessageHandler(self.closer), name: "exit")
+        userContentController.addScriptMessageHandler(CallHandler(self.requestHandler), contentWorld: .page, name: "call")
+        // the UI endpoints of the page, see bridge/platform.ts
+        self.requestHandler.ui = { [weak self] path, query in
+            guard let self = self else { return nil }
+            switch path {
+            case "/open":
+                if let ctx = query["ctx"].flatMap({ UInt8($0) }) {
+                    WebViewStore.getInstance().addWebView(WebView(ctx))
+                }
+                return ""
+            case "/exit":
+                // answered first, closing stops the pending tasks
+                DispatchQueue.main.async {
+                    WebViewStore.getInstance().removeWebView(self.id)
+                    self.close()
+                }
+                return ""
+            default:
+                return self.resizeRequest(query["size"])
+            }
+        }
         
         self.load(URLRequest(url: URL(string: "fs://localhost")!))
     }
@@ -125,13 +125,9 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         self.loadHTMLString("", baseURL: nil)
         self.removeFromSuperview()
         self.navigationDelegate = nil
-        self.configuration.userContentController.removeScriptMessageHandler(forName: "bridge")
-        self.configuration.userContentController.removeScriptMessageHandler(forName: "open")
-        self.configuration.userContentController.removeScriptMessageHandler(forName: "exit")
         self.configuration.userContentController.removeAllUserScripts()
         self.configuration.userContentController.removeAllScriptMessageHandlers()
         stop(self.requestHandler.ctx)
-        self.closer.webView = nil
         super.close()
     }
     
@@ -140,8 +136,33 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     }
 
     func onStreamData(streamId: UInt8, buffer: Data){
-        DispatchQueue.main.async {
-            self.evaluateJavaScript("window.fullstacked.onStreamData(\(streamId),`\(buffer.base64EncodedString())`)")
+        queueScript("window.fullstacked.onStreamData(\(streamId),`\(buffer.base64EncodedString())`)")
+    }
+    
+    // a statement that throws does not stop the others of the batch
+    private func queueScript(_ statement: String) {
+        scriptLock.lock()
+        pendingScript.append("try{\(statement)}catch(e){console.error(e)};")
+        let schedule = !scriptFlushScheduled
+        scriptFlushScheduled = true
+        scriptLock.unlock()
+        
+        if schedule {
+            DispatchQueue.main.async { [weak self] in
+                self?.flushScripts()
+            }
+        }
+    }
+    
+    private func flushScripts() {
+        scriptLock.lock()
+        let script = pendingScript
+        pendingScript = ""
+        scriptFlushScheduled = false
+        scriptLock.unlock()
+        
+        if !script.isEmpty {
+            self.evaluateJavaScript(script)
         }
     }
     
@@ -193,21 +214,6 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         }
     }
     
-    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        let payload = Data(base64Encoded: message.body as! String)!
-        let response = coreCall(payload: payload)
-        
-        // Sync
-        if(payload[payload.startIndex + 4] == 1) {
-            let id = payload[payload.startIndex + 1]
-            self.requestHandler.resolveSyncAwaiter(id: id, payload: response)
-        }
-        // Async
-        else {
-            self.evaluateJavaScript("window.fullstacked.respond(\(payload[payload.startIndex + 1]),`\(response.base64EncodedString())`)")
-        }
-    }
-    
     func webView(_ webView: WKWebView, didFinish didFinishNavigation: WKNavigation) {
         var title = webView.title
         if(title == nil || title!.isEmpty) {
@@ -245,180 +251,6 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     }
 }
 
-
-class RequestHandler: NSObject, WKURLSchemeHandler {
-    var ctx: UInt8
-    private var syncAwaitersResolve: [UInt8:((_ payload: Data) -> Void)] = [:]
-    private var syncAwaitersPayload: [UInt8:Data] = [:]
-    private var stoppedTasks = Set<ObjectIdentifier>()
-    private let tasksLock = NSLock()
-    
-    private static var nextReqId: UInt8 = 0
-    private static let reqIdLock = NSLock()
-    static func getNextReqId() -> UInt8 {
-        reqIdLock.lock()
-        defer { reqIdLock.unlock() }
-        nextReqId = nextReqId &+ 1
-        return nextReqId
-    }
-    
-    init(ctx: UInt8) {
-        self.ctx = ctx
-    }
-    
-    func reset(ctx: UInt8) {
-        self.ctx = ctx
-        self.syncAwaitersResolve.removeAll()
-        self.syncAwaitersPayload.removeAll()
-        tasksLock.lock()
-        stoppedTasks.removeAll()
-        tasksLock.unlock()
-    }
-    
-    func resolveSyncAwaiter(id: UInt8, payload: Data) {
-        if let resolve = syncAwaitersResolve[id] {
-            resolve(payload)
-            syncAwaitersResolve.removeValue(forKey: id)
-        } else {
-            syncAwaitersPayload[id] = payload
-        }
-    }
-    
-    func send(urlSchemeTask: WKURLSchemeTask,
-              url: URL,
-              statusCode: Int,
-              mimeType: String,
-              data: Data) {
-        tasksLock.lock()
-        let isStopped = stoppedTasks.contains(ObjectIdentifier(urlSchemeTask as AnyObject))
-        tasksLock.unlock()
-        if isStopped { return }
-        
-        let responseHTTP = HTTPURLResponse(
-            url: url,
-            statusCode: statusCode,
-            httpVersion: "HTTP/1.1",
-            headerFields: [
-                "Content-Type": mimeType,
-                "Content-Length": String(data.count),
-                "Cache-Control": "no-cache"
-            ]
-        )!
-        
-        urlSchemeTask.didReceive(responseHTTP)
-        urlSchemeTask.didReceive(data)
-        urlSchemeTask.didFinish()
-    }
-    
-    func webView(_ webView: WKWebView, start urlSchemeTask: any WKURLSchemeTask) {
-        let request = urlSchemeTask.request
-        var pathname = request.url!.pathComponents.filter({$0 != "/"}).joined(separator: "/")
-        
-        if(pathname.isEmpty) {
-            pathname = "/"
-        }
-        
-        print(pathname)
-        
-        if(pathname == "platform") {
-            let data = platform.data(using: .utf8)!
-            self.send(urlSchemeTask: urlSchemeTask,
-                      url: request.url!,
-                      statusCode: 200,
-                      mimeType: "text/plain",
-                      data: data)
-            return
-        } else if (pathname == "ctx") {
-            self.send(urlSchemeTask: urlSchemeTask,
-                      url: request.url!,
-                      statusCode: 200,
-                      mimeType: "text/plain",
-                      data: Data(String(self.ctx).utf8))
-            return
-        } else if (pathname.starts(with: "sync")) {
-            let idStr = pathname.split(separator: "/").last!
-            let id = UInt8(idStr)!
-            
-            let sendCallback = {(payload: Data) -> Void in
-                DispatchQueue.main.async {
-                    self.send(
-                        urlSchemeTask: urlSchemeTask,
-                        url: request.url!,
-                        statusCode: 200,
-                        mimeType: "application/octet-stream",
-                        data: payload.base64EncodedData()
-                    )
-                }
-            }
-            
-            if let payload = self.syncAwaitersPayload[id] {
-                sendCallback(payload)
-                self.syncAwaitersPayload.removeValue(forKey: id)
-            } else {
-                self.syncAwaitersResolve[id] = sendCallback
-            }
-            
-            return
-        }
-        
-        // static file serving
-        
-        let pathnameData = pathname.data(using: .utf8)!
-        let reqId = RequestHandler.getNextReqId()
-        var payload = Data([
-            self.ctx,
-            reqId, // req id
-            0, // Core Module
-            0, // Fn Static File
-            0, // Async
-            
-            SerializableDataType.STRING.rawValue,
-        ])
-        payload.append(NumberToUint4Bytes(num: pathnameData.count))
-        payload.append(pathnameData)
-        
-        let responseData = coreCall(payload: payload)
-        guard responseData.count > 1 else {
-            send(urlSchemeTask: urlSchemeTask,
-                 url: request.url!,
-                 statusCode: 404,
-                 mimeType: "text/plain",
-                 data: "Not Found".data(using: .utf8)!)
-            return
-        }
-        let (response, _) = Deserialize(buffer: responseData, index: 1)
-        guard let responseDataPayload = response as? Data else {
-            send(urlSchemeTask: urlSchemeTask,
-                 url: request.url!,
-                 statusCode: 404,
-                 mimeType: "text/plain",
-                 data: "Not Found".data(using: .utf8)!)
-            return
-        }
-        let args = DeserializeAll(buffer: responseDataPayload)
-        
-        guard args.count >= 2, let mimeType = args[0] as? String, let fileData = args[1] as? Data else {
-            send(urlSchemeTask: urlSchemeTask,
-                 url: request.url!,
-                 statusCode: 404,
-                 mimeType: "text/plain",
-                 data: "Not Found".data(using: .utf8)!)
-            return
-        }
-        
-        send(urlSchemeTask: urlSchemeTask,
-             url: request.url!,
-             statusCode: 200,
-             mimeType: mimeType,
-             data: fileData)
-    }
-    
-    func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) {
-        tasksLock.lock()
-        stoppedTasks.insert(ObjectIdentifier(urlSchemeTask as AnyObject))
-        tasksLock.unlock()
-    }
-}
 
 extension String {
     func ptr() -> UnsafeMutablePointer<CChar>? {

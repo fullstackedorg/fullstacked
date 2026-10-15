@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/types"
+	"sync/atomic"
 	"time"
 )
 
@@ -18,6 +19,8 @@ const (
 	StreamWrite        TestFn = 4
 	EventEmitter       TestFn = 5
 	Panic              TestFn = 6
+	BenchEcho          TestFn = 7
+	BenchStream        TestFn = 8
 )
 
 type TestObject struct {
@@ -98,6 +101,36 @@ func Switch(
 		return nil
 	case Panic:
 		panic(data[0].Data.(string))
+	case BenchEcho:
+		// no argument acts as a noop
+		response.Type = types.CoreResponseData
+		if len(data) > 0 {
+			response.Data = data[0].Data
+		}
+		return nil
+	case BenchStream:
+		if len(data) < 2 || data[0].Type != types.NUMBER || data[1].Type != types.NUMBER {
+			return errors.New("bench stream requires total and chunk size")
+		}
+
+		total := int(data[0].Data.(float64))
+		chunkSize := int(data[1].Data.(float64))
+		if total < 0 || chunkSize <= 0 {
+			return errors.New("bench stream requires total >= 0 and chunk size > 0")
+		}
+
+		closed := atomic.Bool{}
+
+		response.Type = types.CoreResponseStream
+		response.Stream = &types.ResponseStream{
+			Open: func(ctx *types.Context, streamId uint8) {
+				benchStream(ctx, streamId, total, chunkSize, &closed)
+			},
+			Close: func(ctx *types.Context, streamId uint8) {
+				closed.Store(true)
+			},
+		}
+		return nil
 	}
 
 	return errors.New("unknown test function")
@@ -138,5 +171,32 @@ func streamTest(
 		go streamingFn()
 	} else {
 		streamingFn()
+	}
+}
+
+func benchStream(
+	ctx *types.Context,
+	streamId uint8,
+	total int,
+	chunkSize int,
+	closed *atomic.Bool,
+) {
+	if total == 0 {
+		store.StreamChunk(ctx, streamId, nil, true)
+		return
+	}
+
+	chunk := make([]byte, min(chunkSize, total))
+	for i := range chunk {
+		chunk[i] = byte(i)
+	}
+
+	for sent := 0; sent < total; {
+		if closed.Load() {
+			return
+		}
+		size := min(chunkSize, total-sent)
+		sent += size
+		store.StreamChunk(ctx, streamId, chunk[:size], sent == total)
 	}
 }

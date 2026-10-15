@@ -520,6 +520,77 @@ suite("fs - e2e", () => {
         });
     });
 
+    test("createReadStream", async () => {
+        const path = "test-create-read-stream";
+        const content = Buffer.from(
+            Array.from({ length: 200_000 }, (_, i) => i & 0xff)
+        );
+        nodeFs.writeFileSync(path, content);
+        const read = (options?: any) =>
+            new Promise<{ data: Buffer; chunks: number; events: string[] }>(
+                (resolve, reject) => {
+                    const stream = fs.createReadStream(path, options);
+                    const parts: Buffer[] = [];
+                    const events: string[] = [];
+                    stream.on("open", () => events.push("open"));
+                    stream.on("data", (c: any) =>
+                        parts.push(Buffer.from(c, options?.encoding))
+                    );
+                    stream.on("end", () => events.push("end"));
+                    stream.on("close", () => {
+                        events.push("close");
+                        resolve({
+                            data: Buffer.concat(parts),
+                            chunks: parts.length,
+                            events
+                        });
+                    });
+                    stream.on("error", reject);
+                }
+            );
+        try {
+            const whole = await read();
+            assert.ok(whole.data.equals(content));
+            assert.deepEqual(whole.events, ["open", "end", "close"]);
+            assert.equal(whole.chunks, Math.ceil(content.length / (64 * 1024)));
+
+            const range = await read({ start: 10, end: 1000 });
+            assert.ok(range.data.equals(content.subarray(10, 1001)));
+
+            const small = await read({ highWaterMark: 1024, end: 9999 });
+            assert.ok(small.data.equals(content.subarray(0, 10000)));
+            assert.equal(small.chunks, 10);
+
+            const text = await read({ encoding: "hex", end: 3 });
+            assert.equal(text.data.toString("hex"), "00010203");
+        } finally {
+            nodeFs.rmSync(path);
+        }
+    });
+
+    test("createReadStream of a missing file", async () => {
+        const error: any = await new Promise((resolve) =>
+            fs.createReadStream("not-exists-read-stream").on("error", resolve)
+        );
+        assert.equal(error.code, "ENOENT");
+        assert.equal(error.syscall, "open");
+    });
+
+    test("createReadStream destroyed early", async () => {
+        const path = "test-create-read-stream-destroy";
+        nodeFs.writeFileSync(path, Buffer.alloc(4 * 1024 * 1024, 1));
+        try {
+            const stream = fs.createReadStream(path, { highWaterMark: 1024 });
+            await new Promise<void>((resolve) => {
+                stream.once("data", () => stream.destroy());
+                stream.on("close", () => resolve());
+            });
+            assert.ok(stream.bytesRead < 4 * 1024 * 1024);
+        } finally {
+            nodeFs.rmSync(path);
+        }
+    });
+
     test("resolve path using changed cwd", () => {
         const originalCwd = process.cwd();
         try {
