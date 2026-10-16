@@ -4,6 +4,7 @@ node_modules
 *.env
 bin
 out
+dist
 !test/static-file/sample/out
 .vscode
 ./build.js
