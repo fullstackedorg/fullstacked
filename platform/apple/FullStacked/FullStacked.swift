@@ -47,6 +47,20 @@ struct FullStackedApp: App {
     
     init() {
         coreInit()
+        #if os(macOS)
+        // Safe Mode before the page gets the keys: a webview offers key
+        // equivalents to its page first, which can take them
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            guard modifiers == [.command, .shift],
+                  event.charactersIgnoringModifiers?.lowercased() == "t" else {
+                return event
+            }
+            let store = WebViewStore.getInstance()
+            store.safe(from: store.webViews.first(where: { $0.window === event.window }))
+            return nil
+        }
+        #endif
     }
 
     var body: some Scene {
@@ -89,19 +103,15 @@ struct FullStackedApp: App {
                                     .id(webView.id)
                                     #if os(iOS)
                                     .ignoresSafeArea(edges: .bottom)
-                                    #else
-                                    .ignoresSafeArea()
                                     #endif
                                     .background(self.webViewStore.webViewsMeta[webView.id]?.1)
                                     .navigationTitle(self.webViewStore.webViewsMeta[webView.id]?.0 ?? "FullStacked")
-                                
+
                                 #if os(macOS)
+                                    // a compact title bar in the color of the page, below
+                                    // it the webview (no toolbar, it makes the bar tall)
                                     .preferredColorScheme(getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[webView.id]?.1))
-                                    .padding(EdgeInsets(top: 1, leading: 0, bottom: 0, trailing: 0))
-                                    .toolbar{
-                                        Spacer()
-                                    }
-                                    .toolbarBackground(self.webViewStore.webViewsMeta[webView.id]?.1 ?? Color(red: 0, green: 0, blue: 0, opacity: 0))
+                                    .background(WindowTitleBar(color: self.webViewStore.webViewsMeta[webView.id]?.1))
                                 #else
                                     .preferredColorScheme(isIPadOS
                                                           ? getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[webView.id]?.1)

@@ -330,7 +330,52 @@ func MkdirFn(p string) error {
 }
 
 func RmFn(p string) error {
-	return os.RemoveAll(p)
+	err := os.RemoveAll(p)
+	if err != nil && runtime.GOOS == "windows" {
+		// A packaged (MSIX) app sees AppData through a redirection that the
+		// handle relative calls of RemoveAll do not get right: a directory
+		// fails with "unlinkat <dir>: is a directory". Paths go through it.
+		return removeAllPaths(p)
+	}
+	return err
+}
+
+// removeAllPaths removes p and its contents with path based calls only.
+// Links are removed, not followed.
+func removeAllPaths(p string) error {
+	err := os.Remove(p)
+	if err == nil || os.IsNotExist(err) {
+		return nil
+	}
+
+	info, statErr := os.Lstat(p)
+	if os.IsNotExist(statErr) {
+		return nil
+	}
+	if statErr != nil || !info.IsDir() {
+		return err
+	}
+
+	entries, readErr := os.ReadDir(p)
+	if readErr != nil {
+		return readErr
+	}
+
+	var entryErr error
+	for _, entry := range entries {
+		if err := removeAllPaths(filepath.Join(p, entry.Name())); err != nil && entryErr == nil {
+			entryErr = err
+		}
+	}
+
+	err = os.Remove(p)
+	if err == nil || os.IsNotExist(err) {
+		return nil
+	}
+	if entryErr != nil {
+		return entryErr
+	}
+	return err
 }
 
 func CreateFn(p string) (*os.File, error) {

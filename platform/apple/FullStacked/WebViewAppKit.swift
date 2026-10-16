@@ -270,20 +270,12 @@ class WebViewExtended: WKWebView, WKUIDelegate {
     }
 }
 
-// suppress "funk" noise
+// suppress "funk" noise, Safe Mode (Cmd+Shift+T) is an app key monitor
 // source: https://stackoverflow.com/a/69858444
 class KeyView: NSView {
     weak var webView: WebView?
     override var acceptsFirstResponder: Bool { true }
-    override func keyDown(with event: NSEvent) {
-        if(
-            event.modifierFlags.contains(.command) &&
-            event.modifierFlags.contains(.shift) &&
-            event.keyCode == 17
-        ) {
-            WebViewStore.getInstance().safe(from: self.webView)
-        }
-    }
+    override func keyDown(with event: NSEvent) {}
 }
 
 struct WebViewRepresentable: NSViewRepresentable {
@@ -315,6 +307,29 @@ struct WebViewRepresentable: NSViewRepresentable {
             subview.removeFromSuperview()
         }
         nsView.removeFromSuperview()
+    }
+}
+
+// The title bar of the window takes the color of the page, its title the
+// appearance (light, dark) readable on it
+struct WindowTitleBar: NSViewRepresentable {
+    let color: Color?
+
+    func makeNSView(context: Context) -> NSView {
+        return NSView()
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        let color = self.color
+        // the view is in its window on the next tick
+        DispatchQueue.main.async {
+            guard let window = view.window else { return }
+            window.titlebarAppearsTransparent = true
+            window.titlebarSeparatorStyle = .none
+            guard let color else { return }
+            window.backgroundColor = NSColor(color)
+            window.appearance = NSAppearance(named: getBestSuitedColorScheme(color: color) == .dark ? .darkAqua : .aqua)
+        }
     }
 }
 

@@ -102,21 +102,29 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
     // the UI endpoints of the page (/open, /exit, /resize), answered by the
     // window on the main thread with a text, nil leaves them to the core (404)
     var ui: ((_ path: String, _ query: [String: String]) -> String?)?
-    // main thread only
-    private var stoppedTasks = Set<ObjectIdentifier>()
+    // main thread only. The tasks not answered nor stopped yet, retained so
+    // their address (the key) cannot go to a new task while they are here: a
+    // stopped task must not be answered (WebKit throws), a new one always.
+    private var activeTasks: [ObjectIdentifier: any WKURLSchemeTask] = [:]
     private var frameStreams: [ObjectIdentifier: (ctx: UInt8, gen: Int32)] = [:]
-    
+
     init(ctx: UInt8) {
         self.ctx = ctx
     }
-    
+
+    // Before loading a new page in the webview: the tasks of the previous one
+    // are left unanswered, WebKit stops them later (late answers would throw).
     func reset(ctx: UInt8) {
         self.ctx = ctx
-        stoppedTasks.removeAll()
+        activeTasks.removeAll()
+        for stream in frameStreams.values {
+            streamDetach(stream.ctx, stream.gen)
+        }
+        frameStreams.removeAll()
     }
-    
+
     private func respond(_ task: any WKURLSchemeTask, _ url: URL, status: Int, mimeType: String, data: Data) {
-        if stoppedTasks.remove(ObjectIdentifier(task as AnyObject)) != nil { return }
+        if activeTasks.removeValue(forKey: ObjectIdentifier(task as AnyObject)) == nil { return }
         task.didReceive(HTTPURLResponse(url: url, statusCode: status, httpVersion: "HTTP/1.1", headerFields: [
             "Content-Type": mimeType,
             "Content-Length": String(data.count),
@@ -129,6 +137,7 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
     func webView(_ webView: WKWebView, start task: any WKURLSchemeTask) {
         let url = task.request.url!
         let path = URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedPath ?? url.path
+        activeTasks[ObjectIdentifier(task as AnyObject)] = task
         if path == "/stream" {
             startFrameStream(task, url)
             return
@@ -154,7 +163,7 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
     
     func webView(_ webView: WKWebView, stop task: any WKURLSchemeTask) {
         let taskId = ObjectIdentifier(task as AnyObject)
-        stoppedTasks.insert(taskId)
+        activeTasks.removeValue(forKey: taskId)
         // the page went away, stream data goes back to evaluated chunks
         if let stream = frameStreams.removeValue(forKey: taskId) {
             streamDetach(stream.ctx, stream.gen)
@@ -191,6 +200,7 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
             }
             DispatchQueue.main.async {
                 guard self?.frameStreams.removeValue(forKey: taskId)?.gen == gen else { return }
+                self?.activeTasks.removeValue(forKey: taskId)
                 task.didFinish()
             }
         }

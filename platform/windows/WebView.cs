@@ -209,15 +209,18 @@ namespace FullStacked
                 {
                     if (e.KeyEventKind == CoreWebView2KeyEventKind.KeyDown || e.KeyEventKind == CoreWebView2KeyEventKind.SystemKeyDown)
                     {
-                        if (e.VirtualKey == (uint)Windows.System.VirtualKey.T)
+                        bool isCtrl = (GetKeyState(0x11) & 0x8000) != 0 || (GetAsyncKeyState(0x11) & 0x8000) != 0;
+                        bool isShift = (GetKeyState(0x10) & 0x8000) != 0 || (GetAsyncKeyState(0x10) & 0x8000) != 0;
+                        if (isCtrl && isShift && e.VirtualKey == (uint)Windows.System.VirtualKey.T)
                         {
-                            bool isCtrl = (GetKeyState(0x11) & 0x8000) != 0 || (GetAsyncKeyState(0x11) & 0x8000) != 0;
-                            bool isShift = (GetKeyState(0x10) & 0x8000) != 0 || (GetAsyncKeyState(0x10) & 0x8000) != 0;
-                            if (isCtrl && isShift)
-                            {
-                                e.Handled = true;
-                                this.DispatcherQueue.TryEnqueue(() => App.Singleton.Safe());
-                            }
+                            e.Handled = true;
+                            this.DispatcherQueue.TryEnqueue(() => App.Singleton.Safe());
+                        }
+                        // Ctrl+Shift+C goes to the page (copy in the shell) instead of
+                        // inspect element, the devtools stay on F12 and Ctrl+Shift+I
+                        else if (isCtrl && isShift && e.VirtualKey == (uint)Windows.System.VirtualKey.C)
+                        {
+                            e.IsBrowserAcceleratorKeyEnabled = false;
                         }
                     }
                 };
