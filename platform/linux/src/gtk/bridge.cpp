@@ -62,6 +62,12 @@ void GtkBridge::respond(WebKitURISchemeRequest *request, int status,
         webkit_uri_scheme_response_new(stream, length);
     webkit_uri_scheme_response_set_status(response, status, nullptr);
     webkit_uri_scheme_response_set_content_type(response, mimeType.c_str());
+    // the content type alone is not a header: fetch() would see no
+    // Content-Type, unlike every other host
+    SoupMessageHeaders *headers =
+        soup_message_headers_new(SOUP_MESSAGE_HEADERS_RESPONSE);
+    soup_message_headers_append(headers, "Content-Type", mimeType.c_str());
+    webkit_uri_scheme_response_set_http_headers(response, headers);
     webkit_uri_scheme_request_finish_with_response(request, response);
     g_object_unref(response);
     g_object_unref(stream);
