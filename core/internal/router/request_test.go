@@ -30,6 +30,10 @@ func TestHandleRequest(t *testing.T) {
 
 	Platform = "test"
 	check("/platform", nil, 200, "text/plain", []byte("test"))
+	_, versionType, version := HandleRequest(ctxId, "/version", nil)
+	if versionType != "application/json" || !bytes.HasPrefix(version, []byte("{")) {
+		t.Fatalf("/version: %s %q", versionType, version)
+	}
 	check("/bridge", nil, 200, "text/plain", []byte("binary"))
 	BinaryCalls = false
 	check("/bridge", nil, 200, "text/plain", []byte("message"))

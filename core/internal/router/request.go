@@ -1,6 +1,8 @@
 package router
 
 import (
+	"encoding/json"
+	"fullstackedorg/fullstacked/internal/bundle"
 	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/types"
 	"strconv"
@@ -12,7 +14,7 @@ var Platform = ""
 var BinaryCalls = true
 
 // HandleRequest answers a request of the page of context ctxId, so hosts
-// only forward them: GET /platform, /ctx and /bridge, POST /call and /sync
+// only forward them: GET /platform, /ctx, /bridge and /version, POST /call and /sync
 // (the body is the payload, the response the core response), GET
 // /stream/detach and static files. GET /stream, the message channels and the
 // UI endpoints of a host stay with the host.
@@ -22,6 +24,14 @@ func HandleRequest(ctxId uint8, path string, body []byte) (status int, mimeType 
 		return 200, "text/plain", []byte(Platform)
 	case "/ctx":
 		return 200, "text/plain", []byte(strconv.Itoa(int(ctxId)))
+	case "/version":
+		// the running core's version without the bridge: a page whose bundle
+		// was built for another runtime (its bridge cannot talk to this core)
+		// still learns which runtime it runs on, e.g. to fetch a matching build.
+		// Pages built for older runtimes rely on it: keep the path and the
+		// { major, minor, patch, build } shape stable.
+		data, _ := json.Marshal(bundle.FullStackedVersion())
+		return 200, "application/json", data
 	case "/bridge":
 		if BinaryCalls {
 			return 200, "text/plain", []byte("binary")
