@@ -97,6 +97,11 @@ export class Socket extends RealDuplex {
                 await this.duplex.open();
                 this.emit("connect");
                 this.emit("ready");
+            })
+            // refused dial, DNS failure, tunnel upgrade refused (401/403):
+            // like node:net, "error" then "close" so drivers reject promptly
+            .catch((err) => {
+                this.destroy(err instanceof Error ? err : new Error(err));
             });
     }
 

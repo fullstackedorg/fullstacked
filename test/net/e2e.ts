@@ -36,6 +36,43 @@ suite("net - e2e", () => {
         assert.deepEqual(received, data);
     });
 
+    test("connect - refused connection is a socket error", async () => {
+        // a port nothing listens on
+        const closed = net.createServer();
+        await new Promise<void>((resolve) => closed.listen(0, resolve));
+        const port = (closed.address() as net.AddressInfo).port;
+        await new Promise<void>((resolve) => closed.close(() => resolve()));
+
+        const unhandled: unknown[] = [];
+        const onUnhandled = (reason: unknown) => unhandled.push(reason);
+        process.on("unhandledRejection", onUnhandled);
+
+        try {
+            const socket = new netGo.Socket();
+            const events: string[] = [];
+            const error = await new Promise<Error>((resolve) => {
+                let err: Error;
+                socket.on("error", (e) => {
+                    events.push("error");
+                    err = e;
+                });
+                socket.on("close", () => {
+                    events.push("close");
+                    resolve(err);
+                });
+                socket.on("connect", () => events.push("connect"));
+                socket.connect(port, "127.0.0.1");
+            });
+            assert.deepEqual(events, ["error", "close"]);
+            assert.match(error.message, /refused/);
+
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            assert.deepEqual(unhandled, []);
+        } finally {
+            process.off("unhandledRejection", onUnhandled);
+        }
+    });
+
     test("connect - multiple write", async () => {
         const data = new Uint8Array([1, 2, 3]);
         let received = new Uint8Array();

@@ -13,7 +13,8 @@ import fetchGo from "../../core/internal/bundle/lib/fetch/index.ts";
 import gitGo from "../../core/internal/bundle/lib/git/index.ts";
 import { mergeUint8Arrays } from "../../core/internal/bundle/lib/bridge/serialization.ts";
 import { startServer } from "../net/server.ts";
-import { startTunnelServer } from "./server.ts";
+import { startHubServer, startTunnelServer } from "./server.ts";
+import { payload } from "./payload.ts";
 import plugin from "../../core/internal/bundle/lib/plugin/index.ts";
 
 const { Pool } = pg;
@@ -300,6 +301,103 @@ suite("tunnel - e2e", () => {
             socket2.on("close", resolve);
             socket2.destroy();
         });
+    });
+
+    test("connect through tunnel - message larger than 32 KiB", async () => {
+        // the websocket library's default read limit is 32 KiB per message,
+        // the hub sends up to ~64 KiB per message
+        const size = 256 * 1024;
+        const hubServer = await startHubServer(9096, { payloadSize: size });
+
+        await tunnelGo.register({
+            name: "large-message-tunnel-e2e",
+            host: "localhost",
+            port: 9096,
+            unsecure: true
+        });
+
+        try {
+            let received = new Uint8Array();
+            const socket = new netGo.Socket();
+            await new Promise<void>((resolve, reject) => {
+                socket.on("error", reject);
+                socket.on("data", (chunk) => {
+                    received = mergeUint8Arrays(received, chunk);
+                    if (received.length >= size) {
+                        socket.destroy();
+                    }
+                });
+                socket.on("close", resolve);
+                socket.connect(5432, "large-message-tunnel-e2e");
+            });
+            assert.equal(received.length, size);
+            assert.ok(
+                Buffer.from(received).equals(payload(size)),
+                "large message arrived corrupted"
+            );
+        } finally {
+            await hubServer.terminate();
+        }
+    });
+
+    test("connect through tunnel - refused dial is a socket error", async () => {
+        const hubServer = await startHubServer(9097, { refuseStatus: 401 });
+
+        await tunnelGo.register({
+            name: "refused-tunnel-e2e",
+            host: "localhost",
+            port: 9097,
+            unsecure: true
+        });
+
+        const unhandled: unknown[] = [];
+        const onUnhandled = (reason: unknown) => unhandled.push(reason);
+        process.on("unhandledRejection", onUnhandled);
+
+        try {
+            // raw socket: error then close, like node:net
+            const socket = new netGo.Socket();
+            const events: string[] = [];
+            const error = await new Promise<Error>((resolve) => {
+                let err: Error;
+                socket.on("error", (e) => {
+                    events.push("error");
+                    err = e;
+                });
+                socket.on("close", () => {
+                    events.push("close");
+                    resolve(err);
+                });
+                socket.on("connect", () => events.push("connect"));
+                socket.connect(5432, "refused-tunnel-e2e");
+            });
+            assert.deepEqual(events, ["error", "close"]);
+            assert.ok(error instanceof Error);
+            assert.match(error.message, /401/);
+
+            // a driver sees it as a prompt connect rejection
+            const client = new pg.Client({
+                host: "refused-tunnel-e2e",
+                port: 5432,
+                user: "postgres",
+                password: "testpass",
+                database: "postgres",
+                stream: () => new netGo.Socket()
+            });
+            const start = Date.now();
+            await assert.rejects(client.connect(), /401/);
+            assert.ok(
+                Date.now() - start < 5000,
+                "pg took too long to see the refused dial"
+            );
+
+            // let any stray rejection surface
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            assert.deepEqual(unhandled, []);
+        } finally {
+            process.off("unhandledRejection", onUnhandled);
+            await hubServer.terminate();
+        }
     });
 
     test("connect through tunnel - write synchronously immediately after connect", async () => {

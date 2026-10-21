@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/internal/utils"
 	"fullstackedorg/fullstacked/types"
@@ -133,8 +134,13 @@ func (tunnel *Tunnel) Connect() (*types.ResponseStream, error) {
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("tunnel %s: %w", tunnel.Name, err)
 	}
+
+	// the hub sends one message per target socket read (up to ~64 KiB),
+	// above the 32 KiB default; the target's stream has no message size,
+	// so no limit like websocket.NetConn in Dial
+	c.SetReadLimit(-1)
 
 	stream := types.ResponseStream{
 		Open: func(ctx *types.Context, streamId uint8) {
@@ -152,7 +158,11 @@ func (tunnel *Tunnel) Connect() (*types.ResponseStream, error) {
 			}()
 		},
 		Write: func(ctx *types.Context, streamId uint8, data []byte) {
-			c.Write(context.Background(), websocket.MessageBinary, data)
+			err := c.Write(context.Background(), websocket.MessageBinary, data)
+			if err != nil {
+				// the read goroutine sees the closed conn and ends the stream
+				c.CloseNow()
+			}
 		},
 		Close: func(ctx *types.Context, streamId uint8) {
 			c.CloseNow()
