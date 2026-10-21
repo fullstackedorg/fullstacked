@@ -147,6 +147,9 @@ var client = &http.Client{
 			var dialer net.Dialer
 			return dialer.DialContext(ctx, network, addr)
 		},
+		// a custom DialContext disables HTTP/2 unless forced,
+		// and Cloudflare blocks Go's TLS client over HTTP/1.1
+		ForceAttemptHTTP2: true,
 	},
 }
 
