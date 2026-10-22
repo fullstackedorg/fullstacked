@@ -62,7 +62,10 @@ export function onStreamFrame(id: number, flags: number, data: Uint8Array) {
     const duplexes = activeDuplexes.get(id);
 
     if (!duplexes || duplexes.length === 0) {
-        if (flags === 0) {
+        // data for no stream: stop its producer. An empty chunk can trail
+        // the end (a chunk and the page's close racing in the core), and
+        // closing its id could close a newer stream that reuses it
+        if (flags === 0 && data.byteLength > 0) {
             globalThis.fullstacked.bridge({
                 mod: Stream,
                 fn: Close,

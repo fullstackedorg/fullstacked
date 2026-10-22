@@ -143,6 +143,36 @@ suite("fetch - e2e", () => {
         assert.rejects(response.text());
     });
 
+    // a failed request settles: before, the core never ended the stream of
+    // a request whose connection failed, and fetch waited forever
+    test("refused connection rejects", { timeout: 5000 }, async () => {
+        await assert.rejects(fetch("http://localhost:1"), /refused/);
+    });
+
+    test(
+        "connection dropped before the response rejects",
+        { timeout: 5000 },
+        async () => {
+            await assert.rejects(fetch("http://localhost:9090/drop"), /EOF/);
+        }
+    );
+
+    test(
+        "connection dropped mid-body rejects the body",
+        { timeout: 5000 },
+        async () => {
+            const response = await fetch("http://localhost:9090/cut");
+            assert.equal(response.status, 200);
+            let received = 0;
+            await assert.rejects(async () => {
+                for await (const chunk of response.body) {
+                    received += chunk.byteLength;
+                }
+            }, /unexpected EOF/);
+            assert.ok(received > 0 && received < 1024 * 1024);
+        }
+    );
+
     test("redirect - follow", async () => {
         const response = await fetch("http://localhost:9090/redirect");
         assert.deepEqual(response.status, 200);

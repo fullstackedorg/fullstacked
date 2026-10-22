@@ -28,6 +28,19 @@ http.createServer(async (req, res) => {
         return res.end("redirect target reached");
     }
 
+    // the connection drops before any response
+    if (req.url === "/drop") {
+        return req.socket.destroy();
+    }
+
+    // the connection drops partway through the body
+    if (req.url === "/cut") {
+        res.writeHead(200, { "content-length": 1024 * 1024 });
+        res.write(Buffer.alloc(64 * 1024));
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return req.socket.destroy();
+    }
+
     if (req.url === "/wait") {
         await new Promise((resolve) =>
             setTimeout(resolve, parseInt(req.headers["x-wait"] || "0"))

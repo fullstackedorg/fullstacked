@@ -347,16 +347,21 @@ func getCorePayloadStream(ctx *types.Context, id uint8, size int) ([]byte, error
 		return nil, errors.New("cannot find stream for id")
 	}
 
-	var headerByte byte = 0
-	if stream.Error != nil {
-		headerByte = 2
-	} else if stream.Ended {
-		headerByte = 1
-	}
-
 	if size <= 0 || len(stream.Buffer) < size-1 {
 		ctx.StreamsMutex.Unlock()
 		return nil, errors.New("stream buffer too small")
+	}
+
+	// a chunk and the end come from different goroutines (a read loop, the
+	// page's close) and their reads can swap: the stream ends with the read
+	// that takes its last bytes, never before, so no read finds it gone
+	drained := len(stream.Buffer) == size-1
+
+	var headerByte byte = 0
+	if drained && stream.Error != nil {
+		headerByte = 2
+	} else if drained && stream.Ended {
+		headerByte = 1
 	}
 
 	buffer, err := serialization.MergeBuffers([]byte{headerByte}, stream.Buffer[0:size-1])
@@ -368,7 +373,7 @@ func getCorePayloadStream(ctx *types.Context, id uint8, size int) ([]byte, error
 
 	stream.Buffer = stream.Buffer[size-1:]
 
-	if stream.Error != nil || stream.Ended {
+	if headerByte != 0 {
 		delete(ctx.Streams, id)
 	}
 	ctx.StreamsMutex.Unlock()
@@ -393,7 +398,8 @@ func StreamError(
 
 	stream, ok := ctx.Streams[storedStreamId]
 
-	if !ok {
+	// ended already (closed by the page), the error comes too late
+	if !ok || stream.Ended {
 		ctx.StreamsMutex.Unlock()
 		return
 	}
@@ -448,15 +454,12 @@ func StreamChunk(
 	stream, ok := ctx.Streams[storedStreamId]
 	framesAttached := ctx.Frames.Attached()
 
-	if !ok {
-		// a nil map means the context ended while streaming, frames delete
-		// ended streams right away so late chunks are dropped
-		if ctx.Streams != nil && !framesAttached && (len(buffer) > 0 || !end) {
-			panic("no stream for id")
-		} else {
-			ctx.StreamsMutex.Unlock()
-			return
-		}
+	// late chunks of an ended stream are dropped: the page closed it while
+	// its read loop still had a chunk, or the context ended while streaming.
+	// One end only, a second one would reach the page as a stray chunk.
+	if !ok || stream.Ended {
+		ctx.StreamsMutex.Unlock()
+		return
 	}
 
 	if !stream.Opened {

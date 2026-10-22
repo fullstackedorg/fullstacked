@@ -1,0 +1,129 @@
+import test, { after, before, suite } from "node:test";
+import assert from "node:assert";
+import { Worker } from "node:worker_threads";
+
+import netGo from "../../core/internal/bundle/lib/net/index.ts";
+import tunnelGo from "../../core/internal/bundle/lib/tunnel/index.ts";
+import fetchGo from "../../core/internal/bundle/lib/fetch/index.ts";
+import { payload } from "./payload.ts";
+
+// Concurrent large transfers through tunnels, like a bench of S3 GetObject,
+// with database sockets opening and closing alongside and some transfers
+// losing their connection. Every transfer must settle: whole, or with an
+// error. Before, a request whose connection dropped waited forever while both
+// ends of the connection were already closed.
+
+const wsPort = 9098;
+const objectSize = 4 * 1024 * 1024;
+const expected = payload(objectSize);
+
+function startStressServer() {
+    return new Promise<Worker>((res) => {
+        const worker = new Worker("./test/tunnel/server-stress.js", {
+            workerData: { wsPort }
+        });
+        worker.on("message", () => res(worker));
+        worker.on("error", console.log);
+    });
+}
+
+// rejects instead of waiting forever on a stalled transfer
+function withTimeout<T>(promise: Promise<T>, label: string) {
+    const ms = 30_000;
+    let timeout: NodeJS.Timeout;
+    return Promise.race([
+        promise,
+        new Promise<T>((_, reject) => {
+            timeout = setTimeout(
+                () => reject(new Error(`${label} stalled for ${ms}ms`)),
+                ms
+            );
+        })
+    ]).finally(() => clearTimeout(timeout));
+}
+
+async function getObject(path = `${objectSize}`) {
+    const response = await fetchGo(`http://stress-http/${path}`);
+    assert.equal(response.status, 200);
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of response.body as any) {
+        chunks.push(chunk);
+    }
+    return Buffer.concat(chunks);
+}
+
+// connect, one round trip, close: a database client's lifetime
+function echoCycle() {
+    return new Promise<void>((resolve, reject) => {
+        const data = payload(1024);
+        let received = 0;
+        const socket = new netGo.Socket();
+        socket.on("error", reject);
+        socket.on("connect", () => socket.write(data));
+        socket.on("data", (chunk: Buffer) => {
+            received += chunk.byteLength;
+            if (received >= data.byteLength) {
+                socket.destroy();
+            }
+        });
+        socket.on("close", () => {
+            if (received >= data.byteLength) resolve();
+            else reject(new Error("echo socket closed early"));
+        });
+        socket.connect(5432, "stress-echo");
+    });
+}
+
+suite("tunnel - stress", () => {
+    let server: Worker;
+
+    before(async () => {
+        server = await startStressServer();
+        await tunnelGo.register({
+            name: "stress-http",
+            host: "localhost",
+            port: wsPort,
+            unsecure: true
+        });
+        await tunnelGo.register({
+            name: "stress-echo",
+            host: "localhost",
+            port: wsPort,
+            path: "/echo",
+            unsecure: true
+        });
+    });
+
+    after(() => server?.terminate());
+
+    test("concurrent large transfers settle with socket churn and dropped connections", async () => {
+        const transfers = Array.from({ length: 16 }, async (_, w) => {
+            for (let i = 0; i < 6; i++) {
+                const label = `worker ${w} GET ${i}`;
+                if ((w + i) % 4 === 1) {
+                    await withTimeout(
+                        assert.rejects(getObject(`drop/${objectSize}`)),
+                        `${label} (dropped)`
+                    );
+                } else if ((w + i) % 4 === 3) {
+                    await withTimeout(
+                        assert.rejects(getObject(`cut/${objectSize}`)),
+                        `${label} (cut)`
+                    );
+                } else {
+                    const body = await withTimeout(getObject(), label);
+                    assert.equal(body.byteLength, objectSize);
+                    assert.ok(body.equals(expected), `${label} corrupted`);
+                }
+            }
+        });
+
+        const churn = Array.from({ length: 4 }, async (_, c) => {
+            for (let i = 0; i < 40; i++) {
+                await withTimeout(echoCycle(), `churn ${c} cycle ${i}`);
+            }
+        });
+
+        await Promise.all([...transfers, ...churn]);
+    });
+});

@@ -48,16 +48,22 @@ func Switch(
 			Open: func(ctx *types.Context, streamId uint8) {
 				res, err := FetchFnApply(id, requestHead, requestBody)
 
+				// a request the page closed (abort) ended its stream already
 				fetchRequestsMutex.Lock()
 				_, ok := fetchRequests[id]
 				fetchRequestsMutex.Unlock()
 
-				if ok {
-					if err != nil {
-						store.StreamEvent(ctx, streamId, "error", []types.SerializableData{err.Error()}, true)
-					} else {
-						store.StreamEvent(ctx, streamId, "response", []types.SerializableData{res}, true)
-					}
+				if !ok {
+					return
+				}
+
+				// every other outcome ends the stream, or the page's fetch
+				// waits forever (a dropped connection, a refused dial)
+				if err != nil {
+					closeFetchRequest(id)
+					store.StreamEvent(ctx, streamId, "error", []types.SerializableData{err.Error()}, true)
+				} else {
+					store.StreamEvent(ctx, streamId, "response", []types.SerializableData{res}, true)
 				}
 			},
 			Close: func(ctx *types.Context, streamId uint8) {
@@ -77,14 +83,6 @@ func Switch(
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
 			Open: func(ctx *types.Context, streamId uint8) {
-				fetchResponsesMutex.Lock()
-				_, ok := fetchResponses[id]
-				fetchResponsesMutex.Unlock()
-
-				if !ok {
-					return
-				}
-
 				StreamResponse(ctx, streamId, id)
 			},
 			Close: func(ctx *types.Context, streamId uint8) {
@@ -167,10 +165,11 @@ func FetchFnApply(id int, requestHead RequestHead, body []byte) (ResponseHead, e
 	}
 	fetchRequestsMutex.Unlock()
 
+	// on error, the caller closes the request once it checked whether the
+	// page closed it first
 	request, err := http.NewRequestWithContext(ctx, requestHead.Method, requestHead.Url, reqBody)
 
 	if err != nil {
-		closeFetchRequest(id)
 		return ResponseHead{}, err
 	}
 
@@ -198,7 +197,6 @@ func FetchFnApply(id int, requestHead RequestHead, body []byte) (ResponseHead, e
 	response, err := reqClient.Do(request)
 
 	if err != nil {
-		closeFetchRequest(id)
 		return ResponseHead{}, err
 	}
 
@@ -230,34 +228,42 @@ func safelyGetResponse(responseId int) *http.Response {
 	return response
 }
 
+// StreamResponse streams the body until it ends, always ending the stream:
+// with an error when the body is cut short (connection dropped), so the page
+// does not take a truncated body for a whole one
 func StreamResponse(
 	ctx *types.Context,
 	streamId uint8,
 	responseId int,
 ) {
-	response := safelyGetResponse(responseId)
-	if response == nil {
-		return
-	}
-
+	defer closeFetchRequest(responseId)
 	defer closeFetchResponse(responseId)
 
 	for {
 		response := safelyGetResponse(responseId)
 		if response == nil {
-			break
+			// closed by the page (or never there), the store drops the end
+			// of a stream the page already closed
+			store.StreamChunk(ctx, streamId, nil, true)
+			return
 		}
 
 		buffer := make([]byte, 2048)
 		n, err := response.Body.Read(buffer)
-		buffer = buffer[:n]
-		end := err != nil
 
-		store.StreamChunk(ctx, streamId, buffer, end)
-
-		if end {
-			break
+		if err == nil || err == io.EOF {
+			store.StreamChunk(ctx, streamId, buffer[:n], err != nil)
+			if err != nil {
+				return
+			}
+			continue
 		}
+
+		if n > 0 {
+			store.StreamChunk(ctx, streamId, buffer[:n], false)
+		}
+		store.StreamError(ctx, streamId, err)
+		return
 	}
 }
 
