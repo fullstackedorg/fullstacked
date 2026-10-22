@@ -73,12 +73,21 @@ func createSocket(
 
 			}()
 		},
+		QueueWrites: true,
 		Write: func(ctx *types.Context, streamId uint32, data []byte) {
 			_, err := socket.Write(data)
 			if err != nil {
 				// the read goroutine sees the closed socket and ends the stream
 				socket.Close()
 			}
+		},
+		TryWrite: func(ctx *types.Context, streamId uint32, data []byte) int {
+			n, err := tryWrite(socket, data)
+			if err != nil {
+				socket.Close()
+				return len(data)
+			}
+			return n
 		},
 		Close: func(ctx *types.Context, streamId uint32) {
 			socket.Close()

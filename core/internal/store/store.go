@@ -307,7 +307,7 @@ func buildResponseStream(
 	}
 
 	storedStreamId := streamId
-	ctx.Streams[storedStreamId] = &types.StoredStream{
+	stored := &types.StoredStream{
 		Open:       response.Stream.Open,
 		Close:      response.Stream.Close,
 		Write:      response.Stream.Write,
@@ -316,6 +316,11 @@ func buildResponseStream(
 		Ended:      false,
 		Buffer:     []byte{},
 	}
+	if response.Stream.QueueWrites {
+		stored.Writes = &types.StreamWrites{}
+		stored.TryWrite = response.Stream.TryWrite
+	}
+	ctx.Streams[storedStreamId] = stored
 
 	ctx.NextStreamId = wrapStreamId(storedStreamId + 1)
 
@@ -395,6 +400,10 @@ func getCorePayloadStream(ctx *types.Context, id uint32, size int) ([]byte, erro
 		headerByte = 2
 	} else if drained && stream.Ended {
 		headerByte = 1
+	} else if size == 1 && stream.Drains > 0 {
+		// the read of a drain (StreamDrain) takes no data
+		headerByte = frames.FlagDrain
+		stream.Drains--
 	}
 
 	buffer, err := serialization.MergeBuffers([]byte{headerByte}, stream.Buffer[0:size-1])
@@ -406,7 +415,7 @@ func getCorePayloadStream(ctx *types.Context, id uint32, size int) ([]byte, erro
 
 	stream.Buffer = stream.Buffer[size-1:]
 
-	if headerByte != 0 {
+	if headerByte == 1 || headerByte == 2 {
 		delete(ctx.Streams, id)
 	}
 	ctx.StreamsMutex.Unlock()

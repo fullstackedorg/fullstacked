@@ -4,7 +4,8 @@
 //
 // Frame: [streamId u32][flags u8][length u32][data], big endian
 // flags: 0 data, 1 end, 2 error (data is the error message), 3 response of
-// a call (the frame id is the call id)
+// a call (the frame id is the call id), 4 drain (the queued writes of the
+// stream went down, see store.QueueWrite)
 //
 // The host attaches a reader with Attach, which returns a generation and
 // queues a hello frame (stream 0, empty) so the page knows data flows. Read
@@ -26,6 +27,8 @@ const (
 	// the response of a call sent on a message channel, the frame id is
 	// the call id (see router.CallForMessage)
 	FlagResponse uint8 = 3
+	// the page may write again to the stream, empty
+	FlagDrain uint8 = 4
 
 	HeaderSize = 9
 

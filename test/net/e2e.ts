@@ -147,6 +147,140 @@ suite("net - e2e", () => {
         );
     });
 
+    // the core writes in order on a goroutine of the socket: before, the
+    // write call waited for the peer, on the page's thread in Node
+    test("connect - a peer slow to read blocks no other call", async () => {
+        const pauseMs = 1000;
+        const worker = new Worker("./test/net/server-slow.js", {
+            workerData: { pauseMs }
+        });
+        const port = await new Promise<number>((resolve) =>
+            worker.once("message", resolve)
+        );
+
+        try {
+            const size = 8 * 1024 * 1024;
+            const data = new Uint8Array(size);
+            for (let i = 0; i < size; i++) data[i] = i % 251;
+
+            const socket = new netGo.Socket();
+            await new Promise<void>((resolve, reject) => {
+                socket.once("connect", resolve);
+                socket.once("error", reject);
+                socket.connect(port, "127.0.0.1");
+            });
+
+            const chunks: Uint8Array[] = [];
+            let received = 0;
+            const echoed = new Promise<void>((resolve) => {
+                socket.on("data", (chunk) => {
+                    chunks.push(chunk);
+                    received += chunk.byteLength;
+                    if (received >= size) resolve();
+                });
+            });
+
+            // the event loop keeps turning while the peer reads nothing
+            let last = performance.now();
+            let longestGap = 0;
+            const interval = setInterval(() => {
+                const now = performance.now();
+                longestGap = Math.max(longestGap, now - last);
+                last = now;
+            }, 5);
+
+            const start = performance.now();
+            let writtenAfter = 0;
+            const written = new Promise<void>((resolve) =>
+                socket.write(data, () => {
+                    writtenAfter = performance.now() - start;
+                    resolve();
+                })
+            );
+
+            // another socket is not held up either
+            const other = new Promise<string>((resolve) => {
+                const socket = new netGo.Socket();
+                socket.on("data", (chunk) => {
+                    resolve(chunk.toString());
+                    socket.destroy();
+                });
+                socket.once("connect", () => socket.write("other"));
+                socket.connect(9090);
+            });
+            assert.equal(await other, "other");
+            assert.ok(
+                performance.now() - start < pauseMs / 2,
+                "another socket waited for the slow one"
+            );
+
+            await Promise.all([written, echoed]);
+            clearInterval(interval);
+
+            assert.ok(longestGap < 250, `event loop blocked ${longestGap}ms`);
+            // the write callback waits for the core to take the data
+            // (backpressure), so after the pause
+            assert.ok(
+                writtenAfter > pauseMs / 2,
+                `written in ${writtenAfter}ms`
+            );
+            assert.deepEqual(new Uint8Array(Buffer.concat(chunks)), data);
+
+            await new Promise((resolve) => {
+                socket.once("close", resolve);
+                socket.destroy();
+            });
+        } finally {
+            await worker.terminate();
+        }
+    });
+
+    // writes made while one is in flight go in one bridge call (_writev)
+    test("connect - many small writes, in order, batched", async () => {
+        const count = 10000;
+        const expected = Buffer.concat(
+            Array.from({ length: count }, (_, i) => Buffer.from(`${i},`))
+        );
+
+        const bridge = globalThis.fullstacked.bridge;
+        let writeCalls = 0;
+        globalThis.fullstacked.bridge = ((opts: any, sync?: boolean) => {
+            // Stream Write
+            if (opts.mod === 1 && opts.fn === 1) writeCalls++;
+            return bridge(opts, sync);
+        }) as typeof bridge;
+
+        try {
+            const socket = new netGo.Socket();
+            await new Promise<void>((resolve) => {
+                socket.once("connect", resolve);
+                socket.connect(9090);
+            });
+            const chunks: Buffer[] = [];
+            let received = 0;
+            const echoed = new Promise<void>((resolve) => {
+                socket.on("data", (chunk) => {
+                    chunks.push(chunk);
+                    received += chunk.byteLength;
+                    if (received >= expected.byteLength) resolve();
+                });
+            });
+            for (let i = 0; i < count; i++) {
+                socket.write(`${i},`);
+            }
+            await echoed;
+            assert.equal(Buffer.concat(chunks).toString(), expected.toString());
+            assert.ok(writeCalls < 10, `${writeCalls} write calls`);
+
+            await new Promise((resolve) => {
+                socket.once("close", resolve);
+                socket.destroy();
+            });
+        } finally {
+            globalThis.fullstacked.bridge = bridge;
+        }
+    });
+
     test("ssh", { timeout: 300000 }, async () => {
         containerName = `openssh-server-test-${Date.now()}`;
 

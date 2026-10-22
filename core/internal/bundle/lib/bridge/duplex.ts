@@ -20,7 +20,12 @@ type DuplexItem = {
     } | null;
     queuedPackets: { flags: number; data: Uint8Array }[];
     error?: Error;
+    // drains received, and the writes waiting for the next one
+    drains: number;
+    drainWaiters: Set<() => void>;
 };
+
+const FLAG_DRAIN = 4;
 
 const activeDuplexes = new Map<number, DuplexItem[]>();
 
@@ -34,13 +39,14 @@ function onStreamData(id: number, payload: ArrayBuffer | string) {
     onStreamFrame(id, chunk[0], chunk.slice(1));
 }
 
-// flags: 0 data, 1 end, 2 error (data is the message)
+// flags: 0 data, 1 end, 2 error (data is the message), 4 drain (the core
+// wrote the queued writes, see write)
 export function onStreamFrame(id: number, flags: number, data: Uint8Array) {
     const workerStreams = globalThis.fullstacked.workerStreams;
     if (workerStreams) {
         const worker = workerStreams.get(id);
         if (worker) {
-            if (flags !== 0) {
+            if (flags === 1 || flags === 2) {
                 workerStreams.delete(id);
             }
 
@@ -91,6 +97,12 @@ function processPayload(
     flags: number,
     data: Uint8Array
 ) {
+    if (flags === FLAG_DRAIN) {
+        duplex.drains++;
+        releaseWrites(duplex);
+        return;
+    }
+
     const isError = flags === 2;
     duplex.done = flags === 1 || isError;
 
@@ -111,6 +123,8 @@ function processPayload(
     }
 
     if (duplex.done) {
+        // no drain comes after the end
+        releaseWrites(duplex);
         if (!isError) {
             duplex.listeners.close.forEach((cb) => cb());
         }
@@ -135,6 +149,12 @@ function processPayload(
 
         duplex.asyncRead.promise?.resolve?.();
     }
+}
+
+function releaseWrites(duplex: DuplexItem) {
+    const waiters = duplex.drainWaiters;
+    duplex.drainWaiters = new Set();
+    waiters.forEach((resolve) => resolve());
 }
 
 type StreamData = string | Buffer | Uint8Array | DataView;
@@ -169,7 +189,9 @@ export function createDuplex(id: number): Duplex {
         },
         pendingData: [],
         asyncRead: null,
-        queuedPackets: []
+        queuedPackets: [],
+        drains: 0,
+        drainWaiters: new Set()
     };
 
     if (!activeDuplexes.has(id)) {
@@ -288,16 +310,26 @@ export function createDuplex(id: number): Duplex {
         }
     };
 
+    // Sockets write in the core in order, after the call returned: it
+    // answers true once too much is queued, the write then resolves with
+    // the next drain (or the end)
     stream.write = async (data: Uint8Array | string) => {
         if (!duplex.open) {
             await open();
         }
         data = typeof data === "string" ? te.encode(data) : data;
-        return globalThis.fullstacked.bridge({
+        const drains = duplex.drains;
+        const wait = await globalThis.fullstacked.bridge({
             mod: Stream,
             fn: Write,
             data: [id, data]
         });
+        // the drain can come before the response (frames)
+        if (wait === true && duplex.drains === drains && !duplex.done) {
+            await new Promise<void>((resolve) =>
+                duplex.drainWaiters.add(resolve)
+            );
+        }
     };
 
     stream.writeEvent = async (event: string, ...args: SerializableData[]) => {

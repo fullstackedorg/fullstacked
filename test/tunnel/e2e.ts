@@ -55,6 +55,41 @@ suite("tunnel - e2e", () => {
         assert.deepEqual(received, data);
     });
 
+    // a large write goes to the hub in messages of up to 1 MiB, small writes
+    // made meanwhile join in one message, all in order
+    test("connect through tunnel - large and small writes, in order", async () => {
+        const large = payload(5 * 1024 * 1024 + 7);
+        const small = Array.from({ length: 1000 }, (_, i) =>
+            Buffer.from(`${i},`)
+        );
+        const expected = Buffer.concat([large, ...small, large]);
+
+        const socket = new netGo.Socket();
+        await new Promise<void>((resolve) => {
+            socket.once("connect", resolve);
+            socket.connect(9090, "test-tunnel-e2e");
+        });
+        const chunks: Buffer[] = [];
+        let received = 0;
+        const echoed = new Promise<void>((resolve) => {
+            socket.on("data", (chunk) => {
+                chunks.push(chunk);
+                received += chunk.byteLength;
+                if (received >= expected.byteLength) resolve();
+            });
+        });
+        socket.write(large);
+        small.forEach((chunk) => socket.write(chunk));
+        socket.write(large);
+        await echoed;
+        assert.ok(Buffer.concat(chunks).equals(expected));
+
+        await new Promise((resolve) => {
+            socket.once("close", resolve);
+            socket.destroy();
+        });
+    });
+
     test("connect through tunnel - multiple sequential opens", async () => {
         for (let i = 0; i < 3; i++) {
             const data = new Uint8Array([10 + i, 20 + i]);

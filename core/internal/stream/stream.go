@@ -28,7 +28,12 @@ func Switch(
 	case Open:
 		err = openStream(ctx, streamId)
 	case Write:
-		err = writeStream(ctx, streamId, data[1].Data.([]byte))
+		var wait bool
+		wait, err = writeStream(ctx, streamId, data[1].Data.([]byte))
+		// queued writes past the high water mark: the page waits for a drain
+		if wait {
+			response.Data = true
+		}
 	case WriteEvent:
 		dataArgs := []types.DeserializedData{}
 		if len(data) > 2 {
@@ -72,26 +77,30 @@ func openStream(ctx *types.Context, streamId uint32) error {
 	return nil
 }
 
-func writeStream(ctx *types.Context, streamId uint32, data []byte) error {
+func writeStream(ctx *types.Context, streamId uint32, data []byte) (bool, error) {
 	ctx.StreamsMutex.Lock()
 	stream, ok := ctx.Streams[streamId]
 	ctx.StreamsMutex.Unlock()
 
 	if !ok {
-		return nil
+		return false, nil
 	}
 
 	if !stream.Opened {
-		return errors.New("stream is not opened")
+		return false, errors.New("stream is not opened")
 	}
 
 	if stream.Write == nil {
-		return errors.New("stream has no write function")
+		return false, errors.New("stream has no write function")
+	}
+
+	if stream.Writes != nil {
+		return store.QueueWrite(ctx, streamId, stream, data), nil
 	}
 
 	stream.Write(ctx, streamId, data)
 
-	return nil
+	return false, nil
 }
 
 func writeEventStream(ctx *types.Context, streamId uint32, event string, data []types.DeserializedData) error {
@@ -117,19 +126,6 @@ func writeEventStream(ctx *types.Context, streamId uint32, event string, data []
 }
 
 func closeStream(ctx *types.Context, streamId uint32) error {
-	ctx.StreamsMutex.Lock()
-	stream, ok := ctx.Streams[streamId]
-	ctx.StreamsMutex.Unlock()
-
-	if !ok {
-		return nil
-	}
-
-	if stream.Close != nil {
-		stream.Close(ctx, streamId)
-	}
-
-	store.StreamChunk(ctx, streamId, nil, true)
-
+	store.CloseStream(ctx, streamId)
 	return nil
 }

@@ -41,8 +41,16 @@ const (
 )
 
 type ResponseStream struct {
-	Open       func(ctx *Context, streamId uint32)
-	Write      func(ctx *Context, streamId uint32, data []byte)
+	Open  func(ctx *Context, streamId uint32)
+	Write func(ctx *Context, streamId uint32, data []byte)
+	// Write runs on a goroutine of the stream, in order, and the write call
+	// returns before it: a peer slow to take the data blocks no other call
+	// (see store.QueueWrite). A close waits for the queued writes.
+	QueueWrites bool
+	// with QueueWrites, writes what the producer takes now without waiting
+	// (the bytes written, all of them once failed), when no write is queued:
+	// no goroutine hop for a socket that keeps up
+	TryWrite   func(ctx *Context, streamId uint32, data []byte) int
 	WriteEvent func(ctx *Context, streamId uint32, event string, data []DeserializedData)
 	Close      func(ctx *Context, streamId uint32)
 }
@@ -69,6 +77,25 @@ type StoredStream struct {
 	Close      func(ctx *Context, streamId uint32)
 	Ended      bool
 	Error      error
+	// queued writes, nil unless ResponseStream.QueueWrites
+	Writes   *StreamWrites
+	TryWrite func(ctx *Context, streamId uint32, data []byte) int
+	// drains queued for the per chunk callback (store.StreamDrain)
+	Drains int
+}
+
+// The writes of a stream queued for its goroutine, see store.QueueWrite
+type StreamWrites struct {
+	Mutex  sync.Mutex
+	Chunks [][]byte
+	// bytes in Chunks and in the write running
+	Queued int
+	// a goroutine writes the chunks
+	Writing bool
+	// the page waits for a drain chunk
+	DrainRequested bool
+	// closed, or closing once the queued writes are done
+	Closed bool
 }
 
 type StoredResponse struct {

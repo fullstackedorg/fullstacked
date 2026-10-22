@@ -157,6 +157,7 @@ func (tunnel *Tunnel) Connect() (*types.ResponseStream, error) {
 				}
 			}()
 		},
+		QueueWrites: true,
 		Write: func(ctx *types.Context, streamId uint32, data []byte) {
 			err := c.Write(context.Background(), websocket.MessageBinary, data)
 			if err != nil {

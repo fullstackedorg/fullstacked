@@ -129,6 +129,25 @@ export class Socket extends RealDuplex {
             .catch(callback);
     }
 
+    // the chunks written while a write was in flight (or corked) in one
+    // bridge call, one message for a tunnel
+    _writev(
+        chunks: { chunk: any; encoding: string }[],
+        callback: (error?: Error | null) => void
+    ) {
+        const data =
+            chunks.length === 1
+                ? chunks[0].chunk
+                : Buffer.concat(
+                      chunks.map(({ chunk, encoding }) =>
+                          typeof chunk === "string"
+                              ? Buffer.from(chunk, encoding as BufferEncoding)
+                              : chunk
+                      )
+                  );
+        this._write(data, "buffer", callback);
+    }
+
     _final(callback: (error?: Error | null) => void) {
         if (this.duplex) {
             this.duplex.end();
