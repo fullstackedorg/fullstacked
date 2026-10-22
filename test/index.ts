@@ -16,6 +16,7 @@ let tests = [
     "./bundle/index.ts",
     "./stream/index.ts",
     "./events/index.ts",
+    "./timers/index.ts",
     "./fetch/index.ts",
     "./websocket/index.ts",
     "./net/index.ts",
