@@ -4,13 +4,14 @@ import netGo from "../../core/internal/bundle/lib/net/index.ts";
 import { mergeUint8Arrays } from "../../core/internal/bundle/lib/bridge/serialization.ts";
 import { startServer } from "./server.ts";
 import { Worker } from "node:worker_threads";
+import { runContainer, type ServerWorker } from "../server.ts";
 import { NodeSSH } from "node-ssh";
 import { execSync } from "node:child_process";
 import net from "node:net";
 import { prepareServer, runMatrix } from "./ssh-algorithms.ts";
 
 suite("net - e2e", () => {
-    let server: Worker;
+    let server: ServerWorker;
     let containerName: string | null = null;
 
     before(async () => {
@@ -31,7 +32,7 @@ suite("net - e2e", () => {
                 (chunk) => (received = mergeUint8Arrays(received, chunk))
             );
             socket.on("close", resolve);
-            socket.connect(9090);
+            socket.connect(server.port);
         });
         assert.deepEqual(received, data);
     });
@@ -90,7 +91,7 @@ suite("net - e2e", () => {
                 (chunk) => (received = mergeUint8Arrays(received, chunk))
             );
             socket.on("close", resolve);
-            socket.connect(9090);
+            socket.connect(server.port);
         });
         assert.deepEqual(received, data);
     });
@@ -108,7 +109,7 @@ suite("net - e2e", () => {
                             const socket = new netGo.Socket();
                             socket.once("connect", () => resolve(socket));
                             socket.once("error", reject);
-                            socket.connect(9090);
+                            socket.connect(server.port);
                         }
                     )
             )
@@ -206,7 +207,7 @@ suite("net - e2e", () => {
                     socket.destroy();
                 });
                 socket.once("connect", () => socket.write("other"));
-                socket.connect(9090);
+                socket.connect(server.port);
             });
             assert.equal(await other, "other");
             assert.ok(
@@ -254,7 +255,7 @@ suite("net - e2e", () => {
             const socket = new netGo.Socket();
             await new Promise<void>((resolve) => {
                 socket.once("connect", resolve);
-                socket.connect(9090);
+                socket.connect(server.port);
             });
             const chunks: Buffer[] = [];
             let received = 0;
@@ -285,27 +286,16 @@ suite("net - e2e", () => {
         containerName = `openssh-server-test-${Date.now()}`;
 
         // Start openssh-server container with password authentication enabled
-        execSync(
-            `docker run -d --name ${containerName} ` +
-                `-e PASSWORD_ACCESS=true ` +
-                `-e USER_NAME=testuser ` +
-                `-e USER_PASSWORD=testpass ` +
-                `-p 127.0.0.1::2222 ` +
-                `linuxserver/openssh-server`,
-            { stdio: "pipe" }
+        const port = await runContainer(
+            containerName,
+            "-e PASSWORD_ACCESS=true " +
+                "-e USER_NAME=testuser " +
+                "-e USER_PASSWORD=testpass " +
+                "linuxserver/openssh-server",
+            2222
         );
 
         try {
-            // Get mapped port
-            const portOutput = execSync(`docker port ${containerName} 2222`, {
-                encoding: "utf8"
-            }).trim();
-            const match = portOutput.match(/:(\d+)$/);
-            if (!match) {
-                throw new Error(`Failed to parse port: ${portOutput}`);
-            }
-            const port = parseInt(match[1], 10);
-
             // Wait for SSH to be ready by reading the greeting
             let connected = false;
             for (let i = 0; i < 40; i++) {

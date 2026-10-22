@@ -1,6 +1,6 @@
 import test, { after, before, suite } from "node:test";
 import assert from "node:assert";
-import { Worker } from "node:worker_threads";
+import { type ServerWorker, startWorkerServer } from "../server.ts";
 
 import netGo from "../../core/internal/bundle/lib/net/index.ts";
 import tunnelGo from "../../core/internal/bundle/lib/tunnel/index.ts";
@@ -13,18 +13,11 @@ import { payload } from "./payload.ts";
 // error. Before, a request whose connection dropped waited forever while both
 // ends of the connection were already closed.
 
-const wsPort = 9098;
 const objectSize = 4 * 1024 * 1024;
 const expected = payload(objectSize);
 
 function startStressServer() {
-    return new Promise<Worker>((res) => {
-        const worker = new Worker("./test/tunnel/server-stress.js", {
-            workerData: { wsPort }
-        });
-        worker.on("message", () => res(worker));
-        worker.on("error", console.log);
-    });
+    return startWorkerServer("./test/tunnel/server-stress.js");
 }
 
 // rejects instead of waiting forever on a stalled transfer
@@ -75,20 +68,20 @@ function echoCycle() {
 }
 
 suite("tunnel - stress", () => {
-    let server: Worker;
+    let server: ServerWorker;
 
     before(async () => {
         server = await startStressServer();
         await tunnelGo.register({
             name: "stress-http",
             host: "localhost",
-            port: wsPort,
+            port: server.port,
             unsecure: true
         });
         await tunnelGo.register({
             name: "stress-echo",
             host: "localhost",
-            port: wsPort,
+            port: server.port,
             path: "/echo",
             unsecure: true
         });

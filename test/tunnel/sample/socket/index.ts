@@ -2,12 +2,15 @@ import net from "net";
 // @ts-ignore
 import tunnel from "tunnel";
 
-// Port 9091 is where our websocket tunnel proxy server will be listening
+// where our websocket tunnel proxy server listens, from
+// test/tunnel/integration.ts
+const port = parseInt(new URLSearchParams(location.search).get("port"));
+
 tunnel
     .register({
         name: "my-test-tunnel",
         host: "localhost",
-        port: 9091,
+        port,
         unsecure: true
     })
     .then(() => {

@@ -11,4 +11,5 @@ socket.on("data", (chunk: Uint8Array) => {
 socket.on("close", () => {
     document.body.classList.add("done");
 });
-socket.connect(9090);
+// the test server's port, from test/net/integration.ts
+socket.connect(parseInt(new URLSearchParams(location.search).get("port")));

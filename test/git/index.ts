@@ -4,9 +4,11 @@ import fs from "node:fs";
 import git from "../../core/internal/bundle/lib/git/index.ts";
 import plugin from "../../core/internal/bundle/lib/plugin/index.ts";
 import assert from "node:assert";
+import { resetGitServer, startGitServer, stopGitServer } from "./server.ts";
 
-const localGitServerDirectory = "test/git/local-git-server";
 const testDirectory = "test/git/test";
+let origin: string;
+let gitAuth: Awaited<ReturnType<typeof plugin.register>>;
 
 async function resetRepositories() {
     if (fs.existsSync(testDirectory)) {
@@ -17,24 +19,16 @@ async function resetRepositories() {
             retryDelay: 100
         });
     }
-    child_process.execSync(
-        "docker compose exec git-server /bin/bash /home/setup.sh",
-        {
-            cwd: localGitServerDirectory,
-            stdio: "ignore"
-        }
-    );
+    resetGitServer();
 }
 
 async function cloneRepository(
     name: "test" | "empty",
     directory = testDirectory
 ) {
-    await (
-        await git.clone(`http://localhost:8080/${name}`, directory)
-    ).promise();
+    await (await git.clone(`${origin}/${name}`, directory)).promise();
     child_process.execSync(
-        `git remote set-url origin http://test:testing@localhost:8080/${name}`,
+        `git remote set-url origin ${origin.replace("//", "//test:testing@")}/${name}`,
         {
             cwd: directory,
             stdio: "ignore"
@@ -44,12 +38,9 @@ async function cloneRepository(
 
 suite("git - e2e", () => {
     before(async () => {
-        child_process.execSync("docker compose up --build -d", {
-            cwd: localGitServerDirectory,
-            stdio: "ignore"
-        });
+        origin = (await startGitServer()).origin;
 
-        await plugin.register("git-auth", {
+        gitAuth = await plugin.register("git-auth", {
             callback: () => ({
                 username: "test",
                 password: "testing"
@@ -65,10 +56,7 @@ suite("git - e2e", () => {
     });
 
     test("clone - error", async () => {
-        const duplex = await git.clone(
-            "http://localhost:8080/non-existent",
-            testDirectory
-        );
+        const duplex = await git.clone(`${origin}/non-existent`, testDirectory);
         let errorEmitted: Error | null = null;
         duplex.on("error", (err) => {
             errorEmitted = err;
@@ -338,7 +326,7 @@ suite("git - e2e", () => {
     });
 
     test("init", async () => {
-        await git.init(testDirectory, "http://localhost:8080/empty");
+        await git.init(testDirectory, `${origin}/empty`);
         assert.deepEqual([".git"], fs.readdirSync(`${testDirectory}`));
         fs.writeFileSync(`${testDirectory}/test.txt`, "testing");
         await git.add(testDirectory, ".");
@@ -438,18 +426,14 @@ suite("git - e2e", () => {
         });
 
         try {
-            const duplex = await git.clone(
-                "http://localhost:8080/test",
-                testDirectory,
-                {
-                    proxy: {
-                        url: `http://127.0.0.1:${port}`,
-                        headers: {
-                            "X-Test-Header": "test-value"
-                        }
+            const duplex = await git.clone(`${origin}/test`, testDirectory, {
+                proxy: {
+                    url: `http://127.0.0.1:${port}`,
+                    headers: {
+                        "X-Test-Header": "test-value"
                     }
                 }
-            );
+            });
             await duplex.promise();
 
             // verify git config has proxy saved
@@ -471,10 +455,11 @@ suite("git - e2e", () => {
     });
 
     after(async () => {
-        await resetRepositories();
-        child_process.execSync("docker compose down", {
-            cwd: localGitServerDirectory,
-            stdio: "ignore"
-        });
+        await gitAuth?.unregister();
+        try {
+            await resetRepositories();
+        } finally {
+            stopGitServer();
+        }
     });
 });

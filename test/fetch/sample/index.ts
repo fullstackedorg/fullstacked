@@ -7,7 +7,10 @@ body.id = "body";
 
 document.body.append(head, headers, body);
 
-const response = await fetch("http://localhost:9090", {
+// the test server's port, from test/fetch/integration.ts
+const port = new URLSearchParams(location.search).get("port");
+
+const response = await fetch(`http://localhost:${port}`, {
     method: "POST",
     body: new Uint8Array([1, 2, 3])
 });

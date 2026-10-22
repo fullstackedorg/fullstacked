@@ -12,10 +12,10 @@ server.on("message", (msg, rinfo) => {
     );
 });
 
+// a port the system picks, posted once bound (test/server.ts): a datagram
+// sent before is dropped, and the test waits for its echo forever
 server.on("listening", () => {
-    parentPort.postMessage("ready");
+    parentPort.postMessage(server.address().port);
 });
 
-// ready once bound: a datagram sent before is dropped, and the test waits
-// for its echo forever
-server.bind(9091, "127.0.0.1");
+server.bind(0, "127.0.0.1");

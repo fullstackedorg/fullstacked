@@ -1,37 +1,38 @@
 import test, { after, before, suite } from "node:test";
 import { startServer } from "./server.ts";
-import { Worker } from "node:worker_threads";
+import type { ServerWorker } from "../server.ts";
 import assert from "node:assert";
 import { type Browser, createBrowser } from "../browser.ts";
 import bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 
 suite("fetch - integration", () => {
     let browser: Browser = null,
-        worker: Worker = null;
+        worker: ServerWorker = null;
+    let origin: string;
 
     before(async () => {
         browser = await createBrowser("test/fetch/sample");
         worker = await startServer();
+        origin = `http://localhost:${worker.port}`;
     });
 
     test("fetch", async () => {
         const result = await bundle.bundle("test/fetch/sample/index.ts");
         assert.deepEqual(result.Errors, null);
         assert.deepEqual(result.Warnings, null);
-        const page = await browser.createPage();
+        const page = await browser.createPage(
+            browser.url({ port: worker.port })
+        );
 
         const test = async () => {
             await page.page.waitForFunction(
                 'document.body.classList.contains("done")'
             );
 
-            const response = await globalThis.fullstacked.fetch(
-                "http://localhost:9090",
-                {
-                    method: "POST",
-                    body: new Uint8Array([1, 2, 3])
-                }
-            );
+            const response = await globalThis.fullstacked.fetch(origin, {
+                method: "POST",
+                body: new Uint8Array([1, 2, 3])
+            });
 
             const head: typeof response = JSON.parse(
                 await page.getTextContent("#head")
@@ -73,13 +74,10 @@ suite("fetch - integration", () => {
 
     test("fetch - redirect", async () => {
         const responseFollow = await globalThis.fullstacked.fetch(
-            "http://localhost:9090/redirect"
+            `${origin}/redirect`
         );
         assert.deepEqual(responseFollow.status, 200);
-        assert.deepEqual(
-            responseFollow.url,
-            "http://localhost:9090/redirect-target"
-        );
+        assert.deepEqual(responseFollow.url, `${origin}/redirect-target`);
         assert.deepEqual(responseFollow.redirected, true);
         assert.deepEqual(
             await responseFollow.text(),
@@ -87,11 +85,11 @@ suite("fetch - integration", () => {
         );
 
         const responseManual = await globalThis.fullstacked.fetch(
-            "http://localhost:9090/redirect",
+            `${origin}/redirect`,
             { redirect: "manual" }
         );
         assert.deepEqual(responseManual.status, 302);
-        assert.deepEqual(responseManual.url, "http://localhost:9090/redirect");
+        assert.deepEqual(responseManual.url, `${origin}/redirect`);
         assert.deepEqual(responseManual.redirected, false);
     });
 

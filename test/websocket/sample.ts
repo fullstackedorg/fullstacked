@@ -16,7 +16,8 @@ assert.ok(
 );
 
 // Connect to test server using global WebSocket
-const ws = new WebSocket("ws://localhost:9092");
+// the test server's port, from test/websocket/execute.ts
+const ws = new WebSocket(`ws://localhost:${process.env.WEBSOCKET_PORT}`);
 
 await new Promise<void>((resolve, reject) => {
     ws.onopen = () => {

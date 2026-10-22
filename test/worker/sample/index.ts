@@ -1,6 +1,7 @@
 import { Worker } from "worker_threads";
 
-const worker = new Worker("./worker.ts.js");
+// the echo server's port, passed on to the worker in its own location
+const worker = new Worker("./worker.ts.js" + location.search);
 worker.on("message", (event) => {
     const data = event.data;
     if (data && data.success) {

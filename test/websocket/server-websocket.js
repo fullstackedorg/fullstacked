@@ -1,7 +1,8 @@
 import { WebSocketServer } from "ws";
 import { parentPort } from "node:worker_threads";
 
-const wss = new WebSocketServer({ port: 9092 });
+// a port the system picks, posted once bound (test/server.ts)
+const wss = new WebSocketServer({ port: 0 });
 
 wss.on("connection", (ws) => {
     ws.on("message", (data, isBinary) => {
@@ -20,5 +21,5 @@ wss.on("connection", (ws) => {
 });
 
 wss.on("listening", () => {
-    parentPort.postMessage("ready");
+    parentPort.postMessage(wss.address().port);
 });

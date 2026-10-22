@@ -17,8 +17,12 @@ suite("stream - e2e", () => {
             streamed = mergeUint8Arrays(streamed, chunk);
         });
         stream.on("close", () => {
-            assert.deepEqual(streamed, data);
-            done();
+            try {
+                assert.deepEqual(streamed, data);
+                done();
+            } catch (e) {
+                done(e);
+            }
         });
     });
 

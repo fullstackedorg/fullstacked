@@ -44,7 +44,10 @@ async function runTests() {
 
         await fs.promises.rm(testFile);
 
-        // 3. Test direct socket (TCP loopback on port 9090)
+        // 3. Test direct socket (TCP loopback on the echo server's port)
+        const port = parseInt(
+            new URLSearchParams(self.location.search).get("port")
+        );
         let receivedDirect = "";
         const socketDirect = new net.Socket();
         await new Promise<void>((resolve, reject) => {
@@ -67,10 +70,10 @@ async function runTests() {
                 }
             });
             socketDirect.on("error", reject);
-            socketDirect.connect(9090, "127.0.0.1");
+            socketDirect.connect(port, "127.0.0.1");
         });
 
-        // 4. Test tunnel socket (proxied TCP loopback on port 9090 via tunnel "test-tunnel-worker")
+        // 4. Test tunnel socket (proxied TCP loopback via tunnel "test-tunnel-worker")
         let receivedTunnel = "";
         const socketTunnel = new net.Socket();
         await new Promise<void>((resolve, reject) => {

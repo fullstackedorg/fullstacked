@@ -1,6 +1,7 @@
 import test, { suite, before, after } from "node:test";
 import assert from "node:assert";
-import puppeteer, { type Browser, type Page } from "puppeteer";
+import { type Browser, type Page } from "puppeteer";
+import { launchBrowser } from "../../browser.ts";
 import { fileURLToPath } from "node:url";
 import createDOMPurify from "dompurify";
 import * as lib from "../../../core/internal/bundle/lib/DOMParser/index.ts";
@@ -112,7 +113,7 @@ const parseOrError: Case = ({ DOMParser, XMLSerializer, dump }, inputs) =>
 
 suite("shim DOMParser (the TypeScript parser against the browser)", () => {
     before(async () => {
-        browser = await puppeteer.launch({ headless: true });
+        browser = await launchBrowser({ headless: true });
         page = await browser.newPage();
     });
     after(() => browser?.close());

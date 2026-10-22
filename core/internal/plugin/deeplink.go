@@ -35,11 +35,18 @@ func TriggerDeepLink(ctx *types.Context, url string) int {
 }
 
 // deliverPendingDeepLinks hands the queued deeplinks to a deeplink plugin that
-// just became ready.
+// just became ready, in the order they came: one goroutine each raced, and
+// the plugin could get them in any order.
 func deliverPendingDeepLinks(ctx *types.Context, pluginId uint8) {
-	for _, url := range takePendingDeepLinks(ctx) {
-		go callDeepLink(ctx, pluginId, url)
+	urls := takePendingDeepLinks(ctx)
+	if len(urls) == 0 {
+		return
 	}
+	go func() {
+		for _, url := range urls {
+			callDeepLink(ctx, pluginId, url)
+		}
+	}()
 }
 
 func callDeepLink(ctx *types.Context, pluginId uint8, url string) {

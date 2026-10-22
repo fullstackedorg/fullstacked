@@ -7,7 +7,7 @@
         "fmt": "sh ./fmt.sh",
         "typecheck": "tsc --noEmit",
         "pretest": "npm run build && npm run build -w platform/node",
-        "test": "node --experimental-test-coverage --test-coverage-exclude='**/*.js' --test-coverage-exclude='**/*.cjs' --test-coverage-exclude='test/**/*' test/index.ts"
+        "test": "node --test-timeout=180000 --experimental-test-coverage --test-coverage-exclude='**/*.js' --test-coverage-exclude='**/*.cjs' --test-coverage-exclude='test/**/*' test/index.ts"
     },
     "workspaces": [
         "shell",

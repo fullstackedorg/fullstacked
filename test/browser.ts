@@ -1,4 +1,5 @@
-import puppeteer from "puppeteer";
+import puppeteer, { type LaunchOptions } from "puppeteer";
+import fs from "node:fs";
 import run from "../core/internal/bundle/lib/run/index.ts";
 import type { createWebView as CreateWebViewType } from "../platform/node/src/index.ts";
 
@@ -7,6 +8,25 @@ export type Browser = Awaited<ReturnType<typeof createBrowser>>;
 let createWebView: typeof CreateWebViewType;
 
 const activeBrowser = new Set<Browser>();
+
+// Puppeteer has no Chrome download for Linux arm64: use the system's Chromium
+// when its own browser is missing. PUPPETEER_EXECUTABLE_PATH still wins.
+async function executablePath() {
+    if (process.env.PUPPETEER_EXECUTABLE_PATH) return undefined;
+    if (fs.existsSync(await puppeteer.executablePath())) return undefined;
+    return [
+        "/usr/bin/chromium",
+        "/usr/bin/chromium-browser",
+        "/usr/bin/google-chrome"
+    ].find((path) => fs.existsSync(path));
+}
+
+export async function launchBrowser(options?: LaunchOptions) {
+    return puppeteer.launch({
+        executablePath: await executablePath(),
+        ...options
+    });
+}
 
 export async function createBrowser(
     directory: string,
@@ -24,10 +44,16 @@ export async function createBrowser(
     const showBrowser =
         process.argv.includes("--show-browser") || !!process.env.SHOW_BROWSER;
 
-    const browser = await puppeteer.launch({
-        headless: !showBrowser,
-        devtools: showBrowser
-    });
+    let browser: Awaited<ReturnType<typeof launchBrowser>>;
+    try {
+        browser = await launchBrowser({
+            headless: !showBrowser,
+            devtools: showBrowser
+        });
+    } catch (e) {
+        webview.close();
+        throw e;
+    }
 
     const createPage = async (url?: string) => {
         const page = await browser.newPage();
@@ -100,8 +126,18 @@ export async function createBrowser(
         browser,
         webview,
         sleep: (ms: number) => new Promise((res) => setTimeout(res, ms)),
+        // the app's address, with params a sample reads from location.search
+        // (the ports of the test servers)
+        url(params?: Record<string, string | number>) {
+            const search = new URLSearchParams(
+                Object.entries(params ?? {}).map(([k, v]) => [k, String(v)])
+            ).toString();
+            return `http://localhost:${webview.port}/${search ? "?" + search : ""}`;
+        },
+        // suites end a browser in the test and again in after(), for when
+        // the test failed before it could
         end() {
-            activeBrowser.delete(b);
+            if (!activeBrowser.delete(b)) return Promise.resolve();
             webview.close();
             return browser.close();
         },

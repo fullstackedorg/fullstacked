@@ -1,6 +1,6 @@
 import test, { after, before, suite } from "node:test";
 import assert from "node:assert";
-import { Worker } from "node:worker_threads";
+import { runContainer, type ServerWorker } from "../server.ts";
 import { type Browser, createBrowser } from "../browser.ts";
 import bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 import { startServer } from "./server.ts";
@@ -15,7 +15,7 @@ import {
 import { KNOWN_FAILURES } from "../shim/known-failures.ts";
 
 suite("net - integration", () => {
-    let browser: Browser, server: Worker;
+    let browser: Browser, server: ServerWorker;
     let containerName: string | null = null;
 
     before(async () => {
@@ -27,7 +27,9 @@ suite("net - integration", () => {
         const result = await bundle.bundle("test/net/sample/basic/index.ts");
         assert.deepEqual(result.Errors, null);
         assert.deepEqual(result.Warnings, null);
-        const page = await browser.createPage();
+        const page = await browser.createPage(
+            browser.url({ port: server.port })
+        );
 
         const test = async () => {
             await page.page.waitForFunction(
@@ -48,27 +50,14 @@ suite("net - integration", () => {
         containerName = `openssh-server-test-${Date.now()}`;
 
         // Start openssh-server container with password authentication enabled
-        execSync(
-            `docker run -d --name ${containerName} ` +
-                `-e PASSWORD_ACCESS=true ` +
-                `-e USER_NAME=testuser ` +
-                `-e USER_PASSWORD=testpass ` +
-                `-p 127.0.0.1::2222 ` +
-                `linuxserver/openssh-server`,
-            { stdio: "pipe" }
+        const sshPort = await runContainer(
+            containerName,
+            "-e PASSWORD_ACCESS=true " +
+                "-e USER_NAME=testuser " +
+                "-e USER_PASSWORD=testpass " +
+                "linuxserver/openssh-server",
+            2222
         );
-
-        // Get the dynamic host port mapped to container port 2222
-        const portOutput = execSync(`docker port ${containerName} 2222`, {
-            encoding: "utf8"
-        }).trim();
-        const match = portOutput.match(/:(\d+)$/);
-        if (!match) {
-            throw new Error(
-                `Failed to parse docker port output: ${portOutput}`
-            );
-        }
-        const sshPort = parseInt(match[1], 10);
 
         // Wait for SSH to be ready by reading the greeting
         let connected = false;

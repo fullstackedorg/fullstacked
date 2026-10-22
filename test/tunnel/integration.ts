@@ -1,6 +1,6 @@
 import test, { after, before, suite } from "node:test";
 import assert from "node:assert";
-import { Worker } from "node:worker_threads";
+import type { ServerWorker } from "../server.ts";
 import http from "node:http";
 
 import tunnelGo from "../../core/internal/bundle/lib/tunnel/index.ts";
@@ -10,14 +10,14 @@ import { createBrowser } from "../browser.ts";
 import bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 
 suite("tunnel - integration", () => {
-    let tcpServer: Worker;
-    let wsTunnelServer: Worker;
+    let tcpServer: ServerWorker;
+    let wsTunnelServer: ServerWorker;
     let fetchHttpServer: any;
-    let fetchTunnelServer: Worker;
+    let fetchTunnelServer: ServerWorker;
 
     before(async () => {
         tcpServer = await startServer();
-        wsTunnelServer = await startTunnelServer(9091, 9090);
+        wsTunnelServer = await startTunnelServer(tcpServer.port);
 
         // Start HTTP server for fetch integration test
         fetchHttpServer = http.createServer((req, res) => {
@@ -29,14 +29,14 @@ suite("tunnel - integration", () => {
         );
         const httpPort = fetchHttpServer.address().port;
 
-        // Start tunnel server for fetch on port 9093
-        fetchTunnelServer = await startTunnelServer(9093, httpPort);
+        // Start tunnel server for fetch
+        fetchTunnelServer = await startTunnelServer(httpPort);
 
         // Register fetch tunnel
         await tunnelGo.register({
             name: "my-fetch-tunnel",
             host: "localhost",
-            port: 9093,
+            port: fetchTunnelServer.port,
             unsecure: true
         });
     });
@@ -50,7 +50,9 @@ suite("tunnel - integration", () => {
 
         const browser = await createBrowser("test/tunnel/sample/socket");
         try {
-            const page = await browser.createPage();
+            const page = await browser.createPage(
+                browser.url({ port: wsTunnelServer.port })
+            );
             await page.page.waitForFunction(
                 'document.body.classList.contains("done")'
             );
@@ -68,7 +70,9 @@ suite("tunnel - integration", () => {
 
         const browser = await createBrowser("test/tunnel/sample/fetch");
         try {
-            const page = await browser.createPage();
+            const page = await browser.createPage(
+                browser.url({ port: fetchTunnelServer.port })
+            );
             await page.page.waitForFunction(
                 'document.body.classList.contains("done")'
             );

@@ -2,10 +2,10 @@ import test, { after, before, suite } from "node:test";
 import assert from "node:assert";
 import fullstacked from "../../core/internal/bundle/lib/fullstacked/index.ts";
 import { startServer } from "./server.ts";
-import { Worker } from "node:worker_threads";
+import type { ServerWorker } from "../server.ts";
 
 suite("websocket - execute", () => {
-    let worker: Worker = null;
+    let worker: ServerWorker = null;
 
     before(async () => {
         worker = await startServer();
@@ -14,6 +14,8 @@ suite("websocket - execute", () => {
     test("execute file provides WebSocket in global scope", async () => {
         const exitCode = await fullstacked.execute([
             "fullstacked",
+            "-e",
+            `WEBSOCKET_PORT=${worker.port}`,
             "-f",
             "test/websocket/sample.ts"
         ]);

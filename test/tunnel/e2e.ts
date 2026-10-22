@@ -1,6 +1,5 @@
 import test, { after, before, suite } from "node:test";
 import assert from "node:assert";
-import { Worker } from "node:worker_threads";
 import { execSync } from "node:child_process";
 import net from "node:net";
 import http from "node:http";
@@ -13,6 +12,13 @@ import fetchGo from "../../core/internal/bundle/lib/fetch/index.ts";
 import gitGo from "../../core/internal/bundle/lib/git/index.ts";
 import { mergeUint8Arrays } from "../../core/internal/bundle/lib/bridge/serialization.ts";
 import { startServer } from "../net/server.ts";
+import { runContainer, type ServerWorker } from "../server.ts";
+import { failWith } from "../listener.ts";
+import {
+    resetGitServer,
+    startGitServer,
+    stopGitServer
+} from "../git/server.ts";
 import {
     startHubServer,
     startSlowUpgradeServer,
@@ -24,17 +30,17 @@ import plugin from "../../core/internal/bundle/lib/plugin/index.ts";
 const { Pool } = pg;
 
 suite("tunnel - e2e", () => {
-    let tcpServer: Worker;
-    let wsTunnelServer: Worker;
+    let tcpServer: ServerWorker;
+    let wsTunnelServer: ServerWorker;
 
     before(async () => {
         tcpServer = await startServer();
-        wsTunnelServer = await startTunnelServer(9091, 9090);
+        wsTunnelServer = await startTunnelServer(tcpServer.port);
 
         await tunnelGo.register({
             name: "test-tunnel-e2e",
             host: "localhost",
-            port: 9091,
+            port: wsTunnelServer.port,
             unsecure: true
         });
     });
@@ -122,7 +128,7 @@ suite("tunnel - e2e", () => {
             const data = new Uint8Array([index, index + 10]);
             let received = new Uint8Array();
             const socket = new netGo.Socket();
-            return new Promise<void>((resolve) => {
+            return new Promise<void>((resolve, reject) => {
                 socket.on("connect", () => {
                     socket.write(data);
                 });
@@ -132,10 +138,14 @@ suite("tunnel - e2e", () => {
                         socket.destroy();
                     }
                 });
-                socket.on("close", () => {
-                    assert.deepEqual(received, data);
-                    resolve();
-                });
+                socket.on("error", reject);
+                socket.on(
+                    "close",
+                    failWith(reject, () => {
+                        assert.deepEqual(received, data);
+                        resolve();
+                    })
+                );
                 socket.connect(9090, "test-tunnel-e2e");
             });
         });
@@ -154,27 +164,14 @@ suite("tunnel - e2e", () => {
 
         const containerName = `postgres-tunnel-test-${Date.now()}`;
 
-        execSync(
-            `docker run -d --name ${containerName} ` +
-                `-e POSTGRES_PASSWORD=testpass ` +
-                `-p 127.0.0.1::5432 ` +
-                `postgres:alpine`,
-            { stdio: "pipe" }
+        const pgPort = await runContainer(
+            containerName,
+            "-e POSTGRES_PASSWORD=testpass postgres:alpine",
+            5432
         );
-
-        let pgPort = 0;
-        let pgWsTunnelServer: Worker | null = null;
+        let pgWsTunnelServer: ServerWorker | null = null;
 
         try {
-            const portOutput = execSync(`docker port ${containerName} 5432`, {
-                encoding: "utf8"
-            }).trim();
-            const match = portOutput.match(/:(\d+)$/);
-            if (!match) {
-                throw new Error(`Failed to parse pg port: ${portOutput}`);
-            }
-            pgPort = parseInt(match[1], 10);
-
             // Wait for Postgres to be fully ready by performing the handshake directly in the ready loop
             let ready = false;
             for (let i = 0; i < 40; i++) {
@@ -207,12 +204,12 @@ suite("tunnel - e2e", () => {
                 "PostgreSQL container did not become ready in time"
             );
 
-            pgWsTunnelServer = await startTunnelServer(9092, pgPort);
+            pgWsTunnelServer = await startTunnelServer(pgPort);
 
             await tunnelGo.register({
                 name: "pg-tunnel-e2e",
                 host: "localhost",
-                port: 9092,
+                port: pgWsTunnelServer.port,
                 unsecure: true
             });
 
@@ -342,12 +339,12 @@ suite("tunnel - e2e", () => {
         // the websocket library's default read limit is 32 KiB per message,
         // the hub sends up to ~64 KiB per message
         const size = 256 * 1024;
-        const hubServer = await startHubServer(9096, { payloadSize: size });
+        const hubServer = await startHubServer({ payloadSize: size });
 
         await tunnelGo.register({
             name: "large-message-tunnel-e2e",
             host: "localhost",
-            port: 9096,
+            port: hubServer.port,
             unsecure: true
         });
 
@@ -376,12 +373,12 @@ suite("tunnel - e2e", () => {
     });
 
     test("connect through tunnel - refused dial is a socket error", async () => {
-        const hubServer = await startHubServer(9097, { refuseStatus: 401 });
+        const hubServer = await startHubServer({ refuseStatus: 401 });
 
         await tunnelGo.register({
             name: "refused-tunnel-e2e",
             host: "localhost",
-            port: 9097,
+            port: hubServer.port,
             unsecure: true
         });
 
@@ -463,11 +460,11 @@ suite("tunnel - e2e", () => {
     // froze every other socket for the length of each upgrade.
     test("concurrent tunnel connects do not wait for each other", async () => {
         const upgradeDelayMs = 150;
-        const hub = await startSlowUpgradeServer(9100, upgradeDelayMs);
+        const hub = await startSlowUpgradeServer(upgradeDelayMs);
         await tunnelGo.register({
             name: "slow-upgrade-tunnel-e2e",
             host: "localhost",
-            port: 9100,
+            port: hub.port,
             unsecure: true
         });
 
@@ -538,11 +535,11 @@ suite("tunnel - e2e", () => {
         await new Promise<void>((resolve) => httpServer.listen(0, resolve));
         const httpPort = (httpServer.address() as any).port;
 
-        const fetchWsTunnelServer = await startTunnelServer(9099, httpPort);
+        const fetchWsTunnelServer = await startTunnelServer(httpPort);
         await tunnelGo.register({
             name: "fetch-reuse-tunnel-e2e",
             host: "localhost",
-            port: 9099,
+            port: fetchWsTunnelServer.port,
             unsecure: true
         });
 
@@ -581,12 +578,12 @@ suite("tunnel - e2e", () => {
         await new Promise<void>((resolve) => httpServer.listen(0, resolve));
         const httpPort = (httpServer.address() as any).port;
 
-        const fetchWsTunnelServer = await startTunnelServer(9095, httpPort);
+        const fetchWsTunnelServer = await startTunnelServer(httpPort);
 
         await tunnelGo.register({
             name: "fetch-tunnel-e2e",
             host: "localhost",
-            port: 9095,
+            port: fetchWsTunnelServer.port,
             unsecure: true
         });
 
@@ -641,29 +638,6 @@ suite("tunnel - e2e", () => {
             return;
         }
 
-        // Start git-server docker compose
-        execSync("docker compose up --build -d", {
-            cwd: "test/git/local-git-server",
-            stdio: "ignore"
-        });
-
-        const gitWsTunnelServer = await startTunnelServer(9093, 8080);
-
-        await tunnelGo.register({
-            name: "git-tunnel-e2e",
-            host: "localhost",
-            port: 9093,
-            unsecure: true
-        });
-
-        // Initialize git auth plugin
-        await plugin.register("git-auth", {
-            callback: () => ({
-                username: "test",
-                password: "testing"
-            })
-        });
-
         const testCloneDir = "test/tunnel/git-test-repo";
         if (fs.existsSync(testCloneDir)) {
             await fs.promises.rm(testCloneDir, {
@@ -672,19 +646,36 @@ suite("tunnel - e2e", () => {
             });
         }
 
+        const gitServer = await startGitServer();
+        let gitWsTunnelServer: ServerWorker | null = null;
+        // the context keeps one git-auth plugin at most: left registered,
+        // the git suite's own fails every authentication
+        let gitAuth: Awaited<ReturnType<typeof plugin.register>> | null = null;
+
         try {
+            gitWsTunnelServer = await startTunnelServer(gitServer.port);
+
+            await tunnelGo.register({
+                name: "git-tunnel-e2e",
+                host: "localhost",
+                port: gitWsTunnelServer.port,
+                unsecure: true
+            });
+
+            // Initialize git auth plugin
+            gitAuth = await plugin.register("git-auth", {
+                callback: () => ({
+                    username: "test",
+                    password: "testing"
+                })
+            });
+
             // Populate/reset repositories in git-server
-            execSync(
-                "docker compose exec git-server /bin/bash /home/setup.sh",
-                {
-                    cwd: "test/git/local-git-server",
-                    stdio: "ignore"
-                }
-            );
+            resetGitServer();
 
             // Clone non-empty repository
             const duplex = await gitGo.clone(
-                "http://localhost:8080/test",
+                `${gitServer.origin}/test`,
                 testCloneDir,
                 { tunnel: "git-tunnel-e2e" }
             );
@@ -709,6 +700,7 @@ suite("tunnel - e2e", () => {
                 "Expected at least one commit in history"
             );
         } finally {
+            await gitAuth?.unregister();
             if (gitWsTunnelServer) {
                 await gitWsTunnelServer.terminate();
             }
@@ -718,15 +710,7 @@ suite("tunnel - e2e", () => {
                     force: true
                 });
             }
-            // Stop git-server docker compose
-            try {
-                execSync("docker compose down", {
-                    cwd: "test/git/local-git-server",
-                    stdio: "ignore"
-                });
-            } catch {
-                // ignore
-            }
+            stopGitServer();
         }
     });
 

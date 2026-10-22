@@ -1,12 +1,12 @@
 import test, { after, before, suite } from "node:test";
 import assert from "node:assert";
-import { Worker } from "node:worker_threads";
+import type { ServerWorker } from "../server.ts";
 import { type Browser, createBrowser } from "../browser.ts";
 import bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 import { startServer } from "./server.ts";
 
 suite("dgram - integration", () => {
-    let browser: Browser, server: Worker;
+    let browser: Browser, server: ServerWorker;
 
     before(async () => {
         server = await startServer();
@@ -17,7 +17,9 @@ suite("dgram - integration", () => {
         const result = await bundle.bundle("test/dgram/sample/index.ts");
         assert.deepEqual(result.Errors, null);
         assert.deepEqual(result.Warnings, null);
-        const page = await browser.createPage();
+        const page = await browser.createPage(
+            browser.url({ port: server.port })
+        );
 
         const testFlow = async () => {
             await page.page.waitForFunction(

@@ -6,10 +6,10 @@ import { payload } from "./payload.ts";
 // - payloadSize: sends one binary message of that many bytes on connection
 //   (the hub sends one message per target socket read, up to ~64 KiB)
 // - refuseStatus: refuses the upgrade with that HTTP status
-const { wsPort, payloadSize, refuseStatus } = workerData;
+const { payloadSize, refuseStatus } = workerData;
 
 const wss = new WebSocketServer({
-    port: wsPort,
+    port: 0,
     verifyClient: refuseStatus
         ? (_, callback) => callback(false, refuseStatus)
         : undefined
@@ -20,5 +20,5 @@ wss.on("connection", (ws) => {
 });
 
 wss.on("listening", () => {
-    parentPort.postMessage("ready");
+    parentPort.postMessage(wss.address().port);
 });

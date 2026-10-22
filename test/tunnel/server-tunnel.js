@@ -2,9 +2,10 @@ import { parentPort, workerData } from "node:worker_threads";
 import { WebSocketServer } from "ws";
 import net from "node:net";
 
-const { wsPort, tcpPort } = workerData;
+// forwards every connection to tcpPort, on a port the system picks
+const { tcpPort } = workerData;
 
-const wss = new WebSocketServer({ port: wsPort });
+const wss = new WebSocketServer({ port: 0 });
 
 wss.on("connection", async (ws) => {
     const dataQueue = [];
@@ -72,5 +73,5 @@ wss.on("connection", async (ws) => {
 });
 
 wss.on("listening", () => {
-    parentPort.postMessage("ready");
+    parentPort.postMessage(wss.address().port);
 });

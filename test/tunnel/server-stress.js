@@ -1,4 +1,4 @@
-import { parentPort, workerData } from "node:worker_threads";
+import { parentPort } from "node:worker_threads";
 import { WebSocketServer } from "ws";
 import http from "node:http";
 import net from "node:net";
@@ -11,8 +11,6 @@ import { payload } from "./payload.ts";
 //   - GET /<size>: <size> deterministic bytes
 //   - GET /drop/<size>: the connection drops before the response
 //   - GET /cut/<size>: the connection drops partway through the body
-const { wsPort } = workerData;
-
 const httpServer = http.createServer((req, res) => {
     const [, mode, sizeParam] = req.url.match(/^\/(?:(drop|cut)\/)?(\d+)$/);
     const body = payload(parseInt(sizeParam, 10));
@@ -39,7 +37,7 @@ const httpServer = http.createServer((req, res) => {
 httpServer.listen(0, "127.0.0.1", () => {
     const httpPort = httpServer.address().port;
 
-    const wss = new WebSocketServer({ port: wsPort });
+    const wss = new WebSocketServer({ port: 0 });
 
     wss.on("connection", (ws, req) => {
         if (req.url === "/echo") {
@@ -67,5 +65,5 @@ httpServer.listen(0, "127.0.0.1", () => {
         tcpSocket.on("error", () => ws.close());
     });
 
-    wss.on("listening", () => parentPort.postMessage("ready"));
+    wss.on("listening", () => parentPort.postMessage(wss.address().port));
 });

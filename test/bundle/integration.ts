@@ -1,11 +1,10 @@
 import test, { after, before, suite, afterEach } from "node:test";
-import { type Browser, createBrowser } from "../browser.ts";
+import { type Browser, createBrowser, launchBrowser } from "../browser.ts";
 import bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 import assert from "node:assert";
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
-import puppeteer from "puppeteer";
 import { cleanup } from "./common.ts";
 
 suite("bundle - integration", () => {
@@ -56,7 +55,7 @@ suite("bundle - browser-only", () => {
     before(cleanup);
     afterEach(cleanup);
 
-    test("browser-only entrypoint served via basic static http server", async () => {
+    test("browser-only entrypoint served via basic static http server", async (t) => {
         // 1. Bundle using the fullstacked bundle function
         await bundle.bundle("test/bundle/samples/browser-only/index.ts");
 
@@ -95,9 +94,21 @@ suite("bundle - browser-only", () => {
         });
 
         // 3. Launch puppeteer to load the page and check execution
-        const browser = await puppeteer.launch({
+        const browser = await launchBrowser({
             headless: !process.argv.includes("--show-browser"),
             devtools: process.argv.includes("--show-browser")
+        }).catch((e) => {
+            server.close();
+            throw e;
+        });
+        t.after(async () => {
+            await browser.close();
+            await new Promise<void>((resolve, reject) => {
+                server.close((err) => {
+                    if (err) reject(err);
+                    else resolve();
+                });
+            });
         });
 
         const page = await browser.newPage();
@@ -126,14 +137,5 @@ suite("bundle - browser-only", () => {
 
         // Make sure there were no uncaught errors during page execution
         assert.deepEqual(errors, [], "Should have no uncaught page errors");
-
-        // Clean up
-        await browser.close();
-        await new Promise<void>((resolve, reject) => {
-            server.close((err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
     });
 });

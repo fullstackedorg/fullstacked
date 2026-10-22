@@ -1,34 +1,19 @@
-import { Worker } from "node:worker_threads";
+import { startWorkerServer } from "../server.ts";
 
-export function startTunnelServer(wsPort: number, tcpPort: number) {
-    return new Promise<Worker>((res) => {
-        const worker = new Worker("./test/tunnel/server-tunnel.js", {
-            workerData: { wsPort, tcpPort }
-        });
-        worker.on("message", () => res(worker));
-        worker.on("error", console.log);
-    });
+// a tunnel hub stand-in that forwards each connection to tcpPort
+export function startTunnelServer(tcpPort: number) {
+    return startWorkerServer("./test/tunnel/server-tunnel.js", { tcpPort });
 }
 
-export function startHubServer(
-    wsPort: number,
-    opts: { payloadSize?: number; refuseStatus?: number }
-) {
-    return new Promise<Worker>((res) => {
-        const worker = new Worker("./test/tunnel/server-hub.js", {
-            workerData: { wsPort, ...opts }
-        });
-        worker.on("message", () => res(worker));
-        worker.on("error", console.log);
-    });
+export function startHubServer(opts: {
+    payloadSize?: number;
+    refuseStatus?: number;
+}) {
+    return startWorkerServer("./test/tunnel/server-hub.js", opts);
 }
 
-export function startSlowUpgradeServer(wsPort: number, upgradeDelayMs: number) {
-    return new Promise<Worker>((res) => {
-        const worker = new Worker("./test/tunnel/server-slow-upgrade.js", {
-            workerData: { wsPort, upgradeDelayMs }
-        });
-        worker.on("message", () => res(worker));
-        worker.on("error", console.log);
+export function startSlowUpgradeServer(upgradeDelayMs: number) {
+    return startWorkerServer("./test/tunnel/server-slow-upgrade.js", {
+        upgradeDelayMs
     });
 }

@@ -9,5 +9,7 @@ socket.on("message", (msg) => {
 });
 
 socket.bind(0, () => {
-    socket.send(Buffer.from("123"), 9091, "127.0.0.1");
+    // the test server's port, from test/dgram/integration.ts
+    const port = parseInt(new URLSearchParams(location.search).get("port"));
+    socket.send(Buffer.from("123"), port, "127.0.0.1");
 });

@@ -14,7 +14,7 @@ function readBody(req) {
     });
 }
 
-http.createServer(async (req, res) => {
+const server = http.createServer(async (req, res) => {
     if (req.url === "/redirect") {
         res.writeHead(302, {
             Location: "/redirect-target",
@@ -83,6 +83,7 @@ http.createServer(async (req, res) => {
               : "test";
 
     res.end(responseBody);
-}).listen(9090, () => {
-    parentPort.postMessage("ready");
 });
+
+// a port the system picks, posted once bound (test/server.ts)
+server.listen(0, () => parentPort.postMessage(server.address().port));

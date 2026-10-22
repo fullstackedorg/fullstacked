@@ -1,10 +1,6 @@
-import { Worker } from "node:worker_threads";
+import { startWorkerServer } from "../server.ts";
 
-export function startServer(): Promise<Worker> {
-    return new Promise((resolve, reject) => {
-        const worker = new Worker("./test/dgram/server-dgram.js");
-        worker.on("message", () => resolve(worker));
-        // the port taken (another run still up) fails here, not later
-        worker.on("error", reject);
-    });
+// an echo server that appends "ACK"
+export function startServer() {
+    return startWorkerServer("./test/dgram/server-dgram.js");
 }

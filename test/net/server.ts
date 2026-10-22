@@ -1,9 +1,6 @@
-import { Worker } from "node:worker_threads";
+import { startWorkerServer } from "../server.ts";
 
+// an echo server
 export function startServer() {
-    return new Promise<Worker>((res, rej) => {
-        const worker = new Worker("./test/net/server-net.js");
-        worker.on("message", () => res(worker));
-        worker.on("error", rej);
-    });
+    return startWorkerServer("./test/net/server-net.js");
 }

@@ -3,24 +3,24 @@ import assert from "node:assert";
 import "../../core/internal/bundle/lib/fetch/index.ts";
 import { mergeUint8Arrays } from "../../core/internal/bundle/lib/bridge/serialization.ts";
 import { startServer } from "./server.ts";
-import { Worker } from "node:worker_threads";
+import type { ServerWorker } from "../server.ts";
 import http from "node:http";
 import net from "node:net";
 
 suite("fetch - e2e", () => {
-    let worker: Worker = null;
+    let worker: ServerWorker = null;
+    let origin: string;
 
     before(async () => {
         worker = await startServer();
+        origin = `http://localhost:${worker.port}`;
     });
 
     test("head", async () => {
         assert.notEqual(fetch, globalThis.fullstacked.fetch);
 
-        const responseNode = await globalThis.fullstacked.fetch(
-            "http://localhost:9090"
-        );
-        const responseGo = await fetch("http://localhost:9090");
+        const responseNode = await globalThis.fullstacked.fetch(origin);
+        const responseGo = await fetch(origin);
         assert.deepEqual(responseNode.ok, responseGo.ok);
         assert.ok(!!responseNode.headers.get("x-header-test"));
         assert.deepEqual(
@@ -32,15 +32,13 @@ suite("fetch - e2e", () => {
     });
 
     test("response body - stream", async () => {
-        const responseNode = await globalThis.fullstacked.fetch(
-            "http://localhost:9090"
-        );
+        const responseNode = await globalThis.fullstacked.fetch(origin);
         let streamedNode = new Uint8Array();
         for await (const chunk of responseNode.body) {
             streamedNode = mergeUint8Arrays(streamedNode, chunk);
         }
 
-        const responseGo = await fetch("http://localhost:9090");
+        const responseGo = await fetch(origin);
         let streamedGo = new Uint8Array();
         for await (const chunk of responseGo.body) {
             streamedGo = mergeUint8Arrays(streamedGo, chunk);
@@ -50,7 +48,7 @@ suite("fetch - e2e", () => {
     });
 
     test("response body - async iterable stream", async () => {
-        const responseGo = await fetch("http://localhost:9090");
+        const responseGo = await fetch(origin);
         const stream = responseGo.body;
         assert.ok(Symbol.asyncIterator in stream);
 
@@ -69,7 +67,7 @@ suite("fetch - e2e", () => {
     // next read (each chunk merged into the rest was quadratic)
     test("response body - large body read late", async () => {
         const size = 32 * 1024 * 1024;
-        const response = await fetch(`http://localhost:9090/bytes/${size}`);
+        const response = await fetch(`${origin}/bytes/${size}`);
         const reader = response.body.getReader();
         // reading started, then the reader lags
         const chunks: Uint8Array[] = [(await reader.read()).value];
@@ -129,18 +127,14 @@ suite("fetch - e2e", () => {
     });
 
     test("response body - bytes", async () => {
-        const responseNode = await globalThis.fullstacked.fetch(
-            "http://localhost:9090"
-        );
-        const responseGo = await fetch("http://localhost:9090");
+        const responseNode = await globalThis.fullstacked.fetch(origin);
+        const responseGo = await fetch(origin);
         assert.deepEqual(await responseNode.bytes(), await responseGo.bytes());
     });
 
     test("response body - arraybuffer", async () => {
-        const responseNode = await globalThis.fullstacked.fetch(
-            "http://localhost:9090"
-        );
-        const responseGo = await fetch("http://localhost:9090");
+        const responseNode = await globalThis.fullstacked.fetch(origin);
+        const responseGo = await fetch(origin);
         assert.deepEqual(
             await responseNode.arrayBuffer(),
             await responseGo.arrayBuffer()
@@ -148,20 +142,18 @@ suite("fetch - e2e", () => {
     });
 
     test("response body - text", async () => {
-        const responseNode = await globalThis.fullstacked.fetch(
-            "http://localhost:9090"
-        );
-        const responseGo = await fetch("http://localhost:9090");
+        const responseNode = await globalThis.fullstacked.fetch(origin);
+        const responseGo = await fetch(origin);
         assert.deepEqual(await responseNode.text(), await responseGo.text());
     });
 
     test("response body - json", async () => {
         const responseNode = await globalThis.fullstacked.fetch(
-            "http://localhost:9090/json"
+            `${origin}/json`
         );
         const jsonNode = await responseNode.json();
 
-        const responseGo = await fetch("http://localhost:9090/json");
+        const responseGo = await fetch(`${origin}/json`);
         const jsonGo = await responseGo.json();
 
         assert.deepEqual(jsonNode, jsonGo);
@@ -169,25 +161,22 @@ suite("fetch - e2e", () => {
 
     test("request body", async () => {
         const body = new Uint8Array([1, 2, 3, 4]);
-        const responseGo = await fetch("http://localhost:9090", {
+        const responseGo = await fetch(origin, {
             method: "POST",
             body
         });
         const responseGoBytes = await responseGo.bytes();
         assert.deepEqual(responseGoBytes, body);
-        const responseNode = await globalThis.fullstacked.fetch(
-            "http://localhost:9090",
-            {
-                method: "POST",
-                body
-            }
-        );
+        const responseNode = await globalThis.fullstacked.fetch(origin, {
+            method: "POST",
+            body
+        });
         assert.deepEqual(responseGoBytes, await responseNode.bytes());
     });
 
     test("timeout", { timeout: 1000 }, async () => {
         assert.rejects(
-            fetch("http://localhost:9090/wait", {
+            fetch(`${origin}/wait`, {
                 headers: {
                     "x-wait": "2000"
                 },
@@ -198,7 +187,7 @@ suite("fetch - e2e", () => {
 
     test("cancel", { timeout: 3000 }, async () => {
         const controller = new AbortController();
-        const response = await fetch("http://localhost:9090/stream", {
+        const response = await fetch(`${origin}/stream`, {
             headers: {
                 "x-wait": "2000"
             },
@@ -218,7 +207,7 @@ suite("fetch - e2e", () => {
         "connection dropped before the response rejects",
         { timeout: 5000 },
         async () => {
-            await assert.rejects(fetch("http://localhost:9090/drop"), /EOF/);
+            await assert.rejects(fetch(`${origin}/drop`), /EOF/);
         }
     );
 
@@ -226,7 +215,7 @@ suite("fetch - e2e", () => {
         "connection dropped mid-body rejects the body",
         { timeout: 5000 },
         async () => {
-            const response = await fetch("http://localhost:9090/cut");
+            const response = await fetch(`${origin}/cut`);
             assert.equal(response.status, 200);
             let received = 0;
             await assert.rejects(async () => {
@@ -239,26 +228,26 @@ suite("fetch - e2e", () => {
     );
 
     test("redirect - follow", async () => {
-        const response = await fetch("http://localhost:9090/redirect");
+        const response = await fetch(`${origin}/redirect`);
         assert.deepEqual(response.status, 200);
-        assert.deepEqual(response.url, "http://localhost:9090/redirect-target");
+        assert.deepEqual(response.url, `${origin}/redirect-target`);
         assert.deepEqual(response.redirected, true);
         assert.deepEqual(await response.text(), "redirect target reached");
     });
 
     test("redirect - manual / false", async () => {
-        const responseManual = await fetch("http://localhost:9090/redirect", {
+        const responseManual = await fetch(`${origin}/redirect`, {
             redirect: "manual"
         });
         assert.deepEqual(responseManual.status, 302);
-        assert.deepEqual(responseManual.url, "http://localhost:9090/redirect");
+        assert.deepEqual(responseManual.url, `${origin}/redirect`);
         assert.deepEqual(responseManual.redirected, false);
 
-        const responseBool = await fetch("http://localhost:9090/redirect", {
+        const responseBool = await fetch(`${origin}/redirect`, {
             redirect: false as any
         });
         assert.deepEqual(responseBool.status, 302);
-        assert.deepEqual(responseBool.url, "http://localhost:9090/redirect");
+        assert.deepEqual(responseBool.url, `${origin}/redirect`);
         assert.deepEqual(responseBool.redirected, false);
     });
 

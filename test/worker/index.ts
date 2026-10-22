@@ -1,6 +1,6 @@
 import test, { after, before, suite } from "node:test";
 import assert from "node:assert";
-import { Worker } from "node:worker_threads";
+import type { ServerWorker } from "../server.ts";
 import { type Browser, createBrowser } from "../browser.ts";
 import bundle from "../../core/internal/bundle/lib/bundle/index.ts";
 import tunnelGo from "../../core/internal/bundle/lib/tunnel/index.ts";
@@ -8,22 +8,22 @@ import { startServer } from "../net/server.ts";
 import { startTunnelServer } from "../tunnel/server.ts";
 
 suite("worker - integration", () => {
-    let tcpServer: Worker;
-    let wsTunnelServer: Worker;
+    let tcpServer: ServerWorker;
+    let wsTunnelServer: ServerWorker;
     let browser: Browser;
 
     before(async () => {
-        // Start TCP echo server on port 9090
+        // Start TCP echo server
         tcpServer = await startServer();
 
-        // Start WS tunnel server on port 9091 pointing to TCP port 9090
-        wsTunnelServer = await startTunnelServer(9091, 9090);
+        // Start WS tunnel server pointing to the TCP server
+        wsTunnelServer = await startTunnelServer(tcpServer.port);
 
         // Register the tunnel
         await tunnelGo.register({
             name: "test-tunnel-worker",
             host: "localhost",
-            port: 9091,
+            port: wsTunnelServer.port,
             unsecure: true
         });
 
@@ -44,7 +44,9 @@ suite("worker - integration", () => {
     });
 
     test("worker bridge functionality (path, fs, socket, tunnel)", async () => {
-        const page = await browser.createPage();
+        const page = await browser.createPage(
+            browser.url({ port: tcpServer.port })
+        );
 
         // Wait for worker tests to finish and write to body
         await page.page.waitForFunction(
