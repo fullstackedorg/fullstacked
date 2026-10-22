@@ -140,7 +140,7 @@ func (tunnel *Tunnel) Connect() *types.ResponseStream {
 	return &types.ResponseStream{
 		Open: func(ctx *types.Context, streamId uint32) {
 			go func() {
-				c, _, err := websocket.Dial(context.Background(), url, &websocket.DialOptions{
+				c, err := dialHub(context.Background(), url, &websocket.DialOptions{
 					HTTPHeader: HTTPHeaders,
 				})
 				if err != nil {
@@ -199,7 +199,7 @@ func (tunnel *Tunnel) Dial(ctx context.Context) (net.Conn, error) {
 		HTTPHeaders["Authorization"] = []string{tunnel.Authorization}
 	}
 
-	c, _, err := websocket.Dial(ctx, tunnel.url(), &websocket.DialOptions{
+	c, err := dialHub(ctx, tunnel.url(), &websocket.DialOptions{
 		HTTPHeader: HTTPHeaders,
 	})
 
