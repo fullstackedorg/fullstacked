@@ -13,7 +13,7 @@ const cli =
     path.join(root, "platform/node/index.ts");
 
 const servers = fork(fileURLToPath(new URL("./servers.js", import.meta.url)));
-const { echoPort, hubPort } = await new Promise<any>((resolve) =>
+const { echoPort, slowPort, hubPort } = await new Promise<any>((resolve) =>
     servers.once("message", resolve)
 );
 
@@ -25,7 +25,7 @@ const result = spawnSync(
         stdio: "inherit",
         env: {
             ...process.env,
-            BENCH_PORTS: `${echoPort},${hubPort}`,
+            BENCH_PORTS: `${echoPort},${slowPort},${hubPort}`,
             BENCH_JSON: process.argv.includes("--json") ? "1" : "0"
         }
     }

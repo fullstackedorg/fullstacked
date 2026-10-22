@@ -12,6 +12,8 @@
 // - 16 MB in 1 KB writes: written back to back (a driver's pipelined
 //   queries), echoed
 // - 64 sockets: 64 connections at once, 4 MB each, echoed
+// - round trips on one socket while another uploads 32 MB to a peer that
+//   reads 50 MB/s
 // Throughput counts the bytes of one direction.
 
 import "../../core/internal/bundle/lib/fullstacked/index.ts";
@@ -34,8 +36,9 @@ const modes: Mode[] =
 const json = args.includes("--json");
 
 const servers = fork(fileURLToPath(new URL("./servers.js", import.meta.url)));
-const { echoPort, hubPort } = await new Promise<{
+const { echoPort, slowPort, hubPort } = await new Promise<{
     echoPort: number;
+    slowPort: number;
     hubPort: number;
 }>((resolve) => servers.once("message", resolve as any));
 
@@ -46,23 +49,34 @@ await tunnelGo.register({
     port: hubPort,
     unsecure: true
 });
+await tunnelGo.register({
+    name: `${tunnelName}-slow`,
+    host: "127.0.0.1",
+    port: hubPort,
+    path: "/slow",
+    unsecure: true
+});
 
-function connect(mode: Mode): Promise<Socket> {
+function connect(mode: Mode, target = "echo"): Promise<Socket> {
+    const port = target === "slow" ? slowPort : echoPort;
     return new Promise((resolve, reject) => {
         let socket: Socket;
         switch (mode) {
             case "node":
                 socket = net.connect({
-                    port: echoPort,
+                    port,
                     host: "127.0.0.1",
                     noDelay: true
                 });
                 break;
             case "runtime":
-                socket = netGo.connect(echoPort, "127.0.0.1");
+                socket = netGo.connect(port, "127.0.0.1");
                 break;
             case "tunnel":
-                socket = netGo.connect(echoPort, tunnelName);
+                socket = netGo.connect(
+                    port,
+                    target === "slow" ? `${tunnelName}-slow` : tunnelName
+                );
                 break;
         }
         socket.once("connect", () => resolve(socket));
@@ -72,7 +86,7 @@ function connect(mode: Mode): Promise<Socket> {
 
 const results: Record<string, Awaited<ReturnType<typeof bench>>> = {};
 for (const mode of modes) {
-    results[mode] = await bench(() => connect(mode));
+    results[mode] = await bench((target) => connect(mode, target));
 }
 print(results, json);
 

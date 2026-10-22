@@ -6,7 +6,8 @@ import tunnel from "tunnel";
 import { bench, print, type Socket } from "./cases.ts";
 
 // set by app-run.ts
-const [echoPort, hubPort] = process.env.BENCH_PORTS.split(",").map(Number);
+const [echoPort, slowPort, hubPort] =
+    process.env.BENCH_PORTS.split(",").map(Number);
 const json = process.env.BENCH_JSON === "1";
 
 const tunnelName = "bench-tunnel";
@@ -16,10 +17,21 @@ await tunnel.register({
     port: hubPort,
     unsecure: true
 });
+await tunnel.register({
+    name: `${tunnelName}-slow`,
+    host: "127.0.0.1",
+    port: hubPort,
+    path: "/slow",
+    unsecure: true
+});
 
-function connect(host: string): Promise<Socket> {
+function connect(host: string, target = "echo"): Promise<Socket> {
+    const viaTunnel = host === tunnelName;
     return new Promise((resolve, reject) => {
-        const socket = net.connect(echoPort, host);
+        const socket = net.connect(
+            target === "slow" ? slowPort : echoPort,
+            viaTunnel && target === "slow" ? `${tunnelName}-slow` : host
+        );
         socket.once("connect", () => resolve(socket));
         socket.once("error", reject);
     });
@@ -27,8 +39,8 @@ function connect(host: string): Promise<Socket> {
 
 print(
     {
-        runtime: await bench(() => connect("127.0.0.1")),
-        tunnel: await bench(() => connect(tunnelName))
+        runtime: await bench((target) => connect("127.0.0.1", target)),
+        tunnel: await bench((target) => connect(tunnelName, target))
     },
     json
 );

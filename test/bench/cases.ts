@@ -10,7 +10,8 @@ export interface Socket {
     destroy(): unknown;
 }
 
-export type Connect = () => Promise<Socket>;
+// echo: the echo server, slow: the slow sink
+export type Connect = (target?: "echo" | "slow") => Promise<Socket>;
 
 // resolves once size bytes came back
 function receive(socket: Socket, size: number) {
@@ -128,6 +129,49 @@ async function parallel(connect: Connect, sockets: number, size: number) {
     return { mbps: (size * sockets) / 1e6 / (ms / 1000) };
 }
 
+// round trips on one socket while another uploads to a peer slow to take
+// it: what one upload does to every other socket
+async function rttDuringUpload(connect: Connect, uploadSize: number) {
+    const socket = await connect();
+    const upload = await connect("slow");
+    const data = payload(64);
+    const uploadData = payload(uploadSize);
+    const times: number[] = [];
+
+    let uploading = true;
+    let uploaded: Promise<void>;
+    let start = 0;
+    while (uploading && times.length < 100000) {
+        const t = performance.now();
+        // in a timed round trip: a write call that waits for the peer
+        // shows as a long one
+        if (times.length === 20) {
+            start = t;
+            uploaded = new Promise<void>((resolve) =>
+                upload.write(uploadData, () => {
+                    uploading = false;
+                    resolve();
+                })
+            );
+        }
+        const done = receive(socket, data.byteLength);
+        socket.write(data);
+        await done;
+        times.push(performance.now() - t);
+    }
+    await uploaded;
+    const uploadMs = performance.now() - start;
+    await Promise.all([close(socket), close(upload)]);
+
+    times.sort((a, b) => a - b);
+    return {
+        uploadMs,
+        roundTrips: times.length,
+        p50Us: times[Math.floor(times.length * 0.5)] * 1000,
+        maxUs: times[times.length - 1] * 1000
+    };
+}
+
 const KB = 1024;
 const MB = 1024 * 1024;
 
@@ -138,7 +182,8 @@ export async function bench(connect: Connect) {
         echo64KB: await echo(connect, 64 * KB, 200),
         echo16MB: await echo(connect, 16 * MB, 3),
         writes1KB: await smallWrites(connect, 16 * MB, KB),
-        parallel64: await parallel(connect, 64, 4 * MB)
+        parallel64: await parallel(connect, 64, 4 * MB),
+        duringUpload: await rttDuringUpload(connect, 32 * MB)
     };
 }
 
@@ -161,7 +206,13 @@ export function print(
             ["echo 64 KB (MB/s)", (r) => f(r.echo64KB.mbps)],
             ["echo 16 MB (MB/s)", (r) => f(r.echo16MB.mbps)],
             ["16 MB in 1 KB writes (MB/s)", (r) => f(r.writes1KB.mbps)],
-            ["64 sockets x 4 MB (MB/s)", (r) => f(r.parallel64.mbps)]
+            ["64 sockets x 4 MB (MB/s)", (r) => f(r.parallel64.mbps)],
+            [
+                "round trips during a 32 MB slow upload",
+                (r) => f(r.duringUpload.roundTrips)
+            ],
+            ["  their p50 (us)", (r) => f(r.duringUpload.p50Us)],
+            ["  their max (us)", (r) => f(r.duringUpload.maxUs)]
         ];
         const header = ["", ...modes];
         const table = [
