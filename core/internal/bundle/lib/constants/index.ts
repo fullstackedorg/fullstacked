@@ -148,6 +148,10 @@ export const S_IFSOCK = 49152;
 export const O_CREAT = 512;
 export const O_EXCL = 2048;
 export const UV_FS_O_FILEMAP = 0;
+export const UV_FS_O_TEMPORARY = 0;
+export const UV_FS_O_SHORT_LIVED = 0;
+export const UV_FS_O_SEQUENTIAL = 0;
+export const UV_FS_O_RANDOM = 0;
 export const O_NOCTTY = 131072;
 export const O_TRUNC = 1024;
 export const O_APPEND = 8;
@@ -179,7 +183,7 @@ export const UV_FS_COPYFILE_FICLONE = 2;
 export const COPYFILE_FICLONE = 2;
 export const UV_FS_COPYFILE_FICLONE_FORCE = 4;
 export const COPYFILE_FICLONE_FORCE = 4;
-export const OPENSSL_VERSION_NUMBER = 810549344;
+export const OPENSSL_VERSION_NUMBER = 810549392;
 export const SSL_OP_ALL = 2147485776;
 export const SSL_OP_ALLOW_NO_DHE_KEX = 1024;
 export const SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION = 262144;
@@ -219,6 +223,7 @@ export const DH_CHECK_P_NOT_PRIME = 1;
 export const DH_UNABLE_TO_CHECK_GENERATOR = 4;
 export const DH_NOT_SUITABLE_GENERATOR = 8;
 export const RSA_PKCS1_PADDING = 1;
+export const RSA_SSLV23_PADDING = 2;
 export const RSA_NO_PADDING = 3;
 export const RSA_PKCS1_OAEP_PADDING = 4;
 export const RSA_X931_PADDING = 5;
@@ -381,6 +386,10 @@ const constants = {
     O_CREAT,
     O_EXCL,
     UV_FS_O_FILEMAP,
+    UV_FS_O_TEMPORARY,
+    UV_FS_O_SHORT_LIVED,
+    UV_FS_O_SEQUENTIAL,
+    UV_FS_O_RANDOM,
     O_NOCTTY,
     O_TRUNC,
     O_APPEND,
@@ -452,6 +461,7 @@ const constants = {
     DH_UNABLE_TO_CHECK_GENERATOR,
     DH_NOT_SUITABLE_GENERATOR,
     RSA_PKCS1_PADDING,
+    RSA_SSLV23_PADDING,
     RSA_NO_PADDING,
     RSA_PKCS1_OAEP_PADDING,
     RSA_X931_PADDING,

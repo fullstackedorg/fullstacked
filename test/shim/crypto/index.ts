@@ -2032,7 +2032,7 @@ suite("shim crypto - key derivation, random and misc", () => {
                 "des-ede3-cbc",
                 "chacha20",
                 "chacha20-poly1305",
-                "id-aes256-GCM"
+                "id-aes256-gcm"
             ].map((c) => crypto.getCiphers().includes(c)),
             [
                 "sha1",

@@ -131,7 +131,7 @@ export function getCiphers() {
         "des3"
     ];
     for (const bits of [128, 192, 256]) {
-        list.push(`aes${bits}`, `id-aes${bits}-GCM`);
+        list.push(`aes${bits}`, `id-aes${bits}-gcm`);
         for (const mode of AES_MODES) list.push(`aes-${bits}-${mode}`);
     }
     return list.sort();

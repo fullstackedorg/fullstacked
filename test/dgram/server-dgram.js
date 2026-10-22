@@ -16,6 +16,6 @@ server.on("listening", () => {
     parentPort.postMessage("ready");
 });
 
+// ready once bound: a datagram sent before is dropped, and the test waits
+// for its echo forever
 server.bind(9091, "127.0.0.1");
-
-parentPort.postMessage("ready");
