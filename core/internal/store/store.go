@@ -14,6 +14,11 @@ import (
 	"time"
 )
 
+// Size of the reads of the read loops of streams (sockets, response
+// bodies): a read returns what is there, up to this. StreamChunk copies the
+// chunk, a read loop reuses its buffer.
+const ReadSize = 64 << 10
+
 // ctxId, storedStreamId, size
 var OnStreamData = (func(uint8, uint32, int))(nil)
 

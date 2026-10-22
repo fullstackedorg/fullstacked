@@ -239,6 +239,7 @@ func StreamResponse(
 	defer closeFetchRequest(responseId)
 	defer closeFetchResponse(responseId)
 
+	buffer := make([]byte, store.ReadSize)
 	for {
 		response := safelyGetResponse(responseId)
 		if response == nil {
@@ -248,7 +249,6 @@ func StreamResponse(
 			return
 		}
 
-		buffer := make([]byte, 2048)
 		n, err := response.Body.Read(buffer)
 
 		if err == nil || err == io.EOF {

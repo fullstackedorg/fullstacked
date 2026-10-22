@@ -6,7 +6,7 @@ import {
     ResponseBody,
     type ResponseHead
 } from "../@types/fetch.ts";
-import { mergeUint8Arrays } from "../bridge/serialization.ts";
+import { concatUint8Arrays } from "../bridge/serialization.ts";
 import type { Duplex } from "../bridge/duplex.ts";
 import type { EventEmitter } from "../bridge/eventEmitter.ts";
 
@@ -194,14 +194,15 @@ async function fetchCore(
             throw getAbortError();
         }
         try {
-            let buffer = new Uint8Array();
+            // merged once, merging each chunk in was quadratic
+            const chunks: Uint8Array[] = [];
             for await (const chunk of response.body) {
                 if (signal?.aborted) {
                     throw getAbortError();
                 }
-                buffer = mergeUint8Arrays(buffer, chunk);
+                chunks.push(chunk);
             }
-            return buffer;
+            return concatUint8Arrays(chunks);
         } finally {
             cleanupAbortListener();
         }

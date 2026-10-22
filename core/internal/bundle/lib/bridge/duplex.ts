@@ -1,7 +1,7 @@
 import { toByteArray } from "./base64.ts";
 import { type SerializableData, Stream } from "../@types/index.ts";
 import { Close, Open, Write, WriteEvent } from "../@types/stream.ts";
-import { mergeUint8Arrays } from "./serialization.ts";
+import { concatUint8Arrays, mergeUint8Arrays } from "./serialization.ts";
 import { createEventEmitter } from "./eventEmitter.ts";
 
 type DuplexItem = {
@@ -16,7 +16,9 @@ type DuplexItem = {
     pendingData: Uint8Array[];
     asyncRead: {
         promise?: { resolve: () => void; reject: (reason: any) => void };
-        data: Uint8Array | null;
+        // chunks since the last read, merged once by the read (merging each
+        // chunk in was quadratic when the reader lags)
+        chunks: Uint8Array[];
     } | null;
     queuedPackets: { flags: number; data: Uint8Array }[];
     error?: Error;
@@ -116,7 +118,14 @@ function processPayload(
         }
     }
 
-    if (duplex.listeners.data.size === 0 && !duplex.done && !isError) {
+    // kept for the first listener or read; an async reader has its own
+    // chunks (kept here too, a whole body stayed until the end)
+    if (
+        duplex.listeners.data.size === 0 &&
+        duplex.asyncRead === null &&
+        !duplex.done &&
+        !isError
+    ) {
         duplex.pendingData.push(data);
     } else if (!isError) {
         duplex.listeners.data.forEach((cb) => cb(data));
@@ -142,11 +151,7 @@ function processPayload(
     }
 
     if (duplex.asyncRead !== null && !isError) {
-        duplex.asyncRead.data =
-            duplex.asyncRead.data === null
-                ? data
-                : mergeUint8Arrays(duplex.asyncRead.data, data);
-
+        duplex.asyncRead.chunks.push(data);
         duplex.asyncRead.promise?.resolve?.();
     }
 }
@@ -240,17 +245,13 @@ export function createDuplex(id: number): Duplex {
         }
 
         if (duplex.asyncRead === null) {
-            let initialData: Uint8Array | null = null;
-            if (duplex.pendingData.length > 0) {
-                initialData = mergeUint8Arrays(...duplex.pendingData);
-                duplex.pendingData = [];
-            }
             duplex.asyncRead = {
-                data: initialData
+                chunks: duplex.pendingData
             };
+            duplex.pendingData = [];
         }
 
-        if (duplex.done && !duplex.asyncRead.data) {
+        if (duplex.done && duplex.asyncRead.chunks.length === 0) {
             return { done: true };
         }
 
@@ -258,7 +259,7 @@ export function createDuplex(id: number): Duplex {
             await open();
         }
 
-        if (!duplex.asyncRead.data) {
+        if (duplex.asyncRead.chunks.length === 0) {
             await read();
         }
 
@@ -266,8 +267,14 @@ export function createDuplex(id: number): Duplex {
             throw duplex.error;
         }
 
-        const value = duplex.asyncRead.data;
-        duplex.asyncRead.data = null;
+        const chunks = duplex.asyncRead.chunks;
+        duplex.asyncRead.chunks = [];
+        const value =
+            chunks.length === 0
+                ? null
+                : chunks.length === 1
+                  ? chunks[0]
+                  : concatUint8Arrays(chunks);
 
         return {
             value,

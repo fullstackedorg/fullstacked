@@ -51,10 +51,10 @@ using FinalizerDataType = void;
 
 void CallJs(Napi::Env env, Function callback, Context *context,
             DataType *data) {
-    StreamChunk chunk = *data;
-    callback.Call({Number::New(env, chunk.ctx), Number::New(env, chunk.id),
-                   Napi::ArrayBuffer::New(env, chunk.buffer.data(),
-                                          chunk.buffer.size())});
+    // the page copies what it keeps during the call (onStreamData)
+    callback.Call({Number::New(env, data->ctx), Number::New(env, data->id),
+                   Napi::ArrayBuffer::New(env, data->buffer.data(),
+                                          data->buffer.size())});
     delete data;
 }
 using TSFN = TypedThreadSafeFunction<Context, DataType, CallJs>;
@@ -70,7 +70,7 @@ void n_onStreamData(uint8_t ctx, uint32_t streamId, int size) {
     StreamChunk *chunk = new StreamChunk;
     chunk->ctx = ctx;
     chunk->id = streamId;
-    chunk->buffer = buffer;
+    chunk->buffer = std::move(buffer);
     tsfn.NonBlockingCall(chunk);
 }
 

@@ -63,6 +63,32 @@ suite("fetch - e2e", () => {
         assert.ok(totalSize > 0);
     });
 
+    // the chunks that came while the reader lagged are merged once by the
+    // next read (each chunk merged into the rest was quadratic)
+    test("response body - large body read late", async () => {
+        const size = 32 * 1024 * 1024;
+        const response = await fetch(`http://localhost:9090/bytes/${size}`);
+        const reader = response.body.getReader();
+        // reading started, then the reader lags
+        const chunks: Uint8Array[] = [(await reader.read()).value];
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        const start = performance.now();
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+        }
+        const readMs = performance.now() - start;
+
+        const body = mergeUint8Arrays(...chunks);
+        assert.equal(body.byteLength, size);
+        for (let i = 0; i < size; i += 4099) {
+            assert.equal(body[i], i % 251);
+        }
+        assert.ok(readMs < 5000, `read in ${readMs}ms`);
+    });
+
     test("response body - bytes", async () => {
         const responseNode = await globalThis.fullstacked.fetch(
             "http://localhost:9090"

@@ -266,6 +266,11 @@ export function serialize(data: SerializableData): Uint8Array<ArrayBuffer> {
 }
 
 export function mergeUint8Arrays(...arrays: Uint8Array[]) {
+    return concatUint8Arrays(arrays);
+}
+
+// an array of any length, spreading many chunks in a call can overflow
+export function concatUint8Arrays(arrays: Uint8Array[]) {
     if (arrays.find((arr) => !(arr instanceof Uint8Array))) {
         throw new Error("cannot merge anything other than Uint8Array");
     }

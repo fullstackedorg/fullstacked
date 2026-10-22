@@ -92,7 +92,14 @@ export class Socket extends RealDuplex {
                 this.duplex = d;
                 this.duplex.on("data", (data: Uint8Array) => {
                     if (this.destroyed) return;
-                    this.push(Buffer.from(data));
+                    // the chunk has its own buffer, no copy
+                    this.push(
+                        Buffer.from(
+                            data.buffer,
+                            data.byteOffset,
+                            data.byteLength
+                        )
+                    );
                 });
                 this.duplex.on("close", () => {
                     if (!this.destroyed) {

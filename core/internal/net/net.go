@@ -58,8 +58,8 @@ func createSocket(
 	stream := types.ResponseStream{
 		Open: func(ctx *types.Context, streamId uint32) {
 			go func() {
+				buffer := make([]byte, store.ReadSize)
 				for {
-					buffer := make([]byte, 1024)
 					n, err := socket.Read(buffer)
 
 					if err != nil {

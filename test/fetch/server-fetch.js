@@ -41,6 +41,20 @@ http.createServer(async (req, res) => {
         return req.socket.destroy();
     }
 
+    // a body of that many deterministic bytes (i % 251), in 64 KiB writes
+    if (req.url.startsWith("/bytes/")) {
+        const size = parseInt(req.url.slice("/bytes/".length));
+        const data = Buffer.alloc(size);
+        for (let i = 0; i < size; i++) data[i] = i % 251;
+        res.writeHead(200, { "content-length": size });
+        for (let i = 0; i < size; i += 64 * 1024) {
+            if (!res.write(data.subarray(i, i + 64 * 1024))) {
+                await new Promise((resolve) => res.once("drain", resolve));
+            }
+        }
+        return res.end();
+    }
+
     if (req.url === "/wait") {
         await new Promise((resolve) =>
             setTimeout(resolve, parseInt(req.headers["x-wait"] || "0"))
