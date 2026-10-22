@@ -80,8 +80,9 @@ type StoredStream struct {
 	// queued writes, nil unless ResponseStream.QueueWrites
 	Writes   *StreamWrites
 	TryWrite func(ctx *Context, streamId uint32, data []byte) int
-	// drains queued for the per chunk callback (store.StreamDrain)
-	Drains int
+	// signals (drain, connected) queued for the per chunk callback, see
+	// store.StreamSignal
+	Signals []uint8
 }
 
 // The writes of a stream queued for its goroutine, see store.QueueWrite

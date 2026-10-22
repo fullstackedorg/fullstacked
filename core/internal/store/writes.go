@@ -112,7 +112,7 @@ func writeQueued(ctx *types.Context, streamId uint32, stream *types.StoredStream
 		w.Mutex.Unlock()
 
 		if drain {
-			StreamDrain(ctx, streamId)
+			StreamSignal(ctx, streamId, frames.FlagDrain)
 		}
 	}
 }
@@ -152,9 +152,10 @@ func closeStreamNow(ctx *types.Context, streamId uint32, stream *types.StoredStr
 	StreamChunk(ctx, streamId, nil, true)
 }
 
-// StreamDrain tells the page it may write to the stream again, an empty
-// chunk with the drain flag
-func StreamDrain(ctx *types.Context, streamId uint32) {
+// StreamSignal sends the page an empty chunk with a flag of its own:
+// frames.FlagDrain (it may write to the stream again), FlagConnected (the
+// stream's socket dialed)
+func StreamSignal(ctx *types.Context, streamId uint32, flag uint8) {
 	if _, ok := GetContext(ctx.Id); !ok {
 		return
 	}
@@ -169,12 +170,12 @@ func StreamDrain(ctx *types.Context, streamId uint32) {
 
 	if ctx.Frames.Attached() {
 		ctx.StreamsMutex.Unlock()
-		ctx.Frames.Push(streamId, frames.FlagDrain, nil)
+		ctx.Frames.Push(streamId, flag, nil)
 		return
 	}
 
 	// the read of size 1 takes no data, see getCorePayloadStream
-	stream.Drains++
+	stream.Signals = append(stream.Signals, flag)
 
 	if OnStreamData == nil {
 		panic("did not set OnStreamData")

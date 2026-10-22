@@ -13,7 +13,11 @@ import fetchGo from "../../core/internal/bundle/lib/fetch/index.ts";
 import gitGo from "../../core/internal/bundle/lib/git/index.ts";
 import { mergeUint8Arrays } from "../../core/internal/bundle/lib/bridge/serialization.ts";
 import { startServer } from "../net/server.ts";
-import { startHubServer, startTunnelServer } from "./server.ts";
+import {
+    startHubServer,
+    startSlowUpgradeServer,
+    startTunnelServer
+} from "./server.ts";
 import { payload } from "./payload.ts";
 import plugin from "../../core/internal/bundle/lib/plugin/index.ts";
 
@@ -452,6 +456,79 @@ suite("tunnel - e2e", () => {
 
     // each HTTP connection to a tunnel name is a tunnel connection (DNS, TLS
     // and an upgrade through the hub): concurrent requests reuse them
+    // a tunnel connect dials (an upgrade through the hub) off the bridge
+    // call: concurrent connects take about one upgrade, and the sockets
+    // already open keep their traffic going meanwhile. The dial ran in the
+    // call, on the runtime's thread in Node: connects went one at a time and
+    // froze every other socket for the length of each upgrade.
+    test("concurrent tunnel connects do not wait for each other", async () => {
+        const upgradeDelayMs = 150;
+        const hub = await startSlowUpgradeServer(9100, upgradeDelayMs);
+        await tunnelGo.register({
+            name: "slow-upgrade-tunnel-e2e",
+            host: "localhost",
+            port: 9100,
+            unsecure: true
+        });
+
+        const connect = () =>
+            new Promise<InstanceType<typeof netGo.Socket>>(
+                (resolve, reject) => {
+                    const socket = new netGo.Socket();
+                    socket.once("connect", () => resolve(socket));
+                    socket.once("error", reject);
+                    socket.connect(5432, "slow-upgrade-tunnel-e2e");
+                }
+            );
+
+        const echo = (socket: InstanceType<typeof netGo.Socket>) =>
+            new Promise<number>((resolve) => {
+                const start = performance.now();
+                socket.once("data", () => resolve(performance.now() - start));
+                socket.write("ping");
+            });
+
+        try {
+            const open = await connect();
+
+            // round trips on the open socket while 16 others connect
+            let connecting = true;
+            const roundTrips: number[] = [];
+            const probe = (async () => {
+                while (connecting) roundTrips.push(await echo(open));
+            })();
+
+            const start = performance.now();
+            const sockets = await Promise.all(
+                Array.from({ length: 16 }, connect)
+            );
+            const elapsed = performance.now() - start;
+            connecting = false;
+            await probe;
+
+            assert.ok(
+                elapsed < upgradeDelayMs * 4,
+                `16 concurrent connects took ${Math.round(elapsed)} ms`
+            );
+            assert.ok(
+                Math.max(...roundTrips) < upgradeDelayMs / 2,
+                `a round trip on an open socket took ${Math.round(Math.max(...roundTrips))} ms during the connects`
+            );
+
+            await Promise.all(
+                [open, ...sockets].map(
+                    (socket) =>
+                        new Promise((resolve) => {
+                            socket.once("close", resolve);
+                            socket.destroy();
+                        })
+                )
+            );
+        } finally {
+            await hub.terminate();
+        }
+    });
+
     test("fetch through tunnel reuses connections", async () => {
         let connections = 0;
         const httpServer = http.createServer((req, res) => {

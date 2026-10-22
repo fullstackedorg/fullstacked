@@ -62,6 +62,7 @@ type SocketOpts = {
 
 export class Socket extends RealDuplex {
     private duplex: Duplex = null;
+    private isConnected = false;
 
     constructor(options?: Partial<SocketOpts>) {
         super(options);
@@ -107,7 +108,14 @@ export class Socket extends RealDuplex {
                     }
                     this.emit("close");
                 });
+                // a failed dial ends the stream with its error
+                this.duplex.on("error", (err) => this.destroy(err));
                 await this.duplex.open();
+                // the core dials after the call returned the stream, off the
+                // bridge: concurrent connects do not wait for each other
+                await this.duplex.connected();
+                if (this.destroyed) return;
+                this.isConnected = true;
                 this.emit("connect");
                 this.emit("ready");
             })
@@ -125,7 +133,7 @@ export class Socket extends RealDuplex {
         encoding: string,
         callback: (error?: Error | null) => void
     ) {
-        if (!this.duplex) {
+        if (!this.isConnected) {
             this.once("connect", () => this._write(chunk, encoding, callback));
             return;
         }

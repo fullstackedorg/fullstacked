@@ -22,3 +22,13 @@ export function startHubServer(
         worker.on("error", console.log);
     });
 }
+
+export function startSlowUpgradeServer(wsPort: number, upgradeDelayMs: number) {
+    return new Promise<Worker>((res) => {
+        const worker = new Worker("./test/tunnel/server-slow-upgrade.js", {
+            workerData: { wsPort, upgradeDelayMs }
+        });
+        worker.on("message", () => res(worker));
+        worker.on("error", console.log);
+    });
+}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"fullstackedorg/fullstacked/internal/frames"
 	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/internal/utils"
 	"fullstackedorg/fullstacked/types"
@@ -123,28 +124,43 @@ func (tunnel *Tunnel) url() string {
 	return url.String()
 }
 
-func (tunnel *Tunnel) Connect() (*types.ResponseStream, error) {
+// Connect returns the stream of a connection through the tunnel at once, the
+// WebSocket dials in its Open (see store.Dialing): connected, or an error
+// ending the stream
+func (tunnel *Tunnel) Connect() *types.ResponseStream {
 	HTTPHeaders := http.Header{}
 	if tunnel.Authorization != "" {
 		HTTPHeaders["Authorization"] = []string{tunnel.Authorization}
 	}
+	url := tunnel.url()
+	name := tunnel.Name
 
-	c, _, err := websocket.Dial(context.Background(), tunnel.url(), &websocket.DialOptions{
-		HTTPHeader: HTTPHeaders,
-	})
+	dialing := store.NewDialing[*websocket.Conn]()
 
-	if err != nil {
-		return nil, fmt.Errorf("tunnel %s: %w", tunnel.Name, err)
-	}
-
-	// the hub sends one message per target socket read (up to ~64 KiB),
-	// above the 32 KiB default; the target's stream has no message size,
-	// so no limit like websocket.NetConn in Dial
-	c.SetReadLimit(-1)
-
-	stream := types.ResponseStream{
+	return &types.ResponseStream{
 		Open: func(ctx *types.Context, streamId uint32) {
 			go func() {
+				c, _, err := websocket.Dial(context.Background(), url, &websocket.DialOptions{
+					HTTPHeader: HTTPHeaders,
+				})
+				if err != nil {
+					dialing.Failed()
+					store.StreamError(ctx, streamId, fmt.Errorf("tunnel %s: %w", name, err))
+					return
+				}
+
+				// the hub sends one message per target socket read (up to
+				// ~64 KiB), above the 32 KiB default; the target's stream has
+				// no message size, so no limit like websocket.NetConn in Dial
+				c.SetReadLimit(-1)
+
+				// closed by the page while dialing
+				if !dialing.Dialed(c) {
+					c.CloseNow()
+					return
+				}
+				store.StreamSignal(ctx, streamId, frames.FlagConnected)
+
 				for {
 					_, data, err := c.Read(context.Background())
 
@@ -159,6 +175,10 @@ func (tunnel *Tunnel) Connect() (*types.ResponseStream, error) {
 		},
 		QueueWrites: true,
 		Write: func(ctx *types.Context, streamId uint32, data []byte) {
+			c, ok := dialing.Wait()
+			if !ok {
+				return
+			}
 			err := c.Write(context.Background(), websocket.MessageBinary, data)
 			if err != nil {
 				// the read goroutine sees the closed conn and ends the stream
@@ -166,11 +186,11 @@ func (tunnel *Tunnel) Connect() (*types.ResponseStream, error) {
 			}
 		},
 		Close: func(ctx *types.Context, streamId uint32) {
-			c.CloseNow()
+			if c, ok := dialing.Close(); ok {
+				c.CloseNow()
+			}
 		},
 	}
-
-	return &stream, nil
 }
 
 func (tunnel *Tunnel) Dial(ctx context.Context) (net.Conn, error) {

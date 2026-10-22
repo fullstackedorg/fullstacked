@@ -405,10 +405,10 @@ func getCorePayloadStream(ctx *types.Context, id uint32, size int) ([]byte, erro
 		headerByte = 2
 	} else if drained && stream.Ended {
 		headerByte = 1
-	} else if size == 1 && stream.Drains > 0 {
-		// the read of a drain (StreamDrain) takes no data
-		headerByte = frames.FlagDrain
-		stream.Drains--
+	} else if size == 1 && len(stream.Signals) > 0 {
+		// the read of a signal (StreamSignal) takes no data
+		headerByte = stream.Signals[0]
+		stream.Signals = stream.Signals[1:]
 	}
 
 	buffer, err := serialization.MergeBuffers([]byte{headerByte}, stream.Buffer[0:size-1])

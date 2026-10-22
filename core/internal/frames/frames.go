@@ -5,7 +5,8 @@
 // Frame: [streamId u32][flags u8][length u32][data], big endian
 // flags: 0 data, 1 end, 2 error (data is the error message), 3 response of
 // a call (the frame id is the call id), 4 drain (the queued writes of the
-// stream went down, see store.QueueWrite)
+// stream went down, see store.QueueWrite), 5 connected (a socket's dial
+// done, data and writes can flow)
 //
 // The host attaches a reader with Attach, which returns a generation and
 // queues a hello frame (stream 0, empty) so the page knows data flows. Read
@@ -29,6 +30,8 @@ const (
 	FlagResponse uint8 = 3
 	// the page may write again to the stream, empty
 	FlagDrain uint8 = 4
+	// the socket of the stream is connected, empty
+	FlagConnected uint8 = 5
 
 	HeaderSize = 9
 

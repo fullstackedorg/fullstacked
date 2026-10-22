@@ -25,9 +25,13 @@ type DuplexItem = {
     // drains received, and the writes waiting for the next one
     drains: number;
     drainWaiters: Set<() => void>;
+    // the stream's socket dialed (net, tunnel), and who waits for it
+    connected: boolean;
+    connectedWaiters: Set<{ resolve: () => void; reject: (e: Error) => void }>;
 };
 
 const FLAG_DRAIN = 4;
+const FLAG_CONNECTED = 5;
 
 const activeDuplexes = new Map<number, DuplexItem[]>();
 
@@ -105,6 +109,14 @@ function processPayload(
         return;
     }
 
+    if (flags === FLAG_CONNECTED) {
+        duplex.connected = true;
+        const waiters = duplex.connectedWaiters;
+        duplex.connectedWaiters = new Set();
+        waiters.forEach(({ resolve }) => resolve());
+        return;
+    }
+
     const isError = flags === 2;
     duplex.done = flags === 1 || isError;
 
@@ -132,8 +144,13 @@ function processPayload(
     }
 
     if (duplex.done) {
-        // no drain comes after the end
+        // no drain comes after the end, nor a connection
         releaseWrites(duplex);
+        const waiters = duplex.connectedWaiters;
+        duplex.connectedWaiters = new Set();
+        waiters.forEach(({ reject }) =>
+            reject(duplex.error ?? new Error("closed before connecting"))
+        );
         if (!isError) {
             duplex.listeners.close.forEach((cb) => cb());
         }
@@ -178,6 +195,7 @@ export interface Duplex extends ReadableStream<Uint8Array<ArrayBuffer>> {
     promise(): Promise<any>;
     eventEmitter(): ReturnType<typeof createEventEmitter>;
     open(): Promise<void>;
+    connected(): Promise<void>;
 }
 
 const te = new TextEncoder();
@@ -196,7 +214,9 @@ export function createDuplex(id: number): Duplex {
         asyncRead: null,
         queuedPackets: [],
         drains: 0,
-        drainWaiters: new Set()
+        drainWaiters: new Set(),
+        connected: false,
+        connectedWaiters: new Set()
     };
 
     if (!activeDuplexes.has(id)) {
@@ -337,6 +357,20 @@ export function createDuplex(id: number): Duplex {
                 duplex.drainWaiters.add(resolve)
             );
         }
+    };
+
+    // resolves once the stream's socket dialed (it dials after the call
+    // that returned the stream), rejects when the dial failed
+    stream.connected = () => {
+        if (duplex.connected) return Promise.resolve();
+        if (duplex.done) {
+            return Promise.reject(
+                duplex.error ?? new Error("closed before connecting")
+            );
+        }
+        return new Promise<void>((resolve, reject) =>
+            duplex.connectedWaiters.add({ resolve, reject })
+        );
     };
 
     stream.writeEvent = async (event: string, ...args: SerializableData[]) => {

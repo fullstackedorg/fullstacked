@@ -2,6 +2,7 @@ package net
 
 import (
 	"errors"
+	"fullstackedorg/fullstacked/internal/frames"
 	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/internal/tunnel"
 	"fullstackedorg/fullstacked/types"
@@ -41,23 +42,37 @@ func Switch(
 	return errors.New("unknown net function")
 }
 
+// createSocket returns the socket's stream at once, it dials in its Open (see
+// store.Dialing): connected, or an error ending the stream
 func createSocket(
 	port int,
 	hostname string,
 ) (*types.ResponseStream, error) {
 	tunnel := tunnel.FindTunnel(hostname)
 	if tunnel != nil {
-		return tunnel.Connect()
+		return tunnel.Connect(), nil
 	}
 
-	socket, err := net.Dial("tcp", net.JoinHostPort(hostname, strconv.Itoa(port)))
-	if err != nil {
-		return nil, err
-	}
+	address := net.JoinHostPort(hostname, strconv.Itoa(port))
+	dialing := store.NewDialing[net.Conn]()
 
 	stream := types.ResponseStream{
 		Open: func(ctx *types.Context, streamId uint32) {
 			go func() {
+				socket, err := net.Dial("tcp", address)
+				if err != nil {
+					dialing.Failed()
+					store.StreamError(ctx, streamId, err)
+					return
+				}
+
+				// closed by the page while dialing
+				if !dialing.Dialed(socket) {
+					socket.Close()
+					return
+				}
+				store.StreamSignal(ctx, streamId, frames.FlagConnected)
+
 				buffer := make([]byte, store.ReadSize)
 				for {
 					n, err := socket.Read(buffer)
@@ -70,11 +85,14 @@ func createSocket(
 
 					store.StreamChunk(ctx, streamId, buffer[0:n], false)
 				}
-
 			}()
 		},
 		QueueWrites: true,
 		Write: func(ctx *types.Context, streamId uint32, data []byte) {
+			socket, ok := dialing.Wait()
+			if !ok {
+				return
+			}
 			_, err := socket.Write(data)
 			if err != nil {
 				// the read goroutine sees the closed socket and ends the stream
@@ -82,6 +100,10 @@ func createSocket(
 			}
 		},
 		TryWrite: func(ctx *types.Context, streamId uint32, data []byte) int {
+			socket, ok := dialing.Ready()
+			if !ok {
+				return 0
+			}
 			n, err := tryWrite(socket, data)
 			if err != nil {
 				socket.Close()
@@ -90,7 +112,9 @@ func createSocket(
 			return n
 		},
 		Close: func(ctx *types.Context, streamId uint32) {
-			socket.Close()
+			if socket, ok := dialing.Close(); ok {
+				socket.Close()
+			}
 		},
 	}
 
