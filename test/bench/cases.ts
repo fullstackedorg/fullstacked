@@ -3,7 +3,7 @@
 // test/bench/servers.js. Throughput counts the bytes of one direction.
 
 export interface Socket {
-    write(data: Uint8Array): unknown;
+    write(data: Uint8Array, callback?: () => void): unknown;
     on(event: "data", cb: (chunk: Uint8Array) => void): unknown;
     off(event: "data", cb: (chunk: Uint8Array) => void): unknown;
     once(event: string, cb: (...args: any[]) => void): unknown;

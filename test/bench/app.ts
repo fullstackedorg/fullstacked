@@ -2,7 +2,7 @@
 // tunnel are lib/net and lib/tunnel on lib/stream, lib/process..., what an
 // app's drivers get.
 import net from "net";
-import tunnel from "tunnel";
+import tunnel from "../../core/internal/bundle/lib/tunnel/index.ts";
 import { bench, print, type Socket } from "./cases.ts";
 
 // set by app-run.ts

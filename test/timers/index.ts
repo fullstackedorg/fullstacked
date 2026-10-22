@@ -34,8 +34,10 @@ suite("timers", () => {
         delete (globalThis as any).setImmediate;
         delete (globalThis as any).clearImmediate;
         try {
-            const timers =
-                await import("../../core/internal/bundle/lib/timers/index.ts?polyfill");
+            // a second instance of the module, evaluated without one
+            const polyfill =
+                "../../core/internal/bundle/lib/timers/index.ts?polyfill";
+            const timers = await import(polyfill);
             assert.notEqual(timers.setImmediate, native.setImmediate);
 
             const order: string[] = [];
