@@ -5,13 +5,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/internal/tunnel"
 	"fullstackedorg/fullstacked/types"
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"sync"
+	"time"
 )
 
 type FetchFn = uint8
@@ -129,8 +132,44 @@ type ResponseHead struct {
 var fetchResponses = map[int]*http.Response{}
 var fetchResponsesMutex = sync.Mutex{}
 
+// Go replays an idempotent request that a reused connection drops before
+// responding, on the next connection, and its pool counts as reused a
+// connection dialed for a request another one served: a request the server
+// always drops went through every pooled connection, and under load (the
+// pool refilled by other requests' dials) without end, a new tunnel
+// connection each time. A request gets maxAttempts connections.
+const maxAttempts = 3
+
+var errDropped = fmt.Errorf("connection closed before a response, %d attempts", maxAttempts)
+
+type boundedAttempts struct {
+	http.RoundTripper
+}
+
+func (b boundedAttempts) RoundTrip(req *http.Request) (*http.Response, error) {
+	ctx, cancel := context.WithCancelCause(req.Context())
+	attempts := 0
+	ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
+		GotConn: func(httptrace.GotConnInfo) {
+			attempts++
+			if attempts > maxAttempts {
+				cancel(errDropped)
+			}
+		},
+	})
+	res, err := b.RoundTripper.RoundTrip(req.WithContext(ctx))
+	// on success the body is read under ctx, the request's cancel ends it
+	if err != nil {
+		cancel(nil)
+		if errors.Is(context.Cause(ctx), errDropped) {
+			err = errDropped
+		}
+	}
+	return res, err
+}
+
 var client = &http.Client{
-	Transport: &http.Transport{
+	Transport: boundedAttempts{&http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			host, _, err := net.SplitHostPort(addr)
 			if err != nil {
@@ -148,7 +187,14 @@ var client = &http.Client{
 		// a custom DialContext disables HTTP/2 unless forced,
 		// and Cloudflare blocks Go's TLS client over HTTP/1.1
 		ForceAttemptHTTP2: true,
-	},
+		// connections go back to the pool once a body is read: Go keeps 2
+		// per host by default, the others closed, so concurrent requests
+		// to a host (a tunnel name: each connection a tunnel connection
+		// through the hub) opened a new connection per request
+		MaxIdleConns:        1024,
+		MaxIdleConnsPerHost: 256,
+		IdleConnTimeout:     90 * time.Second,
+	}},
 }
 
 func FetchFnApply(id int, requestHead RequestHead, body []byte) (ResponseHead, error) {

@@ -4,6 +4,8 @@ import "../../core/internal/bundle/lib/fetch/index.ts";
 import { mergeUint8Arrays } from "../../core/internal/bundle/lib/bridge/serialization.ts";
 import { startServer } from "./server.ts";
 import { Worker } from "node:worker_threads";
+import http from "node:http";
+import net from "node:net";
 
 suite("fetch - e2e", () => {
     let worker: Worker = null;
@@ -87,6 +89,43 @@ suite("fetch - e2e", () => {
             assert.equal(body[i], i % 251);
         }
         assert.ok(readMs < 5000, `read in ${readMs}ms`);
+    });
+
+    // concurrent requests to one host reuse their connections: the pool
+    // kept 2 per host, a tunnel name took a new tunnel connection per request
+    test("connections are reused across rounds", async () => {
+        let connections = 0;
+        const server = http.createServer((req, res) => {
+            // the requests of a round overlap
+            setTimeout(() => res.end("ok"), 20);
+        });
+        server.on("connection", () => connections++);
+        await new Promise<void>((resolve) =>
+            server.listen(0, "127.0.0.1", resolve)
+        );
+        const port = (server.address() as net.AddressInfo).port;
+
+        try {
+            const concurrent = 32;
+            for (let round = 0; round < 5; round++) {
+                const texts = await Promise.all(
+                    Array.from({ length: concurrent }, async () => {
+                        const response = await fetch(
+                            `http://127.0.0.1:${port}/`
+                        );
+                        return response.text();
+                    })
+                );
+                assert.ok(texts.every((text) => text === "ok"));
+            }
+            assert.ok(
+                connections <= concurrent + 2,
+                `${connections} connections for ${concurrent} concurrent requests`
+            );
+        } finally {
+            server.closeAllConnections();
+            await new Promise<void>((resolve) => server.close(() => resolve()));
+        }
     });
 
     test("response body - bytes", async () => {

@@ -450,6 +450,51 @@ suite("tunnel - e2e", () => {
         assert.deepEqual(received, data);
     });
 
+    // each HTTP connection to a tunnel name is a tunnel connection (DNS, TLS
+    // and an upgrade through the hub): concurrent requests reuse them
+    test("fetch through tunnel reuses connections", async () => {
+        let connections = 0;
+        const httpServer = http.createServer((req, res) => {
+            setTimeout(() => res.end("ok"), 20);
+        });
+        httpServer.on("connection", () => connections++);
+        await new Promise<void>((resolve) => httpServer.listen(0, resolve));
+        const httpPort = (httpServer.address() as any).port;
+
+        const fetchWsTunnelServer = await startTunnelServer(9099, httpPort);
+        await tunnelGo.register({
+            name: "fetch-reuse-tunnel-e2e",
+            host: "localhost",
+            port: 9099,
+            unsecure: true
+        });
+
+        try {
+            const concurrent = 16;
+            for (let round = 0; round < 4; round++) {
+                const texts = await Promise.all(
+                    Array.from({ length: concurrent }, async () => {
+                        const response = await fetchGo(
+                            "http://fetch-reuse-tunnel-e2e/"
+                        );
+                        return response.text();
+                    })
+                );
+                assert.ok(texts.every((text) => text === "ok"));
+            }
+            assert.ok(
+                connections <= concurrent + 2,
+                `${connections} tunnel connections for ${concurrent} concurrent requests`
+            );
+        } finally {
+            await fetchWsTunnelServer.terminate();
+            httpServer.closeAllConnections();
+            await new Promise<void>((resolve) =>
+                httpServer.close(() => resolve())
+            );
+        }
+    });
+
     test("fetch through tunnel integration", async () => {
         const httpServer = http.createServer((req, res) => {
             res.writeHead(200, { "Content-Type": "text/plain" });
