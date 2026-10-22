@@ -83,6 +83,12 @@ export class Socket extends RealDuplex {
                 data: [port, host]
             })
             .then(async (d) => {
+                // destroyed while connecting: close the connection now, it
+                // would stay open and hold its stream id
+                if (this.destroyed) {
+                    d.end();
+                    return;
+                }
                 this.duplex = d;
                 this.duplex.on("data", (data: Uint8Array) => {
                     if (this.destroyed) return;

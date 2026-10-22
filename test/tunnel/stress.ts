@@ -126,4 +126,73 @@ suite("tunnel - stress", () => {
 
         await Promise.all([...transfers, ...churn]);
     });
+
+    // Stream ids are one byte (1-255) per context. A stream whose producer
+    // never ended kept its id for good: failed requests did, and once all
+    // ids were taken the core searched for a free one forever on the
+    // runtime's thread. Hundreds of short-lived streams, some abandoned,
+    // then many open at once.
+    test("short-lived and abandoned streams do not exhaust stream ids", async () => {
+        for (let i = 0; i < 300; i++) {
+            await withTimeout(
+                assert.rejects(getObject(`drop/${objectSize}`)),
+                `dropped GET ${i}`
+            );
+        }
+
+        for (let i = 0; i < 300; i++) {
+            await withTimeout(echoCycle(), `echo cycle ${i}`);
+        }
+
+        // closed by the app mid-transfer
+        for (let i = 0; i < 50; i++) {
+            await withTimeout(
+                new Promise<void>((resolve, reject) => {
+                    const socket = new netGo.Socket();
+                    socket.on("error", reject);
+                    socket.on("connect", () => socket.write(payload(1 << 20)));
+                    socket.once("data", () => socket.destroy());
+                    socket.on("close", () => resolve());
+                    socket.connect(5432, "stress-echo");
+                }),
+                `abandoned socket ${i}`
+            );
+        }
+
+        // destroyed while connecting
+        for (let i = 0; i < 60; i++) {
+            const socket = new netGo.Socket();
+            socket.connect(5432, "stress-echo");
+            socket.destroy();
+        }
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        // many at once: fails when the streams above kept their ids
+        const sockets = await withTimeout(
+            Promise.all(
+                Array.from(
+                    { length: 200 },
+                    () =>
+                        new Promise<InstanceType<typeof netGo.Socket>>(
+                            (resolve, reject) => {
+                                const socket = new netGo.Socket();
+                                socket.on("error", reject);
+                                socket.on("connect", () => resolve(socket));
+                                socket.connect(5432, "stress-echo");
+                            }
+                        )
+                )
+            ),
+            "200 open sockets"
+        );
+        await Promise.all(
+            sockets.map(
+                (socket) =>
+                    new Promise((resolve) => {
+                        socket.on("close", resolve);
+                        socket.destroy();
+                    })
+            )
+        );
+    });
 });

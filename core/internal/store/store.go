@@ -222,11 +222,25 @@ func BuildResponse(
 	case types.CoreResponseData:
 		return buildResponseData(response)
 	case types.CoreResponseStream:
-		return buildResponseStream(ctx, response)
+		payload, err := buildResponseStream(ctx, response)
+		if errors.Is(err, errNoStreamId) {
+			// the call fails instead, releasing what the stream holds
+			// (a socket, a request)
+			if response.Stream.Close != nil {
+				response.Stream.Close(ctx, 0)
+			}
+			return buildResponseData(types.CoreCallResponse{
+				Type: types.CoreResponseError,
+				Data: err.Error(),
+			})
+		}
+		return payload, err
 	}
 
 	return nil, errors.New("unknown core response type")
 }
+
+var errNoStreamId = errors.New("too many open streams, no stream id free")
 
 func buildResponseData(
 	response types.CoreCallResponse,
@@ -263,15 +277,23 @@ func buildResponseStream(
 		return nil, errors.New("context ended")
 	}
 
+	// ids 1-255, the next free one from NextStreamId; with all of them
+	// taken the call fails, searching on would never end
 	streamId := ctx.NextStreamId
-	for {
+	free := false
+	for range 255 {
 		if streamId == 0 {
 			streamId = 1
 		}
 		if ctx.Streams[streamId] == nil {
+			free = true
 			break
 		}
 		streamId++
+	}
+
+	if !free {
+		return nil, errNoStreamId
 	}
 
 	storedStreamId := streamId
