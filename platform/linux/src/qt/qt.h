@@ -87,7 +87,7 @@ class QtWindow : public Window {
         QtWindow(uint8_t ctx);
         ~QtWindow() override;
 
-        void onStreamData(uint8_t streamId,
+        void onStreamData(uint32_t streamId,
                           const std::vector<uint8_t> &data) override;
         void bringToFront(bool reload) override;
         void setFullscreen() override;

@@ -389,7 +389,7 @@ namespace FullStacked
         }
     }
 
-    public void onStreamData(byte streamId, byte[] data) => this.bridge.OnStreamData(streamId, data);
+    public void onStreamData(uint streamId, byte[] data) => this.bridge.OnStreamData(streamId, data);
 
         private (IRandomAccessStream, string) bufferToResponseStream(byte[] buffer, string mimeType = "text/plain")
         {

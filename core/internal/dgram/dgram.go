@@ -66,7 +66,7 @@ func createSocket(
 	}
 
 	stream := types.ResponseStream{
-		Open: func(ctx *types.Context, streamId uint8) {
+		Open: func(ctx *types.Context, streamId uint32) {
 			go func() {
 				// emit listening event
 				boundAddr := conn.LocalAddr().(*net.UDPAddr)
@@ -96,10 +96,10 @@ func createSocket(
 
 			}()
 		},
-		Write: func(ctx *types.Context, streamId uint8, data []byte) {
+		Write: func(ctx *types.Context, streamId uint32, data []byte) {
 			// Write interface implementation, no-op for generic send
 		},
-		WriteEvent: func(ctx *types.Context, streamId uint8, event string, data []types.DeserializedData) {
+		WriteEvent: func(ctx *types.Context, streamId uint32, event string, data []types.DeserializedData) {
 			if event == "send" && len(data) >= 3 {
 				buffer := data[0].Data.([]byte)
 				targetPort := int(data[1].Data.(float64))
@@ -111,7 +111,7 @@ func createSocket(
 				}
 			}
 		},
-		Close: func(ctx *types.Context, streamId uint8) {
+		Close: func(ctx *types.Context, streamId uint32) {
 			conn.Close()
 		},
 	}

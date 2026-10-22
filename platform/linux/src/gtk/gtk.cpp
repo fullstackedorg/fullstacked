@@ -468,7 +468,7 @@ void WebkitGTKWindow::handleSchemeRequest(WebKitURISchemeRequest *request) {
 }
 
 // called from core threads, App holds the window while it runs
-void WebkitGTKWindow::onStreamData(uint8_t streamId,
+void WebkitGTKWindow::onStreamData(uint32_t streamId,
                                    const std::vector<uint8_t> &data) {
     if (bridge) bridge->onStreamData(streamId, data);
 }

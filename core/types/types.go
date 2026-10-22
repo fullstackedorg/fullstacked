@@ -41,10 +41,10 @@ const (
 )
 
 type ResponseStream struct {
-	Open       func(ctx *Context, streamId uint8)
-	Write      func(ctx *Context, streamId uint8, data []byte)
-	WriteEvent func(ctx *Context, streamId uint8, event string, data []DeserializedData)
-	Close      func(ctx *Context, streamId uint8)
+	Open       func(ctx *Context, streamId uint32)
+	Write      func(ctx *Context, streamId uint32, data []byte)
+	WriteEvent func(ctx *Context, streamId uint32, event string, data []DeserializedData)
+	Close      func(ctx *Context, streamId uint32)
 }
 
 type CoreCallResponse struct {
@@ -62,11 +62,11 @@ type CoreCallHeader struct {
 
 type StoredStream struct {
 	Buffer     []byte
-	Open       func(ctx *Context, streamId uint8)
+	Open       func(ctx *Context, streamId uint32)
 	Opened     bool
-	Write      func(ctx *Context, streamId uint8, data []byte)
-	WriteEvent func(ctx *Context, streamId uint8, event string, data []DeserializedData)
-	Close      func(ctx *Context, streamId uint8)
+	Write      func(ctx *Context, streamId uint32, data []byte)
+	WriteEvent func(ctx *Context, streamId uint32, event string, data []DeserializedData)
+	Close      func(ctx *Context, streamId uint32)
 	Ended      bool
 	Error      error
 }
@@ -122,13 +122,13 @@ type Context struct {
 	Responses      map[uint8][]byte
 	ResponsesMutex *sync.Mutex
 
-	Streams      map[uint8]*StoredStream
+	Streams      map[uint32]*StoredStream
 	StreamsMutex *sync.Mutex
 
 	// stream data for the host reader of GET /stream, see package frames
 	Frames *frames.Queue
 
-	NextStreamId uint8
+	NextStreamId uint32
 
 	// crypto handles (hashes, ciphers), see package crypto
 	Crypto       map[uint32]any
@@ -140,7 +140,7 @@ type Context struct {
 	ZlibMutex  *sync.Mutex
 	NextZlibId uint32
 
-	PluginStreamId uint8
+	PluginStreamId uint32
 	Plugins        map[uint8]*ContextPlugin
 	PluginsMutex   *sync.Mutex
 

@@ -31,7 +31,7 @@ class QtBridge : public QObject {
         // on the main thread
         void request(QWebEngineUrlRequestJob *job, const QString &path);
         // any thread
-        void onStreamData(uint8_t streamId, const std::vector<uint8_t> &data);
+        void onStreamData(uint32_t streamId, const std::vector<uint8_t> &data);
 
     public slots:
         // the reply: the response in base64, empty when the core put a large

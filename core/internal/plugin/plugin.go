@@ -47,7 +47,7 @@ func Switch(
 		ctx.PluginsMutex = &sync.Mutex{}
 
 		stream := types.ResponseStream{
-			Open: func(ctx *types.Context, streamId uint8) {
+			Open: func(ctx *types.Context, streamId uint32) {
 				ctx.PluginsMutex.Lock()
 				ctx.PluginStreamId = streamId
 				ctx.Plugins = make(map[uint8]*types.ContextPlugin)
@@ -55,12 +55,12 @@ func Switch(
 
 				store.StreamEvent(ctx, streamId, "ready", nil, false)
 			},
-			Close: func(ctx *types.Context, streamId uint8) {
+			Close: func(ctx *types.Context, streamId uint32) {
 				ctx.PluginsMutex.Lock()
 				ctx.PluginStreamId = 0
 				ctx.PluginsMutex.Unlock()
 			},
-			WriteEvent: func(ctx *types.Context, streamId uint8, event string, data []types.DeserializedData) {
+			WriteEvent: func(ctx *types.Context, streamId uint32, event string, data []types.DeserializedData) {
 				if event != "plugin-response" {
 					fmt.Println("Unknown plugin stream event type: ", event)
 					return

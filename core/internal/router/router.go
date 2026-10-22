@@ -102,7 +102,7 @@ func CallForMessage(payload []byte) (response []byte, framed bool) {
 		return response, false
 	}
 
-	if len(response) >= ResponseFrameMinSize && ctx.Frames.Push(header.Id, frames.FlagResponse, response) {
+	if len(response) >= ResponseFrameMinSize && ctx.Frames.Push(uint32(header.Id), frames.FlagResponse, response) {
 		return nil, true
 	}
 

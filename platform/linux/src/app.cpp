@@ -91,7 +91,7 @@ void App::deepLink(const std::string &url) {
     }
 }
 
-void App::onStreamData(uint8_t ctx, uint8_t streamId,
+void App::onStreamData(uint8_t ctx, uint32_t streamId,
                        const std::vector<uint8_t> &data) {
     // held during the call so the window cannot be erased and deleted
     std::lock_guard<std::mutex> lock(activeWindowsMutex);
@@ -103,7 +103,7 @@ void App::onStreamData(uint8_t ctx, uint8_t streamId,
 
 int App::run(int argc, char *argv[]) {
     Core::init();
-    Core::setStreamCallback([this](uint8_t ctx, uint8_t streamId,
+    Core::setStreamCallback([this](uint8_t ctx, uint32_t streamId,
                                    const std::vector<uint8_t> &data) {
         onStreamData(ctx, streamId, data);
     });

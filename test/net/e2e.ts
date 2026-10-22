@@ -95,6 +95,58 @@ suite("net - e2e", () => {
         assert.deepEqual(received, data);
     });
 
+    // every socket holds a stream id of the context: a pooled app (database
+    // and cache pools, fetches) holds more than one byte of ids at once
+    test("connect - more than 255 sockets open at once", async () => {
+        const count = 300;
+        const sockets = await Promise.all(
+            Array.from(
+                { length: count },
+                () =>
+                    new Promise<InstanceType<typeof netGo.Socket>>(
+                        (resolve, reject) => {
+                            const socket = new netGo.Socket();
+                            socket.once("connect", () => resolve(socket));
+                            socket.once("error", reject);
+                            socket.connect(9090);
+                        }
+                    )
+            )
+        );
+        const ids = new Set(sockets.map((s) => s.getStreamId()));
+        assert.equal(ids.size, count);
+        assert.ok(Math.max(...ids) > 255);
+
+        // each socket gets its own data back, while all are open
+        const echoes = await Promise.all(
+            sockets.map(
+                (socket, i) =>
+                    new Promise<string>((resolve) => {
+                        const message = `socket ${i}`;
+                        let received = "";
+                        socket.on("data", (chunk) => {
+                            received += chunk.toString();
+                            if (received.length >= message.length) {
+                                resolve(received);
+                            }
+                        });
+                        socket.write(message);
+                    })
+            )
+        );
+        echoes.forEach((echo, i) => assert.equal(echo, `socket ${i}`));
+
+        await Promise.all(
+            sockets.map(
+                (socket) =>
+                    new Promise((resolve) => {
+                        socket.once("close", resolve);
+                        socket.destroy();
+                    })
+            )
+        );
+    });
+
     test("ssh", { timeout: 300000 }, async () => {
         containerName = `openssh-server-test-${Date.now()}`;
 

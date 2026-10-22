@@ -57,7 +57,7 @@ func coreDeepLink(ctx: UInt8, url: String) -> Int {
 
 func onStreamDataCallback(
     ctx: UInt8,
-    streamId: UInt8,
+    streamId: UInt32,
     size: Int32
 ){
     if let webView = WebViewStore.getInstance().webViews.first(where: {$0.requestHandler.ctx == ctx}) {
@@ -236,7 +236,7 @@ class CallHandler: NSObject, WKScriptMessageHandlerWithReply {
 func coreInit(){
     "apple".withCString { setPlatform(UnsafeMutablePointer(mutating: $0), 1) }
     let cb: @convention(c) (UInt8,
-                            UInt8,
+                            UInt32,
                             Int32) -> Void = onStreamDataCallback
     let cbPtr = unsafeBitCast(cb, to: UnsafeMutableRawPointer.self)
     setOnStreamData(cbPtr)

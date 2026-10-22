@@ -63,7 +63,7 @@ class WebkitGTKWindow : public Window {
         WebkitGTKWindow(uint8_t ctx, Glib::RefPtr<Gtk::Application> app);
         ~WebkitGTKWindow() override;
 
-        void onStreamData(uint8_t streamId,
+        void onStreamData(uint32_t streamId,
                           const std::vector<uint8_t> &data) override;
         void bringToFront(bool reload) override;
         void setFullscreen() override;

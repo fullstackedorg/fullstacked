@@ -56,7 +56,7 @@ func createSocket(
 	}
 
 	stream := types.ResponseStream{
-		Open: func(ctx *types.Context, streamId uint8) {
+		Open: func(ctx *types.Context, streamId uint32) {
 			go func() {
 				for {
 					buffer := make([]byte, 1024)
@@ -73,14 +73,14 @@ func createSocket(
 
 			}()
 		},
-		Write: func(ctx *types.Context, streamId uint8, data []byte) {
+		Write: func(ctx *types.Context, streamId uint32, data []byte) {
 			_, err := socket.Write(data)
 			if err != nil {
 				// the read goroutine sees the closed socket and ends the stream
 				socket.Close()
 			}
 		},
-		Close: func(ctx *types.Context, streamId uint8) {
+		Close: func(ctx *types.Context, streamId uint32) {
 			socket.Close()
 		},
 	}

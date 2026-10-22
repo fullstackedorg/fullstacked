@@ -84,7 +84,7 @@ func Switch(
 
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
-			Open: func(ctx *types.Context, streamId uint8) {
+			Open: func(ctx *types.Context, streamId uint32) {
 				install(ctx, directory, packagesName, saveDev, 10, false, func(p Progress) {
 					if ctx != nil {
 						if p.Stage == "Error" {
@@ -119,7 +119,7 @@ func Switch(
 
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
-			Open: func(ctx *types.Context, streamId uint8) {
+			Open: func(ctx *types.Context, streamId uint32) {
 				uninstall(ctx, directory, packagesName, func(p Progress) {
 					if ctx != nil {
 						if p.Stage == "Error" {

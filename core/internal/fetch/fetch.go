@@ -45,7 +45,7 @@ func Switch(
 
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
-			Open: func(ctx *types.Context, streamId uint8) {
+			Open: func(ctx *types.Context, streamId uint32) {
 				res, err := FetchFnApply(id, requestHead, requestBody)
 
 				// a request the page closed (abort) ended its stream already
@@ -66,7 +66,7 @@ func Switch(
 					store.StreamEvent(ctx, streamId, "response", []types.SerializableData{res}, true)
 				}
 			},
-			Close: func(ctx *types.Context, streamId uint8) {
+			Close: func(ctx *types.Context, streamId uint32) {
 				closeFetchRequest(id)
 				closeFetchResponse(id)
 			},
@@ -82,10 +82,10 @@ func Switch(
 		}
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
-			Open: func(ctx *types.Context, streamId uint8) {
+			Open: func(ctx *types.Context, streamId uint32) {
 				StreamResponse(ctx, streamId, id)
 			},
-			Close: func(ctx *types.Context, streamId uint8) {
+			Close: func(ctx *types.Context, streamId uint32) {
 				closeFetchRequest(id)
 				closeFetchResponse(id)
 			},
@@ -233,7 +233,7 @@ func safelyGetResponse(responseId int) *http.Response {
 // does not take a truncated body for a whole one
 func StreamResponse(
 	ctx *types.Context,
-	streamId uint8,
+	streamId uint32,
 	responseId int,
 ) {
 	defer closeFetchRequest(responseId)

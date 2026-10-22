@@ -116,7 +116,7 @@ func Switch(
 
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
-			Open: func(ctx *types.Context, streamId uint8) {
+			Open: func(ctx *types.Context, streamId uint32) {
 				result := BundleDirFn(ctx, entryPoint)
 				store.StreamEvent(ctx, streamId, "result", []types.SerializableData{result}, true)
 			},

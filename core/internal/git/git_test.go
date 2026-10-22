@@ -110,7 +110,7 @@ func TestPullPushAlreadyUpToDate(t *testing.T) {
 
 	// Mock OnStreamData to prevent panics in StreamError / StreamChunk
 	oldOnStreamData := store.OnStreamData
-	store.OnStreamData = func(ctxId uint8, streamId uint8, size int) {}
+	store.OnStreamData = func(ctxId uint8, streamId uint32, size int) {}
 	defer func() {
 		store.OnStreamData = oldOnStreamData
 	}()
@@ -118,7 +118,7 @@ func TestPullPushAlreadyUpToDate(t *testing.T) {
 	// Register stream 1 in the context
 	storedStream := &types.StoredStream{
 		Opened: true,
-		Close:  func(ctx *types.Context, streamId uint8) {},
+		Close:  func(ctx *types.Context, streamId uint32) {},
 	}
 	ctx.StreamsMutex.Lock()
 	ctx.Streams[1] = storedStream

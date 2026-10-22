@@ -9,7 +9,7 @@
 class Core {
     public:
         using StreamDataCallback = std::function<void(
-            uint8_t ctx, uint8_t streamId, const std::vector<uint8_t> &data)>;
+            uint8_t ctx, uint32_t streamId, const std::vector<uint8_t> &data)>;
 
         static void init();
         static uint8_t start(const std::string &root, const std::string &build);

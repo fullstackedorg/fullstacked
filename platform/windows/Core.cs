@@ -10,7 +10,7 @@ namespace FullStacked
         public abstract byte startSafeCore(char* root, char* build);
         public abstract void stopCore(byte ctxId);
         public abstract void setOnStreamDataCore(CoreOnStreamData cb);
-        public abstract void getCorePayloadCore(byte ctx, byte coreType, byte id, void* ptr, int size);
+        public abstract void getCorePayloadCore(byte ctx, byte coreType, uint id, void* ptr, int size);
         public abstract int callCore(void* buffer, int length);
         public abstract void* callWithResponseCore(void* buffer, int length, int* size);
         public abstract void* callMessageCore(void* buffer, int length, int* size);
@@ -22,7 +22,7 @@ namespace FullStacked
         public abstract void* streamReadCore(byte ctxId, int gen, int* size);
         public abstract void streamDetachCore(byte ctxId, int gen);
 
-        public delegate void CoreOnStreamData(byte ctx, byte streamId, int size);
+        public delegate void CoreOnStreamData(byte ctx, uint streamId, int size);
 
     }
 
@@ -94,7 +94,7 @@ namespace FullStacked
             this.lib.stopCore(ctxId);
         }
 
-        private static void onStreamDataCore(byte ctx, byte streamId, int size)
+        private static void onStreamDataCore(byte ctx, uint streamId, int size)
         {
             try
             {
@@ -240,7 +240,7 @@ namespace FullStacked
             this.call(Serialization.MergeBuffers([header, urlLength, urlData]));
         }
 
-        public delegate void CoreCallbackDelegate(byte ctx, byte streamId, byte[] data);
+        public delegate void CoreCallbackDelegate(byte ctx, uint streamId, byte[] data);
 
     }
 }

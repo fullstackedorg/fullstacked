@@ -181,7 +181,7 @@ namespace FullStacked
         private readonly StringBuilder pendingScript = new();
         private bool scriptFlushScheduled = false;
 
-        public void OnStreamData(byte streamId, byte[] data)
+        public void OnStreamData(uint streamId, byte[] data)
         {
             lock (this.scriptLock)
             {

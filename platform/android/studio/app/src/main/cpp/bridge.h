@@ -18,7 +18,7 @@ extern "C" {
     int streamAttach(uint8_t ctxId);
     void* streamRead(uint8_t ctxId, int gen, int* size);
     void streamDetach(uint8_t ctxId, int gen);
-    void getCorePayload(uint8_t ctx, uint8_t coreType, uint8_t id, void* ptr, int size);
+    void getCorePayload(uint8_t ctx, uint8_t coreType, uint32_t id, void* ptr, int size);
     void setOnStreamData(void* cb);
 
     JNIEXPORT jint JNICALL Java_org_fullstacked_Core_start

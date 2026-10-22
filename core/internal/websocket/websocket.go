@@ -80,7 +80,7 @@ func createWebSocketStream(urlStr string, protocols []string) *types.ResponseStr
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &types.ResponseStream{
-		Open: func(coreCtx *types.Context, streamId uint8) {
+		Open: func(coreCtx *types.Context, streamId uint32) {
 			opts := &websocket.DialOptions{
 				Subprotocols: protocols,
 				HTTPClient:   httpClient,
@@ -124,7 +124,7 @@ func createWebSocketStream(urlStr string, protocols []string) *types.ResponseStr
 				}
 			}
 		},
-		WriteEvent: func(coreCtx *types.Context, streamId uint8, event string, data []types.DeserializedData) {
+		WriteEvent: func(coreCtx *types.Context, streamId uint32, event string, data []types.DeserializedData) {
 			connMutex.Lock()
 			c := wsConn
 			connMutex.Unlock()
@@ -175,7 +175,7 @@ func createWebSocketStream(urlStr string, protocols []string) *types.ResponseStr
 				c.Close(websocket.StatusCode(code), reason)
 			}
 		},
-		Close: func(coreCtx *types.Context, streamId uint8) {
+		Close: func(coreCtx *types.Context, streamId uint32) {
 			cancel()
 			connMutex.Lock()
 			c := wsConn

@@ -143,7 +143,7 @@ func (tunnel *Tunnel) Connect() (*types.ResponseStream, error) {
 	c.SetReadLimit(-1)
 
 	stream := types.ResponseStream{
-		Open: func(ctx *types.Context, streamId uint8) {
+		Open: func(ctx *types.Context, streamId uint32) {
 			go func() {
 				for {
 					_, data, err := c.Read(context.Background())
@@ -157,14 +157,14 @@ func (tunnel *Tunnel) Connect() (*types.ResponseStream, error) {
 				}
 			}()
 		},
-		Write: func(ctx *types.Context, streamId uint8, data []byte) {
+		Write: func(ctx *types.Context, streamId uint32, data []byte) {
 			err := c.Write(context.Background(), websocket.MessageBinary, data)
 			if err != nil {
 				// the read goroutine sees the closed conn and ends the stream
 				c.CloseNow()
 			}
 		},
-		Close: func(ctx *types.Context, streamId uint8) {
+		Close: func(ctx *types.Context, streamId uint32) {
 			c.CloseNow()
 		},
 	}

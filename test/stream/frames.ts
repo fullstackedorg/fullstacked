@@ -3,12 +3,12 @@ import assert from "node:assert";
 import { FrameParser } from "../../core/internal/bundle/lib/bridge/frames.ts";
 
 function frame(streamId: number, flags: number, data: number[]) {
-    const bytes = new Uint8Array(6 + data.length);
+    const bytes = new Uint8Array(9 + data.length);
     const view = new DataView(bytes.buffer);
-    bytes[0] = streamId;
-    bytes[1] = flags;
-    view.setUint32(2, data.length);
-    bytes.set(data, 6);
+    view.setUint32(0, streamId);
+    bytes[4] = flags;
+    view.setUint32(5, data.length);
+    bytes.set(data, 9);
     return bytes;
 }
 
@@ -45,13 +45,18 @@ suite("stream - frames", () => {
         frame(0, 0, []),
         frame(3, 0, [1, 2, 3, 4, 5]),
         frame(4, 2, [101, 114, 114]),
-        frame(3, 1, [])
+        frame(3, 1, []),
+        // ids past one byte, a context holds more than 255 streams
+        frame(300, 0, [7]),
+        frame(70000, 1, [8, 9])
     );
     const expected = [
         [0, 0, [], 0],
         [3, 0, [1, 2, 3, 4, 5], 5],
         [4, 2, [101, 114, 114], 3],
-        [3, 1, [], 0]
+        [3, 1, [], 0],
+        [300, 0, [7], 1],
+        [70000, 1, [8, 9], 2]
     ];
 
     test("whole frames in one chunk", () => {
@@ -67,6 +72,6 @@ suite("stream - frames", () => {
     });
 
     test("frames cut in headers and data", () => {
-        assert.deepEqual(parseIn(stream, [3, 8, 9, 20, 25]), expected);
+        assert.deepEqual(parseIn(stream, [3, 8, 9, 20, 25, 40, 50]), expected);
     });
 });

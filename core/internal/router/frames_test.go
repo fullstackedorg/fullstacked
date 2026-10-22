@@ -32,7 +32,7 @@ func call(t *testing.T, ctx uint8, module types.CoreModule, fn uint8, data ...ty
 }
 
 type frame struct {
-	streamId uint8
+	streamId uint32
 	flags    uint8
 	data     []byte
 }
@@ -43,12 +43,14 @@ func parseFrames(t *testing.T, buf []byte) []frame {
 		if len(buf) < frames.HeaderSize {
 			t.Fatalf("partial header %v", buf)
 		}
-		length := int(binary.BigEndian.Uint32(buf[2:6]))
+		streamId := binary.BigEndian.Uint32(buf[0:4])
+		length := int(binary.BigEndian.Uint32(buf[5:9]))
+		data := buf[frames.HeaderSize : frames.HeaderSize+length]
 		// stream 0 is hello and keepalives
-		if buf[0] != 0 {
-			parsed = append(parsed, frame{buf[0], buf[1], buf[6 : 6+length]})
+		if streamId != 0 {
+			parsed = append(parsed, frame{streamId, buf[4], data})
 		}
-		buf = buf[6+length:]
+		buf = buf[frames.HeaderSize+length:]
 	}
 	return parsed
 }
@@ -62,7 +64,7 @@ func TestStreamFrames(t *testing.T) {
 
 	gen := ctx.Frames.Attach()
 	hello := ctx.Frames.Read(gen)
-	if !bytes.Equal(hello, []byte{0, 0, 0, 0, 0, 0}) {
+	if !bytes.Equal(hello, make([]byte, frames.HeaderSize)) {
 		t.Fatalf("hello %v", hello)
 	}
 
@@ -83,7 +85,7 @@ func TestStreamFrames(t *testing.T) {
 
 	sizes := []int{}
 	for i, f := range received {
-		if f.streamId != uint8(streamId.Data.(float64)) {
+		if f.streamId != uint32(streamId.Data.(float64)) {
 			t.Fatalf("frame %d of stream %d", i, f.streamId)
 		}
 		sizes = append(sizes, len(f.data))
@@ -151,7 +153,7 @@ func TestCallForMessage(t *testing.T) {
 		t.Fatalf("large response not framed: %d bytes", len(reply))
 	}
 	buf := ctx.Frames.Read(gen)
-	if buf[0] != 9 || buf[1] != frames.FlagResponse || !bytes.Equal(buf[frames.HeaderSize:], inline) {
+	if binary.BigEndian.Uint32(buf) != 9 || buf[4] != frames.FlagResponse || !bytes.Equal(buf[frames.HeaderSize:], inline) {
 		t.Fatalf("response frame %v", buf[:frames.HeaderSize])
 	}
 

@@ -22,7 +22,7 @@ class GtkBridge {
 
         void request(WebKitURISchemeRequest *request, const std::string &path);
         // any thread
-        void onStreamData(uint8_t streamId, const std::vector<uint8_t> &data);
+        void onStreamData(uint32_t streamId, const std::vector<uint8_t> &data);
 
         static void respond(WebKitURISchemeRequest *request, int status,
                             const std::string &mimeType, const void *data,

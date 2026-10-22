@@ -1,7 +1,7 @@
 // Stream data arrives as binary frames on one long-lived response per
 // context (GET /stream) instead of a script evaluated per chunk.
 //
-// Frame: [streamId u8][flags u8][length u32 big endian][data]
+// Frame: [streamId u32][flags u8][length u32][data], big endian
 // flags: 0 data, 1 end, 2 error (data is the error message), 3 response of a
 // call (the id is the call id, see responses.ts)
 //
@@ -12,7 +12,7 @@
 import { onStreamFrame } from "./duplex.ts";
 import { onResponseFrame } from "./responses.ts";
 
-export const FRAME_HEADER_SIZE = 6;
+export const FRAME_HEADER_SIZE = 9;
 
 // time to receive the hello frame before falling back to evaluated chunks
 const HELLO_TIMEOUT_MS = 3000;
@@ -53,9 +53,9 @@ export class FrameParser {
                 }
                 this.headerFilled = 0;
 
-                const streamId = this.header[0];
-                const flags = this.header[1];
-                const length = this.headerView.getUint32(2);
+                const streamId = this.headerView.getUint32(0);
+                const flags = this.header[4];
+                const length = this.headerView.getUint32(5);
 
                 // whole data in this chunk
                 if (chunk.byteLength - i >= length) {

@@ -5,7 +5,7 @@ typedef bool (*Check)(uint8_t ctx);
 typedef void (*Stop)(uint8_t ctx);
 typedef void (*SetOnStreamData)(void *cb);
 typedef int (*Call)(void *buffer, int length);
-typedef void (*GetCorePayload)(uint8_t ctx, uint8_t coreType, uint8_t id,
+typedef void (*GetCorePayload)(uint8_t ctx, uint8_t coreType, uint32_t id,
                                void *ptr, int size);
 typedef int (*StreamAttach)(uint8_t ctx);
 typedef void *(*StreamRead)(uint8_t ctx, int gen, int *size);

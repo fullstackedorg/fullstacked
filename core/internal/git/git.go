@@ -265,7 +265,7 @@ func Switch(
 		response.Type = types.CoreResponseStream
 
 		response.Stream = &types.ResponseStream{
-			Open: func(ctx *types.Context, streamId uint8) {
+			Open: func(ctx *types.Context, streamId uint32) {
 				branches, err := branch(ctx, path.ResolveWithContext(ctx, data[0].Data.(string)))
 				if err != nil {
 					store.StreamError(ctx, streamId, err)
@@ -281,7 +281,7 @@ func Switch(
 		response.Type = types.CoreResponseStream
 
 		response.Stream = &types.ResponseStream{
-			Open: func(ctx *types.Context, streamId uint8) {
+			Open: func(ctx *types.Context, streamId uint32) {
 				tags, err := tags(ctx, path.ResolveWithContext(ctx, data[0].Data.(string)))
 				if err != nil {
 					store.StreamError(ctx, streamId, err)
@@ -635,7 +635,7 @@ func commit(directory string, message string, author GitAuthor) (string, error) 
 
 type GitStream struct {
 	ctx      *types.Context
-	streamId uint8
+	streamId uint32
 }
 
 func (progress *GitStream) Write(p []byte) (n int, err error) {
@@ -675,7 +675,7 @@ func clone(
 		exists = fs.ExistsFn(directory)
 	}
 
-	processErr := func(ctx *types.Context, streamId uint8, err error, print bool) {
+	processErr := func(ctx *types.Context, streamId uint32, err error, print bool) {
 		if err == nil {
 			return
 		}
@@ -690,7 +690,7 @@ func clone(
 	}
 
 	return &types.ResponseStream{
-		Open: func(ctx *types.Context, streamId uint8) {
+		Open: func(ctx *types.Context, streamId uint32) {
 
 			options := git.CloneOptions{
 				AllowEmptyRepo: true,
@@ -896,7 +896,7 @@ func pull(directory string, tunnel string) (*types.ResponseStream, error) {
 		return nil, err
 	}
 	return &types.ResponseStream{
-		Open: func(ctx *types.Context, streamId uint8) {
+		Open: func(ctx *types.Context, streamId uint32) {
 			defer dir.Close()
 
 			options := git.PullOptions{
@@ -945,7 +945,7 @@ func pull(directory string, tunnel string) (*types.ResponseStream, error) {
 // without touching the worktree.
 func fetch(directory string, tunnel string) *types.ResponseStream {
 	return &types.ResponseStream{
-		Open: func(ctx *types.Context, streamId uint8) {
+		Open: func(ctx *types.Context, streamId uint32) {
 			dir, err := OpenGitDirectory(directory)
 			if err != nil {
 				store.StreamError(ctx, streamId, err)
@@ -1007,7 +1007,7 @@ func push(directory string, tunnel string) (*types.ResponseStream, error) {
 	}
 
 	return &types.ResponseStream{
-		Open: func(ctx *types.Context, streamId uint8) {
+		Open: func(ctx *types.Context, streamId uint32) {
 			defer dir.Close()
 			options := git.PushOptions{
 				Progress: &GitStream{
@@ -1232,7 +1232,7 @@ func tags(ctx *types.Context, directory string) ([]GitTag, error) {
 
 func checkout(directory string, ref string, create bool, tunnel string) (*types.ResponseStream, error) {
 	return &types.ResponseStream{
-		Open: func(ctx *types.Context, streamId uint8) {
+		Open: func(ctx *types.Context, streamId uint32) {
 			dir, err := OpenGitDirectory(directory)
 			if err == nil {
 				dir.Tunnel = tunnel

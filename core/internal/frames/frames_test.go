@@ -19,7 +19,7 @@ func TestHelloAndFrames(t *testing.T) {
 	}
 
 	hello := q.Read(gen)
-	if !bytes.Equal(hello, []byte{0, 0, 0, 0, 0, 0}) {
+	if !bytes.Equal(hello, []byte{0, 0, 0, 0, 0, 0, 0, 0, 0}) {
 		t.Fatalf("hello frame %v", hello)
 	}
 
@@ -27,7 +27,7 @@ func TestHelloAndFrames(t *testing.T) {
 	q.Push(3, FlagEnd, nil)
 
 	got := q.Read(gen)
-	want := []byte{3, 0, 0, 0, 0, 2, 'a', 'b', 3, 1, 0, 0, 0, 0}
+	want := []byte{0, 0, 0, 3, 0, 0, 0, 0, 2, 'a', 'b', 0, 0, 0, 3, 1, 0, 0, 0, 0}
 	if !bytes.Equal(got, want) {
 		t.Fatalf("frames %v, want %v", got, want)
 	}
@@ -50,7 +50,7 @@ func TestKeepalives(t *testing.T) {
 
 	// one keepalive per delay after data, then the reader waits for data
 	for i := range KeepaliveDelays {
-		if b := q.Read(gen); !bytes.Equal(b, []byte{0, 0, 0, 0, 0, 0}) {
+		if b := q.Read(gen); !bytes.Equal(b, []byte{0, 0, 0, 0, 0, 0, 0, 0, 0}) {
 			t.Fatalf("keepalive %d: %v", i, b)
 		}
 	}

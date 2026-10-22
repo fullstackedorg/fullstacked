@@ -192,7 +192,7 @@ JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_getCorePayload
         getCorePayload(
             static_cast<uint8_t>(ctx),
             static_cast<uint8_t>(coreType),
-            static_cast<uint8_t>(id),
+            static_cast<uint32_t>(id),
             static_cast<void*>(ptr),
             size
         );
@@ -214,7 +214,7 @@ struct CallbackResponder {
 std::vector<CallbackResponder> responders = {};
 std::mutex respondersMutex;
 
-void streamDataCallback(uint8_t ctx, uint8_t id, int size) {
+void streamDataCallback(uint8_t ctx, uint32_t id, int size) {
     std::vector<CallbackResponder> respondersCopy;
     {
         std::lock_guard<std::mutex> lock(respondersMutex);

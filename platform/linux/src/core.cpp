@@ -11,8 +11,8 @@ extern void startWithCtx(char *root, char *build, uint8_t ctxId);
 extern int check(uint8_t ctxId);
 extern void stop(uint8_t ctxId);
 extern void setOnStreamData(void *cb);
-extern void getCorePayload(uint8_t ctx, uint8_t coreType, uint8_t id, void *ptr,
-                           int size);
+extern void getCorePayload(uint8_t ctx, uint8_t coreType, uint32_t id,
+                           void *ptr, int size);
 extern int call(void *buffer, int length);
 extern void *callWithResponse(void *buffer, int length, int *size);
 extern void *callMessage(void *buffer, int length, int *size);
@@ -28,7 +28,7 @@ extern void *handleRequest(uint8_t ctxId, char *path, void *body, int length,
 static Core::StreamDataCallback s_streamCallback = nullptr;
 static std::mutex s_callbackMutex;
 
-static void c_onStreamData(uint8_t ctx, uint8_t streamId, int size) {
+static void c_onStreamData(uint8_t ctx, uint32_t streamId, int size) {
     std::vector<uint8_t> buffer(size);
     if (size > 0) {
         getCorePayload(ctx, 2 /* CoreResponseStream */, streamId, buffer.data(),

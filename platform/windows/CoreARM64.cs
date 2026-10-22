@@ -23,7 +23,7 @@ namespace FullStacked
         public static extern void setOnStreamData(CoreOnStreamData cb);
 
         [DllImport(dllName)]
-        public static extern void getCorePayload(byte ctx, byte coreType, byte id, void* ptr, int size);
+        public static extern void getCorePayload(byte ctx, byte coreType, uint id, void* ptr, int size);
 
         [DllImport(dllName)]
         public static extern int call(void* buffer, int length);
@@ -70,7 +70,7 @@ namespace FullStacked
         public override void setOnStreamDataCore(CoreOnStreamData cb) {
             setOnStreamData(cb);
         }
-        public override void getCorePayloadCore(byte ctx, byte coreType, byte id, void* ptr, int size) {
+        public override void getCorePayloadCore(byte ctx, byte coreType, uint id, void* ptr, int size) {
             getCorePayload(ctx, coreType, id, ptr, size);
         }
         public override int callCore(void* buffer, int length) {

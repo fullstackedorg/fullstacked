@@ -43,7 +43,7 @@ class App {
         void close(uint8_t ctx);
         void safeTrigger();
         void deepLink(const std::string &url);
-        void onStreamData(uint8_t ctx, uint8_t streamId,
+        void onStreamData(uint8_t ctx, uint32_t streamId,
                           const std::vector<uint8_t> &data);
 
         int run(int argc, char *argv[]);

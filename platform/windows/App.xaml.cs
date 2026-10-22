@@ -194,7 +194,7 @@ namespace FullStacked
         }
 
         // called from core threads, the webview batches chunks for the UI thread
-        private void onStreamData(byte ctx, byte streamId, byte[] data)
+        private void onStreamData(byte ctx, uint streamId, byte[] data)
         {
             WebView webview;
             lock (this.webviewsLock)

@@ -119,7 +119,7 @@ func Switch(
 
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
-			Open: func(ctx *types.Context, streamId uint8) {
+			Open: func(ctx *types.Context, streamId uint32) {
 				defer close(openedChan)
 				dir := filepath.Dir(filePath)
 				if !ExistsFn(dir) {
@@ -131,7 +131,7 @@ func Switch(
 					store.StreamEvent(ctx, streamId, "error", []types.SerializableData{openErr.Error()}, true)
 				}
 			},
-			Write: func(ctx *types.Context, streamId uint8, data []byte) {
+			Write: func(ctx *types.Context, streamId uint32, data []byte) {
 				<-openedChan
 				if openErr != nil {
 					return
@@ -144,7 +144,7 @@ func Switch(
 					store.StreamEvent(ctx, streamId, "error", []types.SerializableData{err.Error()}, true)
 				}
 			},
-			Close: func(ctx *types.Context, streamId uint8) {
+			Close: func(ctx *types.Context, streamId uint32) {
 				<-openedChan
 				if file != nil {
 					file.Close()
@@ -184,14 +184,14 @@ func Switch(
 
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
-			Open: func(ctx *types.Context, streamId uint8) {
+			Open: func(ctx *types.Context, streamId uint32) {
 				defer closeFile()
 				readFileStream(ctx, streamId, file, start, end, chunkSize, reading)
 			},
 			// the core removes the stream right after: once this returns,
 			// the reader pushes nothing more (a chunk for a removed stream
 			// is a panic of store.StreamChunk)
-			Close: func(ctx *types.Context, streamId uint8) {
+			Close: func(ctx *types.Context, streamId uint32) {
 				reading.mu.Lock()
 				reading.closed = true
 				reading.mu.Unlock()
@@ -443,7 +443,7 @@ func copyFileFn(src string, dst string) error {
 // error ends the stream early (the page sees fewer bytes).
 func readFileStream(
 	ctx *types.Context,
-	streamId uint8,
+	streamId uint32,
 	file *os.File,
 	start int64,
 	end int64,

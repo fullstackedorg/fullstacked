@@ -41,7 +41,7 @@ void N_Stop(const Napi::CallbackInfo &info) {
 
 struct StreamChunk {
         uint8_t ctx;
-        uint8_t id;
+        uint32_t id;
         std::vector<uint8_t> buffer;
 };
 
@@ -61,7 +61,7 @@ using TSFN = TypedThreadSafeFunction<Context, DataType, CallJs>;
 
 TSFN tsfn;
 
-void n_onStreamData(uint8_t ctx, uint8_t streamId, int size) {
+void n_onStreamData(uint8_t ctx, uint32_t streamId, int size) {
     std::vector<uint8_t> buffer(size, 0);
     // 2 for CoreType Stream
     if (streamId != 0) {

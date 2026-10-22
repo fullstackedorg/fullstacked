@@ -607,7 +607,7 @@ void QtWindow::handleSchemeRequest(QWebEngineUrlRequestJob *job) {
 }
 
 // called from core threads, App holds the window while it runs
-void QtWindow::onStreamData(uint8_t streamId,
+void QtWindow::onStreamData(uint32_t streamId,
                             const std::vector<uint8_t> &data) {
     if (bridge) bridge->onStreamData(streamId, data);
 }

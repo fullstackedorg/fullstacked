@@ -290,11 +290,7 @@ suite("tunnel - e2e", () => {
             id2,
             `Stream ID ${id1} was reused immediately after close!`
         );
-        assert.equal(
-            id2,
-            (id1 % 255) + 1,
-            `Expected monotonic stream ID transition`
-        );
+        assert.equal(id2, id1 + 1, `Expected monotonic stream ID transition`);
 
         // Clean up
         await new Promise<void>((resolve) => {

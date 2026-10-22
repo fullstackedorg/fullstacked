@@ -6,8 +6,8 @@ package main
 #include <string.h>
 #include <stdint.h>
 
-typedef void (*Callback)(uint8_t ctx, uint8_t id, int size);
-static inline void CallMyFunction(void *callback, uint8_t ctx, uint8_t id, int size) {
+typedef void (*Callback)(uint8_t ctx, uint32_t id, int size);
+static inline void CallMyFunction(void *callback, uint8_t ctx, uint32_t id, int size) {
     ((Callback)callback)(ctx, id, size);
 }
 
@@ -88,11 +88,11 @@ func setOnStreamData(
 
 	cCallback = cb
 
-	store.OnStreamData = func(ctx uint8, streamId uint8, size int) {
+	store.OnStreamData = func(ctx uint8, streamId uint32, size int) {
 		C.CallMyFunction(
 			cCallback,
 			C.uint8_t(ctx),
-			C.uint8_t(streamId),
+			C.uint32_t(streamId),
 			C.int(size),
 		)
 	}
@@ -102,11 +102,11 @@ func setOnStreamData(
 func getCorePayload(
 	ctx C.uint8_t,
 	coreType C.uint8_t,
-	id C.uint8_t,
+	id C.uint32_t,
 	ptr unsafe.Pointer,
 	size C.int,
 ) {
-	response, err := store.GetCorePayload(uint8(ctx), uint8(coreType), uint8(id), int(size))
+	response, err := store.GetCorePayload(uint8(ctx), uint8(coreType), uint32(id), int(size))
 
 	if err != nil {
 		fmt.Println(err.Error())

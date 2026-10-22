@@ -2,7 +2,7 @@
 // drains it into one long-lived binary response (GET /stream) instead of
 // evaluating a script per chunk.
 //
-// Frame: [streamId u8][flags u8][length u32 big endian][data]
+// Frame: [streamId u32][flags u8][length u32][data], big endian
 // flags: 0 data, 1 end, 2 error (data is the error message), 3 response of
 // a call (the frame id is the call id)
 //
@@ -27,7 +27,7 @@ const (
 	// the call id (see router.CallForMessage)
 	FlagResponse uint8 = 3
 
-	HeaderSize = 6
+	HeaderSize = 9
 
 	// producers wait while this much is queued and a reader is attached
 	MaxQueued = 8 << 20
@@ -71,11 +71,11 @@ func NewQueue() *Queue {
 	return q
 }
 
-func Encode(dst []byte, streamId uint8, flags uint8, data []byte) []byte {
+func Encode(dst []byte, streamId uint32, flags uint8, data []byte) []byte {
 	var header [HeaderSize]byte
-	header[0] = streamId
-	header[1] = flags
-	binary.BigEndian.PutUint32(header[2:], uint32(len(data)))
+	binary.BigEndian.PutUint32(header[0:], streamId)
+	header[4] = flags
+	binary.BigEndian.PutUint32(header[5:], uint32(len(data)))
 	dst = append(dst, header[:]...)
 	return append(dst, data...)
 }
@@ -172,7 +172,7 @@ func (q *Queue) Read(gen int) []byte {
 
 // Push queues a frame, waiting while the queue is full. Returns false when
 // no reader is attached, the caller then uses the callback.
-func (q *Queue) Push(streamId uint8, flags uint8, data []byte) bool {
+func (q *Queue) Push(streamId uint32, flags uint8, data []byte) bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 

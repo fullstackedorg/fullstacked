@@ -11,7 +11,7 @@ class Window {
         uint8_t ctx = 0;
         virtual ~Window() = default;
 
-        virtual void onStreamData(uint8_t streamId,
+        virtual void onStreamData(uint32_t streamId,
                                   const std::vector<uint8_t> &data) = 0;
         virtual void bringToFront(bool reload) = 0;
         virtual void setFullscreen() = 0;

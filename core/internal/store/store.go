@@ -6,6 +6,7 @@ import (
 	"fullstackedorg/fullstacked/internal/frames"
 	"fullstackedorg/fullstacked/internal/serialization"
 	"fullstackedorg/fullstacked/types"
+	"math"
 	"path/filepath"
 	"runtime/debug"
 	"strings"
@@ -14,7 +15,7 @@ import (
 )
 
 // ctxId, storedStreamId, size
-var OnStreamData = (func(uint8, uint8, int))(nil)
+var OnStreamData = (func(uint8, uint32, int))(nil)
 
 var nextCtxId uint8 = 0
 var Contexts = map[uint8]*types.Context{}
@@ -63,7 +64,7 @@ func NewContextWithCtxId(
 		Responses:      map[uint8][]byte{},
 		ResponsesMutex: &sync.Mutex{},
 
-		Streams:      map[uint8]*types.StoredStream{},
+		Streams:      map[uint32]*types.StoredStream{},
 		StreamsMutex: &sync.Mutex{},
 
 		Frames: frames.NewQueue(),
@@ -242,6 +243,18 @@ func BuildResponse(
 
 var errNoStreamId = errors.New("too many open streams, no stream id free")
 
+// stream ids are 1 to MaxStreamId, 0 is the hello and keepalive frames of
+// package frames. The hosts take them as a signed 32 bit int (Java). A var
+// for tests.
+var MaxStreamId uint64 = math.MaxInt32
+
+func wrapStreamId(id uint32) uint32 {
+	if id == 0 || uint64(id) > MaxStreamId {
+		return 1
+	}
+	return id
+}
+
 func buildResponseData(
 	response types.CoreCallResponse,
 ) ([]byte, error) {
@@ -277,19 +290,16 @@ func buildResponseStream(
 		return nil, errors.New("context ended")
 	}
 
-	// ids 1-255, the next free one from NextStreamId; with all of them
-	// taken the call fails, searching on would never end
-	streamId := ctx.NextStreamId
+	// the next free id from NextStreamId, one of the next len(Streams)+1 is
+	// free; with every id taken the call fails, searching on would never end
+	streamId := wrapStreamId(ctx.NextStreamId)
 	free := false
-	for range 255 {
-		if streamId == 0 {
-			streamId = 1
-		}
+	for range min(uint64(len(ctx.Streams))+1, MaxStreamId) {
 		if ctx.Streams[streamId] == nil {
 			free = true
 			break
 		}
-		streamId++
+		streamId = wrapStreamId(streamId + 1)
 	}
 
 	if !free {
@@ -307,10 +317,7 @@ func buildResponseStream(
 		Buffer:     []byte{},
 	}
 
-	ctx.NextStreamId = storedStreamId + 1
-	if ctx.NextStreamId == 0 {
-		ctx.NextStreamId = 1
-	}
+	ctx.NextStreamId = wrapStreamId(storedStreamId + 1)
 
 	payload := []byte{response.Type}
 	storedStreamIdSerialized, err := serialization.Serialize(float64(storedStreamId))
@@ -330,7 +337,7 @@ func buildResponseStream(
 func GetCorePayload(
 	ctxId uint8,
 	coreType types.CoreCallResponseType,
-	id uint8,
+	id uint32,
 	size int,
 ) ([]byte, error) {
 	ctx, ok := GetContext(ctxId)
@@ -340,7 +347,11 @@ func GetCorePayload(
 
 	switch coreType {
 	case types.CoreResponseData:
-		return getCorePayloadData(ctx, id)
+		// call ids are one byte
+		if id > math.MaxUint8 {
+			return nil, errors.New("cannot find response for id")
+		}
+		return getCorePayloadData(ctx, uint8(id))
 	case types.CoreResponseStream:
 		return getCorePayloadStream(ctx, id, size)
 	}
@@ -360,7 +371,7 @@ func getCorePayloadData(ctx *types.Context, id uint8) ([]byte, error) {
 
 	return response, nil
 }
-func getCorePayloadStream(ctx *types.Context, id uint8, size int) ([]byte, error) {
+func getCorePayloadStream(ctx *types.Context, id uint32, size int) ([]byte, error) {
 	ctx.StreamsMutex.Lock()
 
 	stream, ok := ctx.Streams[id]
@@ -405,7 +416,7 @@ func getCorePayloadStream(ctx *types.Context, id uint8, size int) ([]byte, error
 
 func StreamError(
 	ctx *types.Context,
-	storedStreamId uint8,
+	storedStreamId uint32,
 	err error,
 ) {
 	ctxMutex.Lock()
@@ -459,7 +470,7 @@ func StreamError(
 
 func StreamChunk(
 	ctx *types.Context,
-	storedStreamId uint8,
+	storedStreamId uint32,
 	buffer []byte,
 	end bool,
 ) {
@@ -524,7 +535,7 @@ func StreamChunk(
 
 func StreamEvent(
 	ctx *types.Context,
-	storedStreamId uint8,
+	storedStreamId uint32,
 	name string,
 	data []types.SerializableData,
 	end bool,

@@ -137,7 +137,7 @@ void QtBridge::resolveSync(uint8_t id, const std::vector<uint8_t> &response) {
 }
 
 // any thread, a statement that throws does not stop the others of the batch
-void QtBridge::onStreamData(uint8_t streamId,
+void QtBridge::onStreamData(uint32_t streamId,
                             const std::vector<uint8_t> &data) {
     {
         std::lock_guard<std::mutex> lock(scriptMutex);

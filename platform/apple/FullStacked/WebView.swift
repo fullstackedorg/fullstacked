@@ -135,7 +135,7 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKDownloadDelegate, Codabl
         fatalError("init(coder:) has not been implemented")
     }
 
-    func onStreamData(streamId: UInt8, buffer: Data){
+    func onStreamData(streamId: UInt32, buffer: Data){
         queueScript("window.fullstacked.onStreamData(\(streamId),`\(buffer.base64EncodedString())`)")
     }
     

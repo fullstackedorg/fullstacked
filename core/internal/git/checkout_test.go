@@ -43,10 +43,10 @@ func mockStreamContext(t *testing.T, dir string) (*types.Context, *types.StoredS
 	t.Cleanup(func() { store.EndContext(ctxId) })
 
 	oldOnStreamData := store.OnStreamData
-	store.OnStreamData = func(ctxId uint8, streamId uint8, size int) {}
+	store.OnStreamData = func(ctxId uint8, streamId uint32, size int) {}
 	t.Cleanup(func() { store.OnStreamData = oldOnStreamData })
 
-	stream := &types.StoredStream{Opened: true, Close: func(ctx *types.Context, streamId uint8) {}}
+	stream := &types.StoredStream{Opened: true, Close: func(ctx *types.Context, streamId uint32) {}}
 	ctx.StreamsMutex.Lock()
 	ctx.Streams[1] = stream
 	ctx.StreamsMutex.Unlock()
