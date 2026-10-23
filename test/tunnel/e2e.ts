@@ -336,8 +336,8 @@ suite("tunnel - e2e", () => {
     });
 
     test("connect through tunnel - message larger than 32 KiB", async () => {
-        // the websocket library's default read limit is 32 KiB per message,
-        // the hub sends up to ~64 KiB per message
+        // the websocket library's default read limit is 32 KiB per message:
+        // a DATA frame beyond it still arrives whole
         const size = 256 * 1024;
         const hubServer = await startHubServer({ payloadSize: size });
 
@@ -451,8 +451,6 @@ suite("tunnel - e2e", () => {
         assert.deepEqual(received, data);
     });
 
-    // each HTTP connection to a tunnel name is a tunnel connection (DNS, TLS
-    // and an upgrade through the hub): concurrent requests reuse them
     // a tunnel connect dials (an upgrade through the hub) off the bridge
     // call: concurrent connects take about one upgrade, and the sockets
     // already open keep their traffic going meanwhile. The dial ran in the

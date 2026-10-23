@@ -10,11 +10,9 @@ import (
 	"fullstackedorg/fullstacked/internal/utils"
 	"fullstackedorg/fullstacked/types"
 	"net"
-	"net/http"
 	"net/url"
 	"strconv"
-
-	"github.com/coder/websocket"
+	"sync"
 )
 
 type TunnelFn = uint8
@@ -60,9 +58,13 @@ type Tunnel struct {
 	Path          string `json:"path,omitempty"`
 	Unsecure      bool   `json:"unsecure,omitempty"`
 	Authorization string `json:"authorization,omitempty"`
+
+	// the tunnel's sessions to the hub (pool.go)
+	pool *pool
 }
 
-var tunnels = []Tunnel{}
+var tunnels = []*Tunnel{}
+var tunnelsMutex sync.Mutex
 
 func RegisterTunnelFn(tunnel Tunnel) (string, error) {
 	if tunnel.Host == "" {
@@ -81,25 +83,49 @@ func RegisterTunnelFn(tunnel Tunnel) (string, error) {
 		}
 	}
 
-	existing := FindTunnel(tunnel.Name)
+	tunnelsMutex.Lock()
+	defer tunnelsMutex.Unlock()
+
+	existing := findTunnelLocked(tunnel.Name)
 
 	if existing != nil {
+		same := existing.Host == tunnel.Host && existing.Port == tunnel.Port &&
+			existing.Path == tunnel.Path && existing.Unsecure == tunnel.Unsecure &&
+			existing.Authorization == tunnel.Authorization
+		if same {
+			existing.pool.warm()
+			return tunnel.Name, nil
+		}
+		// another hub or credential: new sessions, the old ones close once
+		// their streams end
+		existing.pool.stop()
 		existing.Host = tunnel.Host
 		existing.Port = tunnel.Port
 		existing.Path = tunnel.Path
 		existing.Unsecure = tunnel.Unsecure
 		existing.Authorization = tunnel.Authorization
+		existing.pool = newPool(existing)
+		existing.pool.warm()
 	} else {
-		tunnels = append(tunnels, tunnel)
+		t := tunnel
+		t.pool = newPool(&t)
+		tunnels = append(tunnels, &t)
+		t.pool.warm()
 	}
 
 	return tunnel.Name, nil
 }
 
 func FindTunnel(name string) *Tunnel {
-	for i, t := range tunnels {
+	tunnelsMutex.Lock()
+	defer tunnelsMutex.Unlock()
+	return findTunnelLocked(name)
+}
+
+func findTunnelLocked(name string) *Tunnel {
+	for _, t := range tunnels {
 		if t.Name == name {
-			return &tunnels[i]
+			return t
 		}
 	}
 	return nil
@@ -124,88 +150,81 @@ func (tunnel *Tunnel) url() string {
 	return url.String()
 }
 
-// Connect returns the stream of a connection through the tunnel at once, the
-// WebSocket dials in its Open (see store.Dialing): connected, or an error
-// ending the stream
+// Connect returns the stream of a connection through the tunnel at once: a
+// stream on one of the tunnel's sessions (pool.go), opened in its Open (see
+// store.Dialing): connected once the hub dialed the target, or an error
+// ending the stream (the hub's reason, e.g. target_unreachable)
 func (tunnel *Tunnel) Connect() *types.ResponseStream {
-	HTTPHeaders := http.Header{}
-	if tunnel.Authorization != "" {
-		HTTPHeaders["Authorization"] = []string{tunnel.Authorization}
-	}
-	url := tunnel.url()
 	name := tunnel.Name
+	p := tunnel.pool
 
-	dialing := store.NewDialing[*websocket.Conn]()
+	dialing := store.NewDialing[*muxStream]()
 
 	return &types.ResponseStream{
 		Open: func(ctx *types.Context, streamId uint32) {
 			go func() {
-				c, err := dialHub(context.Background(), url, &websocket.DialOptions{
-					HTTPHeader: HTTPHeaders,
-				})
+				stream, err := p.open(context.Background())
+				if err == nil {
+					err = stream.Opened(nil)
+				}
 				if err != nil {
+					if stream != nil {
+						stream.Close()
+					}
 					dialing.Failed()
 					store.StreamError(ctx, streamId, fmt.Errorf("tunnel %s: %w", name, err))
 					return
 				}
 
-				// the hub sends one message per target socket read (up to
-				// ~64 KiB), above the 32 KiB default; the target's stream has
-				// no message size, so no limit like websocket.NetConn in Dial
-				c.SetReadLimit(-1)
-
-				// closed by the page while dialing
-				if !dialing.Dialed(c) {
-					c.CloseNow()
+				// closed by the page while opening
+				if !dialing.Dialed(stream) {
+					stream.Close()
 					return
 				}
 				store.StreamSignal(ctx, streamId, frames.FlagConnected)
 
+				buffer := make([]byte, store.ReadSize)
 				for {
-					_, data, err := c.Read(context.Background())
-
+					n, err := stream.Read(buffer)
+					if n > 0 {
+						store.StreamChunk(ctx, streamId, append([]byte(nil), buffer[:n]...), false)
+					}
 					if err != nil {
 						store.StreamChunk(ctx, streamId, nil, true)
 						return
 					}
-
-					store.StreamChunk(ctx, streamId, data, false)
 				}
 			}()
 		},
 		QueueWrites: true,
 		Write: func(ctx *types.Context, streamId uint32, data []byte) {
-			c, ok := dialing.Wait()
+			stream, ok := dialing.Wait()
 			if !ok {
 				return
 			}
-			err := c.Write(context.Background(), websocket.MessageBinary, data)
-			if err != nil {
-				// the read goroutine sees the closed conn and ends the stream
-				c.CloseNow()
+			if _, err := stream.Write(data); err != nil {
+				// the read goroutine sees the closed stream and ends it
+				stream.Close()
 			}
 		},
 		Close: func(ctx *types.Context, streamId uint32) {
-			if c, ok := dialing.Close(); ok {
-				c.CloseNow()
+			if stream, ok := dialing.Close(); ok {
+				stream.Close()
 			}
 		},
 	}
 }
 
+// Dial returns a connection through the tunnel (fetch, git, WebSocket):
+// a stream on one of its sessions, once the hub dialed the target
 func (tunnel *Tunnel) Dial(ctx context.Context) (net.Conn, error) {
-	HTTPHeaders := http.Header{}
-	if tunnel.Authorization != "" {
-		HTTPHeaders["Authorization"] = []string{tunnel.Authorization}
-	}
-
-	c, err := dialHub(ctx, tunnel.url(), &websocket.DialOptions{
-		HTTPHeader: HTTPHeaders,
-	})
-
+	stream, err := tunnel.pool.open(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("tunnel %s: %w", tunnel.Name, err)
 	}
-
-	return websocket.NetConn(ctx, c, websocket.MessageBinary), nil
+	if err := stream.Opened(ctx.Done()); err != nil {
+		stream.Close()
+		return nil, fmt.Errorf("tunnel %s: %w", tunnel.Name, err)
+	}
+	return stream, nil
 }
