@@ -23,8 +23,24 @@ const core = await load(
     }
 );
 
+// Node exits once nothing runs: an open stream of the core (a socket, a
+// tunnel, a response being read...) keeps it running like a socket would,
+// see keepAlive in core/internal/bundle/lib/bridge/duplex.ts
+let openStreams = 0;
+let ended = false;
+const keepAliveHandle = setInterval(() => {}, 1 << 30);
+keepAliveHandle.unref();
+globalThis.fullstacked.keepAlive = (delta) => {
+    openStreams = Math.max(0, openStreams + delta);
+    if (openStreams > 0 && !ended) {
+        keepAliveHandle.ref();
+    } else {
+        keepAliveHandle.unref();
+    }
+};
+
 const forcefullyExit = () => {
-    core.end();
+    stop();
     process.exit();
 };
 ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => {
@@ -55,6 +71,18 @@ export function staticFileResolve(ctx: number, pathname: string) {
 
 globalThis.fullstacked.open = createWebView;
 
+// the dev server (fullstacked [directory]) runs until stopped, whether a
+// page is open or not
+export function keepRunning() {
+    globalThis.fullstacked.keepAlive?.(1);
+}
+
+// ends the core (its stream data is dropped, calls into it throw) and
+// lets the process exit
 export function stop() {
+    if (ended) return;
+    ended = true;
+    keepAliveHandle.unref();
+    clearInterval(keepAliveHandle);
     core.end();
 }

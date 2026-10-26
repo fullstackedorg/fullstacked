@@ -3,6 +3,7 @@
 #include <functional>
 #include <iostream>
 #include <map>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -17,7 +18,22 @@ using namespace Napi;
 
 CoreLib lib;
 
-Napi::Number N_Start(const Napi::CallbackInfo &info) {
+// Once ended (end(), or the env tearing down), the stream data of the core
+// is dropped and the calls throw: the core threads keep running and a call
+// to the released callback aborts the process.
+std::recursive_mutex endedMutex;
+bool ended = false;
+
+bool throwIfEnded(Napi::Env env) {
+    std::lock_guard<std::recursive_mutex> lock(endedMutex);
+    if (!ended) return false;
+    Napi::Error::New(env, "the FullStacked core has ended")
+        .ThrowAsJavaScriptException();
+    return true;
+}
+
+Napi::Value N_Start(const Napi::CallbackInfo &info) {
+    if (throwIfEnded(info.Env())) return info.Env().Undefined();
     Napi::String root = info[0].As<Napi::String>().ToString();
     Napi::String build = root;
     if (info.Length() > 1 && !info[1].IsUndefined()) {
@@ -51,6 +67,11 @@ using FinalizerDataType = void;
 
 void CallJs(Napi::Env env, Function callback, Context *context,
             DataType *data) {
+    // no env once the callback is finalized with chunks left in its queue
+    if (env == nullptr || callback == nullptr) {
+        delete data;
+        return;
+    }
     // the page copies what it keeps during the call (onStreamData)
     callback.Call({Number::New(env, data->ctx), Number::New(env, data->id),
                    Napi::ArrayBuffer::New(env, data->buffer.data(),
@@ -71,7 +92,10 @@ void n_onStreamData(uint8_t ctx, uint32_t streamId, int size) {
     chunk->ctx = ctx;
     chunk->id = streamId;
     chunk->buffer = std::move(buffer);
-    tsfn.NonBlockingCall(chunk);
+    std::lock_guard<std::recursive_mutex> lock(endedMutex);
+    if (ended || tsfn.NonBlockingCall(chunk) != napi_ok) {
+        delete chunk;
+    }
 }
 
 void N_Callback(const Napi::CallbackInfo &info) {
@@ -82,18 +106,28 @@ void N_Callback(const Napi::CallbackInfo &info) {
         "OnStreamData",         // Name
         0,                      // Unlimited queue
         1,                      // Only one thread will use this initially
-        nullptr,
-        [](Napi::Env, FinalizerDataType *, Context *ctx) { delete ctx; });
+        nullptr, [](Napi::Env, FinalizerDataType *, Context *ctx) {
+            std::lock_guard<std::recursive_mutex> lock(endedMutex);
+            ended = true;
+            delete ctx;
+        });
+    // does not keep the process alive: what runs in the core does (the
+    // streams open in JS, the servers of the webviews)
+    tsfn.Unref(env);
 
     lib.setOnStreamData((void *)n_onStreamData);
 }
 
 void N_End(const Napi::CallbackInfo &info) {
+    std::lock_guard<std::recursive_mutex> lock(endedMutex);
+    if (ended) return;
+    ended = true;
     tsfn.Release();
 }
 
-Napi::ArrayBuffer N_Call(const Napi::CallbackInfo &info) {
+Napi::Value N_Call(const Napi::CallbackInfo &info) {
     Napi::Env env = info.Env();
+    if (throwIfEnded(env)) return env.Undefined();
     Napi::ArrayBuffer buffer = info[0].As<Napi::ArrayBuffer>();
     int size = lib.call(buffer.Data(), buffer.ByteLength());
     uint8_t *payload = (uint8_t *)(buffer.Data());
@@ -107,7 +141,8 @@ Napi::ArrayBuffer N_Call(const Napi::CallbackInfo &info) {
 
 // Stream data of a context as binary frames for GET /stream, see
 // core/internal/frames
-Napi::Number N_StreamAttach(const Napi::CallbackInfo &info) {
+Napi::Value N_StreamAttach(const Napi::CallbackInfo &info) {
+    if (throwIfEnded(info.Env())) return info.Env().Undefined();
     uint32_t ctxId = info[0].As<Napi::Number>().Uint32Value();
     return Napi::Number::New(info.Env(),
                              lib.streamAttach(static_cast<uint8_t>(ctxId)));
@@ -155,6 +190,7 @@ using FramesTSFN =
 // each batch and null once the reader ended
 void N_StreamStart(const Napi::CallbackInfo &info) {
     Napi::Env env = info.Env();
+    if (throwIfEnded(env)) return;
     uint8_t ctxId =
         static_cast<uint8_t>(info[0].As<Napi::Number>().Uint32Value());
     int gen = info[1].As<Napi::Number>().Int32Value();
@@ -195,6 +231,7 @@ void N_SetPlatform(const Napi::CallbackInfo &info) {
 // with the body an external Buffer over the core response
 Napi::Value N_Request(const Napi::CallbackInfo &info) {
     Napi::Env env = info.Env();
+    if (throwIfEnded(env)) return env.Undefined();
     uint8_t ctxId =
         static_cast<uint8_t>(info[0].As<Napi::Number>().Uint32Value());
     std::string path = info[1].As<Napi::String>().Utf8Value();

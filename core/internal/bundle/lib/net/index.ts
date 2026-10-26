@@ -63,6 +63,9 @@ type SocketOpts = {
 export class Socket extends RealDuplex {
     private duplex: Duplex = null;
     private isConnected = false;
+    // its stream ended in the core: closing its id again could close a newer
+    // stream that reuses it
+    private remoteClosed = false;
 
     constructor(options?: Partial<SocketOpts>) {
         super(options);
@@ -102,11 +105,15 @@ export class Socket extends RealDuplex {
                         )
                     );
                 });
+                // the core closed the connection, both ways: like node:net,
+                // the end of its data ends the socket, which then closes
+                // once (autoDestroy, or destroy() if it came first)
                 this.duplex.on("close", () => {
-                    if (!this.destroyed) {
-                        this.push(null);
-                    }
-                    this.emit("close");
+                    this.remoteClosed = true;
+                    if (this.destroyed) return;
+                    this.push(null);
+                    this.read(0);
+                    if (!this.writableEnded) this.end();
                 });
                 // a failed dial ends the stream with its error
                 this.duplex.on("error", (err) => this.destroy(err));
@@ -164,14 +171,14 @@ export class Socket extends RealDuplex {
     }
 
     _final(callback: (error?: Error | null) => void) {
-        if (this.duplex) {
+        if (this.duplex && !this.remoteClosed) {
             this.duplex.end();
         }
         callback();
     }
 
     _destroy(error: Error | null, callback: (error: Error | null) => void) {
-        if (this.duplex) {
+        if (this.duplex && !this.remoteClosed) {
             this.duplex.end();
         }
         callback(error);

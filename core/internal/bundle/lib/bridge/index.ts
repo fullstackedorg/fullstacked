@@ -37,6 +37,10 @@ type FullStacked = {
 
     exit: () => void;
 
+    // hosts that exit once nothing runs (Node): +1 while a stream is open,
+    // -1 once it ended (see bridge/duplex)
+    keepAlive?: (delta: 1 | -1) => void;
+
     clipboard: {
         copy?: (text: string) => void;
         paste?: () => string | Promise<string>;

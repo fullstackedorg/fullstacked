@@ -14,6 +14,9 @@ if (portIndex !== -1 && args[portIndex + 1]) {
     }
 }
 
+// -n, --no-open: serve without opening the browser (as TEST does)
+const noOpen = args.some((arg) => arg === "-n" || arg === "--no-open");
+
 export type CreateWebViewOpts = {
     quiet?: boolean;
     didClose?: () => void;
@@ -50,7 +53,7 @@ export async function createWebViewWithCore(
         console.log(`Listening at http://localhost:${port}`);
     }
 
-    if (!process.env.TEST) {
+    if (!noOpen && !process.env.TEST) {
         open(`http://localhost:${port}`);
     }
 

@@ -15,6 +15,11 @@ import WebSocketCore from "../websocket/index.ts";
 
 export interface ExecuteOptions {
     stdio?: any[];
+    // the script owns the process (Node's fullstacked --file): it runs on
+    // after its module settled (timers, sockets) and keeps the globals it
+    // ran with (the core's WebSocket, window...). Otherwise they are
+    // restored once its module settled, for the next command.
+    keepGlobals?: boolean;
 }
 
 function createConsoleStream(consoleFn: (...args: any[]) => void) {
@@ -368,6 +373,7 @@ async function bundleAndImportFile(
 async function runFile(
     file: string,
     extraArgs: string[],
+    keepGlobals: boolean,
     writeOut: (msg: any) => void,
     writeErr: (msg: any) => void
 ): Promise<number> {
@@ -405,6 +411,10 @@ async function runFile(
         }
         return 0;
     } finally {
+        if (!keepGlobals) restoreGlobals();
+    }
+
+    function restoreGlobals() {
         if (originalWebSocket) {
             globalThis.WebSocket = originalWebSocket;
         } else {
@@ -603,6 +613,7 @@ Options:
   -p, --plugin  Specify a plugin for the build process (can be used multiple times)
   -e, --env     Define environment variables in KEY=VALUE format (can be used multiple times)
   -o, --open    Directly open the browser
+  -n, --no-open Don't open a window (Node: serve without opening the browser)
   -b, --build   Only bundle the project, don't run it afterward
   -f, --file    Bundle and execute a single script file
   -s, --safe    Skip the initialDirectory config check
@@ -644,7 +655,13 @@ Directory:
         }
 
         const extraArgs = getExtraArgs(args);
-        return runFile(file, extraArgs, writeOut, writeErr);
+        return runFile(
+            file,
+            extraArgs,
+            !!opts?.keepGlobals,
+            writeOut,
+            writeErr
+        );
     }
 
     const targetDirectory = path.resolve(positionals.at(-1) || ".");

@@ -1,23 +1,30 @@
 #!/usr/bin/env node
 import fullstacked from "../../core/internal/bundle/lib/fullstacked/index.ts";
-import { stop } from "./src/index.ts";
+import { keepRunning, stop } from "./src/index.ts";
 
-const code = await fullstacked.execute(process.argv);
+const matches = (args: string[]) =>
+    !!process.argv.find((arg) => args.find((flag) => arg.startsWith(flag)));
+const exits = matches(["-b", "--build", "-h", "--help", "-v", "--version"]);
+const runsFile = matches(["-f", "--file"]);
 
-const argsThatExits = [
-    "-b",
-    "--build",
-    "-f",
-    "--file",
-    "-h",
-    "--help",
-    "-v",
-    "--version"
-];
-const shouldExit = !!process.argv.find((arg) =>
-    argsThatExits.find((exitArg) => arg.startsWith(exitArg))
-);
+// -n, --no-open on Node serves without opening the browser (see
+// src/webview.ts): the page is still served
+const noOpenArgs = ["-n", "--no-open"];
+const argv = runsFile
+    ? process.argv
+    : process.argv.filter((arg) => !noOpenArgs.includes(arg));
 
-if ((typeof code === "number" && code !== 0) || shouldExit) {
+const code = await fullstacked.execute(argv, { keepGlobals: runsFile });
+
+if (typeof code === "number" && code !== 0) {
+    process.exitCode = code;
     stop();
+} else if (exits) {
+    stop();
+} else if (runsFile) {
+    // the script runs until nothing does (timers, open sockets and tunnel
+    // sessions...), not only until its module settled
+    process.once("beforeExit", stop);
+} else {
+    keepRunning();
 }

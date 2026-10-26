@@ -28,12 +28,29 @@ type DuplexItem = {
     // the stream's socket dialed (net, tunnel), and who waits for it
     connected: boolean;
     connectedWaiters: Set<{ resolve: () => void; reject: (e: Error) => void }>;
+    // keeps the host running from open() to the end, see hold
+    held: boolean;
 };
 
 const FLAG_DRAIN = 4;
 const FLAG_CONNECTED = 5;
 
 const activeDuplexes = new Map<number, DuplexItem[]>();
+
+// A host that exits once nothing runs (Node, fullstacked --file) keeps
+// running while a stream is open, like a socket: from open() to its end.
+// Hosts without keepAlive (webviews) live as long as their window.
+function hold(duplex: DuplexItem) {
+    if (duplex.held || duplex.done) return;
+    duplex.held = true;
+    globalThis.fullstacked.keepAlive?.(1);
+}
+
+function release(duplex: DuplexItem) {
+    if (!duplex.held) return;
+    duplex.held = false;
+    globalThis.fullstacked.keepAlive?.(-1);
+}
 
 // payload: [flags u8][data], base64 when evaluated by the host
 function onStreamData(id: number, payload: ArrayBuffer | string) {
@@ -144,6 +161,7 @@ function processPayload(
     }
 
     if (duplex.done) {
+        release(duplex);
         // no drain comes after the end, nor a connection
         releaseWrites(duplex);
         const waiters = duplex.connectedWaiters;
@@ -216,7 +234,8 @@ export function createDuplex(id: number): Duplex {
         drains: 0,
         drainWaiters: new Set(),
         connected: false,
-        connectedWaiters: new Set()
+        connectedWaiters: new Set(),
+        held: false
     };
 
     if (!activeDuplexes.has(id)) {
@@ -233,6 +252,7 @@ export function createDuplex(id: number): Duplex {
             return duplex.opening;
         }
 
+        hold(duplex);
         duplex.opening = new Promise(async (resolveOpening) => {
             await globalThis.fullstacked.bridge({
                 mod: Stream,
