@@ -15,6 +15,8 @@ const withInterval = !process.argv.includes("--no-interval");
 const nodeNet = globalThis.process.getBuiltinModule("node:net");
 const server = nodeNet.createServer((socket) => {
     socket.unref();
+    // the core closing with an echo in flight resets the connection on Windows
+    socket.on("error", () => {});
     socket.pipe(socket);
     if (!withInterval && seconds) {
         setTimeout(() => socket.end(), seconds * 1000).unref();

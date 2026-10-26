@@ -241,13 +241,14 @@ func TestReify_MovesBackUnchangedNestedPackages(t *testing.T) {
 }
 
 func TestRetirePath_MatchesNpm(t *testing.T) {
-	// Values from @npmcli/arborist lib/retire-path.js
+	// Values from @npmcli/arborist lib/retire-path.js, which hashes the path as
+	// given: posix paths, on Windows too
 	cases := map[string]string{
 		"/p/node_modules/react-dom":  "/p/node_modules/.react-dom-ggJtRVnn",
 		"/p/node_modules/@scope/pkg": "/p/node_modules/@scope/.pkg-vv9K9hc2",
 	}
 	for from, want := range cases {
-		if got := filepath.ToSlash(retirePath(filepath.FromSlash(from))); got != want {
+		if got := filepath.ToSlash(retirePath(from)); got != want {
 			t.Errorf("retirePath(%s) = %s, want %s", from, got, want)
 		}
 	}

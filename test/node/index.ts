@@ -56,8 +56,11 @@ suite("node - fullstacked --file", () => {
                 }
             }
         );
-        assert.strictEqual(run.signal, null, run.stderr);
-        assert.strictEqual(run.code, 0, run.stderr);
+        // Windows has no signals: kill() terminates the child
+        if (process.platform !== "win32") {
+            assert.strictEqual(run.signal, null, run.stderr);
+            assert.strictEqual(run.code, 0, run.stderr);
+        }
         assert.ok(run.stdout.includes("alive 16s, echoes 15"), run.stdout);
     });
 
@@ -118,7 +121,11 @@ suite("node - fullstacked --file", () => {
     });
 
     test("an ended core drops its data and throws on calls", async () => {
-        const server = nodeNet.createServer((socket) => socket.pipe(socket));
+        const server = nodeNet.createServer((socket) => {
+            // the core ending resets the connection on Windows
+            socket.on("error", () => {});
+            socket.pipe(socket);
+        });
         await new Promise<void>((resolve) =>
             server.listen(0, "127.0.0.1", resolve)
         );
@@ -203,6 +210,9 @@ suite("node - dev server", () => {
         const { status, text } = await page;
         assert.strictEqual(status, 200);
         assert.ok(text.includes("<html"), text);
-        assert.strictEqual(run.code, 0, run.stderr);
+        // Windows has no signals: kill() terminates the child
+        if (process.platform !== "win32") {
+            assert.strictEqual(run.code, 0, run.stderr);
+        }
     });
 });
