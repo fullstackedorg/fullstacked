@@ -509,115 +509,15 @@ func install(
 	// Fast Path: If package-lock exists and no specific packages requested, use lockfile
 	if !skipFastPath && len(packagesName) == 0 && oldLock != nil {
 		onProgress(Progress{Stage: "Verifying Lockfile"})
-		sem := make(chan struct{}, maxConcurrent)
-		var wg sync.WaitGroup
-		var downloadCount int
-		var mu sync.Mutex
-		var downloadErr error
-
-		threadSafeProgress := func(p Progress) {
-			mu.Lock()
-			defer mu.Unlock()
-			onProgress(p)
+		count, err := reify(ctx, directory, oldLock.Packages, maxConcurrent, onProgress)
+		if err == nil {
+			err = writeHiddenLockfile(directory, oldLock)
 		}
-
-		for pathKey, pkg := range oldLock.Packages {
-			if pathKey == "" {
-				continue
-			}
-
-			pkgName := path.Base(pathKey)
-			if pkgName == "fullstacked" || !isPlatformSupported(pkg.OS, pkg.CPU) {
-				continue
-			}
-
-			targetDir := filepath.Join(directory, pathKey)
-			if fs.ExistsFn(targetDir) {
-				continue
-			}
-
-			resolved := pkg.Resolved
-			if resolved == "" {
-				displayName := pkgName
-				if strings.HasPrefix(path.Base(path.Dir(pathKey)), "@") {
-					displayName = path.Join(path.Base(path.Dir(pathKey)), pkgName)
-				}
-				resolved = getTarballURL(displayName, pkg.Version)
-			}
-
-			wg.Add(1)
-			go func(pKey string, p LockDependency, tDir string, resolvedURL string) {
-				defer wg.Done()
-				sem <- struct{}{}
-				defer func() { <-sem }()
-
-				pkgName := path.Base(pKey)
-				displayName := pkgName
-				if strings.HasPrefix(path.Base(path.Dir(pKey)), "@") {
-					displayName = path.Join(path.Base(path.Dir(pKey)), pkgName)
-				}
-
-				fs.MkdirFn(tDir)
-
-				var err error
-				gitUrl, isGit := isGithubRepo(resolvedURL)
-				if isGit {
-					err = git.CloneRepo(ctx, gitUrl, tDir, nil)
-					if err == nil {
-						packGitCheckout(tDir)
-					}
-				} else {
-					err = downloadAndExtract(resolvedURL, tDir, pkgName, func(prog float64) {
-						threadSafeProgress(Progress{
-							Name:     displayName,
-							Version:  p.Version,
-							Stage:    "Extracting",
-							Progress: prog,
-						})
-					})
-				}
-
-				if err == nil {
-					mu.Lock()
-					downloadCount++
-					mu.Unlock()
-				} else {
-					mu.Lock()
-					downloadErr = err
-					mu.Unlock()
-				}
-
-				threadSafeProgress(Progress{
-					Name:     displayName,
-					Version:  p.Version,
-					Stage:    "Extracting",
-					Progress: 1,
-				})
-			}(pathKey, pkg, targetDir, resolved)
-		}
-
-		wg.Wait()
-
-		if downloadErr != nil {
-			onProgress(Progress{Stage: "Error", Error: downloadErr.Error()})
-			return
-		}
-
-		// Also create node_modules/.package-lock.json in fast path
-		fs.MkdirFn(filepath.Join(directory, "node_modules"))
-		nodeModulesLockPath := filepath.Join(directory, "node_modules", ".package-lock.json")
-		if f, err := fs.CreateFn(nodeModulesLockPath); err == nil {
-			defer f.Close()
-			enc := json.NewEncoder(f)
-			enc.SetEscapeHTML(false)
-			enc.SetIndent("", "  ")
-			enc.Encode(oldLock)
-		} else {
+		if err != nil {
 			onProgress(Progress{Stage: "Error", Error: err.Error()})
 			return
 		}
-
-		onProgress(Progress{Stage: "Done", Progress: float64(downloadCount)})
+		onProgress(Progress{Stage: "Done", Progress: float64(count)})
 		return
 	}
 
@@ -683,101 +583,9 @@ func install(
 	slotOwners := make(map[string]string)      // path -> parentPath that placed it
 	slotConstraints := make(map[string]string) // path -> constraint range it was placed for
 
-	// Concurrency control for installation
-	sem := make(chan struct{}, maxConcurrent)
-	var wg sync.WaitGroup
 	var bundledWG sync.WaitGroup
-	var mu sync.Mutex
-	var downloadCount int
-	var downloadErr error
 	var resolveErr error
 	var resolveErrMu sync.Mutex
-
-	threadSafeProgress := func(p Progress) {
-		mu.Lock()
-		defer mu.Unlock()
-		onProgress(p)
-	}
-
-	// Helper to trigger install if needed
-	triggerInstall := func(pathKey string, dep LockDependency) {
-		if pathKey == "" {
-			return
-		}
-
-		targetDir := filepath.Join(directory, pathKey)
-
-		needsInstall := true
-		if fs.ExistsFn(targetDir) {
-			if oldLock != nil {
-				if oldPkg, ok := oldLock.Packages[pathKey]; ok {
-					if oldPkg.Version == dep.Version && oldPkg.Integrity == dep.Integrity {
-						needsInstall = false
-					}
-				}
-			}
-		}
-
-		pkgName := path.Base(pathKey)
-		displayName := pkgName
-		if strings.HasPrefix(path.Base(path.Dir(pathKey)), "@") {
-			displayName = path.Join(path.Base(path.Dir(pathKey)), pkgName)
-		}
-
-		if !needsInstall {
-			threadSafeProgress(Progress{
-				Name:     displayName,
-				Version:  dep.Version,
-				Stage:    "Extracting",
-				Progress: 1,
-			})
-			return
-		}
-
-		wg.Add(1)
-		go func(ver LockDependency, tDir string, pDisplay string, pFlat string) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
-			fs.RmFn(tDir)
-			fs.MkdirFn(tDir)
-
-			var err error
-			gitUrl, isGit := isGithubRepo(ver.Resolved)
-			if isGit {
-				err = git.CloneRepo(ctx, gitUrl, tDir, nil)
-				if err == nil {
-					packGitCheckout(tDir)
-				}
-			} else {
-				err = downloadAndExtract(ver.Resolved, tDir, pFlat, func(p float64) {
-					threadSafeProgress(Progress{
-						Name:     pDisplay,
-						Version:  ver.Version,
-						Stage:    "Extracting",
-						Progress: p,
-					})
-				})
-			}
-
-			if err == nil {
-				mu.Lock()
-				downloadCount++
-				mu.Unlock()
-			} else {
-				mu.Lock()
-				downloadErr = err
-				mu.Unlock()
-			}
-			threadSafeProgress(Progress{
-				Name:     pDisplay,
-				Version:  ver.Version,
-				Stage:    "Extracting",
-				Progress: 1,
-			})
-		}(dep, targetDir, displayName, pkgName)
-	}
 
 	var stateMu sync.Mutex
 
@@ -1085,11 +893,6 @@ func install(
 				slotConstraints[targetPath] = pRange
 				stateMu.Unlock()
 
-				// Only install to disk if platform is supported
-				if isPlatformSupported(ver.OS, ver.CPU) {
-					triggerInstall(targetPath, depEntry)
-				}
-
 				// Collect child deps sorted
 				var childItems []DepItem
 				for k, v := range ver.Dependencies {
@@ -1136,7 +939,6 @@ func install(
 	}
 
 	bundledWG.Wait()
-	wg.Wait()
 
 	// Calculate Dependency Flags: dev, optional, peer
 	resolveDepPath := func(currPath, depName string) string {
@@ -1349,42 +1151,34 @@ func install(
 		newLock.Packages[pPath] = pkg
 	}
 
-	// 6. Save Lockfile
-	onProgress(Progress{Stage: "Finalizing"})
-	if f, err := fs.CreateFn(packageLockPath); err == nil {
-		defer f.Close()
-		enc := json.NewEncoder(f)
-		enc.SetEscapeHTML(false)
-		enc.SetIndent("", "  ")
-		enc.Encode(newLock)
-	} else {
-		onProgress(Progress{Stage: "Error", Error: err.Error()})
-		return
-	}
-
-	// 6.5 Save node_modules/.package-lock.json
-	fs.MkdirFn(filepath.Join(directory, "node_modules"))
-	nodeModulesLockPath := filepath.Join(directory, "node_modules", ".package-lock.json")
-	if f, err := fs.CreateFn(nodeModulesLockPath); err == nil {
-		defer f.Close()
-		enc := json.NewEncoder(f)
-		enc.SetEscapeHTML(false)
-		enc.SetIndent("", "  ")
-		if encodeErr := enc.Encode(newLock); encodeErr != nil {
-			onProgress(Progress{Stage: "Error", Error: encodeErr.Error()})
-			return
-		}
-	} else {
-		onProgress(Progress{Stage: "Error", Error: err.Error()})
-		return
-	}
-
 	if resolveErr != nil {
 		onProgress(Progress{Stage: "Error", Error: resolveErr.Error()})
 		return
 	}
-	if downloadErr != nil {
-		onProgress(Progress{Stage: "Error", Error: downloadErr.Error()})
+
+	// 5. Reify: put the resolved tree on disk (the lockfiles are written only once it is)
+	downloadCount, err := reify(ctx, directory, newLock.Packages, maxConcurrent, onProgress)
+	if err != nil {
+		onProgress(Progress{Stage: "Error", Error: err.Error()})
+		return
+	}
+
+	// 6. Save Lockfile
+	onProgress(Progress{Stage: "Finalizing"})
+	if f, err := fs.CreateFn(packageLockPath); err == nil {
+		enc := json.NewEncoder(f)
+		enc.SetEscapeHTML(false)
+		enc.SetIndent("", "  ")
+		enc.Encode(newLock)
+		f.Close()
+	} else {
+		onProgress(Progress{Stage: "Error", Error: err.Error()})
+		return
+	}
+
+	// 6.5 Save node_modules/.package-lock.json, last
+	if err := writeHiddenLockfile(directory, newLock); err != nil {
+		onProgress(Progress{Stage: "Error", Error: err.Error()})
 		return
 	}
 

@@ -412,11 +412,23 @@ func TestInstall_ResolutionFailures(t *testing.T) {
 	pjBytes, _ := json.Marshal(pj)
 	os.WriteFile(path.Join(tmpDir, "package.json"), pjBytes, 0644)
 
-	install(nil, tmpDir, nil, false, 5, false, nil)
+	var failed bool
+	install(nil, tmpDir, nil, false, 5, false, func(p Progress) {
+		if p.Stage == "Error" {
+			failed = true
+		}
+	})
 
-	// good-pkg should be there
-	if _, err := os.Stat(filepath.Join(tmpDir, "node_modules", "good-pkg", "index.js")); os.IsNotExist(err) {
-		t.Error("good-pkg not installed despite errors in other deps")
+	// As npm: a required dependency that does not resolve fails the install before
+	// anything is put on disk or locked
+	if !failed {
+		t.Error("expected an Error progress for the unresolvable dependencies")
+	}
+	if _, err := os.Stat(filepath.Join(tmpDir, "node_modules", "good-pkg")); !os.IsNotExist(err) {
+		t.Error("good-pkg installed although the install failed")
+	}
+	if _, err := os.Stat(filepath.Join(tmpDir, "package-lock.json")); !os.IsNotExist(err) {
+		t.Error("package-lock.json written although the install failed")
 	}
 }
 
