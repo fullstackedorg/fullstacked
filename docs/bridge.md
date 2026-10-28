@@ -4,22 +4,23 @@ The bridge is how JavaScript running in a webview (or in Node, for the CLI) call
 
 This page covers the whole path of a call: the payload, how it reaches the core on each platform, how responses and streams come back, and how workers join in. To write a new host, see [Porting to a new host](contributing/porting-a-host.md).
 
-```text
-┌────────────── page / worker ──────────────┐
-│  your code → lib module (fs, git, …)      │
-│      → fullstacked.bridge({mod, fn, data}) │
-│      → bridge/platform.ts (transport)      │
-└───────────────────┬────────────────────────┘
-                    │ HTTP requests on the app's origin
-                    │ or a message channel of the webview
-┌───────────────────▼────────────────────────┐
-│  host (Swift, Kotlin, C#, C++, Node addon) │
-│      → C ABI of the core                    │
-└───────────────────┬────────────────────────┘
-┌───────────────────▼────────────────────────┐
-│  Go core: router → module Switch(fn)        │
-│      → response | stream frames             │
-└─────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph page["Page or worker"]
+        code["Your code"] --> module["Lib module (fs, git, …)"]
+        module --> bridgeCall["fullstacked.bridge({ mod, fn, data })"]
+        bridgeCall --> transport["bridge/platform.ts (transport)"]
+    end
+    subgraph host["Host"]
+        abi["Swift, Kotlin, C#, C++ or Node addon<br/>calls the C ABI of the core"]
+    end
+    subgraph core["Go core"]
+        router["Router"] --> moduleSwitch["Module Switch(fn)"]
+    end
+
+    transport -- "HTTP requests on the app's origin<br/>or a message channel of the webview" --> abi
+    abi --> router
+    moduleSwitch -. "response, or stream frames" .-> transport
 ```
 
 ## The call

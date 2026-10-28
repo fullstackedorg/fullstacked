@@ -2,23 +2,16 @@
 
 FullStacked runs JavaScript projects with Node's APIs on any device, including iOS and Android, where neither Node nor a JavaScript engine of your own may run. It has three parts:
 
-```text
- project code (TypeScript, JSX, npm packages)
-        │  bundled by esbuild in the core
-        ▼
-┌──────────────────────────────┐
-│ webview: the system's engine │  WKWebView, Android WebView, WebView2, WebKitGTK, QtWebEngine
-│  + runtime lib (TypeScript)  │  Node's modules, the runtime API, the bridge
-└──────────────┬───────────────┘
-               │  the bridge: HTTP requests + message channels + a frame stream
-┌──────────────▼───────────────┐
-│ host (native app or Node)    │  Swift, Kotlin, C#, C++, Node addon
-└──────────────┬───────────────┘
-               │  C ABI
-┌──────────────▼───────────────┐
-│ core (Go, one library)       │  fs, net, dns, crypto, zlib, fetch, WebSocket,
-│                              │  esbuild, npm installer, git, tunnels
-└──────────────────────────────┘
+```mermaid
+flowchart TD
+    code["<b>Project code</b><br/>TypeScript, JSX, npm packages"]
+    webview["<b>Webview</b>: the system's engine<br/>WKWebView, Android WebView, WebView2, WebKitGTK, QtWebEngine<br/><br/><b>+ runtime lib</b> (TypeScript)<br/>Node's modules, the runtime API, the bridge"]
+    host["<b>Host</b>: native app or Node<br/>Swift, Kotlin, C#, C++, Node addon"]
+    core["<b>Core</b>: Go, one library<br/>fs, net, dns, crypto, zlib, fetch, WebSocket,<br/>esbuild, npm installer, git, tunnels"]
+
+    code -- "bundled by esbuild in the core" --> webview
+    webview <-- "the bridge: HTTP requests,<br/>message channels, a frame stream" --> host
+    host <-- "C ABI" --> core
 ```
 
 - **The core** (`core/`) is a Go library with a C ABI, built as a static or shared library for each platform. It does everything that needs the system or heavy computation: files, sockets, DNS, HTTP, TLS, compression, cryptography, bundling (esbuild), package installs and git (go-git). One core serves every project open in the app.
