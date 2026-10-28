@@ -7,6 +7,3 @@
 [submodule "plugins/sass"]
 	path = plugins/sass
 	url = https://github.com/fullstackedorg/sass.git
-[submodule "docs"]
-	path = docs
-	url = https://github.com/fullstackedorg/docs.git
