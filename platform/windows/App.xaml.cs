@@ -4,6 +4,7 @@ using Microsoft.Windows.AppLifecycle;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using Windows.ApplicationModel.Activation;
 
 namespace FullStacked
@@ -184,16 +185,22 @@ namespace FullStacked
             {
                 this.webviews.Add(ctx, webview);
             }
+            // the context ends with its window, like the other platforms: its streams
+            // (sockets, fetches, tunnels...) would keep running for no page. Off the
+            // UI thread, closing a socket can wait on the network.
             webview.Closed += delegate (object sender, WindowEventArgs args)
             {
                 lock (this.webviewsLock)
                 {
                     this.webviews.Remove(ctx);
                 }
+                Task.Run(() => core.stop(ctx));
             };
         }
 
-        // called from core threads, the webview batches chunks for the UI thread
+        // called from core threads, the webview batches chunks for the UI thread.
+        // Data of a context without a window (closed, exiting, run with --no-open) is
+        // dropped: opening a window for it spawned stray windows.
         private void onStreamData(byte ctx, uint streamId, byte[] data)
         {
             WebView webview;
@@ -202,14 +209,7 @@ namespace FullStacked
                 this.webviews.TryGetValue(ctx, out webview);
             }
 
-            if (webview != null)
-            {
-                webview.onStreamData(streamId, data);
-            }
-            else
-            {
-                this.open(ctx);
-            }
+            webview?.onStreamData(streamId, data);
         }
 
 
