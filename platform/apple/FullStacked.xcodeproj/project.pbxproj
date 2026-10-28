@@ -429,7 +429,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = v1.FullStacked;
+				PRODUCT_BUNDLE_IDENTIFIER = org.fullstacked;
 				PRODUCT_NAME = FullStacked;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -472,7 +472,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = v1.FullStacked;
+				PRODUCT_BUNDLE_IDENTIFIER = org.fullstacked;
 				PRODUCT_NAME = FullStacked;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -522,7 +522,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = v1.FullStacked;
+				PRODUCT_BUNDLE_IDENTIFIER = org.fullstacked;
 				PRODUCT_NAME = "FullStacked v1";
 				REGISTER_APP_GROUPS = NO;
 				SDKROOT = macosx;
@@ -574,7 +574,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = v1.FullStacked;
+				PRODUCT_BUNDLE_IDENTIFIER = org.fullstacked;
 				PRODUCT_NAME = "FullStacked v1";
 				REGISTER_APP_GROUPS = NO;
 				SDKROOT = macosx;
