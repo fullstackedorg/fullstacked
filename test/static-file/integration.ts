@@ -1,8 +1,19 @@
 import test, { before, suite, after } from "node:test";
 import { type Browser, createBrowser } from "../browser.ts";
 import assert from "node:assert";
+import http from "node:http";
 import { HTTPResponse } from "puppeteer";
 import fs from "../../core/internal/bundle/lib/fs/index.ts";
+
+// the request path as is, a browser would resolve the ../ before sending it
+function getStatus(port: number, path: string) {
+    return new Promise<number>((resolve, reject) => {
+        http.get({ host: "localhost", port, path }, (res) => {
+            res.resume();
+            resolve(res.statusCode);
+        }).on("error", reject);
+    });
+}
 
 suite("static-file - integration", () => {
     let browser: Browser;
@@ -38,6 +49,21 @@ suite("static-file - integration", () => {
             scriptContent,
             fs.readFileSync("test/static-file/sample/script/index.js")
         );
+    });
+
+    test("outside of the project", async () => {
+        const port = browser.webview.port;
+        assert.equal(await getStatus(port, "/script%2F..%2Findex.html"), 200);
+        // test/static-file/e2e.ts is right above the project
+        for (const path of [
+            "/../e2e.ts",
+            "/..%2Fe2e.ts",
+            "/%2E%2E%2Fe2e.ts",
+            "/..%5Ce2e.ts",
+            "/script%2F..%2F..%2Fe2e.ts"
+        ]) {
+            assert.equal(await getStatus(port, path), 404, path);
+        }
     });
 
     after(() => browser.end());
