@@ -42,26 +42,55 @@ func staticFile(ctx *types.Context, pathname string) []byte {
 
 // the file of a page path in the build directory, then the root directory
 func resolveStaticFile(ctx *types.Context, pathname string) (string, []byte, bool) {
-	pathname, _ = url.PathUnescape(pathname)
-	pathname = strings.TrimLeft(pathname, "/")
-	pathname = strings.TrimRight(pathname, "/")
-
-	foundPath, contents, err := resolveFile(filepath.Join(ctx.Directories.Build, pathname))
-	if err != nil {
-		foundPath, contents, err = resolveFile(filepath.Join(ctx.Directories.Root, pathname))
-	}
-
+	pathname, err := url.PathUnescape(pathname)
 	if err != nil {
 		return "", nil, false
 	}
 
-	mimeType := mime.TypeByExtension(filepath.Ext(foundPath))
+	// a page path uses / only, a \ is a separator on Windows
+	pathname = strings.ReplaceAll(pathname, "\\", "/")
+	pathname = strings.Trim(pathname, "/")
 
-	if mimeType == "" {
-		mimeType = "text/plain"
+	// C:/... is still absolute once trimmed on Windows
+	if filepath.VolumeName(pathname) != "" {
+		return "", nil, false
 	}
 
-	return mimeType, contents, true
+	for _, dir := range []string{ctx.Directories.Build, ctx.Directories.Root} {
+		file, inside := joinInside(dir, pathname)
+		if !inside {
+			continue
+		}
+
+		foundPath, contents, err := resolveFile(file)
+		if err != nil {
+			continue
+		}
+
+		mimeType := mime.TypeByExtension(filepath.Ext(foundPath))
+
+		if mimeType == "" {
+			mimeType = "text/plain"
+		}
+
+		return mimeType, contents, true
+	}
+
+	return "", nil, false
+}
+
+// pathname joined to dir, false when it resolves outside of dir (../ in any
+// form). Same containment as path.ResolveWithContext, but a page path outside
+// of dir is not found instead of clamped to dir.
+func joinInside(dir string, pathname string) (string, bool) {
+	joined := filepath.Clean(filepath.Join(dir, pathname))
+
+	rel, err := filepath.Rel(dir, joined)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+
+	return joined, true
 }
 
 func resolveFile(pathname string) (string, []byte, error) {
