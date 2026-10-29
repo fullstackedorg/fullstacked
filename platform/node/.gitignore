@@ -7,3 +7,5 @@ gyp/build
 gyp/binding.gyp
 *.node
 fullstacked_modules
+*.so
+types

@@ -1,9 +1,8 @@
 SHELL := /bin/bash
 OUT = $(CURDIR)/../bin
 
-$(shell node ./typescript-go-patch/patch.js)
-
-TAGS=$(shell if [[ "$(MAKEFLAGS)" == *"NO_TSGO"* ]]; then echo "-tags NO_TSGO"; fi)
+MACOSX_DEPLOYMENT_TARGET ?= 15.0
+IPHONEOS_DEPLOYMENT_TARGET ?= 15.0
 
 ###### MacOS #######
 
@@ -12,36 +11,40 @@ darwin-x64-shared:
 	GOOS=darwin \
 	GOARCH=amd64 \
 	SDK=macosx \
+	MACOSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET) \
 	CC=$(CURDIR)/apple-clang.sh \
-	CGO_CFLAGS="-target x86_64-apple-darwin" \
-	go build -buildmode=c-shared $(TAGS) -o $(OUT)/darwin-x64.so -v ..
+	CGO_CFLAGS="-target x86_64-apple-macos$(MACOSX_DEPLOYMENT_TARGET) -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)" \
+	go build -buildmode=c-shared -o $(OUT)/darwin-x64.so -v ..
 
 darwin-x64-static:
 	CGO_ENABLED=1 \
 	GOOS=darwin \
 	GOARCH=amd64 \
 	SDK=macosx \
+	MACOSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET) \
 	CC=$(CURDIR)/apple-clang.sh \
-	CGO_CFLAGS="-target x86_64-apple-darwin" \
-	go build -buildmode=c-archive $(TAGS) -o $(OUT)/darwin-x64.a -v ..
+	CGO_CFLAGS="-target x86_64-apple-macos$(MACOSX_DEPLOYMENT_TARGET) -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)" \
+	go build -buildmode=c-archive -o $(OUT)/darwin-x64.a -v ..
 
 darwin-arm64-shared:
 	CGO_ENABLED=1 \
 	GOOS=darwin \
 	GOARCH=arm64 \
 	SDK=macosx \
+	MACOSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET) \
 	CC=$(CURDIR)/apple-clang.sh \
-	CGO_CFLAGS="-target arm64-apple-darwin" \
-	go build -buildmode=c-shared $(TAGS) -o $(OUT)/darwin-arm64.so -v ..
+	CGO_CFLAGS="-target arm64-apple-macos$(MACOSX_DEPLOYMENT_TARGET) -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)" \
+	go build -buildmode=c-shared -o $(OUT)/darwin-arm64.so -v ..
 
 darwin-arm64-static:
 	CGO_ENABLED=1 \
 	GOOS=darwin \
 	GOARCH=arm64 \
 	SDK=macosx \
+	MACOSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET) \
 	CC=$(CURDIR)/apple-clang.sh \
-	CGO_CFLAGS="-target arm64-apple-darwin" \
-	go build -buildmode=c-archive $(TAGS) -o $(OUT)/darwin-arm64.a -v ..
+	CGO_CFLAGS="-target arm64-apple-macos$(MACOSX_DEPLOYMENT_TARGET) -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)" \
+	go build -buildmode=c-archive -o $(OUT)/darwin-arm64.a -v ..
 
 darwin-static: darwin-x64-static darwin-arm64-static
 	lipo $(OUT)/darwin-x64.a $(OUT)/darwin-arm64.a -create -output $(OUT)/darwin.a
@@ -54,9 +57,10 @@ ios-arm64:
 	GOOS=ios \
 	GOARCH=arm64 \
 	SDK=iphoneos \
+	IPHONEOS_DEPLOYMENT_TARGET=$(IPHONEOS_DEPLOYMENT_TARGET) \
 	CC=$(CURDIR)/apple-clang.sh \
-	CGO_CFLAGS="-fembed-bitcode" \
-	go build -buildmode=c-archive -tags ios $(TAGS) -o $(OUT)/ios-arm64.a -v ..
+	CGO_CFLAGS="-target arm64-apple-ios$(IPHONEOS_DEPLOYMENT_TARGET) -miphoneos-version-min=$(IPHONEOS_DEPLOYMENT_TARGET)" \
+	go build -buildmode=c-archive -tags ios  -o $(OUT)/ios-arm64.a -v ..
 
 ###### Android #######
 
@@ -68,27 +72,27 @@ android-arm:
 	CGO_ENABLED=1 \
 	GOOS=android \
 	GOARCH=arm \
-	CGO_LDFLAGS="-Wl,-soname,core.so" \
-	CC=~/Library/Android/sdk/ndk/$(NDK_VERSION)/toolchains/llvm/prebuilt/darwin-x86_64/bin/armv7a-linux-androideabi34-clang \
-	go build -buildmode=c-shared $(TAGS) -o $(ANDROID_OUT)/armeabi-v7a/core.so -v ..
+	CGO_LDFLAGS="-Wl,-soname,libcore.so" \
+	CC=~/Library/Android/sdk/ndk/$(NDK_VERSION)/toolchains/llvm/prebuilt/darwin-x86_64/bin/armv7a-linux-androideabi35-clang \
+	go build -buildmode=c-shared -o $(ANDROID_OUT)/armeabi-v7a/libcore.so -v ..
 
 android-arm64:
 	mkdir -p $(ANDROID_OUT)/arm64-v8a && \
 	CGO_ENABLED=1 \
 	GOOS=android \
 	GOARCH=arm64 \
-	CGO_LDFLAGS="-Wl,-soname,core.so" \
-	CC=~/Library/Android/sdk/ndk/${NDK_VERSION}/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android34-clang \
-	go build -buildmode=c-shared $(TAGS) -o $(ANDROID_OUT)/arm64-v8a/core.so -v .. 
+	CGO_LDFLAGS="-Wl,-soname,libcore.so" \
+	CC=~/Library/Android/sdk/ndk/${NDK_VERSION}/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android35-clang \
+	go build -buildmode=c-shared -o $(ANDROID_OUT)/arm64-v8a/libcore.so -v .. 
 
 android-x64:
 	mkdir -p $(ANDROID_OUT)/x86_64 && \
 	CGO_ENABLED=1 \
 	GOOS=android \
 	GOARCH=amd64 \
-	CGO_LDFLAGS="-Wl,-soname,core.so" \
-	CC=~/Library/Android/sdk/ndk/${NDK_VERSION}/toolchains/llvm/prebuilt/darwin-x86_64/bin/x86_64-linux-android34-clang \
-	go build -buildmode=c-shared $(TAGS) -o $(ANDROID_OUT)/x86_64/core.so -v .. 
+	CGO_LDFLAGS="-Wl,-soname,libcore.so" \
+	CC=~/Library/Android/sdk/ndk/${NDK_VERSION}/toolchains/llvm/prebuilt/darwin-x86_64/bin/x86_64-linux-android35-clang \
+	go build -buildmode=c-shared -o $(ANDROID_OUT)/x86_64/libcore.so -v .. 
 
 android: android-arm android-arm64 android-x64
 
@@ -98,35 +102,29 @@ linux-x64-shared:
 	CGO_ENABLED=1 \
 	GOOS=linux \
 	GOARCH=amd64 \
-	go build -buildmode=c-shared $(TAGS) -o $(OUT)/linux-x64.so -v ..
+	CC=x86_64-linux-gnu-gcc \
+	go build -buildmode=c-shared -o $(OUT)/linux-x64.so -v ..
 
 linux-arm64-shared:
 	CGO_ENABLED=1 \
 	GOOS=linux \
 	GOARCH=arm64 \
-	go build -buildmode=c-shared $(TAGS) -o $(OUT)/linux-arm64.so -v ..
+	CC=aarch64-linux-gnu-gcc \
+	go build -buildmode=c-shared -o $(OUT)/linux-arm64.so -v ..
 
 linux-x64-static:
 	CGO_ENABLED=1 \
 	GOOS=linux \
 	GOARCH=amd64 \
-	go build -buildmode=c-archive $(TAGS) -o $(OUT)/linux-x64.a -v ..
+	CC=x86_64-linux-gnu-gcc \
+	go build -buildmode=c-archive -o $(OUT)/linux-x64.a -v ..
 
 linux-arm64-static:
 	CGO_ENABLED=1 \
 	GOOS=linux \
 	GOARCH=arm64 \
-	go build -buildmode=c-archive $(TAGS) -o $(OUT)/linux-arm64.a -v ..
-
-
-###### WebAssembly #######
-
-wasm:
-	GOOS=js \
-	GOARCH=wasm \
-	go build $(TAGS) -o $(OUT)/fullstacked.wasm -v ../wasm && \
-	cp -rf $(shell find $(HOME)/go -name "wasm_exec.js" | grep lib) $(OUT)/wasm_exec.js
-
+	CC=aarch64-linux-gnu-gcc \
+	go build -buildmode=c-archive -o $(OUT)/linux-arm64.a -v ..
 
 ###### Clean #######
 

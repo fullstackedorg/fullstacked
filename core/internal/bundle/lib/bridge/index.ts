@@ -1,0 +1,226 @@
+import { deserialize, mergeUint8Arrays, serialize } from "./serialization.ts";
+import {
+    type CoreCallResponseType,
+    type CoreModule,
+    CoreResponseData,
+    CoreResponseError,
+    CoreResponseStream,
+    type SerializableData
+} from "../@types/index.ts";
+import onStreamData, { createDuplex } from "./duplex.ts";
+import type platformBridgeType from "./platform.ts";
+import fetchCore from "../fetch/index.ts";
+import WebSocketCore from "../websocket/index.ts";
+import parentWindow from "../parentWindow/index.ts";
+import { acquireId, releaseId, tryAcquireId } from "./ids.ts";
+
+import type { JSPlugin } from "../plugin/index.ts";
+
+declare global {
+    var fullstacked: Partial<FullStacked>;
+    var __dirname: string;
+}
+
+type FullStacked = {
+    bridge: Bridge;
+    platformBridge: typeof platformBridgeType;
+
+    onStreamData: (id: number, payload: ArrayBuffer | string) => void;
+
+    // how stream data reaches this runtime: frames (GET /stream),
+    // shared-buffers (WebView2), evaluated (onStreamData)
+    streamTransport?: string;
+
+    workerStreams: Map<number, any>;
+
+    plugins: Map<number, JSPlugin>;
+
+    exit: () => void;
+
+    // hosts that exit once nothing runs (Node): +1 while a stream is open,
+    // -1 once it ended (see bridge/duplex)
+    keepAlive?: (delta: 1 | -1) => void;
+
+    clipboard: {
+        copy?: (text: string) => void;
+        paste?: () => string | Promise<string>;
+        respondPaste?: (id: number, responseBase64: string) => void;
+    };
+
+    // size string is : `${width}:${height}:${x}:${y}`
+    // `kiosk` <= Mode kiosk
+    // `fullscreen` <= Fullscreen/Maximized
+    window: {
+        resize?: (size: string) => void;
+        getSize?: () => Promise<string>;
+    };
+
+    fetch: typeof fetch;
+    WebSocket: typeof WebSocket;
+    open?: (ctx: number) => void;
+};
+
+globalThis.__dirname = "/";
+
+type BridgeOpts = {
+    mod: CoreModule;
+    fn: number;
+    data?: SerializableData[];
+    // context the call runs in (defaults to this runtime's context)
+    ctx?: number;
+};
+
+type BridgeAsync = (opts: BridgeOpts) => Promise<SerializableData>;
+type BridgeSync<T extends boolean> = (
+    opts: BridgeOpts,
+    sync: T
+) => T extends true ? SerializableData : Promise<SerializableData>;
+type Bridge = BridgeSync<boolean> & BridgeAsync;
+
+async function init() {
+    if (globalThis.fullstacked?.bridge) {
+        return;
+    }
+
+    globalThis.fullstacked = globalThis.fullstacked || {};
+    globalThis.fullstacked.clipboard = globalThis.fullstacked.clipboard || {};
+    globalThis.fullstacked.plugins =
+        globalThis.fullstacked.plugins || new Map();
+    globalThis.fullstacked.window = globalThis.fullstacked.window || {};
+    globalThis.fullstacked.workerStreams =
+        globalThis.fullstacked.workerStreams || new Map();
+
+    const platformBridge = (await import("./platform.ts")).default;
+    try {
+        await platformBridge.ready;
+    } catch {
+        return;
+    }
+
+    const bridge: Bridge = (opts: BridgeOpts, sync?: boolean) => {
+        const preparePayload = (id: number) => {
+            const data = opts.data
+                ? mergeUint8Arrays(...opts.data.map(serialize))
+                : null;
+            const payload = new Uint8Array(5 + (data?.byteLength ?? 0));
+
+            payload[0] = opts.ctx ?? platformBridge.bridge.ctx;
+            payload[1] = id;
+            payload[2] = opts.mod;
+            payload[3] = opts.fn;
+            payload[4] = sync ? 1 : 0;
+            if (data != null) {
+                payload.set(data, 5);
+            }
+            return payload;
+        };
+
+        if (sync) {
+            // a sync call cannot wait for an id to free up
+            const id = tryAcquireId();
+            if (id === null) {
+                throw new Error("too many bridge calls in flight");
+            }
+            let responseBuffer: ArrayBuffer | void;
+            try {
+                const payload = preparePayload(id);
+                responseBuffer = platformBridge.bridge.Sync(payload.buffer);
+                if (!responseBuffer && platformBridge.bridge.GetResponseSync) {
+                    responseBuffer = platformBridge.bridge.GetResponseSync(id);
+                }
+            } finally {
+                releaseId(id);
+            }
+            const response = processResponse(responseBuffer);
+            if (response instanceof Error) {
+                throw response;
+            }
+            return response;
+        }
+
+        return new Promise<SerializableData>(async (resolve, reject) => {
+            let id = acquireId();
+            if (typeof id !== "number") {
+                id = await id;
+            }
+            let responseBuffer: ArrayBuffer;
+            try {
+                const payload = preparePayload(id);
+                responseBuffer = await platformBridge.bridge.Async(
+                    payload.buffer
+                );
+            } catch (e) {
+                reject(e);
+                return;
+            } finally {
+                releaseId(id);
+            }
+            const response = processResponse(responseBuffer);
+            if (response instanceof Error) {
+                reject(response);
+            } else {
+                resolve(response);
+            }
+        });
+    };
+
+    globalThis.fullstacked.platformBridge = platformBridge;
+    globalThis.fullstacked.bridge = bridge;
+    globalThis.fullstacked.fetch = fetch.bind(globalThis);
+    if (typeof WebSocket !== "undefined") {
+        globalThis.fullstacked.WebSocket = WebSocket;
+    }
+    globalThis.fullstacked.onStreamData = onStreamData;
+
+    globalThis.fetch = fetchCore;
+
+    if (typeof window !== "undefined" || !globalThis.process?.versions?.node) {
+        globalThis.WebSocket = WebSocketCore as any;
+    }
+
+    await Promise.all([import("timers"), import("buffer")]);
+
+    // workers and Node (fullstacked --file) have no DOMParser:
+    // lib/DOMParser's parser and DOM become their globals
+    if (!globalThis.DOMParser) {
+        const dom = await import("../DOMParser/index.ts");
+        Object.entries(dom).forEach(
+            ([key, value]) =>
+                ((globalThis as Record<string, unknown>)[key] = value)
+        );
+    }
+
+    if (!globalThis.process) {
+        globalThis.process = (await import("process")).default;
+    }
+
+    await parentWindow.setup();
+}
+
+await init();
+
+function processResponse(buffer: ArrayBuffer | void) {
+    if (!buffer || buffer.byteLength === 0) {
+        return new Error("received empty response");
+    }
+
+    const responseType = new DataView(buffer, 0, 1).getUint8(
+        0
+    ) as CoreCallResponseType;
+    switch (responseType) {
+        case CoreResponseError:
+            return new Error(
+                `error from bridge: [${deserialize(buffer, 1).data}]`
+            );
+        case CoreResponseData:
+            if (buffer.byteLength === 1) {
+                return undefined;
+            }
+            return deserialize(buffer, 1).data;
+        case CoreResponseStream:
+            const streamId = deserialize(buffer, 1).data as number;
+            return createDuplex(streamId);
+    }
+
+    throw new Error("don't know how to process response from core");
+}

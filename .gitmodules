@@ -1,9 +1,9 @@
-[submodule "demo"]
-	path = demo
-	url = https://github.com/fullstackedorg/demo.git
-[submodule "editor"]
-	path = editor
-	url = https://github.com/fullstackedorg/editor.git
-[submodule "core/typescript-go"]
-	path = core/typescript-go
-	url = https://github.com/microsoft/typescript-go.git
+[submodule "app/shell"]
+	path = shell
+	url = https://github.com/fullstackedorg/shell.git
+[submodule "plugins/tailwindcss"]
+	path = plugins/tailwindcss
+	url = https://github.com/fullstackedorg/tailwindcss.git
+[submodule "plugins/sass"]
+	path = plugins/sass
+	url = https://github.com/fullstackedorg/sass.git

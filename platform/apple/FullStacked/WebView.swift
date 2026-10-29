@@ -1,44 +1,203 @@
-@preconcurrency import WebKit
+import WebKit
+import SwiftUI
+import AuthenticationServices
 
-let platform = "apple"
 let downloadDirectory = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first! + "/downloads";
 
-class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WKDownloadDelegate {
-    public let requestHandler: RequestHandler
-    var firstContact = false
-    private var messageToBeSent = [(String, String)]()
-    public var mounted = false
+func startMain(_ providedCtx: UInt8?, _ safe: Bool?) -> UInt8 {
+    let rootPtr = root.ptr()
+    let buildPtr = build.ptr()
     
-    init(instance: Instance) {
-        self.requestHandler = RequestHandler(instance: instance)
+    var ctx: UInt8
+    if(safe == true) {
+        ctx = startSafe(rootPtr, buildPtr)
+    } else if(providedCtx == nil) {
+        ctx = start(rootPtr, buildPtr)
+    } else {
+        startWithCtx(rootPtr, buildPtr, providedCtx!)
+        ctx = providedCtx!
+    }
+    
+    rootPtr?.deallocate()
+    buildPtr?.deallocate()
+    
+    return ctx
+}
+
+class WeakMessageHandler: NSObject, WKScriptMessageHandler {
+    weak var target: (AnyObject & WKScriptMessageHandler)?
+    init(_ target: AnyObject & WKScriptMessageHandler) {
+        self.target = target
+    }
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        target?.userContentController(userContentController, didReceive: message)
+    }
+}
+
+class WebView: WebViewExtended, WKNavigationDelegate, WKDownloadDelegate, Codable, Identifiable, ASWebAuthenticationPresentationContextProviding {
+    
+    var id = UUID()
+    public let requestHandler: RequestHandler
+    
+    public var isSafe = false
+    
+    // responses and stream chunks received between two main thread ticks are
+    // evaluated in one script
+    private let scriptLock = NSLock()
+    private var pendingScript = ""
+    private var scriptFlushScheduled = false
+    
+    required init(from decoder: any Decoder) throws {
+        fatalError("init(coder:) has not been implemented")
+    }
+    func encode(to encoder: any Encoder) throws {
         
+    }
+    
+    init(dummy: Bool) {
+        self.isSafe = false
+        self.requestHandler = RequestHandler(ctx: 0)
+        let wkWebViewConfig = WKWebViewConfiguration()
+        super.init(frame: CGRect(), configuration: wkWebViewConfig)
+    }
+
+    init(_ providedCtx: UInt8?, safe: Bool = false) {
+        self.isSafe = safe
+        
+        let ctx = providedCtx ?? startMain(nil, safe)
+        
+        if check(ctx) == 0 {
+            _ = startMain(ctx, safe)
+        }
+        
+        self.requestHandler = RequestHandler(ctx: ctx)
+        
+        // inspector / debug console
         let wkWebViewConfig = WKWebViewConfiguration()
         wkWebViewConfig.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        wkWebViewConfig.preferences.javaScriptCanOpenWindowsAutomatically = true
+        
         let userContentController = WKUserContentController()
         wkWebViewConfig.userContentController = userContentController
         wkWebViewConfig.setURLSchemeHandler(self.requestHandler, forURLScheme: "fs")
         
         super.init(frame: CGRect(), configuration: wkWebViewConfig)
+        
+        self.isInspectable = true
         self.navigationDelegate = self
-        
-        userContentController.add(self, name: "bridge")
-        
-        if #available(iOS 16.4, macOS 13.3, *) {
-            self.isInspectable = true
+        userContentController.addScriptMessageHandler(CallHandler(self.requestHandler), contentWorld: .page, name: "call")
+        // the UI endpoints of the page, see bridge/platform.ts
+        self.requestHandler.ui = { [weak self] path, query in
+            guard let self = self else { return nil }
+            switch path {
+            case "/open":
+                if let ctx = query["ctx"].flatMap({ UInt8($0) }) {
+                    WebViewStore.getInstance().addWebView(WebView(ctx))
+                }
+                return ""
+            case "/exit":
+                // answered first, closing stops the pending tasks
+                DispatchQueue.main.async {
+                    WebViewStore.getInstance().removeWebView(self.id)
+                    self.close()
+                }
+                return ""
+            default:
+                return self.resizeRequest(query["size"])
+            }
         }
         
         self.load(URLRequest(url: URL(string: "fs://localhost")!))
     }
     
-    func close(){
+    func switchToSafeMode() {
+        self.isSafe = true
+        self.stopLoading()
+        stop(self.requestHandler.ctx)
+        let safeCtx = startMain(nil, true)
+        self.requestHandler.reset(ctx: safeCtx)
+        self.load(URLRequest(url: URL(string: "fs://localhost")!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30))
+    }
+    
+    override func close(){
+        self.isInspectable = false
+        self.stopLoading()
+        self.loadHTMLString("", baseURL: nil)
+        self.removeFromSuperview()
         self.navigationDelegate = nil
-        self.configuration.userContentController.removeScriptMessageHandler(forName: "bridge")
+        self.configuration.userContentController.removeAllUserScripts()
+        self.configuration.userContentController.removeAllScriptMessageHandlers()
+        stop(self.requestHandler.ctx)
+        super.close()
     }
     
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
+    func onStreamData(streamId: UInt32, buffer: Data){
+        queueScript("window.fullstacked.onStreamData(\(streamId),`\(buffer.base64EncodedString())`)")
+    }
+    
+    // a statement that throws does not stop the others of the batch
+    private func queueScript(_ statement: String) {
+        scriptLock.lock()
+        pendingScript.append("try{\(statement)}catch(e){console.error(e)};")
+        let schedule = !scriptFlushScheduled
+        scriptFlushScheduled = true
+        scriptLock.unlock()
+        
+        if schedule {
+            DispatchQueue.main.async { [weak self] in
+                self?.flushScripts()
+            }
+        }
+    }
+    
+    private func flushScripts() {
+        scriptLock.lock()
+        let script = pendingScript
+        pendingScript = ""
+        scriptFlushScheduled = false
+        scriptLock.unlock()
+        
+        if !script.isEmpty {
+            self.evaluateJavaScript(script)
+        }
+    }
+    
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        return self.window ?? ASPresentationAnchor()
+    }
+    
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+                
+        if let url = navigationAction.request.url {
+            var urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            if (urlComponents?.queryItems?.first(where: { $0.name == "auth" })?.value) != nil {
+                urlComponents?.queryItems?.append(URLQueryItem(name: "native", value: "1"))
+                // answer on fullstacked-auth://, fullstacked:// carries deeplinks (onOpenURL)
+                urlComponents?.queryItems?.append(URLQueryItem(name: "callback_scheme", value: "fullstacked-auth"))
+
+                let authUrl = urlComponents?.url!
+                // Initialize the session.
+                let session = ASWebAuthenticationSession(url: authUrl!, callbackURLScheme: "fullstacked-auth")
+                { callbackURL, error in
+                    DispatchQueue.main.async {
+                        if(error != nil) {
+                            self.evaluateJavaScript("window.postMessage(new Error(`Authentication Canceled`), \"*\")")
+                        } else {
+                            self.evaluateJavaScript("window.postMessage(Object.fromEntries(new URLSearchParams(`\(callbackURL?.query() ?? "")`)), \"*\")")
+                        }
+                    }
+                }
+                session.presentationContextProvider = self
+                session.start()
+            }
+        }
+        
+        return nil
+    }
     
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         if(navigationAction.shouldPerformDownload) {
@@ -55,44 +214,12 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
         }
     }
     
-    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        if(!self.firstContact){
-            self.firstContact = true
-            self.messageToBeSent.forEach({ self.onMessage(messageType: $0.0, message: $0.1) })
-            self.messageToBeSent.removeAll()
+    func webView(_ webView: WKWebView, didFinish didFinishNavigation: WKNavigation) {
+        var title = webView.title
+        if(title == nil || title!.isEmpty) {
+            title = "FullStacked"
         }
-        let data = Data(base64Encoded: message.body as! String)!
-        var response = data[0...3]
-        let payload = data[4...]
-        let responsePayload = self.requestHandler.instance.callLib(payload: payload)
-        response.append(responsePayload)
-        self.evaluateJavaScript("window.respond(`\(response.base64EncodedString())`)")
-    }
-    
-    func onMessage(messageType: String, message: String) {
-        if(!self.firstContact) {
-            self.messageToBeSent.append((messageType, message))
-            return;
-        }
-        
-        let escapedMessage = message
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "`", with: "\\`")
-        DispatchQueue.main.async() {
-            self.evaluateJavaScript("window.oncoremessage(`\(messageType)`,`\(escapedMessage)`)")
-        }
-    }
-    
-    func webView(_ webView:WKWebView, didFinish didFinishNavigation: WKNavigation){
-        let wkSnapConfig = WKSnapshotConfiguration()
-        wkSnapConfig.rect = CGRect(x: 0, y: 0, width: 1, height: 1)
-        takeSnapshot(with: wkSnapConfig) { image, err in
-            if(err != nil) {
-                print(err!)
-                return
-            }
-            self.snapshotImageToWindowColor(projectId: self.requestHandler.instance.id, image: image!)
-        }
+        WebViewStore.getInstance().webViewsMeta[self.id] = (title!, self.getBackgroundColor())
     }
     
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
@@ -118,97 +245,16 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKScriptMessageHandler, WK
     func downloadDidFinish(_ download: WKDownload) {
         self.openDownloadDirectory()
     }
+    
+    func getBackgroundColor() -> Color {
+        return Color(self.underPageBackgroundColor.cgColor)
+    }
 }
 
 
-class RequestHandler: NSObject, WKURLSchemeHandler {
-    let instance: Instance
-    
-    init(instance: Instance) {
-        self.instance = instance
-    }
-    
-    func send(urlSchemeTask: WKURLSchemeTask,
-              url: URL,
-              statusCode: Int,
-              mimeType: String,
-              data: Data) {
-        
-        let responseHTTP = HTTPURLResponse(
-            url: url,
-            statusCode: statusCode,
-            httpVersion: "HTTP/1.1",
-            headerFields: [
-                "Content-Type": mimeType,
-                "Content-Length": String(data.count),
-                "Cache-Control": "no-cache"
-            ]
-        )!
-        
-        urlSchemeTask.didReceive(responseHTTP)
-        urlSchemeTask.didReceive(data)
-        urlSchemeTask.didFinish()
-    }
-    
-    func webView(_ webView: WKWebView, start urlSchemeTask: any WKURLSchemeTask) {
-        let request = urlSchemeTask.request
-        var pathname = request.url!.pathComponents.filter({$0 != "/"}).joined(separator: "/")
-        
-        if(pathname.isEmpty) {
-            pathname = "/"
-        }
-        
-        if(pathname == "platform") {
-            let data = platform.data(using: .utf8)!
-            self.send(urlSchemeTask: urlSchemeTask,
-                      url: request.url!,
-                      statusCode: 200,
-                      mimeType: "text/plain",
-                      data: data)
-            return
-        }
-        
-        // static file serving
-        
-        let pathnameData = pathname.data(using: .utf8)!
-        var payload = Data([
-            1, // static file method
-            2 // STRING
-        ])
-        payload.append(pathnameData.count.toBytes())
-        payload.append(pathnameData)
-        
-        let response = self.instance.callLib(payload: payload)
-        let args = response.deserializeArgs()
-        
-        if(args.count < 2 || args[0] == nil) {
-            send(urlSchemeTask: urlSchemeTask,
-                 url: request.url!,
-                 statusCode: 404,
-                 mimeType: "text/plain",
-                 data: "Not Found".data(using: .utf8)!)
-            return
-        }
-        
-        send(urlSchemeTask: urlSchemeTask,
-             url: request.url!,
-             statusCode: 200,
-             mimeType: args[0] as! String,
-             data: args[1] as! Data)
-    }
-    
-    func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) { }
-}
-
-
-extension Int {
-    func toBytes() -> Data {
-        var bytes = Data(count: 4)
-        bytes[0] = UInt8((self & 0xff000000) >> 24);
-        bytes[1] = UInt8((self & 0x00ff0000) >> 16)
-        bytes[2] = UInt8((self & 0x0000ff00) >> 8)
-        bytes[3] = UInt8((self & 0x000000ff) >> 0)
-        return bytes
+extension String {
+    func ptr() -> UnsafeMutablePointer<CChar>? {
+        return strdup(self)
     }
 }
 
@@ -217,60 +263,16 @@ extension Data {
         return UnsafeMutableRawPointer(mutating: (self as NSData).bytes)
     }
     
-    func toInt() -> Int {
-        let bytes = [UInt8](self)
-        var value : UInt = 0
-        for byte in bytes {
-            value = value << 8
-            value = value | UInt(byte)
-        }
-        return Int(value)
-    }
-    
-    func deserializeArgs() -> [Any?] {
-        var args: [Any?] = []
-        
-        var cursor = 0;
-        while(cursor < self.count) {
-            let type = DataType(rawValue: self[cursor])
-            cursor += 1
-            let length = self[cursor...(cursor + 3)].toInt()
-            cursor += 4
-            let arg = length > 0 ? self[cursor...(cursor + length - 1)] : Data()
-            cursor += length
-            
-            switch (type) {
-            case .UNDEFINED:
-                args.append(nil)
-                break
-            case .BOOLEAN:
-                args.append(arg[0] == 1 ? true : false)
-                break
-            case .STRING:
-                args.append(String(data: arg, encoding: .utf8))
-                break
-            case .NUMBER:
-                args.append(nil);
-                print("Deserializing number not implemented in iOS")
-                break
-            case .UINT8ARRAY:
-                args.append(arg)
-                break
-            case .none:
-                print("Unknown type to deserialize")
+    func print(){
+        var str = "["
+        for i in 0...(self.count - 1) {
+            str += String(self[self.startIndex + i])
+            if(i < self.count - 1){
+                str += ", "
+            } else {
+                str += "]"
             }
         }
-        
-        return args
+        Swift.print(str)
     }
 }
-
-enum DataType: UInt8 {
-    case UNDEFINED = 0
-    case BOOLEAN = 1
-    case STRING = 2
-    case NUMBER = 3
-    case UINT8ARRAY = 4
-}
-
-

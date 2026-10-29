@@ -1,18 +1,18 @@
 {
-    "version": "0.12.4",
+    "version": "1.0.0",
     "scripts": {
-        "prebuild": "esbuild --bundle --platform=node --format=esm --packages=external --outfile=build.js build.ts",
-        "build": "node build.js",
-        "postbuild": "node -e \"require('node:fs').rmSync('build.js')\"",
-        "start": "npm run build && npm start -w platform/node --ignore-scripts",
+        "generate-types": "node generate-types.ts",
+        "build": "node build.ts",
+        "start": "node index.ts",
         "fmt": "sh ./fmt.sh",
         "typecheck": "tsc --noEmit",
-        "test": "esbuild test/index.ts --bundle --outfile=.cache/test.js --platform=node --format=esm --packages=external && node .cache/test.js "
+        "pretest": "npm run build && npm run build -w platform/node",
+        "test": "node --test-timeout=180000 --experimental-test-coverage --test-coverage-exclude='**/*.js' --test-coverage-exclude='**/*.cjs' --test-coverage-exclude='test/**/*' test/index.ts"
     },
     "workspaces": [
-        "platform/electron",
+        "shell",
         "platform/node",
-        "platform/wasm"
+        "plugins/*"
     ],
     "author": "FullStacked",
     "license": "MIT",
@@ -21,40 +21,22 @@
         "tabWidth": 4,
         "trailingComma": "none"
     },
-    "dependencies": {
-        "@aws-sdk/client-s3": "^3.1045.0",
-        "@codemirror/lsp-client": "^6.2.3",
-        "@codemirror/theme-one-dark": "^6.1.3",
-        "@fullstacked/ai-agent": "github:fullstackedorg/ai-agent",
-        "@fullstacked/codemirror-view": "github:fullstackedorg/codemirror-view#9d7705eb5f73f8733ec93a8f71bb4dd515f6fc86",
-        "@fullstacked/file-tree": "github:fullstackedorg/file-tree#a7b09ad58f0940fa094d4d3939a8009c7cd9a942",
-        "@fullstacked/stack-navigation": "github:fullstackedorg/stack-navigation#888302a680bcc501639dfdb0a6aede3da91f06ff",
-        "@fullstacked/ui": "github:fullstackedorg/ui#2020b31ae235a40f19a2329bd8b1f13808b7bfec",
-        "@types/node": "^25.7.0",
-        "@types/semver": "^7.7.1",
-        "csstype": "^3.2.3",
-        "dotenv": "^17.4.2",
-        "esbuild": "^0.28.0",
-        "fuse.js": "^7.3.0",
-        "node-gyp": "^12.3.0",
-        "open": "^11.0.0",
-        "prettier": "^3.8.3",
-        "pretty-bytes": "^7.1.0",
-        "pretty-ms": "^9.3.0",
-        "puppeteer": "^24.43.1",
-        "sass": "^1.99.0",
-        "semver": "^7.8.0",
-        "slugify": "^1.6.9",
-        "typescript": "^6.0.3"
+    "devDependencies": {
+        "@aws-sdk/client-s3": "^3.1156.0",
+        "@types/node": "^26.6.5",
+        "@types/pg": "^8.23.1",
+        "dompurify": "^3.4.17",
+        "dotenv": "^18.0.9",
+        "esbuild": "^0.28.2",
+        "node-gyp": "^13.1.0",
+        "node-ssh": "^13.2.1",
+        "pg": "^8.23.1",
+        "prettier": "^3.9.10",
+        "puppeteer": "^25.16.0",
+        "typescript": "^7.0.2"
     },
-    "overrides": {
-        "glob": "12.0.0",
-        "tar": "7.5.11",
-        "fast-xml-parser": ">=5.5.7",
-        "brace-expansion": ">=5.0.5",
-        "minimatch": ">=10.2.3",
-        "immutable": "^5.1.5",
-        "picomatch": ">=4.0.4",
-        "basic-ftp": ">=5.2.1"
+    "allowScripts": {
+        "esbuild": true,
+        "puppeteer": true
     }
 }

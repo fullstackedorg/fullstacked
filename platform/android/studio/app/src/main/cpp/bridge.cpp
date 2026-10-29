@@ -1,49 +1,208 @@
 #include <android/log.h>
 #include "bridge.h"
 
-#include <android/log.h>
 #include <cstring>
 #include <string>
+#include <vector>
 #include <functional>
 
 extern "C" {
 
-
-JNIEXPORT void JNICALL Java_org_fullstacked_editor_MainActivity_directories
-        (JNIEnv *env, jobject jobj, jstring root, jstring config, jstring editor, jstring tmp) {
-
+JNIEXPORT jint JNICALL Java_org_fullstacked_Core_start
+        (JNIEnv *env, jobject thiz, jstring root, jstring build) {
     const char* rootPtr = env->GetStringUTFChars(root, nullptr);
-    const char* configPtr = env->GetStringUTFChars(config, nullptr);
-    const char* editorPtr = env->GetStringUTFChars(editor, nullptr);
-    const char* tmpPtr = env->GetStringUTFChars(tmp, nullptr);
+    const char* buildPtr = env->GetStringUTFChars(build, nullptr);
 
-    directories(
-        const_cast<char*>(rootPtr),
-        const_cast<char*>(configPtr),
-        const_cast<char*>(editorPtr),
-        const_cast<char*>(tmpPtr)
-    );
+    uint8_t ctxId = start(const_cast<char*>(rootPtr), const_cast<char*>(buildPtr));
+
+    env->ReleaseStringUTFChars(root, rootPtr);
+    env->ReleaseStringUTFChars(build, buildPtr);
+
+    return static_cast<jint>(ctxId);
 }
 
-int callId = 0;
+JNIEXPORT jint JNICALL Java_org_fullstacked_Core_startSafe
+        (JNIEnv *env, jobject thiz, jstring root, jstring build) {
+    const char* rootPtr = env->GetStringUTFChars(root, nullptr);
+    const char* buildPtr = env->GetStringUTFChars(build, nullptr);
 
-JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_editor_Instance_call
-        (JNIEnv *env, jobject obj, jbyteArray payload)
-{
-    int id = callId++;
+    uint8_t ctxId = startSafe(const_cast<char*>(rootPtr), const_cast<char*>(buildPtr));
 
+    env->ReleaseStringUTFChars(root, rootPtr);
+    env->ReleaseStringUTFChars(build, buildPtr);
+
+    return static_cast<jint>(ctxId);
+}
+
+JNIEXPORT void JNICALL Java_org_fullstacked_Core_startWithCtx
+        (JNIEnv *env, jobject thiz, jstring root, jstring build, jint ctxId) {
+    const char* rootPtr = env->GetStringUTFChars(root, nullptr);
+    const char* buildPtr = env->GetStringUTFChars(build, nullptr);
+
+    startWithCtx(const_cast<char*>(rootPtr), const_cast<char*>(buildPtr), static_cast<uint8_t>(ctxId));
+
+    env->ReleaseStringUTFChars(root, rootPtr);
+    env->ReleaseStringUTFChars(build, buildPtr);
+}
+
+JNIEXPORT jint JNICALL Java_org_fullstacked_Core_check
+        (JNIEnv *env, jobject thiz, jint ctxId) {
+    return check(static_cast<uint8_t>(ctxId));
+}
+
+JNIEXPORT void JNICALL Java_org_fullstacked_Core_stop
+        (JNIEnv *env, jobject thiz, jint ctxId) {
+    stop(static_cast<uint8_t>(ctxId));
+}
+
+JNIEXPORT jint JNICALL Java_org_fullstacked_Core_call
+        (JNIEnv *env, jobject thiz, jbyteArray payload) {
     int length = env->GetArrayLength(payload);
-    int responseSize = call(id, env->GetByteArrayElements(payload, nullptr), length);
+    jbyte* buffer = env->GetByteArrayElements(payload, nullptr);
 
-    auto* responsePtr = new signed char[responseSize];
-    getResponse(id, (void *)responsePtr);
+    int responseSize = call(static_cast<void*>(buffer), length);
 
-    jbyteArray response = env->NewByteArray(responseSize);
-    env->SetByteArrayRegion(response, 0, responseSize, responsePtr);
-    delete[] responsePtr;
+    env->ReleaseByteArrayElements(payload, buffer, JNI_ABORT);
+
+    return responseSize;
+}
+
+// Thread safe: the core synchronizes per context, responses are returned
+// directly instead of being stored by request id.
+JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_callWithResponse
+        (JNIEnv *env, jobject thiz, jbyteArray payload) {
+    int length = env->GetArrayLength(payload);
+    jbyte* buffer = env->GetByteArrayElements(payload, nullptr);
+
+    int size = 0;
+    void* response = callWithResponse(static_cast<void*>(buffer), length, &size);
+
+    env->ReleaseByteArrayElements(payload, buffer, JNI_ABORT);
+
+    if (response == nullptr || size <= 0) {
+        return env->NewByteArray(0);
+    }
+
+    jbyteArray result = env->NewByteArray(size);
+    if (result != nullptr) {
+        env->SetByteArrayRegion(result, 0, size, static_cast<const jbyte*>(response));
+    }
+    freePtr(response);
+
+    return result;
+}
+
+// Stream data of a context as binary frames for GET /stream, see
+// core/internal/frames
+JNIEXPORT jint JNICALL Java_org_fullstacked_Core_streamAttach
+        (JNIEnv *env, jobject thiz, jint ctxId) {
+    return streamAttach(static_cast<uint8_t>(ctxId));
+}
+
+// Blocks until frames are queued, null once the reader ended
+JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_streamRead
+        (JNIEnv *env, jobject thiz, jint ctxId, jint gen) {
+    int size = 0;
+    void* frames = streamRead(static_cast<uint8_t>(ctxId), gen, &size);
+    if (frames == nullptr || size <= 0) {
+        return nullptr;
+    }
+
+    jbyteArray result = env->NewByteArray(size);
+    if (result != nullptr) {
+        env->SetByteArrayRegion(result, 0, size, static_cast<const jbyte*>(frames));
+    }
+    freePtr(frames);
+
+    return result;
+}
+
+JNIEXPORT void JNICALL Java_org_fullstacked_Core_streamDetach
+        (JNIEnv *env, jobject thiz, jint ctxId, jint gen) {
+    streamDetach(static_cast<uint8_t>(ctxId), gen);
+}
+
+JNIEXPORT void JNICALL Java_org_fullstacked_Core_setPlatform
+        (JNIEnv *env, jobject thiz, jstring name, jboolean binaryCalls) {
+    const char* namePtr = env->GetStringUTFChars(name, nullptr);
+    setPlatform(const_cast<char*>(namePtr), binaryCalls ? 1 : 0);
+    env->ReleaseStringUTFChars(name, namePtr);
+}
+
+// A request of the page answered by the core: [status u16][mime type]\n[body]
+JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_handleRequest
+        (JNIEnv *env, jobject thiz, jint ctxId, jstring path) {
+    const char* pathPtr = env->GetStringUTFChars(path, nullptr);
+    int status = 0;
+    int size = 0;
+    void* response = handleRequest(static_cast<uint8_t>(ctxId), const_cast<char*>(pathPtr), nullptr, 0, &status, &size);
+    env->ReleaseStringUTFChars(path, pathPtr);
+
+    jbyteArray result = env->NewByteArray(size + 2);
+    if (result != nullptr) {
+        jbyte statusBytes[2] = {static_cast<jbyte>(status >> 8), static_cast<jbyte>(status & 0xFF)};
+        env->SetByteArrayRegion(result, 0, 2, statusBytes);
+        if (response != nullptr && size > 0) {
+            env->SetByteArrayRegion(result, 2, size, static_cast<const jbyte*>(response));
+        }
+    }
+    if (response != nullptr) {
+        freePtr(response);
+    }
+    return result;
+}
+
+// A call received on a message channel: null when the core put a large
+// response on the frame stream
+JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_callMessage
+        (JNIEnv *env, jobject thiz, jbyteArray payload) {
+    int length = env->GetArrayLength(payload);
+    jbyte* buffer = env->GetByteArrayElements(payload, nullptr);
+
+    int size = 0;
+    void* response = callMessage(static_cast<void*>(buffer), length, &size);
+
+    env->ReleaseByteArrayElements(payload, buffer, JNI_ABORT);
+
+    if (size < 0) {
+        return nullptr;
+    }
+    if (response == nullptr || size == 0) {
+        return env->NewByteArray(0);
+    }
+
+    jbyteArray result = env->NewByteArray(size);
+    if (result != nullptr) {
+        env->SetByteArrayRegion(result, 0, size, static_cast<const jbyte*>(response));
+    }
+    freePtr(response);
+
+    return result;
+}
+
+JNIEXPORT jbyteArray JNICALL Java_org_fullstacked_Core_getCorePayload
+        (JNIEnv *env, jobject thiz, jint ctx, jint coreType, jint id, jint size) {
+    jbyteArray response = env->NewByteArray(size);
+    if (size <= 0 || response == nullptr) {
+        return response;
+    }
+
+    jbyte* ptr = static_cast<jbyte*>(env->GetPrimitiveArrayCritical(response, nullptr));
+    if (ptr != nullptr) {
+        getCorePayload(
+            static_cast<uint8_t>(ctx),
+            static_cast<uint8_t>(coreType),
+            static_cast<uint32_t>(id),
+            static_cast<void*>(ptr),
+            size
+        );
+        env->ReleasePrimitiveArrayCritical(response, ptr, 0);
+    }
 
     return response;
 }
+
+#include <mutex>
 
 JavaVM* javaVm;
 
@@ -53,55 +212,64 @@ struct CallbackResponder {
     jint id;
 };
 std::vector<CallbackResponder> responders = {};
+std::mutex respondersMutex;
 
-void goCallback(char* projectId, char* messageType, void* msg, int msgLength) {
-    __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.editor.core", "goCallback responders count [%zu]", responders.size());
+void streamDataCallback(uint8_t ctx, uint32_t id, int size) {
+    std::vector<CallbackResponder> respondersCopy;
+    {
+        std::lock_guard<std::mutex> lock(respondersMutex);
+        respondersCopy = responders;
+    }
 
-    for(CallbackResponder responder : responders) {
-        // get JNI env
+    __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.core", "streamDataCallback responders count [%zu]", respondersCopy.size());
+
+    for (const CallbackResponder& responder : respondersCopy) {
         JNIEnv *env = nullptr;
         if (javaVm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
-            // find method id on cached class
-            jmethodID methodid = env->GetMethodID(responder.cls, "Callback", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
-
-            // callback
-            jstring jstr = env->NewStringUTF(projectId);
-            jstring jstr2 = env->NewStringUTF(messageType);
-            std::string cppString(reinterpret_cast<char*>(msg), msgLength);
-            jstring jstr3 = env->NewStringUTF(cppString.c_str());
-            env->CallVoidMethod(responder.activity, methodid, jstr, jstr2, jstr3);
+            jmethodID methodid = env->GetMethodID(responder.cls, "onStreamData", "(III)V");
+            if (methodid != nullptr) {
+                env->CallVoidMethod(responder.activity, methodid, static_cast<jint>(ctx), static_cast<jint>(id), static_cast<jint>(size));
+            }
         }
     }
 }
 
-JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved){
-    __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.editor.core", "onLoad");
+JNIEXPORT void JNICALL Java_org_fullstacked_Core_setOnStreamData
+        (JNIEnv *env, jobject thiz) {
+    __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.core", "setOnStreamData");
+    setOnStreamData(reinterpret_cast<void*>(streamDataCallback));
+}
+
+JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
+    __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.core", "onLoad");
     javaVm = vm;
-    callback((void*)goCallback);
+    setOnStreamData(reinterpret_cast<void*>(streamDataCallback));
     return JNI_VERSION_1_6;
 }
 
-JNIEXPORT void JNICALL Java_org_fullstacked_editor_MainActivity_addCallback
-        (JNIEnv * env, jobject thiz, jint id)
-{
-    __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.editor.core", "add callback");
+JNIEXPORT void JNICALL Java_org_fullstacked_MainActivity_addCallback
+        (JNIEnv * env, jobject thiz, jint id) {
+    __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.core", "add callback");
 
     CallbackResponder responder{
         env->NewGlobalRef(thiz),
-        (jclass)(env->NewGlobalRef(env->FindClass("org/fullstacked/editor/MainActivity"))),
+        (jclass)(env->NewGlobalRef(env->FindClass("org/fullstacked/MainActivity"))),
         id
     };
 
+    std::lock_guard<std::mutex> lock(respondersMutex);
     responders.push_back(responder);
 }
 
-JNIEXPORT void JNICALL Java_org_fullstacked_editor_MainActivity_removeCallback
-        (JNIEnv * env, jobject thiz, jint id)
-{
-    __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.editor.core", "remove callback");
+JNIEXPORT void JNICALL Java_org_fullstacked_MainActivity_removeCallback
+        (JNIEnv * env, jobject thiz, jint id) {
+    __android_log_print(ANDROID_LOG_VERBOSE, "org.fullstacked.core", "remove callback");
 
-    for(int i = 0; i < responders.size(); i++) {
-        if(responders.at(i).id == id) {
+    std::lock_guard<std::mutex> lock(respondersMutex);
+    for (size_t i = 0; i < responders.size(); i++) {
+        if (responders.at(i).id == id) {
+            env->DeleteGlobalRef(responders.at(i).activity);
+            env->DeleteGlobalRef(responders.at(i).cls);
             responders.erase(responders.begin() + i);
             return;
         }

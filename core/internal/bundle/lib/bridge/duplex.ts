@@ -1,0 +1,452 @@
+import { toByteArray } from "./base64.ts";
+import { type SerializableData, Stream } from "../@types/index.ts";
+import { Close, Open, Write, WriteEvent } from "../@types/stream.ts";
+import { concatUint8Arrays, mergeUint8Arrays } from "./serialization.ts";
+import { createEventEmitter } from "./eventEmitter.ts";
+
+type DuplexItem = {
+    opening: Promise<void> | null;
+    open: boolean;
+    done: boolean;
+    listeners: {
+        data: Set<(chunk: Uint8Array) => void>;
+        close: Set<() => void>;
+        error: Set<(err: Error) => void>;
+    };
+    pendingData: Uint8Array[];
+    asyncRead: {
+        promise?: { resolve: () => void; reject: (reason: any) => void };
+        // chunks since the last read, merged once by the read (merging each
+        // chunk in was quadratic when the reader lags)
+        chunks: Uint8Array[];
+    } | null;
+    queuedPackets: { flags: number; data: Uint8Array }[];
+    error?: Error;
+    // drains received, and the writes waiting for the next one
+    drains: number;
+    drainWaiters: Set<() => void>;
+    // the stream's socket dialed (net, tunnel), and who waits for it
+    connected: boolean;
+    connectedWaiters: Set<{ resolve: () => void; reject: (e: Error) => void }>;
+    // keeps the host running from open() to the end, see hold
+    held: boolean;
+};
+
+const FLAG_DRAIN = 4;
+const FLAG_CONNECTED = 5;
+
+const activeDuplexes = new Map<number, DuplexItem[]>();
+
+// A host that exits once nothing runs (Node, fullstacked --file) keeps
+// running while a stream is open, like a socket: from open() to its end.
+// Hosts without keepAlive (webviews) live as long as their window.
+function hold(duplex: DuplexItem) {
+    if (duplex.held || duplex.done) return;
+    duplex.held = true;
+    globalThis.fullstacked.keepAlive?.(1);
+}
+
+function release(duplex: DuplexItem) {
+    if (!duplex.held) return;
+    duplex.held = false;
+    globalThis.fullstacked.keepAlive?.(-1);
+}
+
+// payload: [flags u8][data], base64 when evaluated by the host
+function onStreamData(id: number, payload: ArrayBuffer | string) {
+    const chunk =
+        typeof payload === "string"
+            ? toByteArray(payload)
+            : new Uint8Array(payload);
+    // a copy: consumers may use the whole underlying buffer
+    onStreamFrame(id, chunk[0], chunk.slice(1));
+}
+
+// flags: 0 data, 1 end, 2 error (data is the message), 4 drain (the core
+// wrote the queued writes, see write)
+export function onStreamFrame(id: number, flags: number, data: Uint8Array) {
+    const workerStreams = globalThis.fullstacked.workerStreams;
+    if (workerStreams) {
+        const worker = workerStreams.get(id);
+        if (worker) {
+            if (flags === 1 || flags === 2) {
+                workerStreams.delete(id);
+            }
+
+            const payload = new Uint8Array(data.byteLength + 1);
+            payload[0] = flags;
+            payload.set(data, 1);
+            worker.postMessage(
+                {
+                    type: "on-stream-data",
+                    streamId: id,
+                    payload: payload.buffer
+                },
+                [payload.buffer]
+            );
+            return;
+        }
+    }
+
+    const duplexes = activeDuplexes.get(id);
+
+    if (!duplexes || duplexes.length === 0) {
+        // data for no stream: stop its producer. An empty chunk can trail
+        // the end (a chunk and the page's close racing in the core), and
+        // closing its id could close a newer stream that reuses it
+        if (flags === 0 && data.byteLength > 0) {
+            globalThis.fullstacked.bridge({
+                mod: Stream,
+                fn: Close,
+                data: [id]
+            });
+        }
+        return;
+    }
+
+    const duplex = duplexes[0];
+
+    if (duplex.opening) {
+        duplex.queuedPackets.push({ flags, data });
+        return;
+    }
+
+    processPayload(id, duplex, flags, data);
+}
+
+function processPayload(
+    id: number,
+    duplex: DuplexItem,
+    flags: number,
+    data: Uint8Array
+) {
+    if (flags === FLAG_DRAIN) {
+        duplex.drains++;
+        releaseWrites(duplex);
+        return;
+    }
+
+    if (flags === FLAG_CONNECTED) {
+        duplex.connected = true;
+        const waiters = duplex.connectedWaiters;
+        duplex.connectedWaiters = new Set();
+        waiters.forEach(({ resolve }) => resolve());
+        return;
+    }
+
+    const isError = flags === 2;
+    duplex.done = flags === 1 || isError;
+
+    if (isError) {
+        const errorMsg = new TextDecoder().decode(data);
+        const err = new Error(errorMsg);
+        duplex.error = err;
+        duplex.listeners.error.forEach((cb) => cb(err));
+        if (duplex.asyncRead?.promise?.reject) {
+            duplex.asyncRead.promise.reject(err);
+        }
+    }
+
+    // kept for the first listener or read; an async reader has its own
+    // chunks (kept here too, a whole body stayed until the end)
+    if (
+        duplex.listeners.data.size === 0 &&
+        duplex.asyncRead === null &&
+        !duplex.done &&
+        !isError
+    ) {
+        duplex.pendingData.push(data);
+    } else if (!isError) {
+        duplex.listeners.data.forEach((cb) => cb(data));
+    }
+
+    if (duplex.done) {
+        release(duplex);
+        // no drain comes after the end, nor a connection
+        releaseWrites(duplex);
+        const waiters = duplex.connectedWaiters;
+        duplex.connectedWaiters = new Set();
+        waiters.forEach(({ reject }) =>
+            reject(duplex.error ?? new Error("closed before connecting"))
+        );
+        if (!isError) {
+            duplex.listeners.close.forEach((cb) => cb());
+        }
+        // Remove from the queue once done
+        const duplexes = activeDuplexes.get(id);
+        if (duplexes) {
+            const index = duplexes.indexOf(duplex);
+            if (index !== -1) {
+                duplexes.splice(index, 1);
+                if (duplexes.length === 0) {
+                    activeDuplexes.delete(id);
+                }
+            }
+        }
+    }
+
+    if (duplex.asyncRead !== null && !isError) {
+        duplex.asyncRead.chunks.push(data);
+        duplex.asyncRead.promise?.resolve?.();
+    }
+}
+
+function releaseWrites(duplex: DuplexItem) {
+    const waiters = duplex.drainWaiters;
+    duplex.drainWaiters = new Set();
+    waiters.forEach((resolve) => resolve());
+}
+
+type StreamData = string | Buffer | Uint8Array | DataView;
+
+type EndCallback = () => void;
+
+export interface Duplex extends ReadableStream<Uint8Array<ArrayBuffer>> {
+    id: number;
+    // the core's chunks, as received
+    on(event: "data", callback: (chunk: Uint8Array) => void): void;
+    on(event: "close", callback: EndCallback): void;
+    on(event: "error", callback: (err: Error) => void): void;
+    write(data: StreamData): Promise<any>;
+    writeEvent(event: string, ...args: SerializableData[]): Promise<any>;
+    end(): Promise<any>;
+    promise(): Promise<any>;
+    eventEmitter(): ReturnType<typeof createEventEmitter>;
+    open(): Promise<void>;
+    connected(): Promise<void>;
+}
+
+const te = new TextEncoder();
+
+export function createDuplex(id: number): Duplex {
+    const duplex: DuplexItem = {
+        opening: null,
+        open: false,
+        done: false,
+        listeners: {
+            data: new Set<(chunk: Uint8Array) => void>(),
+            close: new Set<() => void>(),
+            error: new Set<(err: Error) => void>()
+        },
+        pendingData: [],
+        asyncRead: null,
+        queuedPackets: [],
+        drains: 0,
+        drainWaiters: new Set(),
+        connected: false,
+        connectedWaiters: new Set(),
+        held: false
+    };
+
+    if (!activeDuplexes.has(id)) {
+        activeDuplexes.set(id, []);
+    }
+    activeDuplexes.get(id).push(duplex);
+
+    const open = () => {
+        if (duplex.open) {
+            return Promise.resolve();
+        }
+
+        if (duplex.opening) {
+            return duplex.opening;
+        }
+
+        hold(duplex);
+        duplex.opening = new Promise(async (resolveOpening) => {
+            await globalThis.fullstacked.bridge({
+                mod: Stream,
+                fn: Open,
+                data: [id]
+            });
+
+            duplex.open = true;
+            duplex.opening = null;
+
+            const packets = duplex.queuedPackets;
+            duplex.queuedPackets = [];
+            packets.forEach((p) => processPayload(id, duplex, p.flags, p.data));
+
+            resolveOpening();
+        });
+
+        return duplex.opening;
+    };
+
+    const read = () => {
+        return new Promise<void>((resolve, reject) => {
+            duplex.asyncRead.promise = { resolve, reject };
+        });
+    };
+
+    const next = async () => {
+        if (duplex.error) {
+            throw duplex.error;
+        }
+
+        if (duplex.asyncRead === null) {
+            duplex.asyncRead = {
+                chunks: duplex.pendingData
+            };
+            duplex.pendingData = [];
+        }
+
+        if (duplex.done && duplex.asyncRead.chunks.length === 0) {
+            return { done: true };
+        }
+
+        if (!duplex.open && !duplex.opening) {
+            await open();
+        }
+
+        if (duplex.asyncRead.chunks.length === 0) {
+            await read();
+        }
+
+        if (duplex.error) {
+            throw duplex.error;
+        }
+
+        const chunks = duplex.asyncRead.chunks;
+        duplex.asyncRead.chunks = [];
+        const value =
+            chunks.length === 0
+                ? null
+                : chunks.length === 1
+                  ? chunks[0]
+                  : concatUint8Arrays(chunks);
+
+        return {
+            value,
+            done: value ? false : duplex.done
+        };
+    };
+
+    const stream: any = {
+        duplex: true,
+        id,
+        [Symbol.asyncIterator]() {
+            return {
+                next
+            };
+        }
+    };
+
+    stream.on = (event: string, cb: any) => {
+        switch (event) {
+            case "data":
+                duplex.listeners.data.add(cb);
+                if (duplex.pendingData.length > 0) {
+                    duplex.pendingData.forEach(cb);
+                    duplex.pendingData = [];
+                }
+                break;
+            case "close":
+                duplex.listeners.close.add(cb);
+                break;
+            case "error":
+                duplex.listeners.error.add(cb);
+                if (duplex.error) {
+                    cb(duplex.error);
+                }
+                break;
+        }
+
+        if (!duplex.open && duplex.opening === null) {
+            open();
+        }
+    };
+
+    // Sockets write in the core in order, after the call returned: it
+    // answers true once too much is queued, the write then resolves with
+    // the next drain (or the end)
+    stream.write = async (data: Uint8Array | string) => {
+        if (!duplex.open) {
+            await open();
+        }
+        data = typeof data === "string" ? te.encode(data) : data;
+        const drains = duplex.drains;
+        const wait = await globalThis.fullstacked.bridge({
+            mod: Stream,
+            fn: Write,
+            data: [id, data]
+        });
+        // the drain can come before the response (frames)
+        if (wait === true && duplex.drains === drains && !duplex.done) {
+            await new Promise<void>((resolve) =>
+                duplex.drainWaiters.add(resolve)
+            );
+        }
+    };
+
+    // resolves once the stream's socket dialed (it dials after the call
+    // that returned the stream), rejects when the dial failed
+    stream.connected = () => {
+        if (duplex.connected) return Promise.resolve();
+        if (duplex.done) {
+            return Promise.reject(
+                duplex.error ?? new Error("closed before connecting")
+            );
+        }
+        return new Promise<void>((resolve, reject) =>
+            duplex.connectedWaiters.add({ resolve, reject })
+        );
+    };
+
+    stream.writeEvent = async (event: string, ...args: SerializableData[]) => {
+        if (!duplex.open) {
+            await open();
+        }
+        return globalThis.fullstacked.bridge({
+            mod: Stream,
+            fn: WriteEvent,
+            data: [id, event, ...args]
+        });
+    };
+
+    stream.end = async () => {
+        if (!duplex.open) {
+            await open();
+        }
+
+        const res = await globalThis.fullstacked.bridge({
+            mod: Stream,
+            fn: Close,
+            data: [id]
+        });
+
+        if (duplex.done) {
+            return res;
+        }
+
+        await new Promise<void>((resolve) => {
+            const onClose = () => {
+                duplex.listeners.close.delete(onClose);
+                resolve();
+            };
+            duplex.listeners.close.add(onClose);
+        });
+
+        return res;
+    };
+
+    stream.promise = async () => {
+        let data = new Uint8Array();
+        for await (const chunk of stream) {
+            data = mergeUint8Arrays(data, chunk);
+        }
+        return data;
+    };
+
+    stream.eventEmitter = () => {
+        return createEventEmitter(stream);
+    };
+
+    stream.open = open;
+
+    stream.id = id;
+
+    return stream;
+}
+
+export default onStreamData;

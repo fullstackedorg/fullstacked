@@ -1,190 +1,108 @@
-import http from "http";
-import net from "net";
+import http from "node:http";
+import net from "node:net";
 import open from "open";
-import { Duplex } from "stream";
-import { WebSocket, WebSocketServer } from "ws";
-import { createInstance } from "./instance";
-import { platform, getEnvVar } from ".";
-import {
-    deserializeArgs,
-    numberTo4Bytes
-} from "../../../fullstacked_modules/bridge/serialization";
+import type { Core } from "./core.ts";
+import { createBridge } from "./bridge.ts";
 
-type Instance = ReturnType<typeof createInstance>;
-
-export let mainPort = parseInt(getEnvVar("port"));
-if (!mainPort || isNaN(mainPort)) {
-    mainPort = 9000;
+const args = process.argv;
+const portIndex = args.findIndex((arg) => arg === "-p" || arg === "--port");
+let mainPort = 9000;
+if (portIndex !== -1 && args[portIndex + 1]) {
+    mainPort = parseInt(args[portIndex + 1]);
+    if (isNaN(mainPort)) {
+        mainPort = 9000;
+    }
 }
 
-const te = new TextEncoder();
+// -n, --no-open: serve without opening the browser (as TEST does)
+const noOpen = args.some((arg) => arg === "-n" || arg === "--no-open");
 
-export async function createWebView(
-    instance: Instance,
-    onClose?: () => void,
-    onFirstConnection?: () => void
+export type CreateWebViewOpts = {
+    quiet?: boolean;
+    didClose?: () => void;
+};
+
+const activeServers = new Set<http.Server>();
+
+export async function createWebViewWithCore(
+    core: Core,
+    ctx: number,
+    opts?: CreateWebViewOpts
 ) {
     const port = await getNextAvailablePort(mainPort);
-    const server = http.createServer(createHandler(instance));
+    const server = http.createServer();
+    activeServers.add(server);
 
+    let closed = false;
     const close = () => {
-        if (onClose) {
-            onClose();
-            server.close();
-        }
+        if (closed) return;
+        closed = true;
+        core.stop(ctx);
+        bridge.close();
+        server?.closeAllConnections?.();
+        server.close();
+        activeServers.delete(server);
+        opts?.didClose?.();
     };
+    const bridge = createBridge(core, ctx, close);
+    server.on("request", createHandler(bridge, close));
 
-    let closeTimeout: ReturnType<typeof setTimeout>,
-        connectedOnce = false,
-        messagesQueue: [string, string][] = [];
-    const onSocketOpen = () => {
-        if (!connectedOnce) {
-            connectedOnce = true;
-            messagesQueue.forEach(send);
-            messagesQueue = [];
-            onFirstConnection?.();
-        }
-        if (!closeTimeout) return;
-        clearTimeout(closeTimeout);
-        closeTimeout = null;
-    };
-    const onSocketClose = () => {
-        if (webSockets.size !== 0) return;
-        closeTimeout = setTimeout(close, 2000);
-    };
-    const webSockets = createWebSocketServer(server, {
-        onSocketOpen,
-        onSocketClose
-    });
-    const send = (m: [string, string]) => {
-        const jsonStr = JSON.stringify(m);
-        webSockets.forEach((ws) => ws.send(jsonStr));
-    };
     server.listen(port);
-    if (!process.env.NO_OPEN) {
-        let url = `http://localhost:${port}`;
-        if (process.argv.includes("--debug")) {
-            url += "?debug";
-        }
-        open(url);
+
+    if (!opts?.quiet) {
+        console.log(`Listening at http://localhost:${port}`);
     }
+
+    if (!noOpen && !process.env.TEST) {
+        open(`http://localhost:${port}`);
+    }
+
     return {
-        message: (type: string, message: string) => {
-            if (!connectedOnce) {
-                messagesQueue.push([type, message]);
-            } else {
-                send([type, message]);
-            }
-        }
+        close,
+        port
     };
 }
 
-function createHandler(instance: Instance) {
+// the UI endpoints of the page, the rest goes to the bridge
+function createHandler(
+    bridge: ReturnType<typeof createBridge>,
+    close: () => void
+) {
     return async (req: http.IncomingMessage, res: http.ServerResponse) => {
-        let [pathname] = req.url.split("?");
-        pathname = decodeURI(pathname);
-
-        if (pathname === "/platform") {
-            res.writeHead(200, {
-                "content-type": "text/plain",
-                "content-length": platform.length
-            });
-            return res.end(platform);
-        } else if (pathname === "/call") {
-            const payload = await readBody(req);
-            const data = instance.call(payload);
-            res.writeHead(200, {
-                "content-type": "application/octet-stream",
-                "content-length": data.length,
-                "cache-control": "no-cache"
-            });
-            return res.end(data);
+        const url = new URL(req.url, "http://localhost");
+        if (url.pathname === "/open") {
+            const ctx = Number(url.searchParams.get("ctx"));
+            if (ctx) globalThis.fullstacked.open(ctx);
+            return res.end();
         }
-
-        // Serve Static File
-
-        const pathnameData = te.encode(pathname);
-
-        const payload = new Uint8Array([
-            1, // Static File Serving
-
-            2, // arg type: STRING
-            ...numberTo4Bytes(pathnameData.length), // arg length
-            ...pathnameData
-        ]);
-        const responseData = await instance.call(payload);
-        const [mimeType, data] = deserializeArgs(responseData);
-
-        // not found
-        if (!mimeType) {
-            const body = te.encode("Not Found");
-            res.writeHead(404, {
-                "content-type": "text/plain",
-                "content-length": body.length,
-                "cache-control": "no-cache"
-            });
-            return res.end(body);
+        if (url.pathname === "/exit") {
+            res.end();
+            return close();
         }
-
-        res.writeHead(200, {
-            "content-type": mimeType,
-            "content-length": data.length,
-            "cache-control": "no-cache"
-        });
-        res.end(data);
+        return bridge.request(req, res, url.pathname);
     };
 }
 
-const readBodyQueue: {
-    req: http.IncomingMessage;
-    resolve: (body: Uint8Array) => void;
-}[] = [];
-let processingRequestLock = false;
-function processRequests() {
-    if (processingRequestLock) {
-        return;
-    }
-    const readBody = readBodyQueue.shift();
-    if (!readBody) {
-        return;
-    }
-    processingRequestLock = true;
-    const { req, resolve } = readBody;
-
-    const end = (body: Uint8Array) => {
-        resolve(body);
-        processingRequestLock = false;
-        processRequests();
-    };
-
-    const contentLengthStr = req.headers["content-length"] || "0";
-    const contentLength = parseInt(contentLengthStr);
-    if (!contentLength) {
-        return end(new Uint8Array());
-    }
-
-    const body = new Uint8Array(contentLength);
-    let i = 0;
-    req.on("data", (chunk: Buffer) => {
-        for (let j = 0; j < chunk.byteLength; j++) {
-            body[j + i] = chunk[j];
-        }
-        i += chunk.length;
-    });
-    req.on("end", () => end(body));
-}
-
-function readBody(req: http.IncomingMessage) {
-    return new Promise<Uint8Array>((resolve) => {
-        readBodyQueue.push({ req, resolve });
-        processRequests();
-    });
+export function staticFileWithCore(core: Core, ctx: number, pathname: string) {
+    const [status, mimeType, data] = core.request(ctx, pathname);
+    return status === 200
+        ? { found: true, mimeType, data }
+        : {
+              found: false,
+              mimeType: "text/plain",
+              data: new TextEncoder().encode("not found")
+          };
 }
 
 function getNextAvailablePort(
     port: number = 9000,
     host = "0.0.0.0"
 ): Promise<number> {
+    for (const s of activeServers) {
+        if ((s.address() as net.AddressInfo).port === port) {
+            return getNextAvailablePort(++port);
+        }
+    }
     return new Promise((resolve, reject) => {
         const socket = new net.Socket();
 
@@ -215,30 +133,4 @@ function getNextAvailablePort(
 
         socket.connect(port, host);
     });
-}
-
-function createWebSocketServer(
-    server: http.Server,
-    cb: {
-        onSocketOpen: () => void;
-        onSocketClose: () => void;
-    }
-) {
-    const webSockets = new Set<WebSocket>();
-    const wss = new WebSocketServer({ noServer: true });
-    const onClose = (ws: WebSocket) => {
-        webSockets.delete(ws);
-        cb.onSocketClose();
-    };
-    const handleUpgrade = (ws: WebSocket) => {
-        webSockets.add(ws);
-        cb.onSocketOpen();
-
-        ws.on("close", () => onClose(ws));
-    };
-    const onUpgrade = (...args: [InstanceType<any>, Duplex, Buffer]) => {
-        wss.handleUpgrade(...args, handleUpgrade);
-    };
-    server.on("upgrade", onUpgrade);
-    return webSockets;
 }

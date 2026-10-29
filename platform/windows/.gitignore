@@ -8,3 +8,4 @@ win32-*.dll
 publish
 AppPackages
 build
+BundleArtifacts

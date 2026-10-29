@@ -15,13 +15,6 @@
 			</array>
 		</dict>
 	</array>
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
-	<key>NSBonjourServices</key>
-	<array>
-		<string>_fullstacked._tcp</string>
-		<string>_fullstacked-ios._tcp</string>
-	</array>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 </dict>

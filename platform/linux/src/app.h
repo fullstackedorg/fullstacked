@@ -1,8 +1,12 @@
 #ifndef APP_H
 #define APP_H
 
-#include "./instance.h"
+#include "./gui.h"
+#include <cstdint>
 #include <map>
+#include <memory>
+#include <mutex>
+#include <string>
 
 #ifdef GTK
 #include "./gtk/gtk.h"
@@ -19,18 +23,30 @@ class App {
 #endif
 
     public:
-        inline static App *instance;
-        std::map<std::string, Instance *> activeWindows;
+        inline static App *instance = nullptr;
+        std::map<uint8_t, Window *> activeWindows;
+        // activeWindows is changed on the main thread and read from core
+        // threads by onStreamData, never hold it while calling the core
+        std::mutex activeWindowsMutex;
+        std::string rootDir;
+        std::string buildDir;
+        // fullstacked:// link the app was launched with
         std::string deeplink;
         bool kiosk = false;
+        bool safe = false;
+        bool isSafeRunning = false;
 
         App();
+        ~App();
 
-        void onMessage(char *projectId, char *type, std::string message);
+        void open(uint8_t ctx);
+        void close(uint8_t ctx);
+        void safeTrigger();
+        void deepLink(const std::string &url);
+        void onStreamData(uint8_t ctx, uint32_t streamId,
+                          const std::vector<uint8_t> &data);
 
-        void open(std::string projectId, bool isEditor);
-
-        int run(int argc, char *argv[], std::string startupId);
+        int run(int argc, char *argv[]);
 };
 
 #endif

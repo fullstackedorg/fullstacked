@@ -79,9 +79,11 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Windows.ImplementationLibrary" Version="1.0.260126.7" />
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7463" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260101001" />
-    <PackageReference Include="System.Drawing.Common" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.MSIX" Version="1.7.260903100">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.4.0" />
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
 
@@ -95,7 +97,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="build\**">
+    <None Update="out\**">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
@@ -127,7 +129,8 @@
     <GenerateTemporaryStoreCertificate>True</GenerateTemporaryStoreCertificate>
     <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
-    <PackageCertificateThumbprint>734F092F0523EE1065405C073E3E682186A2A0D7</PackageCertificateThumbprint>
+    <PackageCertificateKeyFile>FullStacked_TemporaryKey.pfx</PackageCertificateKeyFile>
+    <PackageCertificateThumbprint>17BDBFE0E8A7456A7BC4C0373E1A4269F4F6A28D</PackageCertificateThumbprint>
   </PropertyGroup>
 
   <!--

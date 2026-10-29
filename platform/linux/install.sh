@@ -12,12 +12,12 @@ fi
 mkdir ~/.bin
 
 # nodejs
-curl -o ~/node.xz -L https://nodejs.org/dist/v24.11.1/node-v24.11.1-linux-$ARCH.tar.xz
+curl -o ~/node.xz -L https://nodejs.org/dist/v24.16.0/node-v24.16.0-linux-$ARCH.tar.xz
 mkdir ~/.bin/node
 tar -xvf ~/node.xz -C ~/.bin/node --strip-components=1
 
 # golang
-curl -o ~/go.xz -L https://go.dev/dl/go1.25.4.linux-$ARCH2.tar.gz
+curl -o ~/go.xz -L https://go.dev/dl/go1.26.4.linux-$ARCH2.tar.gz
 mkdir ~/.bin/go
 tar -xvf ~/go.xz -C ~/.bin/go --strip-components=1
 
@@ -25,6 +25,9 @@ rm -rf ~/*.xz
 
 # bash profile
 echo PATH=\$PATH:\$HOME/.bin/node/bin:\$HOME/.bin/go/bin >> ~/.bashrc
+
+# puppeteer skip download
+echo export PUPPETEER_SKIP_DOWNLOAD=1 >> ~/.bashrc
 
 # clone git
 mkdir ~/fullstackedorg

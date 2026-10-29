@@ -1,0 +1,214 @@
+package types
+
+import (
+	"fullstackedorg/fullstacked/internal/frames"
+	"sync"
+	"time"
+)
+
+type CoreModule = uint8
+
+const (
+	Core      CoreModule = 0
+	Stream    CoreModule = 1
+	Test      CoreModule = 2
+	Fs        CoreModule = 3
+	Path      CoreModule = 4
+	Os        CoreModule = 5
+	Net       CoreModule = 6
+	Tunnel    CoreModule = 7
+	Fetch     CoreModule = 8
+	Bundle    CoreModule = 9
+	Dns       CoreModule = 10
+	Git       CoreModule = 11
+	Packages  CoreModule = 12
+	Dgram     CoreModule = 13
+	Plugin    CoreModule = 14
+	WebSocket CoreModule = 15
+	Config    CoreModule = 16
+	Crypto    CoreModule = 17
+	Zlib      CoreModule = 18
+)
+
+type ModuleSwitch = func(*Context, CoreCallHeader, []DeserializedData, *CoreCallResponse) error
+
+type CoreCallResponseType = uint8
+
+const (
+	CoreResponseError  CoreCallResponseType = 0
+	CoreResponseData   CoreCallResponseType = 1
+	CoreResponseStream CoreCallResponseType = 2
+)
+
+type ResponseStream struct {
+	Open  func(ctx *Context, streamId uint32)
+	Write func(ctx *Context, streamId uint32, data []byte)
+	// Write runs on a goroutine of the stream, in order, and the write call
+	// returns before it: a peer slow to take the data blocks no other call
+	// (see store.QueueWrite). A close waits for the queued writes.
+	QueueWrites bool
+	// with QueueWrites, writes what the producer takes now without waiting
+	// (the bytes written, all of them once failed), when no write is queued:
+	// no goroutine hop for a socket that keeps up
+	TryWrite   func(ctx *Context, streamId uint32, data []byte) int
+	WriteEvent func(ctx *Context, streamId uint32, event string, data []DeserializedData)
+	Close      func(ctx *Context, streamId uint32)
+}
+
+type CoreCallResponse struct {
+	Type   CoreCallResponseType
+	Data   SerializableData
+	Stream *ResponseStream
+}
+
+type CoreCallHeader struct {
+	Sync   uint8
+	Id     uint8
+	Module CoreModule
+	Fn     uint8
+}
+
+type StoredStream struct {
+	Buffer     []byte
+	Open       func(ctx *Context, streamId uint32)
+	Opened     bool
+	Write      func(ctx *Context, streamId uint32, data []byte)
+	WriteEvent func(ctx *Context, streamId uint32, event string, data []DeserializedData)
+	Close      func(ctx *Context, streamId uint32)
+	Ended      bool
+	Error      error
+	// queued writes, nil unless ResponseStream.QueueWrites
+	Writes   *StreamWrites
+	TryWrite func(ctx *Context, streamId uint32, data []byte) int
+	// signals (drain, connected) queued for the per chunk callback, see
+	// store.StreamSignal
+	Signals []uint8
+}
+
+// The writes of a stream queued for its goroutine, see store.QueueWrite
+type StreamWrites struct {
+	Mutex  sync.Mutex
+	Chunks [][]byte
+	// bytes in Chunks and in the write running
+	Queued int
+	// a goroutine writes the chunks
+	Writing bool
+	// the page waits for a drain chunk
+	DrainRequested bool
+	// closed, or closing once the queued writes are done
+	Closed bool
+}
+
+type StoredResponse struct {
+	Type    CoreCallResponseType
+	Payload []byte
+}
+
+type ContextDirectories struct {
+	Root  string
+	Build string
+}
+
+type PluginType = string
+
+const (
+	PluginTypeGitAuth  PluginType = "git-auth"
+	PluginTypeBuild    PluginType = "build"
+	PluginTypeDeepLink PluginType = "deeplink"
+)
+
+type PluginRequest struct {
+	Response      []DeserializedData
+	ResponseError *string
+	Wg            *sync.WaitGroup
+}
+
+type ContextPlugin struct {
+	Id   uint8
+	Name string
+	Type PluginType
+	Data DeserializedRawObject
+
+	Requests      map[uint8]*PluginRequest
+	RequestsMutex *sync.Mutex
+}
+
+type GitAuth struct {
+	Host     string `json:"host"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Email    string `json:"email"`
+}
+
+type Context struct {
+	Id          uint8
+	Directories ContextDirectories
+
+	Env map[string]string
+	Cwd string
+
+	Responses      map[uint8][]byte
+	ResponsesMutex *sync.Mutex
+
+	Streams      map[uint32]*StoredStream
+	StreamsMutex *sync.Mutex
+
+	// stream data for the host reader of GET /stream, see package frames
+	Frames *frames.Queue
+
+	NextStreamId uint32
+
+	// crypto handles (hashes, ciphers), see package crypto
+	Crypto       map[uint32]any
+	CryptoMutex  *sync.Mutex
+	NextCryptoId uint32
+
+	// zlib streams, see package zlib
+	Zlib       map[uint32]any
+	ZlibMutex  *sync.Mutex
+	NextZlibId uint32
+
+	PluginStreamId uint32
+	Plugins        map[uint8]*ContextPlugin
+	PluginsMutex   *sync.Mutex
+
+	GitAuths      map[string]*GitAuth
+	GitAuthsMutex *sync.Mutex
+
+	// Deeplinks received before a deeplink plugin registered in this context
+	// (e.g. the deeplink that launched the app), see plugin.TriggerDeepLink
+	PendingDeepLinks      []PendingDeepLink
+	PendingDeepLinksMutex *sync.Mutex
+
+	Exited bool
+}
+
+type PendingDeepLink struct {
+	Url        string
+	ReceivedAt time.Time
+}
+
+type SerializableData = any
+
+type SerializableDataType = uint8
+
+const (
+	UNDEFINED SerializableDataType = 0
+	BOOLEAN   SerializableDataType = 1
+	STRING    SerializableDataType = 2
+	NUMBER    SerializableDataType = 3
+	BUFFER    SerializableDataType = 4
+	OBJECT    SerializableDataType = 5
+)
+
+const MAX_UINT_4_BYTES uint64 = 4294967295
+
+type DeserializedData struct {
+	Data           SerializableData
+	Type           SerializableDataType
+	SizeSerialized int
+}
+
+type DeserializedRawObject struct {
+	Data []byte
+}

@@ -1,102 +1,89 @@
+import os from "node:os";
+import child_process from "node:child_process";
 import path from "node:path";
-import { promises as fs } from "node:fs";
-import { getLibPath } from "./platform/node/src/lib";
-import { load, setDirectories, callLib } from "./platform/node/src/call";
-import { buildNodeBinding } from "./platform/node/build-binding";
-import { createRequire } from "node:module";
-import { buildCore } from "./build-core";
-import { createPayloadHeader } from "./platform/node/src/instance";
-import { serializeArgs } from "./fullstacked_modules/bridge/serialization";
-import version, { getVersion } from "./version";
-import { buildLocalProject } from "./platform/node/src/build";
-globalThis.require = createRequire(import.meta.url);
+import fs from "node:fs";
+import version from "./version.ts";
+import url from "node:url";
 
-const noTSGO = process.argv.includes("--no-tsgo");
+const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
 
-const exit = () => process.exit();
-["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => process.on(signal, exit));
+// types
 
-buildCore(noTSGO);
-
-buildNodeBinding("platform/node");
-
-load(await getLibPath("core/bin"), "platform/node");
-
-const project = "editor";
-
-setDirectories({
-    root: process.cwd(),
-    config: "",
-    editor: process.cwd(),
-    tmp: path.resolve(process.cwd(), ".cache")
+child_process.execSync("go run ./generate.go", {
+    cwd: path.join(currentDirectory, "types")
 });
 
-await buildLocalProject(project);
+// version
 
-await postbuild();
+fs.writeFileSync(
+    path.join(
+        currentDirectory,
+        "core/internal/bundle/lib/process/version.json"
+    ),
+    JSON.stringify(version)
+);
 
-console.log("Success");
+// core
 
-exit();
+const platform = os.platform();
+const arch = os.arch();
 
-async function postbuild() {
-    if (!noTSGO) {
-        await import("./declarations.js");
-    }
-
-    const outDir = "out";
-    const assets = [
-        [`${project}/assets`, "assets"],
-        ["node_modules/@fullstacked/ui/icons", "icons"],
-        ["fullstacked_modules", "fullstacked_modules"]
-    ];
-
-    await fs.rm(outDir, { recursive: true, force: true });
-    await fs.mkdir(outDir, { recursive: true });
-    await fs.rename(`${project}/.build`, `${outDir}/build`);
-
-    for (const [from, to] of assets) {
-        await fs.cp(from, `${outDir}/build/${to}`, {
-            recursive: true,
-            force: true
-        });
-    }
-
-    await (
-        await import("./build-sass.js")
-    ).buildSASS(`${outDir}/build/fullstacked_modules/sass/index.js`);
-
-    await fs.writeFile(`${outDir}/build/version.json`, JSON.stringify(version));
-
-    if (!noTSGO) {
-        await fs.writeFile(
-            `${outDir}/build/version-tsgo.json`,
-            JSON.stringify(getVersion("core/typescript-go"))
-        );
-    }
-
-    // zip demo
-    callLib(
-        new Uint8Array([
-            ...createPayloadHeader({
-                id: "",
-                isEditor: true
-            }),
-            36,
-            ...serializeArgs([`demo`, `${outDir}/build/demo.zip`])
-        ])
-    );
-
-    // zip build
-    callLib(
-        new Uint8Array([
-            ...createPayloadHeader({
-                id: "",
-                isEditor: true
-            }),
-            36,
-            ...serializeArgs([`${outDir}/build`, `${outDir}/zip/build.zip`])
-        ])
-    );
-    await fs.writeFile(`${outDir}/zip/build.txt`, Date.now().toString());
+if (platform === "win32") {
+    child_process.execSync(`call ./windows.bat ${arch}`, {
+        stdio: "inherit",
+        cwd: path.join(currentDirectory, "core/build")
+    });
+} else {
+    const target_name = platform + "-" + arch + "-shared";
+    child_process.execSync(`make ${target_name}`, {
+        stdio: "inherit",
+        cwd: path.join(currentDirectory, "core/build")
+    });
 }
+
+// plugins
+
+const pluginsDir = path.join(currentDirectory, "plugins");
+
+async function copyPlugin(plugin: string) {
+    const pluginPath = path.join(pluginsDir, plugin);
+
+    if (!fs.existsSync(path.join(pluginPath, "package.json"))) return;
+
+    child_process.execSync("npm run build", {
+        cwd: pluginPath,
+        stdio: "inherit"
+    });
+
+    const pkgJsonPath = path.join(pluginPath, "package.json");
+    const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
+    const pkgName = pkgJson.name;
+    const destPath = path.resolve("node_modules", pkgName);
+
+    if (fs.existsSync(destPath)) {
+        fs.rmSync(destPath, { recursive: true, force: true });
+    }
+
+    await fs.promises.cp(pluginPath, destPath, {
+        recursive: true,
+        force: true,
+        filter: (src) => {
+            // the plugin's tests run from this repository, not from the copy
+            const relative = path.relative(pluginPath, src).split(path.sep);
+            return !relative.includes("node_modules") && relative[0] !== "test";
+        }
+    });
+}
+
+const plugins = (await fs.promises.readdir(pluginsDir, { withFileTypes: true }))
+    .filter((dirent) => dirent.isDirectory())
+    .map(({ name }) => name);
+await Promise.all(plugins.map(copyPlugin));
+
+console.log(
+    `\nBuilt FullStacked v${version.major}.${version.minor}.${version.patch}\n` +
+        `\tbuild: ${version.build}\n` +
+        `\tbranch: ${version.branch}\n` +
+        `\thash: ${version.hash.slice(0, 8)}\n` +
+        `\tplatform: ${platform}-${arch}\n`
+);

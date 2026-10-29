@@ -1,0 +1,26 @@
+const head = document.createElement("pre");
+head.id = "head";
+const headers = document.createElement("pre");
+headers.id = "headers";
+const body = document.createElement("pre");
+body.id = "body";
+
+document.body.append(head, headers, body);
+
+// the test server's port, from test/fetch/integration.ts
+const port = new URLSearchParams(location.search).get("port");
+
+const response = await fetch(`http://localhost:${port}`, {
+    method: "POST",
+    body: new Uint8Array([1, 2, 3])
+});
+head.innerHTML = JSON.stringify(response, null, 2);
+const headersObj: Record<string, string> = {};
+response.headers.forEach((value, key) => (headersObj[key] = value));
+headers.innerHTML = JSON.stringify(headersObj, null, 2);
+const payload = await response.arrayBuffer();
+body.innerHTML = `[ ${new Uint8Array(payload).join(", ")} ]`;
+
+document.body.classList.add("done");
+
+export {};

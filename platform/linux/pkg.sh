@@ -1,2 +1,2 @@
-dpkg-deb --root-owner-group --build ./out
-mv out.deb fullstacked.deb
+DEST=${1:-fullstacked.deb}
+dpkg-deb --root-owner-group --build ./out "$DEST"

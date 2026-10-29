@@ -7,48 +7,53 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		9C2CD0202F4EB1E70019F8E6 /* darwin.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 9C2CD01F2F4EB1E70019F8E6 /* darwin.a */; };
-		9C2CD0232F4EB2510019F8E6 /* ios-arm64.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 9C2CD0222F4EB2510019F8E6 /* ios-arm64.a */; };
-		9C5A1EDD2CDB9AB9009B4A20 /* Instance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5A1EDC2CDB9AB4009B4A20 /* Instance.swift */; };
+		9C5516FE2F589B8D006B0B64 /* out in Resources */ = {isa = PBXBuildFile; fileRef = 9C5516FD2F589B8D006B0B64 /* out */; };
+		9C5516FF2F589B9E006B0B64 /* out in Resources */ = {isa = PBXBuildFile; fileRef = 9C5516FD2F589B8D006B0B64 /* out */; };
+		9C5517042F594475006B0B64 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 9C5517032F594475006B0B64 /* AppIcon.icon */; };
+		9C5517052F594475006B0B64 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 9C5517032F594475006B0B64 /* AppIcon.icon */; };
+		9C5A1EDB2CDB99BB009B4A20 /* ios-arm64.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 9C5A1EDA2CDB99BB009B4A20 /* ios-arm64.a */; };
 		9C5A1EDF2CDB9ADB009B4A20 /* WebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5A1EDE2CDB9AD6009B4A20 /* WebView.swift */; };
 		9C7E8A632BAA038500CE9660 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9C7E8A622BA9BF1600CE9660 /* PrivacyInfo.xcprivacy */; };
-		9C8003192E85B87E003D0FBA /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 9C8003182E85B87E003D0FBA /* AppIcon.icon */; };
-		9C80031A2E85B87E003D0FBA /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 9C8003182E85B87E003D0FBA /* AppIcon.icon */; };
 		9C8C8A2E2D2CEA1400C4B8AD /* FullStacked.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C8C8A2D2D2CEA1400C4B8AD /* FullStacked.swift */; };
 		9C8C8A302D2CEAD600C4B8AD /* FullStacked.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C8C8A2D2D2CEA1400C4B8AD /* FullStacked.swift */; };
-		9C91B3C22E0CFAFD00CF54B7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9C91B3BF2E0CF89200CF54B7 /* Assets.xcassets */; };
-		9C91B3C32E0CFAFD00CF54B7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9C91B3BF2E0CF89200CF54B7 /* Assets.xcassets */; };
-		9CA03E522B5715AA002D2D9F /* Main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CA03E512B5715AA002D2D9F /* Main.swift */; };
-		9CBD6C842EA813A9000C96BC /* build in Resources */ = {isa = PBXBuildFile; fileRef = 9CBD6C832EA8137B000C96BC /* build */; };
-		9CBD6C852EA81431000C96BC /* build in Resources */ = {isa = PBXBuildFile; fileRef = 9CBD6C832EA8137B000C96BC /* build */; };
+		9CD1F0D92F55C7A900FD3499 /* darwin.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 9CD1F0D52F55C7A900FD3499 /* darwin.a */; };
+		9CD1F0DA2F55C7A900FD3499 /* ios-arm64.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 9CD1F0D72F55C7A900FD3499 /* ios-arm64.a */; };
+		9CD952B72F3D2D4E009B9EE7 /* libresolv.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 9CD952B62F3D2D40009B9EE7 /* libresolv.tbd */; };
 		9CDBCDA32CF7F8070035BF46 /* WebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5A1EDE2CDB9AD6009B4A20 /* WebView.swift */; };
-		9CDBCDA42CF7F8070035BF46 /* Instance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5A1EDC2CDB9AB4009B4A20 /* Instance.swift */; };
 		9CDBCDA92CF7F8070035BF46 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9C7E8A622BA9BF1600CE9660 /* PrivacyInfo.xcprivacy */; };
 		9CDBCDB32CF7F9BF0035BF46 /* WebViewUIKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CDBCDB12CF7F9B00035BF46 /* WebViewUIKit.swift */; };
 		9CDBCDB82CF7F9F50035BF46 /* WebViewAppKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CDBCDB52CF7F9F50035BF46 /* WebViewAppKit.swift */; };
-		9CDBCDB92CF7FAB80035BF46 /* Main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CA03E512B5715AA002D2D9F /* Main.swift */; };
+		9CDBCDC82CF819F60035BF46 /* (null) in Frameworks */ = {isa = PBXBuildFile; };
+		9CF5A12B2F228EC30027A18F /* Serialization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CF5A12A2F228EBD0027A18F /* Serialization.swift */; };
+		9CF5A12C2F228EC30027A18F /* Serialization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CF5A12A2F228EBD0027A18F /* Serialization.swift */; };
+		9CF5A12E2F2294C90027A18F /* Core.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CF5A12D2F2294C70027A18F /* Core.swift */; };
+		9CF5A12F2F2294C90027A18F /* Core.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CF5A12D2F2294C70027A18F /* Core.swift */; };
+		9CF5A1312F22A7400027A18F /* libresolv.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 9CF5A1302F22A7320027A18F /* libresolv.tbd */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		9C2CD01E2F4EB1E70019F8E6 /* darwin.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = darwin.h; path = ../../../../core/bin/darwin.h; sourceTree = "<group>"; };
-		9C2CD01F2F4EB1E70019F8E6 /* darwin.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = darwin.a; path = ../../../../core/bin/darwin.a; sourceTree = "<group>"; };
-		9C2CD0212F4EB2510019F8E6 /* ios-arm64.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "ios-arm64.h"; path = "../../../../core/bin/ios-arm64.h"; sourceTree = "<group>"; };
-		9C2CD0222F4EB2510019F8E6 /* ios-arm64.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "ios-arm64.a"; path = "../../../../core/bin/ios-arm64.a"; sourceTree = "<group>"; };
-		9C5A1EDC2CDB9AB4009B4A20 /* Instance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Instance.swift; sourceTree = "<group>"; };
+		9C5516FD2F589B8D006B0B64 /* out */ = {isa = PBXFileReference; lastKnownFileType = folder; name = out; path = ../../../shell/out; sourceTree = "<group>"; };
+		9C5517032F594475006B0B64 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		9C5A1EDA2CDB99BB009B4A20 /* ios-arm64.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "ios-arm64.a"; path = "../../core/bin/ios-arm64.a"; sourceTree = SOURCE_ROOT; };
 		9C5A1EDE2CDB9AD6009B4A20 /* WebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebView.swift; sourceTree = "<group>"; };
 		9C7081332BE6CBA100EF0A6B /* FullStacked.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FullStacked.entitlements; sourceTree = "<group>"; };
 		9C7E8A622BA9BF1600CE9660 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		9C8003182E85B87E003D0FBA /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		9C8C8A2D2D2CEA1400C4B8AD /* FullStacked.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullStacked.swift; sourceTree = "<group>"; };
-		9C91B3BF2E0CF89200CF54B7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9C9902662CE792E80039D1F0 /* mac-catalyst-x86_64.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "mac-catalyst-x86_64.a"; path = "../../../core/bin/mac-catalyst-x86_64.a"; sourceTree = "<group>"; };
 		9CA03E4C2B5715AA002D2D9F /* FullStacked.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FullStacked.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		9CA03E512B5715AA002D2D9F /* Main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Main.swift; sourceTree = "<group>"; };
-		9CBD6C832EA8137B000C96BC /* build */ = {isa = PBXFileReference; lastKnownFileType = folder; name = build; path = ../../../out/build; sourceTree = "<group>"; };
+		9CD1F0D42F55C7A900FD3499 /* darwin.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = darwin.h; path = ../../../../core/bin/darwin.h; sourceTree = "<group>"; };
+		9CD1F0D52F55C7A900FD3499 /* darwin.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = darwin.a; path = ../../../../core/bin/darwin.a; sourceTree = "<group>"; };
+		9CD1F0D62F55C7A900FD3499 /* ios-arm64.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "ios-arm64.h"; path = "../../../../core/bin/ios-arm64.h"; sourceTree = "<group>"; };
+		9CD1F0D72F55C7A900FD3499 /* ios-arm64.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "ios-arm64.a"; path = "../../../../core/bin/ios-arm64.a"; sourceTree = "<group>"; };
+		9CD952B52F3D2D37009B9EE7 /* libresolv.9.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libresolv.9.tbd; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/usr/lib/libresolv.9.tbd; sourceTree = DEVELOPER_DIR; };
+		9CD952B62F3D2D40009B9EE7 /* libresolv.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libresolv.tbd; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/usr/lib/libresolv.tbd; sourceTree = DEVELOPER_DIR; };
 		9CDBCDAF2CF7F8070035BF46 /* FullStacked.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FullStacked.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9CDBCDB12CF7F9B00035BF46 /* WebViewUIKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewUIKit.swift; sourceTree = "<group>"; };
 		9CDBCDB52CF7F9F50035BF46 /* WebViewAppKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewAppKit.swift; sourceTree = "<group>"; };
 		9CE2142E2B5E17AA00B3F646 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		9CF5A12A2F228EBD0027A18F /* Serialization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Serialization.swift; sourceTree = "<group>"; };
+		9CF5A12D2F2294C70027A18F /* Core.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core.swift; sourceTree = "<group>"; };
+		9CF5A1302F22A7320027A18F /* libresolv.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libresolv.tbd; path = usr/lib/libresolv.tbd; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -56,7 +61,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9C2CD0232F4EB2510019F8E6 /* ios-arm64.a in Frameworks */,
+				9C5A1EDB2CDB99BB009B4A20 /* ios-arm64.a in Frameworks */,
+				9CD1F0DA2F55C7A900FD3499 /* ios-arm64.a in Frameworks */,
+				9CF5A1312F22A7400027A18F /* libresolv.tbd in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -64,7 +71,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9C2CD0202F4EB1E70019F8E6 /* darwin.a in Frameworks */,
+				9CDBCDC82CF819F60035BF46 /* (null) in Frameworks */,
+				9CD1F0D92F55C7A900FD3499 /* darwin.a in Frameworks */,
+				9CD952B72F3D2D4E009B9EE7 /* libresolv.tbd in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -74,10 +83,10 @@
 		9C2CD0242F4EB25B0019F8E6 /* bin */ = {
 			isa = PBXGroup;
 			children = (
-				9C2CD0212F4EB2510019F8E6 /* ios-arm64.h */,
-				9C2CD0222F4EB2510019F8E6 /* ios-arm64.a */,
-				9C2CD01E2F4EB1E70019F8E6 /* darwin.h */,
-				9C2CD01F2F4EB1E70019F8E6 /* darwin.a */,
+				9CD1F0D42F55C7A900FD3499 /* darwin.h */,
+				9CD1F0D52F55C7A900FD3499 /* darwin.a */,
+				9CD1F0D62F55C7A900FD3499 /* ios-arm64.h */,
+				9CD1F0D72F55C7A900FD3499 /* ios-arm64.a */,
 			);
 			path = bin;
 			sourceTree = "<group>";
@@ -85,6 +94,9 @@
 		9C3752D72BE70548001C98D3 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				9CD952B62F3D2D40009B9EE7 /* libresolv.tbd */,
+				9CD952B52F3D2D37009B9EE7 /* libresolv.9.tbd */,
+				9CF5A1302F22A7320027A18F /* libresolv.tbd */,
 				9C9902662CE792E80039D1F0 /* mac-catalyst-x86_64.a */,
 			);
 			name = Frameworks;
@@ -96,6 +108,7 @@
 				9CA03E4E2B5715AA002D2D9F /* FullStacked */,
 				9CA03E4D2B5715AA002D2D9F /* Products */,
 				9C3752D72BE70548001C98D3 /* Frameworks */,
+				9CD1F0D32F55C72A00FD3499 /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -111,21 +124,28 @@
 		9CA03E4E2B5715AA002D2D9F /* FullStacked */ = {
 			isa = PBXGroup;
 			children = (
+				9C5516FD2F589B8D006B0B64 /* out */,
 				9C2CD0242F4EB25B0019F8E6 /* bin */,
-				9C8003182E85B87E003D0FBA /* AppIcon.icon */,
+				9C5517032F594475006B0B64 /* AppIcon.icon */,
 				9C7081332BE6CBA100EF0A6B /* FullStacked.entitlements */,
 				9CE2142E2B5E17AA00B3F646 /* Info.plist */,
 				9C8C8A2D2D2CEA1400C4B8AD /* FullStacked.swift */,
-				9CA03E512B5715AA002D2D9F /* Main.swift */,
-				9CBD6C832EA8137B000C96BC /* build */,
+				9CF5A12A2F228EBD0027A18F /* Serialization.swift */,
+				9CF5A12D2F2294C70027A18F /* Core.swift */,
 				9C5A1EDE2CDB9AD6009B4A20 /* WebView.swift */,
 				9CDBCDB12CF7F9B00035BF46 /* WebViewUIKit.swift */,
 				9CDBCDB52CF7F9F50035BF46 /* WebViewAppKit.swift */,
-				9C5A1EDC2CDB9AB4009B4A20 /* Instance.swift */,
 				9C7E8A622BA9BF1600CE9660 /* PrivacyInfo.xcprivacy */,
-				9C91B3BF2E0CF89200CF54B7 /* Assets.xcassets */,
 			);
 			path = FullStacked;
+			sourceTree = "<group>";
+		};
+		9CD1F0D32F55C72A00FD3499 /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				9C5A1EDA2CDB99BB009B4A20 /* ios-arm64.a */,
+			);
+			name = "Recovered References";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -177,7 +197,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1520;
-				LastUpgradeCheck = 1610;
+				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					9CA03E4B2B5715AA002D2D9F = {
 						CreatedOnToolsVersion = 15.2;
@@ -210,10 +230,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9CBD6C852EA81431000C96BC /* build in Resources */,
+				9C5517052F594475006B0B64 /* AppIcon.icon in Resources */,
+				9C5516FF2F589B9E006B0B64 /* out in Resources */,
 				9C7E8A632BAA038500CE9660 /* PrivacyInfo.xcprivacy in Resources */,
-				9C80031A2E85B87E003D0FBA /* AppIcon.icon in Resources */,
-				9C91B3C22E0CFAFD00CF54B7 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -221,10 +240,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9CBD6C842EA813A9000C96BC /* build in Resources */,
+				9C5517042F594475006B0B64 /* AppIcon.icon in Resources */,
+				9C5516FE2F589B8D006B0B64 /* out in Resources */,
 				9CDBCDA92CF7F8070035BF46 /* PrivacyInfo.xcprivacy in Resources */,
-				9C8003192E85B87E003D0FBA /* AppIcon.icon in Resources */,
-				9C91B3C32E0CFAFD00CF54B7 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -235,10 +253,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9CA03E522B5715AA002D2D9F /* Main.swift in Sources */,
 				9C8C8A2E2D2CEA1400C4B8AD /* FullStacked.swift in Sources */,
 				9C5A1EDF2CDB9ADB009B4A20 /* WebView.swift in Sources */,
-				9C5A1EDD2CDB9AB9009B4A20 /* Instance.swift in Sources */,
+				9CF5A12E2F2294C90027A18F /* Core.swift in Sources */,
+				9CF5A12C2F228EC30027A18F /* Serialization.swift in Sources */,
 				9CDBCDB32CF7F9BF0035BF46 /* WebViewUIKit.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -247,10 +265,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9CDBCDB92CF7FAB80035BF46 /* Main.swift in Sources */,
 				9CDBCDA32CF7F8070035BF46 /* WebView.swift in Sources */,
 				9CDBCDB82CF7F9F50035BF46 /* WebViewAppKit.swift in Sources */,
-				9CDBCDA42CF7F8070035BF46 /* Instance.swift in Sources */,
+				9CF5A12F2F2294C90027A18F /* Core.swift in Sources */,
+				9CF5A12B2F228EC30027A18F /* Serialization.swift in Sources */,
 				9C8C8A302D2CEAD600C4B8AD /* FullStacked.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -293,6 +311,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = QD7Y9DQ5V4;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -316,6 +335,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -356,6 +376,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = QD7Y9DQ5V4;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -372,6 +393,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -385,13 +407,13 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = FullStacked/FullStacked.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1175;
+				CURRENT_PROJECT_VERSION = 1809;
 				DEVELOPMENT_ASSET_PATHS = "";
-				DEVELOPMENT_TEAM = QD7Y9DQ5V4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = FullStacked/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = FullStacked;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Use camera for file upload";
@@ -401,13 +423,13 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.12.0;
-				PRODUCT_BUNDLE_IDENTIFIER = editor.FullStacked;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.fullstacked;
 				PRODUCT_NAME = FullStacked;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -428,13 +450,13 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = FullStacked/FullStacked.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1175;
+				CURRENT_PROJECT_VERSION = 1809;
 				DEVELOPMENT_ASSET_PATHS = "";
-				DEVELOPMENT_TEAM = QD7Y9DQ5V4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = FullStacked/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = FullStacked;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Use camera for file upload";
@@ -444,13 +466,13 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.12.0;
-				PRODUCT_BUNDLE_IDENTIFIER = editor.FullStacked;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.fullstacked;
 				PRODUCT_NAME = FullStacked;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -472,14 +494,14 @@
 				CODE_SIGN_ENTITLEMENTS = FullStacked/FullStacked.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1175;
+				CURRENT_PROJECT_VERSION = 1809;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "";
-				DEVELOPMENT_TEAM = QD7Y9DQ5V4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = FullStacked/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = FullStacked;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Use camera for file upload";
@@ -489,18 +511,18 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = "$(RECOMMENDED_IPHONEOS_DEPLOYMENT_TARGET)";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = (
+					"$(PROJECT_DIR)/../../core/bin",
 					"$(inherited)",
-					"$(PROJECT_DIR)/FullStacked/bin",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.12.0;
-				PRODUCT_BUNDLE_IDENTIFIER = editor.FullStacked;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.fullstacked;
 				PRODUCT_NAME = FullStacked;
 				REGISTER_APP_GROUPS = NO;
 				SDKROOT = macosx;
@@ -524,14 +546,14 @@
 				CODE_SIGN_ENTITLEMENTS = FullStacked/FullStacked.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1175;
+				CURRENT_PROJECT_VERSION = 1809;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "";
-				DEVELOPMENT_TEAM = QD7Y9DQ5V4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = FullStacked/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = FullStacked;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Use camera for file upload";
@@ -541,18 +563,18 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = "$(RECOMMENDED_IPHONEOS_DEPLOYMENT_TARGET)";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = (
+					"$(PROJECT_DIR)/../../core/bin",
 					"$(inherited)",
-					"$(PROJECT_DIR)/FullStacked/bin",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.12.0;
-				PRODUCT_BUNDLE_IDENTIFIER = editor.FullStacked;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.fullstacked;
 				PRODUCT_NAME = FullStacked;
 				REGISTER_APP_GROUPS = NO;
 				SDKROOT = macosx;

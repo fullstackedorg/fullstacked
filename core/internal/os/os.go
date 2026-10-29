@@ -1,0 +1,91 @@
+package os
+
+import (
+	"encoding/binary"
+	"errors"
+	"fullstackedorg/fullstacked/types"
+	"os"
+	"runtime"
+)
+
+type OsFn = uint8
+
+const (
+	Platform  OsFn = 0
+	Arch      OsFn = 1
+	Endieness OsFn = 2
+	Uname     OsFn = 3
+	Hostname  OsFn = 4
+)
+
+func Switch(
+	ctx *types.Context,
+	header types.CoreCallHeader,
+	data []types.DeserializedData,
+	response *types.CoreCallResponse,
+) error {
+	switch header.Fn {
+	case Platform:
+		response.Type = types.CoreResponseData
+		goos := runtime.GOOS
+		if goos == "windows" {
+			goos = "win32"
+		}
+		response.Data = goos
+		return nil
+	case Arch:
+		response.Type = types.CoreResponseData
+		response.Data = runtime.GOARCH
+		return nil
+	case Endieness:
+		response.Type = types.CoreResponseData
+		response.Data = endieness()
+		return nil
+	case Uname:
+		unameInfo, err := uname()
+		if err != nil {
+			return err
+		}
+		response.Type = types.CoreResponseData
+		response.Data = unameInfo
+		return nil
+	case Hostname:
+		hostname, err := os.Hostname()
+		if err != nil {
+			return err
+		}
+		response.Type = types.CoreResponseData
+		response.Data = hostname
+		return nil
+	}
+
+	return errors.New("unknown os function")
+}
+
+// https://stackoverflow.com/a/78297210
+func endieness() string {
+	little := binary.NativeEndian.Uint16([]byte{0x12, 0x34}) == uint16(0x3412)
+	if little {
+		return "LE"
+	}
+	return "BE"
+}
+
+func int8ToStr(arr []byte) string {
+	b := make([]byte, 0, len(arr))
+	for _, v := range arr {
+		if v == 0x00 {
+			break
+		}
+		b = append(b, byte(v))
+	}
+	return string(b)
+}
+
+type UnameInfo struct {
+	Sysname  string `json:"sysname"`
+	Nodename string `json:"nodename"`
+	Release  string `json:"release"`
+	Version  string `json:"version"`
+	Machine  string `json:"machine"`
+}

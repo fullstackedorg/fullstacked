@@ -5,10 +5,18 @@ CoreLib loadLibrary(std::string libPath) {
     HINSTANCE coreLib = LoadLibrary(libPath.c_str());
 
     CoreLib lib = {
-        (Directories)GetProcAddress(coreLib, "directories"),
-        (Callback)GetProcAddress(coreLib, "callback"),
+        (Start)GetProcAddress(coreLib, "start"),
+        (Check)GetProcAddress(coreLib, "check"),
+        (Stop)GetProcAddress(coreLib, "stop"),
+        (SetOnStreamData)GetProcAddress(coreLib, "setOnStreamData"),
         (Call)GetProcAddress(coreLib, "call"),
-        (GetResponse)GetProcAddress(coreLib, "getResponse"),
+        (GetCorePayload)GetProcAddress(coreLib, "getCorePayload"),
+        (StreamAttach)GetProcAddress(coreLib, "streamAttach"),
+        (StreamRead)GetProcAddress(coreLib, "streamRead"),
+        (StreamDetach)GetProcAddress(coreLib, "streamDetach"),
+        (FreePtr)GetProcAddress(coreLib, "freePtr"),
+        (SetPlatform)GetProcAddress(coreLib, "setPlatform"),
+        (HandleRequest)GetProcAddress(coreLib, "handleRequest"),
     };
 
     return lib;

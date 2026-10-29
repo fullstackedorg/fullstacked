@@ -25,11 +25,27 @@ Create, run and share projects built with web technologies in a fully cross-plat
 
 You can always find those links and access to the beta apps on FullStacked [download page](https://fullstacked.org/download).
 
+## Node.js built-ins
+
+Projects import Node's built-in modules as they would in Node (`node:` prefix or not). The runtime serves them from `core/internal/bundle/lib`, TypeScript written for the webview, with no npm shim: what needs the system or heavy computation calls the Go core.
+
+| Module                                                                                                                                                                                                                           | Runs in                                                                                                                                                                          |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `assert`, `buffer`, `console`, `constants`, `diagnostics_channel`, `events`, `perf_hooks`, `querystring`, `stream` (+ `/promises`, `/web`, `/consumers`), `string_decoder`, `timers` (+ `/promises`), `url`, `util` (+ `/types`) | the page, in TypeScript                                                                                                                                                          |
+| `fs` (+ `/promises`), `net`, `dgram`, `dns` (+ `/promises`), `os`, `path`, `process`                                                                                                                                             | the core: files, sockets and the system                                                                                                                                          |
+| `crypto`                                                                                                                                                                                                                         | MD5, SHA-1, SHA-2, HMAC, AES-CTR, ChaCha20 and random bytes in TypeScript; other ciphers (GCM, CBC, ChaCha20-Poly1305, 3DES), keys, signatures, DH/ECDH and the KDFs in the core |
+| `zlib`                                                                                                                                                                                                                           | the core (deflate, gzip, brotli; the callback forms and streams off the page's thread); `crc32` in TypeScript                                                                    |
+| `worker_threads`, `readline` (+ `/promises`), `tty`                                                                                                                                                                              | the page (`worker_threads` over the webview's web workers)                                                                                                                       |
+| `http`, `https`, `http2`, `tls`                                                                                                                                                                                                  | not available (use `fetch`)                                                                                                                                                      |
+| `child_process`, `async_hooks`, `module`, `vm`, `v8`, `sqlite`                                                                                                                                                                   | not available                                                                                                                                                                    |
+
+`fetch` and `WebSocket` go through the core as well, and `DOMParser` is provided in workers, where the webview has none. How each module was rewritten and measured is in [`improvements/shim/plan.md`](improvements/shim/plan.md).
+
 ## Build from source
 
 ### Requirements
 
-- [Go](https://go.dev) `>=1.25`
+- [Go](https://go.dev) `>=1.26`
 - [NodeJS](https://nodejs.org) `>=20`
 
 #### Windows Requirements

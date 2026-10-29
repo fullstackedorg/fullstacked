@@ -1,52 +1,73 @@
-import child_process from "node:child_process";
+import "../core/internal/bundle/lib/fullstacked/index.ts";
+import { after } from "node:test";
 import fs from "node:fs";
-import path from "node:path";
-import os from "node:os";
-import esbuild from "esbuild";
+import { URL } from "node:url";
+import { stop } from "../platform/node/src/index.ts";
 
-if (os.platform() === "darwin") {
-    for (let port = 9000; port <= 9005; port++) {
-        try {
-            const pid = child_process.execSync(`lsof -t -i:${port}`).toString();
-            if (pid) child_process.execSync(`kill -9 ${pid}`);
-        } catch (e) {}
-    }
+process.env.TEST = "1";
+
+let tests = [
+    "./serialization/index.ts",
+    "./path/index.ts",
+    "./os/index.ts",
+    "./fs/index.ts",
+    "./url/index.ts",
+    "./static-file/index.ts",
+    "./bundle/index.ts",
+    "./stream/index.ts",
+    "./events/index.ts",
+    "./timers/index.ts",
+    "./fetch/index.ts",
+    "./websocket/index.ts",
+    "./net/index.ts",
+    "./tunnel/index.ts",
+    "./dgram/index.ts",
+    "./dns/index.ts",
+    "./git/index.ts",
+    "./packages/index.ts",
+    "./worker/index.ts",
+    "./readline/index.ts",
+    "./config/index.ts",
+    "./deeplink/index.ts",
+    "./fullstacked/index.ts",
+    "./shim/index.ts",
+    "./dompurify/index.ts",
+    "./node/index.ts",
+    ...pluginTests()
+];
+
+// A plugin's tests live in its own repository (plugins/<name>/test/index.ts):
+// they run when the submodule is checked out, and are skipped when it is not.
+function pluginTests() {
+    const plugins = new URL("../plugins/", import.meta.url);
+    if (!fs.existsSync(plugins)) return [];
+    return fs
+        .readdirSync(plugins)
+        .map((name) => `../plugins/${name}/test/index.ts`)
+        .filter((test) => fs.existsSync(new URL(test, import.meta.url)));
 }
 
-const cacheDirectory = path.resolve("test", ".cache");
-
-if (fs.existsSync(cacheDirectory))
-    fs.rmSync(cacheDirectory, { recursive: true });
-
-const build = (testFile: string) => {
-    const outfile = path.resolve(cacheDirectory, "test.js");
-    esbuild.buildSync({
-        entryPoints: [path.resolve("test", testFile)],
-        outfile,
-        bundle: true,
-        packages: "external",
-        format: "esm"
+const definedTests = process.argv
+    .slice(2)
+    .filter((arg) => !arg.startsWith("--") && arg !== "test");
+if (definedTests.length > 0) {
+    tests = definedTests.map((test) => {
+        // plugins/<name>/test is a plugin's own suite, outside test/
+        let t = test.startsWith("plugins/")
+            ? "../" + test
+            : "." + test.replace(/^test/, "");
+        if (!t.endsWith(".ts")) {
+            if (!t.endsWith("/")) t += "/";
+            t += "index.ts";
+        }
+        return t;
     });
-    return outfile;
-};
+}
 
-// type checking
-child_process.execSync(`node ./types.js`, {
-    stdio: "inherit",
-    cwd: "./test"
-});
+for (const test of tests) {
+    const url = new URL(test, import.meta.url);
+    await import(url.toString());
+}
 
-// basic tests
-child_process.execSync(`node ${build("basic.ts")}`, {
-    stdio: "inherit"
-});
-
-// deep links and git clone tests
-child_process.execSync(`node ${build("deeplink-git.ts")}`, {
-    stdio: "inherit"
-});
-
-// git commit and auto-update
-child_process.execSync(`node ${build("commit-auto-update.ts")}`, {
-    stdio: "inherit"
-});
+// hangs if C++ callback not released
+after(stop);

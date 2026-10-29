@@ -6,21 +6,22 @@
         "moduleResolution": "bundler",
         "skipLibCheck": true,
         "jsx": "react",
+        "allowImportingTsExtensions": true,
+        "noEmit": true,
+        "noUnusedLocals": true,
         "strictNullChecks": false,
         "paths": {
-            "*": ["./fullstacked_modules/*"]
+            "fullstacked": ["./core/internal/bundle/lib/fullstacked/index.ts"],
+            "fullstacked/*": ["./core/internal/bundle/lib/*/index.ts"]
         }
     },
     "exclude": [
-        "app",
-        "demo",
         "out",
-        "core",
+        "core/typescript-go",
         "platform/android",
         "platform/apple",
         "platform/docker",
         "platform/linux",
-        "platform/node/fullstacked_modules",
         "platform/windows"
     ]
 }

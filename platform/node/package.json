@@ -1,44 +1,65 @@
 {
     "name": "fullstacked",
-    "version": "0.12.3-1442",
-    "scripts": {
-        "build": "node build.js",
-        "postbuild": "node build.js --binding",
-        "start": "npm run build && node index.js --debug --lib ../../core/bin --root ~/FullStacked --config ~/.config/fullstacked --editor ../../out/build",
-        "prepack": "node build.js --fullstacked_modules"
-    },
+    "version": "1.0.0",
     "bin": {
         "fullstacked": "index.js"
     },
     "type": "module",
+    "scripts": {
+        "build": "node build.ts",
+        "prepack": "node prepare-package.ts --inject",
+        "postpublish": "node prepare-package.ts --clean"
+    },
     "dependencies": {
-        "cli-progress": "^3.12.0",
-        "jsdom": "^29.1.1",
-        "open": "^11.0.0",
-        "pretty-bytes": "^7.1.0",
-        "sass": "^1.99.0",
-        "tar-stream": "^3.2.0",
-        "ws": "^8.20.1"
+        "open": "^11.0.4",
+        "ws": "^8.22.0"
     },
     "devDependencies": {
-        "@types/cli-progress": "^3.11.6",
-        "@types/jsdom": "^28.0.3",
-        "@types/tar-stream": "^3.1.4",
-        "@types/ws": "^8.18.1",
-        "node-addon-api": "^8.7.0"
-    },
-    "overrides": {
-        "cli-progress": {
-            "string-width": "^8.1.0"
-        },
-        "undici": ">=7.24.0"
+        "@types/ws": "^8.18.2",
+        "esbuild": "^0.28.2",
+        "node-addon-api": "^8.9.2"
     },
     "author": "FullStacked",
     "license": "MIT",
-    "description": "Create, run and share projects built with web technologies in a fully cross-platform, local-first environment.",
+    "description": "The Portable JavaScript Runtime",
     "homepage": "https://fullstacked.org",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/fullstackedorg/fullstacked.git"
+    },
+    "exports": {
+        ".": {
+            "types": "./types/fullstacked/index.d.ts"
+        },
+        "./auth": {
+            "types": "./types/auth/index.d.ts"
+        },
+        "./bundle": {
+            "types": "./types/bundle/index.d.ts"
+        },
+        "./config": {
+            "types": "./types/config/index.d.ts"
+        },
+        "./git": {
+            "types": "./types/git/index.d.ts"
+        },
+        "./packages": {
+            "types": "./types/packages/index.d.ts"
+        },
+        "./parentWindow": {
+            "types": "./types/parentWindow/index.d.ts"
+        },
+        "./plugin": {
+            "types": "./types/plugin/index.d.ts"
+        },
+        "./run": {
+            "types": "./types/run/index.d.ts"
+        },
+        "./test": {
+            "types": "./types/test/index.d.ts"
+        },
+        "./tunnel": {
+            "types": "./types/tunnel/index.d.ts"
+        }
     }
 }

@@ -1,0 +1,281 @@
+import { Fetch } from "../@types/index.ts";
+import {
+    Cancel,
+    Fetch as FetchFn,
+    type RequestHead,
+    ResponseBody,
+    type ResponseHead
+} from "../@types/fetch.ts";
+import { concatUint8Arrays } from "../bridge/serialization.ts";
+import type { Duplex } from "../bridge/duplex.ts";
+import type { EventEmitter } from "../bridge/eventEmitter.ts";
+
+function headersToObj(headers: HeadersInit) {
+    if (headers === null) return {};
+    return Object.fromEntries(new Headers(headers).entries());
+}
+function objToHeader(headersObj: ResponseHead["Headers"]) {
+    const headers = new Headers();
+    if (!headersObj) return headers;
+    Object.entries(headersObj).forEach(([key, values]) =>
+        headers.set(key.toLowerCase(), values.at(-1))
+    );
+    return headers;
+}
+
+function bodyInitToBuffer(body: BodyInit) {
+    if (!body) return null;
+    return new Response(body).arrayBuffer();
+}
+
+function urlOrStringToUrl(url: URL | string) {
+    return url instanceof URL
+        ? url
+        : new URL(
+              url,
+              url.startsWith("/")
+                  ? globalThis?.location?.origin ||
+                        globalThis?.location?.href ||
+                        "http://localhost"
+                  : undefined
+          );
+}
+
+function getAbortError() {
+    return new DOMException("The operation was aborted.", "AbortError");
+}
+
+async function fetchCore(
+    request: string | URL | Request,
+    init?: RequestInit
+): Promise<Response> {
+    const requestUrl =
+        request instanceof Request
+            ? request.url
+            : request instanceof URL
+              ? request.href
+              : request;
+    if (typeof requestUrl === "string" && requestUrl.startsWith("data:")) {
+        try {
+            const parts = requestUrl.split(",");
+            const base64 = parts[1];
+            const raw = globalThis.atob(base64);
+            const uint8 = new Uint8Array(raw.length);
+            for (let i = 0; i < raw.length; i++) {
+                uint8[i] = raw.charCodeAt(i);
+            }
+            return new Response(uint8.buffer);
+        } catch (e) {
+            // fallback
+        }
+    }
+
+    if (
+        typeof requestUrl === "string" &&
+        (requestUrl.startsWith("/") || requestUrl.startsWith("fs://"))
+    ) {
+        const nativeFetch = globalThis.fullstacked?.fetch || window.fetch;
+        if (nativeFetch && nativeFetch !== fetchCore) {
+            return nativeFetch(request, init);
+        }
+    }
+
+    const signal = init?.signal;
+    const cleanupAbortListener = () =>
+        signal?.removeEventListener("abort", onAbort);
+    if (signal?.aborted) {
+        throw getAbortError();
+    }
+
+    const url = (
+        request instanceof URL || typeof request === "string"
+            ? urlOrStringToUrl(request)
+            : urlOrStringToUrl(request.url)
+    ).toString();
+
+    const method =
+        (request instanceof Request ? request.method : init?.method) || "GET";
+    const headers = headersToObj(
+        (request instanceof Request ? request.headers : init?.headers) || null
+    );
+
+    const redirectOption =
+        request instanceof Request
+            ? (request as any).redirect
+            : (init as any)?.redirect;
+    const followRedirect =
+        redirectOption !== false &&
+        redirectOption !== "manual" &&
+        redirectOption !== "error";
+
+    const requestHead: RequestHead = {
+        Url: url,
+        Method: method,
+        Headers: headers,
+        Redirect: followRedirect
+    };
+
+    const requestBody =
+        request instanceof Request
+            ? await request.arrayBuffer()
+            : await bodyInitToBuffer(init?.body);
+
+    let responseHeadEE: EventEmitter<{
+            response: [ResponseHead];
+            error: [string];
+        }>,
+        responseHead: ResponseHead,
+        responseBodyStream: Duplex;
+
+    let rejectHead: (reason?: any) => void;
+
+    const onAbort = () => {
+        rejectHead?.(getAbortError());
+
+        responseHeadEE?.duplex.end();
+
+        responseBodyStream?.end();
+
+        if (responseHead) {
+            globalThis.fullstacked.bridge({
+                mod: Fetch,
+                fn: Cancel,
+                data: [responseHead.Id]
+            });
+        }
+    };
+
+    if (signal) {
+        signal.addEventListener("abort", onAbort, { once: true });
+    }
+
+    try {
+        responseHead = await new Promise(async (resolve, reject) => {
+            rejectHead = reject;
+            responseHeadEE = (
+                (await globalThis.fullstacked.bridge({
+                    mod: Fetch,
+                    fn: FetchFn,
+                    data: [requestHead, new Uint8Array(requestBody)]
+                })) as Duplex
+            ).eventEmitter();
+
+            responseHeadEE.on("response", (responseHead) => {
+                resolve(responseHead);
+            });
+
+            responseHeadEE.on("error", (error) => {
+                reject(error);
+            });
+
+            responseHeadEE.duplex.on("close", () => {
+                responseHeadEE = null;
+            });
+        });
+
+        if (signal?.aborted) {
+            throw getAbortError();
+        }
+
+        responseBodyStream = await globalThis.fullstacked.bridge({
+            mod: Fetch,
+            fn: ResponseBody,
+            data: [responseHead.Id]
+        });
+
+        responseBodyStream.on("close", cleanupAbortListener);
+    } catch (e) {
+        cleanupAbortListener();
+        throw e;
+    }
+
+    const readBody = async () => {
+        if (signal?.aborted) {
+            throw getAbortError();
+        }
+        try {
+            // merged once, merging each chunk in was quadratic
+            const chunks: Uint8Array[] = [];
+            for await (const chunk of response.body) {
+                if (signal?.aborted) {
+                    throw getAbortError();
+                }
+                chunks.push(chunk);
+            }
+            return concatUint8Arrays(chunks);
+        } finally {
+            cleanupAbortListener();
+        }
+    };
+
+    const response: Response = {
+        url: responseHead.Url || url,
+        redirected: responseHead.Url ? responseHead.Url !== url : false,
+        headers: objToHeader(responseHead.Headers),
+        type: "default",
+        ok: responseHead.Status >= 200 && responseHead.Status <= 299,
+        status: responseHead.Status,
+        statusText: responseHead.StatusText.replace(
+            responseHead.Status.toString(),
+            ""
+        ).trim(),
+        bodyUsed: false,
+        body: (() => {
+            const iterator = responseBodyStream[Symbol.asyncIterator]();
+            const stream = new ReadableStream({
+                async pull(controller) {
+                    const { value, done } = await iterator.next();
+                    if (done) {
+                        controller.close();
+                    } else {
+                        controller.enqueue(value);
+                    }
+                },
+                cancel() {
+                    responseBodyStream.end();
+                }
+            });
+            if (!(Symbol.asyncIterator in stream)) {
+                (stream as any)[Symbol.asyncIterator] = function () {
+                    const reader = (stream as any).getReader();
+                    return {
+                        async next() {
+                            const { value, done } = await reader.read();
+                            return { value, done } as any;
+                        },
+                        async return() {
+                            reader.releaseLock();
+                            await (stream as any).cancel();
+                            return { done: true, value: undefined as any };
+                        },
+                        [Symbol.asyncIterator]() {
+                            return this;
+                        }
+                    };
+                };
+            }
+            return stream;
+        })() as any,
+        json: async () => {
+            return JSON.parse(new TextDecoder().decode(await readBody()));
+        },
+        text: async () => {
+            return new TextDecoder().decode(await readBody());
+        },
+        arrayBuffer: async () => {
+            return (await readBody()).buffer;
+        },
+        blob: async () => {
+            return new Blob([await readBody()]);
+        },
+        bytes: readBody,
+
+        // not implemented
+        clone: () => null as Response,
+        formData: async () => null as FormData
+    };
+
+    return response;
+}
+
+export default fetchCore;

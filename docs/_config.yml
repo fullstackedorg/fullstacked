@@ -1,0 +1,8 @@
+title: FullStacked
+description: Code, run and share JavaScript projects anywhere. Node's APIs on every device.
+theme: jekyll-theme-primer
+plugins:
+    - jekyll-relative-links
+relative_links:
+    enabled: true
+    collections: false
