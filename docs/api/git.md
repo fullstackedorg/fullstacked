@@ -94,7 +94,7 @@ await plugin.register("git-auth", {
 });
 ```
 
-A context can have one `git-auth` plugin. With none, an authenticated remote fails with `no git auth plugins`. The FullStacked app's shell registers one that prompts in the terminal and stores credentials in `/user_data/`.
+A context can have one `git-auth` plugin. With none, an authenticated remote fails with `no git auth plugins`. The FullStacked app's shell registers one that prompts in the terminal and stores credentials in `/.git-credentials`.
 
 ## Removed
 
