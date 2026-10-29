@@ -37,6 +37,9 @@
     },
     "allowScripts": {
         "esbuild": true,
-        "puppeteer": true
+        "puppeteer": true,
+        "cpu-features": false,
+        "ssh2": false,
+        "@parcel/watcher": false
     }
 }
