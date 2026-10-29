@@ -5,9 +5,9 @@
 **The app**, on any device:
 
 - [Apple App Store](https://apps.apple.com/ca/app/fullstacked/id6477835950): macOS, iOS, iPadOS
-- [Google Play](https://play.google.com/store/apps/details?id=org.fullstacked.editor): Android, ChromeOS
-- [Microsoft Store](https://apps.microsoft.com/detail/9p987qm508vc): Windows 10 and 11
-- Beta builds and Linux: [fullstacked.org/download](https://fullstacked.org/download)
+- [Google Play](https://play.google.com/store/apps/details?id=org.fullstacked): Android, ChromeOS
+- [Microsoft Store](https://apps.microsoft.com/detail/9P1TF0N0VHNC): Windows 10 and 11
+- Beta builds and Linux: [fullstacked.org/download](https://fullstacked.org/download) (see [Releases](contributing/releases.md) for the channels)
 
 The app opens on the **shell**, a terminal where your projects live. Its commands include `git`, `npm`, `bundle`, `run`, `fullstacked`, `ls`, `cd`, `vi`, `ssh`, `curl` and `config`. Run `help` for the full list.
 

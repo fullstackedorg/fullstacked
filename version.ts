@@ -69,4 +69,36 @@ export function getVersion(cwd = currentDirectory) {
     return version;
 }
 
+// the published version: MAJOR.MINOR.PATCH-BUILD for a beta, MAJOR.MINOR.PATCH
+// for a stable release (FULLSTACKED_RELEASE=1). When publishing, a beta must be
+// built from main, and a release from its vMAJOR.MINOR.PATCH tag.
+export function getFullVersion(
+    version: ReturnType<typeof getVersion>,
+    options: { publish?: boolean; cwd?: string } = {}
+) {
+    const base = `${version.major}.${version.minor}.${version.patch}`;
+
+    if (!process.env.FULLSTACKED_RELEASE) {
+        if (options.publish && version.branch !== "main") {
+            throw new Error(
+                `beta releases are built from main, not ${version.branch}`
+            );
+        }
+        return version.build ? `${base}-${version.build}` : base;
+    }
+
+    const tag = `v${base}`;
+    const tags = child_process
+        .execSync("git tag --points-at HEAD", {
+            cwd: options.cwd ?? currentDirectory
+        })
+        .toString()
+        .split("\n")
+        .map((t) => t.trim());
+    if (!tags.includes(tag)) {
+        throw new Error(`release ${base} must be built from the ${tag} tag`);
+    }
+    return base;
+}
+
 export default getVersion();

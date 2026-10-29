@@ -12,7 +12,7 @@ import {
     environment,
     platform
 } from "./utils.ts";
-import { getVersion } from "../../version.ts";
+import { getVersion, getFullVersion } from "../../version.ts";
 
 const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
 
@@ -97,8 +97,9 @@ esbuild.buildSync({
     platform: "node"
 });
 
-const version = getVersion(path.resolve(currentDirectory, "..", ".."));
-const fullVersion = `${version.major}.${version.minor}.${version.patch}${version.patch.includes("-") ? "." : "-"}${version.build}`;
+const rootDirectory = path.resolve(currentDirectory, "..", "..");
+const version = getVersion(rootDirectory);
+const fullVersion = getFullVersion(version, { cwd: rootDirectory });
 
 const binPackageJson = {
     name: `@fullstacked/${environment}`,
@@ -116,6 +117,6 @@ fs.rmSync(path.resolve(currentDirectory, "types"), {
     force: true
 });
 child_process.execSync(`npx tsc -p ./tsconfig.lib.json`, {
-    cwd: path.resolve(currentDirectory, "..", ".."),
+    cwd: rootDirectory,
     stdio: "inherit"
 });

@@ -7,10 +7,18 @@ import { stdin as input, stdout as output } from "node:process";
 import dotenv from "dotenv";
 import prettyBytes from "pretty-bytes";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import version from "../../version.ts";
+import version, { getFullVersion } from "../../version.ts";
 
 const currentDirectory = path.dirname(url.fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(currentDirectory, "..", "..");
+
+// --release publishes a stable release (release.txt), else a beta (beta.txt)
+const isRelease = process.argv.includes("--release");
+if (isRelease) {
+    process.env.FULLSTACKED_RELEASE = "1";
+}
+// checked before building: a beta from main, a release from its tag
+const versionStr = getFullVersion(version, { publish: true });
 
 // 1. Credentials Handling
 async function getCredentials() {
@@ -93,12 +101,6 @@ child_process.execSync("make linux-arm64-static linux-x64-static -j4", {
     stdio: "inherit"
 });
 
-// 4. Determine Version
-const patch = version.patch ? version.patch.split("-")[0] : "0";
-const versionStr = version.build
-    ? `${version.major}.${version.minor}.${patch}-${version.build}`
-    : `${version.major}.${version.minor}.${patch}`;
-
 function updateControlFile(framework) {
     const controlFile = path.resolve(currentDirectory, `control-${framework}`);
     const controlFileContent = fs.readFileSync(controlFile, {
@@ -111,7 +113,7 @@ function updateControlFile(framework) {
     fs.writeFileSync(controlFile, controlFileContentUpdated);
 }
 
-// 5. Build all 4 Linux releases
+// 4. Build all 4 Linux releases
 const targets = [
     { arch: "arm64", framework: "gtk" },
     { arch: "arm64", framework: "qt" },
@@ -165,7 +167,7 @@ for (const target of targets) {
         });
     }
 
-    // 5.1 Package .deb
+    // 4.1 Package .deb
     const debFileName = `fullstacked-${versionStr}-linux-${target.arch}-${target.framework}.deb`;
     const debFilePath = path.resolve(currentDirectory, debFileName);
 
@@ -190,7 +192,7 @@ for (const target of targets) {
         contentType: "application/vnd.debian.binary-package"
     });
 
-    // 5.2 Package portable .tar.xz
+    // 4.2 Package portable .tar.xz
     const stagingDir = path.resolve(currentDirectory, "out-tar");
     if (fs.existsSync(stagingDir)) {
         fs.rmSync(stagingDir, { recursive: true });
@@ -236,7 +238,7 @@ for (const target of targets) {
     });
 }
 
-// 6. Upload release files to R2
+// 5. Upload release files to R2
 async function uploadFileToR2(filePath, fileName, contentType) {
     try {
         const fileBuffer = fs.readFileSync(filePath);
@@ -264,8 +266,7 @@ for (const { filePath, fileName, contentType } of releaseFiles) {
     await uploadFileToR2(filePath, fileName, contentType);
 }
 
-// 7. Update release/beta.txt in R2
-const isRelease = process.argv.includes("--release");
+// 6. Update release/beta.txt in R2
 const versionFileKey = isRelease ? "releases/release.txt" : "releases/beta.txt";
 
 const versionUploadCommand = new PutObjectCommand({

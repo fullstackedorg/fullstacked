@@ -27,7 +27,7 @@ The CLI starts the core with the **current directory as its root**, which is the
 
 | Option                             | Effect                                                                                      |
 | ---------------------------------- | ------------------------------------------------------------------------------------------- |
-| `-v`, `--version`                  | Print the version: `FullStacked v1.0.0-alpha (build N), branch B, hash H`                   |
+| `-v`, `--version`                  | Print the version: `FullStacked v1.0.0 (build N), branch B, hash H`                         |
 | `-h`, `--help`                     | Print the help                                                                              |
 | `-b`, `--build`                    | Bundle only. Exits with 1 on a build error.                                                 |
 | `-e`, `--env KEY=VALUE`            | Set an environment variable, over `.env`. Repeatable.                                       |

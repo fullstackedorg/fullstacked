@@ -32,6 +32,7 @@ It works without shipping Node or a JavaScript engine. The project runs in the p
 
 - [Building from source](contributing/building.md): build, test, and add a core function.
 - [Porting to a new host](contributing/porting-a-host.md): the C ABI and what a host implements.
+- [Releases](contributing/releases.md): versions, the beta and stable channels, and where each platform ships.
 
 ## License
 
