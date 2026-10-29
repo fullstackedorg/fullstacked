@@ -218,6 +218,13 @@ for (const target of targets) {
         { recursive: true }
     );
 
+    // registered in the user's icon theme on launch (src/utils.cpp)
+    fs.cpSync(
+        path.resolve(currentDirectory, "icons", "hicolor"),
+        path.resolve(stagingDir, "fullstacked", "share", "icons", "hicolor"),
+        { recursive: true }
+    );
+
     const tarFileName = `fullstacked-${versionStr}-linux-${target.arch}-${target.framework}.tar.xz`;
     const tarFilePath = path.resolve(currentDirectory, tarFileName);
 

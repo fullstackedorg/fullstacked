@@ -2,6 +2,7 @@
 <resources>
     <style name="Theme.FullStackedEditor" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">#000000</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/fullstacked_splash_icon</item>
         <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
     </style>
 </resources>

@@ -9,6 +9,7 @@
 #include <QCoreApplication>
 #include <QDesktopServices>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QKeyEvent>
 #include <QKeySequence>
 #include <QPointer>
@@ -275,6 +276,10 @@ int QtGUI::run(int &argc, char **argv, std::function<void()> onReady,
     QWebEngineUrlScheme::registerScheme(scheme);
 
     app = new QApplication(argc, argv);
+    // Wayland matches windows to org.fullstacked.desktop and its hicolor
+    // theme icon (utils.cpp)
+    QGuiApplication::setDesktopFileName(QStringLiteral("org.fullstacked"));
+    app->setWindowIcon(QIcon::fromTheme(QStringLiteral("org.fullstacked")));
 
     // Single instance: a second launch forwards its fullstacked:// deeplinks
     // to the running app over a local socket and exits.

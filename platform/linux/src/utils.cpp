@@ -198,46 +198,46 @@ void registerDesktopApp() {
     std::string home = homeEnv;
 
     std::string localIconsDir = home + "/.local/share/icons";
+    std::string localAppsDir = home + "/.local/share/applications";
     std::error_code ec;
-    std::filesystem::create_directories(localIconsDir, ec);
 
-    std::string appDir = getAppDir();
-    std::string iconFound = "";
-    if (std::filesystem::exists(appDir, ec)) {
-        for (const auto &entry :
-             std::filesystem::directory_iterator(appDir, ec)) {
-            if (entry.path().filename().string().find("app-icon") !=
-                    std::string::npos &&
-                entry.path().extension() == ".png") {
-                iconFound = entry.path().string();
-                break;
-            }
+    // entries written by earlier versions, before the org.fullstacked app id
+    std::filesystem::remove(localIconsDir + "/fullstacked.png", ec);
+    std::filesystem::remove(localAppsDir + "/fullstacked.desktop", ec);
+
+    // the hicolor icons ship next to the executable (portable: share/, FHS
+    // and dev builds: ../share/), copied to the user's icon theme
+    std::string exePath = getExePath();
+    std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
+    for (const auto &iconsDir :
+         {exeDir / "share/icons/hicolor",
+          exeDir.parent_path() / "share/icons/hicolor"}) {
+        if (std::filesystem::exists(iconsDir, ec)) {
+            std::filesystem::create_directories(localIconsDir + "/hicolor", ec);
+            std::filesystem::copy(
+                iconsDir, localIconsDir + "/hicolor",
+                std::filesystem::copy_options::recursive |
+                    std::filesystem::copy_options::overwrite_existing,
+                ec);
+            break;
         }
     }
-    if (iconFound.empty() &&
-        std::filesystem::exists(appDir + "/assets/icon.png", ec)) {
-        iconFound = appDir + "/assets/icon.png";
-    }
-    if (!iconFound.empty()) {
-        std::filesystem::copy_file(
-            iconFound, localIconsDir + "/fullstacked.png",
-            std::filesystem::copy_options::overwrite_existing, ec);
-    }
 
-    std::string localAppsDir = home + "/.local/share/applications";
     std::filesystem::create_directories(localAppsDir, ec);
 
-    std::ofstream localAppFile(localAppsDir + "/fullstacked.desktop");
+    // named after the app id so the shell matches windows to this entry
+    std::ofstream localAppFile(localAppsDir + "/org.fullstacked.desktop");
     if (localAppFile.is_open()) {
         std::string contents = "[Desktop Entry]\n"
                                "Name=FullStacked\n"
                                "Exec=" +
-                               getExePath() +
+                               exePath +
                                " %u\n"
                                "Terminal=false\n"
                                "Type=Application\n"
                                "MimeType=x-scheme-handler/fullstacked;\n"
-                               "Icon=fullstacked\n"
+                               "Icon=org.fullstacked\n"
+                               "StartupWMClass=fullstacked\n"
                                "Categories=Development;Utility;\n";
         localAppFile << contents;
         localAppFile.close();

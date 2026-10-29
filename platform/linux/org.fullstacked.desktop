@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=FullStacked
+Exec=fullstacked %u
+Terminal=false
+Type=Application
+MimeType=x-scheme-handler/fullstacked;
+Icon=org.fullstacked
+StartupWMClass=fullstacked
+Categories=Development;Utility;

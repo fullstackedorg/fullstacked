@@ -22,6 +22,8 @@ int WebkitGTKGUI::run(int &argc, char **argv, std::function<void()> onReady,
     // --kiosk are passed through since the app handles its command line.
     app = Gtk::Application::create(
         "org.fullstacked", Gio::Application::Flags::HANDLES_COMMAND_LINE);
+    // hicolor theme icon installed with org.fullstacked.desktop (utils.cpp)
+    Gtk::Window::set_default_icon_name("org.fullstacked");
     // the page posts its calls to /call and /sync (see bridge.cpp)
     Core::setPlatform("linux", true);
     WebKitWebContext *context = webkit_web_context_get_default();
@@ -349,14 +351,16 @@ void WebkitGTKWindow::initWindow() {
     windowGTK = new Gtk::Window();
     windowGTK->set_title("FullStacked");
     windowGTK->set_default_size(800, 600);
-    windowGTK->show();
     windowGTK->signal_close_request().connect(
         [this]() -> bool {
             close();
             return false;
         },
         false);
+    // added before it is shown: the window takes the org.fullstacked app id
+    // when realized, the shell matches it to org.fullstacked.desktop
     app->add_window(*windowGTK);
+    windowGTK->show();
 
     GtkWidget *webviewWidget = webkit_web_view_new();
     webview = WEBKIT_WEB_VIEW(webviewWidget);

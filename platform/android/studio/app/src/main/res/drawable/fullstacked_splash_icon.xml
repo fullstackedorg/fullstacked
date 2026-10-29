@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- logo-mark-color.svg centered on the 288dp splash screen icon, well inside
+     its 192dp circle -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="288dp"
+    android:height="288dp"
+    android:viewportWidth="288"
+    android:viewportHeight="288">
+    <group
+        android:scaleX="0.172146"
+        android:scaleY="0.172146"
+        android:translateX="84.06"
+        android:translateY="81.88">
+        <path
+            android:fillColor="#7FD7EF"
+            android:pathData="M73.6316 550.363L358.403 715.202V378.205C358.403 365.062 365.384 352.902 376.758 346.331L637.135 195.618C650.745 187.748 650.745 168.034 637.135 160.124L382.994 13.1106C367.777 4.29613 349.069 4.29613 333.852 13.1106L67.3957 167.247C56.0221 173.818 49.041 185.977 49.041 199.16V507.628C49.041 525.257 58.4144 541.549 73.6316 550.363Z" />
+        <path
+            android:fillColor="#05BBEE"
+            android:pathData="M635.832 338.37L569.82 300.091L415.336 389.526V501.419L635.832 373.744C649.41 365.892 649.41 346.222 635.832 338.37Z" />
+        <path
+            android:fillColor="#2274BB"
+            android:pathData="M635.793 517.28L569.155 478.687L415.336 567.73V679.976L635.754 552.654C649.332 544.802 649.371 525.133 635.754 517.241L635.793 517.28Z" />
+    </group>
+</vector>

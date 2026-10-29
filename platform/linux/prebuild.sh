@@ -24,6 +24,10 @@ elif [ -d "../../app/out" ]; then
     cp -r ../../app/out ./out/usr/share/fullstacked/app
 fi
 
+mkdir -p ./out/usr/share/applications ./out/usr/share/icons
+cp org.fullstacked.desktop ./out/usr/share/applications/
+cp -r icons/hicolor ./out/usr/share/icons/
+
 FRAMEWORK=$2
 if [ -n "$FRAMEWORK" ] && [ -f "control-$FRAMEWORK" ]; then
     mkdir -p ./out/DEBIAN
