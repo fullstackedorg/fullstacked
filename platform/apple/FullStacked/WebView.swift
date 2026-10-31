@@ -76,6 +76,10 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKDownloadDelegate, Codabl
         let wkWebViewConfig = WKWebViewConfiguration()
         wkWebViewConfig.preferences.setValue(true, forKey: "developerExtrasEnabled")
         wkWebViewConfig.preferences.javaScriptCanOpenWindowsAutomatically = true
+        #if os(iOS)
+        // honor <video playsinline>: iPhone defaults to false, which forces every video into the native fullscreen player
+        wkWebViewConfig.allowsInlineMediaPlayback = true
+        #endif
         
         let userContentController = WKUserContentController()
         wkWebViewConfig.userContentController = userContentController
