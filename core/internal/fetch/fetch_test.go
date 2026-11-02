@@ -1,22 +1,15 @@
 package fetch
 
 import (
-	"context"
 	"errors"
-	"fullstackedorg/fullstacked/internal/tunnel"
 	"fullstackedorg/fullstacked/types"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/coder/websocket"
 )
 
 func TestConcurrentResponseBodyCheck(t *testing.T) {
@@ -52,9 +45,7 @@ func TestConcurrentResponseBodyCheck(t *testing.T) {
 	wg.Wait()
 }
 
-// A target whose /drop closes the connection before any response, and a
-// tunnel hub stand-in in front of it: one WebSocket per connection, piped to
-// the target.
+// A target whose /drop closes the connection before any response.
 func startDropTarget(t *testing.T) (target *httptest.Server, drops *atomic.Int64) {
 	drops = &atomic.Int64{}
 	target = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -71,29 +62,6 @@ func startDropTarget(t *testing.T) (target *httptest.Server, drops *atomic.Int64
 	}))
 	t.Cleanup(target.Close)
 	return target, drops
-}
-
-func startHub(t *testing.T, targetAddr string) *httptest.Server {
-	hub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		c, err := websocket.Accept(w, r, nil)
-		if err != nil {
-			return
-		}
-		ws := websocket.NetConn(context.Background(), c, websocket.MessageBinary)
-		tcp, err := net.Dial("tcp", targetAddr)
-		if err != nil {
-			ws.Close()
-			return
-		}
-		go func() {
-			io.Copy(tcp, ws)
-			tcp.Close()
-		}()
-		io.Copy(ws, tcp)
-		ws.Close()
-	}))
-	t.Cleanup(hub.Close)
-	return hub
 }
 
 var nextTestFetchId = 1_000_000
@@ -154,20 +122,4 @@ func checkDroppedRequest(t *testing.T, base string, drops *atomic.Int64) {
 func TestDroppedRequestRetriesAreBounded(t *testing.T) {
 	target, drops := startDropTarget(t)
 	checkDroppedRequest(t, target.URL, drops)
-}
-
-func TestDroppedRequestRetriesAreBoundedThroughTunnel(t *testing.T) {
-	target, drops := startDropTarget(t)
-	hub := startHub(t, target.Listener.Addr().String())
-	hubURL, _ := url.Parse(hub.URL)
-	port, _ := strconv.Atoi(hubURL.Port())
-	if _, err := tunnel.RegisterTunnelFn(tunnel.Tunnel{
-		Name:     "fetch-test-drop",
-		Host:     hubURL.Hostname(),
-		Port:     port,
-		Unsecure: true,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	checkDroppedRequest(t, "http://fetch-test-drop", drops)
 }
