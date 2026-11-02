@@ -20,6 +20,10 @@ const (
 	Connect WebSocketFn = 0
 )
 
+// maxMessageSize caps one incoming message, like the Node ws package's maxPayload default.
+// coder/websocket's own 32 KiB default is far below what browsers accept.
+const maxMessageSize = 100 << 20
+
 var httpClient = &http.Client{
 	Transport: &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -73,6 +77,32 @@ func Switch(
 	return errors.New("unknown websocket function")
 }
 
+// dial opens a connection whose incoming messages may be up to maxMessageSize.
+func dial(ctx context.Context, urlStr string, protocols []string) (*websocket.Conn, error) {
+	c, _, err := websocket.Dial(ctx, urlStr, &websocket.DialOptions{
+		Subprotocols: protocols,
+		HTTPClient:   httpClient,
+	})
+	if err != nil {
+		return nil, err
+	}
+	c.SetReadLimit(maxMessageSize)
+	return c, nil
+}
+
+// closeInfo maps the error that ended the read loop to the close event's code and reason.
+func closeInfo(err error) (int, string) {
+	var closeErr websocket.CloseError
+	if errors.As(err, &closeErr) {
+		return int(closeErr.Code), closeErr.Reason
+	}
+	if errors.Is(err, websocket.ErrMessageTooBig) {
+		// The library already closed the connection with 1009; report it rather than 1006.
+		return int(websocket.StatusMessageTooBig), err.Error()
+	}
+	return 1006, ""
+}
+
 func createWebSocketStream(urlStr string, protocols []string) *types.ResponseStream {
 	var wsConn *websocket.Conn
 	var connMutex sync.Mutex
@@ -81,12 +111,7 @@ func createWebSocketStream(urlStr string, protocols []string) *types.ResponseStr
 
 	return &types.ResponseStream{
 		Open: func(coreCtx *types.Context, streamId uint32) {
-			opts := &websocket.DialOptions{
-				Subprotocols: protocols,
-				HTTPClient:   httpClient,
-			}
-
-			c, _, err := websocket.Dial(ctx, urlStr, opts)
+			c, err := dial(ctx, urlStr, protocols)
 			if err != nil {
 				store.StreamEvent(coreCtx, streamId, "error", []types.SerializableData{err.Error()}, false)
 				store.StreamEvent(coreCtx, streamId, "close", []types.SerializableData{float64(1006), err.Error(), false}, true)
@@ -102,15 +127,7 @@ func createWebSocketStream(urlStr string, protocols []string) *types.ResponseStr
 			for {
 				msgType, msgData, err := c.Read(ctx)
 				if err != nil {
-					code := int(websocket.CloseStatus(err))
-					if code == -1 {
-						code = 1006
-					}
-					reason := ""
-					var closeErr websocket.CloseError
-					if errors.As(err, &closeErr) {
-						reason = closeErr.Reason
-					}
+					code, reason := closeInfo(err)
 					wasClean := code != 1006
 
 					store.StreamEvent(coreCtx, streamId, "close", []types.SerializableData{float64(code), reason, wasClean}, true)
