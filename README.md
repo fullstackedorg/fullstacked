@@ -95,12 +95,12 @@ fullstacked
 
 Install FullStacked in your projects and get the app on every device. The app opens on a shell: clone a repository and run it.
 
-**Stable** releases are the ones to use. The first stable release of FullStacked v1 is coming soon.
+**Stable** releases are the ones to use.
 
 | Platform | Stable |
 | :--- | :--- |
 | Node.js package (macOS, Windows, Linux · x64, arm64) | `npm i fullstacked` · [npm](https://www.npmjs.com/package/fullstacked) |
-| iPhone, iPad and Mac | [App Store](https://apps.apple.com/app/id6477835950) |
+| iPhone, iPad and Mac | [App Store](https://apps.apple.com/us/app/fullstacked/id6827837091) |
 | Windows 10 and 11 | [Microsoft Store](https://apps.microsoft.com/detail/9P1TF0N0VHNC) |
 | Android and ChromeOS | [Google Play](https://play.google.com/store/apps/details?id=org.fullstacked) |
 | Linux (x64, arm64 · GTK or Qt) | [All Linux builds](https://fullstacked.org/download) |
@@ -110,12 +110,14 @@ Install FullStacked in your projects and get the app on every device. The app op
 | Platform | Beta |
 | :--- | :--- |
 | Node.js package | `npm i fullstacked@beta` · [npm](https://www.npmjs.com/package/fullstacked?activeTab=versions) |
-| iPhone, iPad and Mac | [TestFlight](https://testflight.apple.com/join/CUYvvR4b) |
+| iPhone, iPad and Mac | [TestFlight](https://testflight.apple.com/join/aZx98BHH) |
 | Windows 10 and 11 | [Microsoft Store (beta)](https://apps.microsoft.com/detail/9N9BCQSWWZ79) |
 | Android and ChromeOS | [Join the tester program](https://play.google.com/apps/testing/org.fullstacked), then [Google Play](https://play.google.com/store/apps/details?id=org.fullstacked) |
 | Linux | [All Linux builds](https://fullstacked.org/download) |
 
 See [Releases](https://docs.fullstacked.org/contributing/releases) for how versions and channels work.
+
+If a project takes over the app, <kbd>Cmd+Shift+T</kbd> (Apple), <kbd>Ctrl+Shift+T</kbd> (Windows, Linux, Android) or holding three fingers on a touch screen for 1.5s restarts it on the shell in [safe mode](https://docs.fullstacked.org/getting-started#safe-mode).
 
 ## The Node.js you know, on every device
 

@@ -36,7 +36,7 @@ When a context starts (from a host, [`run`](run.md) or the CLI), and it isn't st
 await config.set("initialDirectory", "app");
 ```
 
-Safe mode exists to recover from a bad value. It is available as `fullstacked --safe`, `run({ safe: true })`, Cmd+Shift+T in the macOS app, and `--safe` on Linux.
+Safe mode exists to recover from a bad value. It is available as `fullstacked --safe`, `run({ safe: true })`, and in the app with <kbd>Cmd+Shift+T</kbd> / <kbd>Ctrl+Shift+T</kbd> or a three-finger hold (see [Safe mode](../getting-started.md#safe-mode)).
 
 ### FullStacked app settings
 

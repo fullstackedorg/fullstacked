@@ -159,7 +159,7 @@ A project that needs a build setup FullStacked doesn't run (other esbuild option
         "react-dom": "^19.0.0"
     },
     "devDependencies": {
-        "fullstacked": "^1.0.0-alpha",
+        "fullstacked": "^1.0.0",
         "@fullstacked/tailwindcss": "^4.3.3-patch.1"
     }
 }

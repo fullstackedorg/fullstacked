@@ -65,7 +65,7 @@ The sandbox applies to files. Network access (`net`, `fetch`, `dgram`) is unrest
 | Linux                   | QtWebEngine         | `fs://` (scheme handler)          | `~/FullStacked`              | QWebChannel + messages             |
 | Node.js ([CLI](cli.md)) | your browser        | `http://localhost:9000+`          | the current directory        | HTTP requests                      |
 
-Every platform starts in _safe mode_ on request (Cmd+Shift+T on macOS, `--safe` on Linux and in the CLI), which ignores `initialDirectory`.
+Every platform starts in _safe mode_ on request, which ignores `initialDirectory`: <kbd>Cmd+Shift+T</kbd> on Apple, <kbd>Ctrl+Shift+T</kbd> elsewhere, a three-finger hold on touch screens, `--safe` on Linux and in the CLI. See [Safe mode](getting-started.md#safe-mode).
 
 The native apps ship the shell, the project in `shell/` built to `shell/out`, as their main page. The shell is a terminal (xterm.js) with commands for git, npm, bundling and running projects, all of it written in TypeScript over the runtime API.
 

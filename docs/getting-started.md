@@ -4,10 +4,17 @@
 
 **The app**, on any device:
 
-- [Apple App Store](https://apps.apple.com/ca/app/fullstacked/id6477835950): macOS, iOS, iPadOS
+- [Apple App Store](https://apps.apple.com/us/app/fullstacked/id6827837091): macOS, iOS, iPadOS
 - [Google Play](https://play.google.com/store/apps/details?id=org.fullstacked): Android, ChromeOS
 - [Microsoft Store](https://apps.microsoft.com/detail/9P1TF0N0VHNC): Windows 10 and 11
-- Beta builds and Linux: [fullstacked.org/download](https://fullstacked.org/download) (see [Releases](contributing/releases.md) for the channels)
+- Linux: [fullstacked.org/download](https://fullstacked.org/download)
+
+**Beta builds**, to try what's next (see [Releases](contributing/releases.md) for the channels):
+
+- Apple: [TestFlight](https://testflight.apple.com/join/aZx98BHH)
+- Android, ChromeOS: [join the tester program](https://play.google.com/apps/testing/org.fullstacked), then update from [Google Play](https://play.google.com/store/apps/details?id=org.fullstacked)
+- Windows: [FullStacked Beta](https://apps.microsoft.com/detail/9N9BCQSWWZ79) in the Microsoft Store
+- Linux: [fullstacked.org/download](https://fullstacked.org/download)
 
 The app opens on the **shell**, a terminal where your projects live. Its commands include `git`, `npm`, `bundle`, `run`, `fullstacked`, `ls`, `cd`, `vi`, `ssh`, `curl` and `config`. Run `help` for the full list.
 
@@ -16,6 +23,21 @@ The app opens on the **shell**, a terminal where your projects live. Its command
 ```bash
 npm install -g fullstacked
 ```
+
+### Safe mode
+
+If a project takes over the app and you can't get back to the shell, restart in _safe mode_. It closes the open projects and reopens the shell, ignoring the [`initialDirectory`](api/config.md#initialdirectory) setting.
+
+| Platform          | Keyboard                                        | Touch                                     |
+| ----------------- | ----------------------------------------------- | ----------------------------------------- |
+| macOS             | <kbd>Cmd+Shift+T</kbd>                          |                                           |
+| iOS, iPadOS       | <kbd>Cmd+Shift+T</kbd>                          | Hold three fingers on the screen for 1.5s |
+| Android, ChromeOS | <kbd>Ctrl+Shift+T</kbd>                         | Hold three fingers on the screen for 1.5s |
+| Windows           | <kbd>Ctrl+Shift+T</kbd>                         |                                           |
+| Linux             | <kbd>Ctrl+Shift+T</kbd>, or start with `--safe` |                                           |
+| CLI               | `fullstacked --safe`                            |                                           |
+
+The shortcut is caught by the app before the page, so a project can't take it over.
 
 ## A first project
 

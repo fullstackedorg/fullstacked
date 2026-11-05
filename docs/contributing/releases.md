@@ -28,13 +28,13 @@ After a release, the next change bumps the version in `package.json` by its impa
 
 ## Platforms
 
-| Platform   | Beta                                              | Stable                                    |
-| ---------- | ------------------------------------------------- | ----------------------------------------- |
-| Apple      | TestFlight                                        | App Store                                 |
-| Android    | Google Play test tracks                           | Google Play                               |
-| Windows    | Microsoft Store, unlisted app                     | Microsoft Store, listed app               |
-| Linux      | `files.fullstacked.org`, pointed to by `beta.txt` | `files.fullstacked.org`, by `release.txt` |
-| Node (npm) | dist-tag `beta`                                   | dist-tag `latest`                         |
+| Platform   | Beta                                                                                   | Stable                                                                       |
+| ---------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Apple      | [TestFlight](https://testflight.apple.com/join/aZx98BHH)                               | [App Store](https://apps.apple.com/us/app/fullstacked/id6827837091)          |
+| Android    | Google Play test tracks ([join](https://play.google.com/apps/testing/org.fullstacked)) | [Google Play](https://play.google.com/store/apps/details?id=org.fullstacked) |
+| Windows    | Microsoft Store, unlisted app                                                          | Microsoft Store, listed app                                                  |
+| Linux      | `files.fullstacked.org`, pointed to by `beta.txt`                                      | `files.fullstacked.org`, by `release.txt`                                    |
+| Node (npm) | dist-tag `beta`                                                                        | dist-tag `latest`                                                            |
 
 ### Apple
 
