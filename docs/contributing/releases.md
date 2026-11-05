@@ -73,6 +73,8 @@ dpkg sorts a version without a revision below the same version with one: `1.0.0`
 
 The `fullstacked` package and its six prebuilt cores, `@fullstacked/<platform>-<arch>` (darwin, linux and win32, on arm64 and x64), all get the same version. Betas are published as `MAJOR.MINOR.PATCH-N` with the `beta` dist-tag. Stable releases are published as `MAJOR.MINOR.PATCH` with the `latest` dist-tag. npm can't rename a version, so promoting publishes the tagged commit again, built with `FULLSTACKED_RELEASE=1`.
 
+Every version goes through npm's [staged publishing](https://docs.npmjs.com/staged-publishing): `npm stage publish --tag <beta|latest>` uploads it without making it public, then a maintainer approves it with 2FA (`npm stage approve <stage-id>`, or on npmjs.com). The six `@fullstacked/*` packages are approved before `fullstacked`, whose `optionalDependencies` pin them at the same version. Staging needs npm 11.15 and Node 22.14 or later. `npm stage publish` runs the same `prepack` and `postpublish` scripts as `npm publish`.
+
 ```bash
 npm install -g fullstacked@beta
 ```
