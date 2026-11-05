@@ -1,21 +1,23 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# R8 shrinks, optimizes and obfuscates the release build. These rules keep what
+# is reached by name from outside Kotlin.
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# JNI: bridge.cpp exports Java_org_fullstacked_<Class>_<method>, so the classes
+# and their native methods keep their names
+-keepclasseswithmembernames,includedescriptorclasses class org.fullstacked.** {
+    native <methods>;
+}
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# bridge.cpp calls MainActivity.onStreamData(III)V with GetMethodID
+-keep class org.fullstacked.MainActivity {
+    void onStreamData(int, int, int);
+}
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# the page calls the methods of the fullstackedCore interface (Bridge) by name
+-keepclassmembers class org.fullstacked.Bridge {
+    @android.webkit.JavascriptInterface <methods>;
+}
+-keepattributes JavascriptInterface
+
+# readable stack traces: Play deobfuscates with the mapping file in the bundle
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
