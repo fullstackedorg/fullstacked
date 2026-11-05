@@ -6,7 +6,7 @@ FullStacked ships on two channels. **Beta** gets a build of `main` on every plat
 flowchart LR
     main["<b>main</b><br/>commit count N"]
     beta["<b>Beta</b><br/>MAJOR.MINOR.PATCH-N"]
-    stable["<b>Stable</b><br/>MAJOR.MINOR.PATCH<br/>git tag vMAJOR.MINOR.PATCH"]
+    stable["<b>Stable</b><br/>MAJOR.MINOR.PATCH<br/>git tag MAJOR.MINOR.PATCH"]
     main -- "build" --> beta
     beta -- "promote" --> stable
 ```
@@ -20,9 +20,9 @@ flowchart LR
 | Beta    | `MAJOR.MINOR.PATCH-N` | `1.0.0-1860` | `main` only. Other branches never go to beta. |
 | Stable  | `MAJOR.MINOR.PATCH`   | `1.0.0`      | The commit of the promoted beta build         |
 
-A promoted build drops its `-N`. The promoted commit is tagged `vMAJOR.MINOR.PATCH` (`git tag v1.0.0 <commit>`, then `git push origin v1.0.0`), so every stable release can be found and rebuilt from GitHub.
+A promoted build drops its `-N`. The promoted commit is tagged `MAJOR.MINOR.PATCH`, with no `v` prefix (`git tag 1.0.0 <commit>`, then `git push origin 1.0.0`), so every stable release can be found and rebuilt from GitHub.
 
-The npm and Linux builds get their version from `getFullVersion` in `version.ts`: the beta version by default, the stable one with `FULLSTACKED_RELEASE=1` (`platform/linux/publish.js --release` sets it). Publishing refuses a beta that isn't on `main`, and a stable release whose commit doesn't carry its `vMAJOR.MINOR.PATCH` tag.
+The npm and Linux builds get their version from `getFullVersion` in `version.ts`: the beta version by default, the stable one with `FULLSTACKED_RELEASE=1` (`platform/linux/publish.js --release` sets it). Publishing refuses a beta that isn't on `main`, and a stable release whose commit doesn't carry its `MAJOR.MINOR.PATCH` tag.
 
 After a release, the next change bumps the version in `package.json` by its impact on existing projects. MINOR is for changes a project may need to adapt to: new features, changed behavior, removed APIs. PATCH is for fixes and internal changes that leave projects as they are. MAJOR marks a new generation of FullStacked, like v1. Builds after that are betas of the next version (`1.0.1-N` or `1.1.0-N`).
 
