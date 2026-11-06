@@ -66,8 +66,8 @@ fullstacked --file scripts/seed.ts --count 10
 
 - `fs`, `net`, `crypto`, … and the runtime API (`fullstacked/git`, …) are the runtime's, calling the core in-process. The script sees the same sandbox as a project: `/` is the current directory.
 - The globals are Node's (`process`, `setImmediate`, `fetch`). `WebSocket` is replaced by the core's, and `window` is set to `globalThis`. A `DOMParser` is installed.
-- Arguments after the file become `process.argv` (as `?argv=` on the import URL).
-- `.env` is read from the current directory, `-e` applies, and both are set on `process.env`.
+- Arguments after the file become `process.argv` (as `?argv=` on the import URL), verbatim: the CLI's own options end at the file, so `fullstacked -f script.ts -s token -e x` hands `-s token -e x` to the script. Put the CLI's options before `-f`.
+- `.env` is read from the current directory, `-e` (before the file) applies, and both are set on `process.env`.
 - The script runs until nothing keeps it alive: open sockets, file streams, timers and readline interfaces hold the process, as in Node. Then the bundled `<file>.js` is deleted.
 
 The file can also be a package's module, resolved from the current directory.

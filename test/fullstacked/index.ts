@@ -104,6 +104,47 @@ if (!process.argv.includes("--debug") || !process.argv.includes("foo") || !proce
         }
     });
 
+    test("arguments after the file reach the script verbatim", async () => {
+        const testFile = path.join(outDir, "test-args-verbatim.ts");
+        nodeFs.writeFileSync(
+            testFile,
+            `import process from "process";
+globalThis.__scriptArgv = [...process.argv];`
+        );
+        try {
+            delete (globalThis as any).__scriptArgv;
+            const code = await execute([
+                "fullstacked",
+                "-f",
+                testFile,
+                "-s",
+                "x",
+                "-e",
+                "y",
+                "--safe",
+                "-h",
+                "-v"
+            ]);
+            assert.strictEqual(code, 0);
+            assert.deepStrictEqual((globalThis as any).__scriptArgv, [
+                "-s",
+                "x",
+                "-e",
+                "y",
+                "--safe",
+                "-h",
+                "-v"
+            ]);
+            // -e after the file is the script's, not an env var
+            assert.strictEqual("y" in process.env, false);
+        } finally {
+            delete (globalThis as any).__scriptArgv;
+            if (nodeFs.existsSync(testFile)) nodeFs.unlinkSync(testFile);
+            if (nodeFs.existsSync(testFile + ".js"))
+                nodeFs.unlinkSync(testFile + ".js");
+        }
+    });
+
     test("standard run without extra flags", async () => {
         const testFile3 = path.join(outDir, "test-args-3.ts");
         nodeFs.writeFileSync(
@@ -170,12 +211,12 @@ assert.strictEqual(process.env.TEST_QUOTED, "hello world");`
         try {
             const code = await execute([
                 "fullstacked",
-                "-f",
-                testFileEnv,
                 "-e",
                 "TEST_SHARED_ENV=from_cli",
                 "-e",
-                "TEST_CLI_ONLY=from_cli_only"
+                "TEST_CLI_ONLY=from_cli_only",
+                "-f",
+                testFileEnv
             ]);
             assert.strictEqual(code, 0);
             assert.strictEqual(process.env.TEST_CWD_ENV, "cwd_val");
@@ -212,10 +253,10 @@ assert.strictEqual(process.env.TEST_CLI_ONLY, "from_cli");`
         try {
             const code = await execute([
                 "fullstacked",
-                "-f",
-                testFileNoEnv,
                 "-e",
-                "TEST_CLI_ONLY=from_cli"
+                "TEST_CLI_ONLY=from_cli",
+                "-f",
+                testFileNoEnv
             ]);
             assert.strictEqual(code, 0);
             assert.strictEqual(process.env.TEST_CLI_ONLY, "from_cli");

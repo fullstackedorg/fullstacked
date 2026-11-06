@@ -25,7 +25,7 @@ await fullstacked.execute(["fullstacked", "-e", "API=https://…", "./my-app"]);
 What each flag does is described in the [CLI reference](../cli.md). In short:
 
 - **Directory mode** registers the `-p` plugins, runs [`bundle`](bundle.md#bundle), prints warnings and errors, and stops there with `-b`. Otherwise it calls [`run`](run.md), then `fullstacked.open(ctx)` (unless `-n`), then the `-l` deep link.
-- **`--file` mode** loads `.env` and `-e` into `process.env`, resolves the file with [`packages.resolve`](packages.md#resolve), runs [`bundleFile`](bundle.md#bundlefile), `import()`s the output with the extra arguments as `process.argv`, waits for open readline interfaces, and deletes the bundled `.js`.
+- **`--file` mode** loads `.env` and `-e` into `process.env`, resolves the file with [`packages.resolve`](packages.md#resolve), runs [`bundleFile`](bundle.md#bundlefile), `import()`s the output with the arguments after the file, verbatim, as `process.argv`, waits for open readline interfaces, and deletes the bundled `.js`.
 
 ## validateCommand
 

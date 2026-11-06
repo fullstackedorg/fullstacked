@@ -195,57 +195,27 @@ function getPositionalArgs(args: string[]): string[] {
     return positionals;
 }
 
-function getExtraArgs(args: string[]): string[] {
-    const extraArgs: string[] = [];
-    const valueFlags = [
-        ["-e", "--env"],
-        ["-p", "--port"],
-        ["-p", "--plugin"],
-        ["-f", "--file"],
-        ["-l", "--deeplink"]
-    ];
-    const booleanFlags = [
-        ["-h", "--help"],
-        ["-v", "--version"],
-        ["-o", "--open"],
-        ["-n", "--no-open"],
-        ["-s", "--safe"],
-        ["-b", "--build"]
-    ];
-
+// `-f <file>` ends the CLI's own options: everything after the file is the
+// script's, verbatim, even when it looks like one of the CLI's flags
+// (`-s <token>` reaches the script, it does not turn on --safe).
+export function splitFileArgs(args: string[]): {
+    cliArgs: string[];
+    scriptArgs: string[];
+} {
     for (let i = 0; i < args.length; i++) {
         const arg = args[i];
-        if (booleanFlags.some((aliases) => aliases.includes(arg))) {
-            continue;
+        let end = -1;
+        if (arg === "-f" || arg === "--file") {
+            const next = args[i + 1];
+            end = next !== undefined && !next.startsWith("-") ? i + 2 : i + 1;
+        } else if (arg.startsWith("-f=") || arg.startsWith("--file=")) {
+            end = i + 1;
         }
-
-        let isValueFlag = false;
-        for (const aliases of valueFlags) {
-            if (aliases.includes(arg)) {
-                const next = args[i + 1];
-                if (next !== undefined && !next.startsWith("-")) {
-                    i++;
-                }
-                isValueFlag = true;
-                break;
-            }
-            let matchedPrefix = false;
-            for (const alias of aliases) {
-                if (arg.startsWith(alias + "=")) {
-                    matchedPrefix = true;
-                    break;
-                }
-            }
-            if (matchedPrefix) {
-                isValueFlag = true;
-                break;
-            }
+        if (end !== -1) {
+            return { cliArgs: args.slice(0, end), scriptArgs: args.slice(end) };
         }
-
-        if (isValueFlag) continue;
-        extraArgs.push(arg);
     }
-    return extraArgs;
+    return { cliArgs: args, scriptArgs: [] };
 }
 
 function parseEnv(src: string): Record<string, string> {
@@ -579,7 +549,7 @@ export async function execute(
         return 1;
     }
 
-    const args = tokens.slice(1);
+    const { cliArgs: args, scriptArgs } = splitFileArgs(tokens.slice(1));
 
     // 2. Option & Action Parsing
     const showVersion = hasArgFlag(["-v", "--version"], args);
@@ -615,7 +585,8 @@ Options:
   -o, --open    Directly open the browser
   -n, --no-open Don't open a window (Node: serve without opening the browser)
   -b, --build   Only bundle the project, don't run it afterward
-  -f, --file    Bundle and execute a single script file
+  -f, --file    Bundle and execute a single script file; every argument after
+                the file is passed to the script as is (put options before -f)
   -s, --safe    Skip the initialDirectory config check
   -l, --deeplink Trigger a deeplink (fullstacked://...) in the project once it runs
   -h, --help    Display this help message
@@ -654,10 +625,9 @@ Directory:
             process.env[key] = value;
         }
 
-        const extraArgs = getExtraArgs(args);
         return runFile(
             file,
-            extraArgs,
+            scriptArgs,
             !!opts?.keepGlobals,
             writeOut,
             writeErr

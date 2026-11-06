@@ -1,9 +1,14 @@
 #!/usr/bin/env node
-import fullstacked from "../../core/internal/bundle/lib/fullstacked/index.ts";
+import fullstacked, {
+    splitFileArgs
+} from "../../core/internal/bundle/lib/fullstacked/index.ts";
 import { keepRunning, stop } from "./src/index.ts";
 
+// only the CLI's own options count: the arguments after `-f <file>` are the
+// script's (process.argv[0..1] are node and this file)
+const { cliArgs } = splitFileArgs(process.argv.slice(2));
 const matches = (args: string[]) =>
-    !!process.argv.find((arg) => args.find((flag) => arg.startsWith(flag)));
+    !!cliArgs.find((arg) => args.find((flag) => arg.startsWith(flag)));
 const exits = matches(["-b", "--build", "-h", "--help", "-v", "--version"]);
 const runsFile = matches(["-f", "--file"]);
 
