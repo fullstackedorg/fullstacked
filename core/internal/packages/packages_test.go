@@ -1006,6 +1006,60 @@ func TestResolveVersion(t *testing.T) {
 	}
 }
 
+func TestResolveVersion_LikeNpm(t *testing.T) {
+	// the fullstacked registry entry after the first beta of 1.0.1
+	meta := PackageMetadata{
+		Name: "fullstacked",
+		DistTags: map[string]string{
+			"latest": "1.0.0",
+			"alpha":  "1.0.0-alpha.1847",
+			"beta":   "1.0.1-1870",
+		},
+		Versions: map[string]PackageVersion{
+			"1.0.0-alpha.1753": {Version: "1.0.0-alpha.1753"},
+			"1.0.0-alpha.1847": {Version: "1.0.0-alpha.1847"},
+			"1.0.0":            {Version: "1.0.0"},
+			"1.0.1-1870":       {Version: "1.0.1-1870"},
+		},
+	}
+
+	tests := []struct {
+		Range    string
+		Expected string
+	}{
+		{"^1.0.0-alpha.1753", "1.0.0"},
+		{"^1.0.0", "1.0.0"},
+		{">=1.0.0-alpha.1800 <1.0.0", "1.0.0-alpha.1847"},
+		{"^1.0.1-0", "1.0.1-1870"},
+		{"^1.0.0 || ^1.0.1-0", "1.0.0"},
+		{"beta", "1.0.1-1870"},
+	}
+	for _, test := range tests {
+		ver, err := resolveVersion(meta, test.Range)
+		if err != nil {
+			t.Errorf("Error resolving %s: %v", test.Range, err)
+			continue
+		}
+		if ver.Version != test.Expected {
+			t.Errorf("Expected %s for range %s, got %s", test.Expected, test.Range, ver.Version)
+		}
+	}
+
+	// without latest in range, a prerelease of another version never matches
+	meta.DistTags["latest"] = "2.0.0"
+	meta.Versions["2.0.0"] = PackageVersion{Version: "2.0.0"}
+	if ver, err := resolveVersion(meta, "^1.0.0-alpha.1753"); err != nil || ver.Version != "1.0.0" {
+		t.Errorf("Expected 1.0.0 for ^1.0.0-alpha.1753 with latest 2.0.0, got %s (%v)", ver.Version, err)
+	}
+
+	// a deprecated latest is skipped for the highest match
+	meta.DistTags["latest"] = "1.0.0-alpha.1753"
+	meta.Versions["1.0.0-alpha.1753"] = PackageVersion{Version: "1.0.0-alpha.1753", Deprecated: "old"}
+	if ver, err := resolveVersion(meta, "^1.0.0-alpha.1753 <1.0.0"); err != nil || ver.Version != "1.0.0-alpha.1847" {
+		t.Errorf("Expected 1.0.0-alpha.1847 past a deprecated latest, got %s (%v)", ver.Version, err)
+	}
+}
+
 func TestFetchReact(t *testing.T) {
 	meta, err := fetchPackageMetadata("react")
 	if err != nil {

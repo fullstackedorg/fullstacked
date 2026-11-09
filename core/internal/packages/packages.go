@@ -17,7 +17,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -1428,7 +1430,7 @@ func resolveVersion(metadata PackageMetadata, versionRange string) (PackageVersi
 		}
 	}
 
-	c, err := semver.NewConstraint(versionRange)
+	r, err := parseRange(versionRange)
 	if err != nil {
 		if v, ok := metadata.Versions[versionRange]; ok {
 			return v, nil
@@ -1439,6 +1441,14 @@ func resolveVersion(metadata PackageMetadata, versionRange string) (PackageVersi
 			}
 		}
 		return PackageVersion{}, err
+	}
+
+	// like npm, the version behind the latest tag wins when it satisfies the range
+	latest := metadata.DistTags["latest"]
+	if tagged, ok := metadata.Versions[latest]; ok && !isDeprecated(tagged) {
+		if v, err := semver.NewVersion(latest); err == nil && r.satisfies(v) {
+			return tagged, nil
+		}
 	}
 
 	var bestVersion PackageVersion
@@ -1453,13 +1463,8 @@ func resolveVersion(metadata PackageMetadata, versionRange string) (PackageVersi
 			continue
 		}
 
-		if c.Check(v) {
-			isDepr := false
-			if s, ok := version.Deprecated.(string); ok && s != "" {
-				isDepr = true
-			}
-
-			if !isDepr {
+		if r.satisfies(v) {
+			if !isDeprecated(version) {
 				if bestSemver == nil || v.GreaterThan(bestSemver) {
 					bestSemver = v
 					bestVersion = version
@@ -1481,6 +1486,53 @@ func resolveVersion(metadata PackageMetadata, versionRange string) (PackageVersi
 	}
 
 	return PackageVersion{}, errors.New("no matching version found for " + metadata.Name + "@" + versionRange)
+}
+
+func isDeprecated(version PackageVersion) bool {
+	s, ok := version.Deprecated.(string)
+	return ok && s != ""
+}
+
+// npmRange is a version range split on ||. Each set keeps the
+// major.minor.patch of the prereleases it names, because npm only lets a
+// prerelease satisfy a set that names a prerelease of the same version:
+// ^1.0.0-alpha.1 matches 1.0.0-alpha.2 and 1.2.0, never 1.0.1-beta
+type npmRange []comparatorSet
+
+type comparatorSet struct {
+	constraint        *semver.Constraints
+	prereleaseCorners []string
+}
+
+var prereleaseComparator = regexp.MustCompile(`(\d+)\.(\d+)\.(\d+)-[0-9A-Za-z.-]+`)
+
+func parseRange(versionRange string) (npmRange, error) {
+	var r npmRange
+	for _, set := range strings.Split(versionRange, "||") {
+		c, err := semver.NewConstraint(set)
+		if err != nil {
+			return nil, err
+		}
+		cs := comparatorSet{constraint: c}
+		for _, m := range prereleaseComparator.FindAllStringSubmatch(set, -1) {
+			cs.prereleaseCorners = append(cs.prereleaseCorners, m[1]+"."+m[2]+"."+m[3])
+		}
+		r = append(r, cs)
+	}
+	return r, nil
+}
+
+func (r npmRange) satisfies(v *semver.Version) bool {
+	corner := fmt.Sprintf("%d.%d.%d", v.Major(), v.Minor(), v.Patch())
+	for _, set := range r {
+		if !set.constraint.Check(v) {
+			continue
+		}
+		if v.Prerelease() == "" || slices.Contains(set.prereleaseCorners, corner) {
+			return true
+		}
+	}
+	return false
 }
 
 func getAncestors(pkgPath string) []string {
