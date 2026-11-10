@@ -1,3 +1,6 @@
+// first: a bundle built with another bridge version fails before it
+// touches the page (see shared.ts)
+import { type SharedBridge, shared } from "./shared.ts";
 import { deserialize, mergeUint8Arrays, serialize } from "./serialization.ts";
 import {
     type CoreCallResponseType,
@@ -23,6 +26,8 @@ declare global {
 
 type FullStacked = {
     bridge: Bridge;
+    // the bridge of the page, shared by its bundles (see shared.ts)
+    __bridge: SharedBridge;
     platformBridge: typeof platformBridgeType;
 
     onStreamData: (id: number, payload: ArrayBuffer | string) => void;
@@ -78,10 +83,6 @@ type BridgeSync<T extends boolean> = (
 type Bridge = BridgeSync<boolean> & BridgeAsync;
 
 async function init() {
-    if (globalThis.fullstacked?.bridge) {
-        return;
-    }
-
     globalThis.fullstacked = globalThis.fullstacked || {};
     globalThis.fullstacked.clipboard = globalThis.fullstacked.clipboard || {};
     globalThis.fullstacked.plugins =
@@ -197,7 +198,9 @@ async function init() {
     await parentWindow.setup();
 }
 
-await init();
+// The first bundle of the page installs the bridge, the bundles it imports
+// later wait for it and use it
+await shared("init", init);
 
 function processResponse(buffer: ArrayBuffer | void) {
     if (!buffer || buffer.byteLength === 0) {

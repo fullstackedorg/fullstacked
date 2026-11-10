@@ -42,7 +42,11 @@
     </Application>
   </Applications>
 
+  <!-- runFullTrust: required by a packaged WinUI 3 (Windows App SDK) desktop app.
+       internetClient: the core's sockets, fetch and WebSocket, and WebView2.
+       See docs/contributing/store-review.md#windows -->
   <Capabilities>
+    <Capability Name="internetClient" />
     <rescap:Capability Name="runFullTrust" />
   </Capabilities>
   <build:Metadata>

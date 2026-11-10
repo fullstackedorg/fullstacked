@@ -38,9 +38,11 @@ if(DEFINED COMPILER_ARCH AND NOT COMPILER_ARCH STREQUAL ARCH)
         "CMakeCache.txt to use the host ones.")
 endif()
 
+# prebuild.sh also builds the shell (shell/out)
 execute_process(
     COMMAND bash prebuild.sh ${ARCH} qt
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    COMMAND_ERROR_IS_FATAL ANY
 )
 
 set(CMAKE_CXX_STANDARD 20)

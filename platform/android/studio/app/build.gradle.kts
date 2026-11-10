@@ -59,7 +59,31 @@ extensions.configure<com.android.build.api.dsl.ApplicationExtension> {
     }
 }
 
+// shell/out, the app's page, as the app ships it: npm run build:shell:release
+// (build-shell.ts at the repository's root). SHELL_PLUGINS and SHELL_FILES in
+// the environment change its plugins and extra files.
+tasks.register<Exec>("buildShell") {
+    workingDir = file("../../../..")
+    val windows = System.getProperty("os.name").lowercase().contains("windows")
+    commandLine(if (windows) "npm.cmd" else "npm", "run", "build:shell:release")
+    if (!windows) {
+        // Android Studio started from the dock doesn't get the terminal's PATH
+        val home = System.getProperty("user.home")
+        environment(
+            "PATH",
+            listOf(
+                "$home/.local/bin",
+                "/opt/homebrew/bin",
+                "/usr/local/bin",
+                "/usr/local/go/bin",
+                System.getenv("PATH") ?: ""
+            ).joinToString(File.pathSeparator)
+        )
+    }
+}
+
 tasks.register<Zip>("zipAppOut") {
+    dependsOn("buildShell")
     from("../../../../shell/out")
     archiveFileName.set("out.zip")
     destinationDirectory.set(file("src/main/res/raw"))

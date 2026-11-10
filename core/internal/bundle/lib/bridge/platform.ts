@@ -20,6 +20,7 @@ import {
     readFrameStream
 } from "./frames.ts";
 import { responseFrame } from "./responses.ts";
+import { shared } from "./shared.ts";
 
 export interface PlatformBridge {
     ctx: number;
@@ -131,7 +132,8 @@ async function hostReadsBodies(): Promise<boolean> {
 // Async calls of a worker go through the main thread (worker_threads relay)
 // which knows the streams they open and hands their frames to the worker.
 const relayed = new Map<number, (response: ArrayBuffer) => void>();
-if (isWorker) {
+
+function listenRelayed() {
     self.addEventListener("message", (event: MessageEvent) => {
         if (!(event.data instanceof ArrayBuffer)) return;
         // [id][response]
@@ -600,6 +602,7 @@ async function installUI() {
 
 async function init(): Promise<PlatformBridge> {
     if (isWorker) {
+        listenRelayed();
         // the first message of the main thread starts the worker
         await new Promise<void>((workerReady) => {
             self.onmessage = () => workerReady();
@@ -670,28 +673,34 @@ async function init(): Promise<PlatformBridge> {
     };
 }
 
-let platformBridge: {
+type PlatformBridgeReady = {
     ready: Promise<void>;
     bridge?: PlatformBridge;
-} = null;
+};
 
-// nodejs
-if (globalThis.process) {
-    platformBridge = {
-        ready: Promise.resolve(),
-        get bridge() {
-            return globalThis.bridge;
-        }
-    };
-}
-// every other platform (browser)
-else {
+function createPlatformBridge(): PlatformBridgeReady {
+    // nodejs
+    if (globalThis.process) {
+        return {
+            ready: Promise.resolve(),
+            get bridge() {
+                return globalThis.bridge;
+            }
+        };
+    }
+    // every other platform (browser)
     globalThis.global = globalThis;
-    platformBridge = {
+    const platformBridge: PlatformBridgeReady = {
         ready: init().then((bridge) => {
             platformBridge.bridge = bridge;
         })
     };
+    return platformBridge;
 }
+
+// one per page, set up by the first bundle (see shared.ts): a later bundle
+// that imports this module (worker_threads) must not attach a second frame
+// reader nor replace the handlers of the host
+const platformBridge = shared("platform", createPlatformBridge);
 
 export default platformBridge;

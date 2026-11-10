@@ -17,5 +17,19 @@
 	</array>
 	<key>UIFileSharingEnabled</key>
 	<true/>
+	<!-- Permissions a project running in the webview can ask for (WebKit prompts first).
+	     See docs/contributing/store-review.md#permissions -->
+	<key>NSCameraUsageDescription</key>
+	<string>A project you run asked to use the camera, to take a photo or video or to stream it in the project.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>A project you run asked to use the microphone, to record audio or video or to stream it in the project.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Save an image from a project you run to your photo library.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>A project you run asked for your location while you use it.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>A project you run asked to transcribe your speech.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>A project you run asked to connect to a device on your local network (TCP or UDP sockets, HTTP requests).</string>
 </dict>
 </plist>

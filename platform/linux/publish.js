@@ -84,17 +84,7 @@ const s3Client = new S3Client({
     }
 });
 
-// 2. Build shell app
-console.log("Building shell app...");
-child_process.execSync(
-    "npm start -- fullstacked shell --build",
-    {
-        cwd: rootDirectory,
-        stdio: "inherit"
-    }
-);
-
-// 3. Build core static libraries
+// 2. Build core static libraries
 console.log("Building core Linux static libraries...");
 child_process.execSync("make linux-arm64-static linux-x64-static -j4", {
     cwd: path.resolve(rootDirectory, "core", "build"),
@@ -113,7 +103,7 @@ function updateControlFile(framework) {
     fs.writeFileSync(controlFile, controlFileContentUpdated);
 }
 
-// 4. Build all 4 Linux releases
+// 3. Build all 4 Linux releases (prebuild.sh builds the shell)
 const targets = [
     { arch: "arm64", framework: "gtk" },
     { arch: "arm64", framework: "qt" },
@@ -167,7 +157,7 @@ for (const target of targets) {
         });
     }
 
-    // 4.1 Package .deb
+    // 3.1 Package .deb
     const debFileName = `fullstacked-${versionStr}-linux-${target.arch}-${target.framework}.deb`;
     const debFilePath = path.resolve(currentDirectory, debFileName);
 
@@ -192,7 +182,7 @@ for (const target of targets) {
         contentType: "application/vnd.debian.binary-package"
     });
 
-    // 4.2 Package portable .tar.xz
+    // 3.2 Package portable .tar.xz
     const stagingDir = path.resolve(currentDirectory, "out-tar");
     if (fs.existsSync(stagingDir)) {
         fs.rmSync(stagingDir, { recursive: true });
@@ -245,7 +235,7 @@ for (const target of targets) {
     });
 }
 
-// 5. Upload release files to R2
+// 4. Upload release files to R2
 async function uploadFileToR2(filePath, fileName, contentType) {
     try {
         const fileBuffer = fs.readFileSync(filePath);
@@ -273,7 +263,7 @@ for (const { filePath, fileName, contentType } of releaseFiles) {
     await uploadFileToR2(filePath, fileName, contentType);
 }
 
-// 6. Update release/beta.txt in R2
+// 5. Update release/beta.txt in R2
 const versionFileKey = isRelease ? "releases/release.txt" : "releases/beta.txt";
 
 const versionUploadCommand = new PutObjectCommand({

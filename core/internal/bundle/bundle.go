@@ -113,11 +113,15 @@ func Switch(
 		if len(data) >= 1 {
 			entryPoint = fspath.ResolveWithContext(ctx, data[0].Data.(string))
 		}
+		production := false
+		if len(data) >= 2 {
+			production, _ = data[1].Data.(bool)
+		}
 
 		response.Type = types.CoreResponseStream
 		response.Stream = &types.ResponseStream{
 			Open: func(ctx *types.Context, streamId uint32) {
-				result := BundleDirFn(ctx, entryPoint)
+				result := BundleDirFn(ctx, entryPoint, production)
 				store.StreamEvent(ctx, streamId, "result", []types.SerializableData{result}, true)
 			},
 		}
@@ -254,6 +258,19 @@ func prepareBundleOptions(entryPoint string) (esbuild.BuildOptions, error) {
 	return esbuildBuildOptions, nil
 }
 
+// productionOptions is what `fullstacked --build` adds: libraries that branch on
+// process.env.NODE_ENV (React, React DOM) take their production build, and the
+// output is minified. Development bundles keep the defaults, and their warnings.
+func productionOptions(buildOptions *esbuild.BuildOptions) {
+	if buildOptions.Define == nil {
+		buildOptions.Define = map[string]string{}
+	}
+	buildOptions.Define["process.env.NODE_ENV"] = `"production"`
+	buildOptions.MinifyWhitespace = true
+	buildOptions.MinifyIdentifiers = true
+	buildOptions.MinifySyntax = true
+}
+
 type PluginBuildData struct {
 	Filter string    `json:"filter"`
 	Ext    *[]string `json:"ext"`
@@ -283,8 +300,11 @@ type BuildPluginOutputFile struct {
 //	-> /out/index.ts.tailwind.css
 //	-> /out/index.html
 //	-> /out/image-xyz.png
-func BundleDirFn(ctx *types.Context, entryPoint string) EsbuildResult {
+func BundleDirFn(ctx *types.Context, entryPoint string, production bool) EsbuildResult {
 	buildOptions, err := prepareBundleOptions(entryPoint)
+	if production {
+		productionOptions(&buildOptions)
+	}
 	if err != nil {
 		return EsbuildResult{
 			Errors: []esbuild.Message{

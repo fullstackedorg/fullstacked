@@ -48,15 +48,20 @@ const pluginsDir = path.join(currentDirectory, "plugins");
 async function copyPlugin(plugin: string) {
     const pluginPath = path.join(pluginsDir, plugin);
 
-    if (!fs.existsSync(path.join(pluginPath, "package.json"))) return;
+    const pkgJsonPath = path.join(pluginPath, "package.json");
+    if (!fs.existsSync(pkgJsonPath)) return;
+
+    const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
+    // A private plugin isn't published: the CLI bundles it from its sources
+    // when a build passes it with -p (plugins/onboarding, see build-shell.ts),
+    // and npm's workspace link stays in node_modules.
+    if (pkgJson.private) return;
 
     child_process.execSync("npm run build", {
         cwd: pluginPath,
         stdio: "inherit"
     });
 
-    const pkgJsonPath = path.join(pluginPath, "package.json");
-    const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
     const pkgName = pkgJson.name;
     const destPath = path.resolve("node_modules", pkgName);
 

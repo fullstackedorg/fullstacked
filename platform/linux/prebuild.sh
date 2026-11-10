@@ -17,12 +17,13 @@ if [ -f "bin/linux-$ARCH.h" ]; then
     cp -f bin/linux-$ARCH.h bin/linux.h
 fi
 
+# the app's page: shell/out as the app ships it (build-shell.ts at the
+# repository's root). SHELL_PLUGINS and SHELL_FILES in the environment change
+# its plugins and extra files.
+(cd ../.. && npm run build:shell:release) || exit 1
+
 mkdir -p ./out/usr/share/fullstacked
-if [ -d "../../shell/out" ]; then
-    cp -r ../../shell/out ./out/usr/share/fullstacked/app
-elif [ -d "../../app/out" ]; then
-    cp -r ../../app/out ./out/usr/share/fullstacked/app
-fi
+cp -r ../../shell/out ./out/usr/share/fullstacked/app
 
 mkdir -p ./out/usr/share/applications ./out/usr/share/icons
 cp org.fullstacked.desktop ./out/usr/share/applications/

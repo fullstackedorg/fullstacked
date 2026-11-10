@@ -472,7 +472,7 @@ async function runDirectory(
         }
     }
 
-    const result = await bundle(targetDirectory);
+    const result = await bundle(targetDirectory, { production: buildOnly });
     if (result.Warnings?.length) {
         result.Warnings.forEach((w: any) => writeErr(formatMessage(w, true)));
     }
@@ -584,7 +584,8 @@ Options:
   -e, --env     Define environment variables in KEY=VALUE format (can be used multiple times)
   -o, --open    Directly open the browser
   -n, --no-open Don't open a window (Node: serve without opening the browser)
-  -b, --build   Only bundle the project, don't run it afterward
+  -b, --build   Only bundle the project, for production (React's production
+                build, minified), don't run it afterward
   -f, --file    Bundle and execute a single script file; every argument after
                 the file is passed to the script as is (put options before -f)
   -s, --safe    Skip the initialDirectory config check

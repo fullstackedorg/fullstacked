@@ -26,6 +26,7 @@ let tests = [
     "./git/index.ts",
     "./packages/index.ts",
     "./worker/index.ts",
+    "./multi-bundle/index.ts",
     "./readline/index.ts",
     "./config/index.ts",
     "./deeplink/index.ts",

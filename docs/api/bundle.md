@@ -10,7 +10,7 @@ Bundles TypeScript and JavaScript with [esbuild](https://esbuild.github.io), whi
 ## bundle
 
 ```ts
-bundle(entryPoint?: string): Promise<EsbuildResult>
+bundle(entryPoint?: string, opts?: { production?: boolean }): Promise<EsbuildResult>
 ```
 
 Builds a **project**. `entryPoint` is a directory (default `"."`) or a file. For a directory, the entry is the first of `index.tsx`, `index.ts`, `index.jsx` and `index.js` that exists.
@@ -89,16 +89,19 @@ Errors from before esbuild runs come back the same way, with only `Text` set: `e
 
 The core runs esbuild with:
 
-| Option                                    | Value                                                                                                  |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `bundle`                                  | `true`                                                                                                 |
-| `format`                                  | `esm`                                                                                                  |
-| `platform`                                | esbuild's default, `browser`, so package `browser` fields are honored                                  |
-| `sourcemap`                               | none                                                                                                   |
-| `minify`, `target`, `define`, `splitting` | not set                                                                                                |
-| `jsx`                                     | esbuild's default, classic `React.createElement`, unless the project's `tsconfig.json` says otherwise  |
-| `tsconfig`                                | Found by esbuild from the entry's directory (`paths`, `jsx`, `jsxImportSource`, …)                     |
-| loaders                                   | by extension: `.ts`, `.tsx`, `.jsx`, `.js`, `.json`, `.css`, plus the image file loaders in `bundle()` |
+| Option                | Value                                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------------------------ |
+| `bundle`              | `true`                                                                                                 |
+| `format`              | `esm`                                                                                                  |
+| `platform`            | esbuild's default, `browser`, so package `browser` fields are honored                                  |
+| `sourcemap`           | none                                                                                                   |
+| `minify`, `define`    | not set, unless `production` (below). esbuild then defines `process.env.NODE_ENV` as `"development"`   |
+| `target`, `splitting` | not set                                                                                                |
+| `jsx`                 | esbuild's default, classic `React.createElement`, unless the project's `tsconfig.json` says otherwise  |
+| `tsconfig`            | Found by esbuild from the entry's directory (`paths`, `jsx`, `jsxImportSource`, …)                     |
+| loaders               | by extension: `.ts`, `.tsx`, `.jsx`, `.js`, `.json`, `.css`, plus the image file loaders in `bundle()` |
+
+With `{ production: true }`, which `fullstacked --build` passes, the core also sets `define: { "process.env.NODE_ENV": "\"production\"" }` and minifies whitespace, identifiers and syntax. React and React DOM then take their production build: a React app's bundle is about a third of its development size, without React's development warnings. `bundleFile()` and `fullstacked` without `--build` keep the development build.
 
 Every entry gets `import "fullstacked";` prepended, which installs the bridge and the [globals](../node/index.md#globals) before your code runs.
 

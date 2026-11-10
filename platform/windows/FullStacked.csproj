@@ -84,11 +84,19 @@
     <ProjectCapability Include="Msix" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Update="out\**">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
+  <!--
+    The app's page, out\ in the package: shell/out as the app ships it
+    (npm run build:shell:release, build-shell.ts at the repository's root).
+    SHELL_PLUGINS and SHELL_FILES in the environment change its plugins and
+    extra files.
+  -->
+  <Target Name="BuildShell" BeforeTargets="BeforeBuild" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Exec Command="npm run build:shell:release" WorkingDirectory="$(MSBuildProjectDirectory)\..\.." />
+    <ItemGroup>
+      <ShellOut Include="..\..\shell\out\**" />
+      <None Include="@(ShellOut)" Link="out\%(ShellOut.RecursiveDir)%(ShellOut.Filename)%(ShellOut.Extension)" CopyToOutputDirectory="Always" />
+    </ItemGroup>
+  </Target>
 
   <ItemGroup>
     <Content Update="Assets\Icon-16.ico">

@@ -25,18 +25,18 @@ fullstacked [options] [directory]
 
 The CLI starts the core with the **current directory as its root**, which is the [sandbox](node/system.md#the-project-sandbox) of everything it runs. The project must be the current directory or below it: `fullstacked ../other-app` and absolute paths outside it fail with `entry point not found`.
 
-| Option                             | Effect                                                                                      |
-| ---------------------------------- | ------------------------------------------------------------------------------------------- |
-| `-v`, `--version`                  | Print the version: `FullStacked v1.0.0 (build N), branch B, hash H`                         |
-| `-h`, `--help`                     | Print the help                                                                              |
-| `-b`, `--build`                    | Bundle only. Exits with 1 on a build error.                                                 |
-| `-e`, `--env KEY=VALUE`            | Set an environment variable, over `.env`. Repeatable.                                       |
-| `-p`, `--plugin <package or file>` | Load a [build plugin](api/plugin.md#build-plugins) before bundling. Repeatable.             |
-| `--port <n>`                       | First port to serve on (default 9000). Each opened project takes the next free port.        |
-| `-n`, `--no-open`                  | Serve without opening the browser                                                           |
-| `-f`, `--file <script> [args…]`    | Run a single script in Node instead of a project (see below)                                |
-| `-s`, `--safe`                     | Ignore the project's `initialDirectory` [config](api/config.md#initialdirectory)            |
-| `-l`, `--deeplink <url>`           | Deliver a `fullstacked://…` [deep link](api/plugin.md#deeplink) to the project once it runs |
+| Option                             | Effect                                                                                                                                                        |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-v`, `--version`                  | Print the version: `FullStacked v1.0.0 (build N), branch B, hash H`                                                                                           |
+| `-h`, `--help`                     | Print the help                                                                                                                                                |
+| `-b`, `--build`                    | Bundle only, for production: `NODE_ENV` is `"production"` and the output is minified ([details](api/bundle.md#build-options)). Exits with 1 on a build error. |
+| `-e`, `--env KEY=VALUE`            | Set an environment variable, over `.env`. Repeatable.                                                                                                         |
+| `-p`, `--plugin <package or file>` | Load a [build plugin](api/plugin.md#build-plugins) before bundling. Repeatable.                                                                               |
+| `--port <n>`                       | First port to serve on (default 9000). Each opened project takes the next free port.                                                                          |
+| `-n`, `--no-open`                  | Serve without opening the browser                                                                                                                             |
+| `-f`, `--file <script> [args…]`    | Run a single script in Node instead of a project (see below)                                                                                                  |
+| `-s`, `--safe`                     | Ignore the project's `initialDirectory` [config](api/config.md#initialdirectory)                                                                              |
+| `-l`, `--deeplink <url>`           | Deliver a `fullstacked://…` [deep link](api/plugin.md#deeplink) to the project once it runs                                                                   |
 
 Use the long form `--port`: the CLI's host code also reads `-p` as a port, so `-p 3000` would be taken as a plugin named `3000`.
 

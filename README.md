@@ -151,6 +151,7 @@ Requirements: [Go](https://go.dev) `>=1.26` and [Node.js](https://nodejs.org) `>
 git clone https://github.com/fullstackedorg/fullstacked.git
 cd fullstacked
 git submodule update --init
+git -C shell submodule update --init
 npm install
 npm start
 ```

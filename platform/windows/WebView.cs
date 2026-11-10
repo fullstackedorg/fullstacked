@@ -373,11 +373,20 @@ namespace FullStacked
             coreWebView2.NewWindowRequested += delegate (CoreWebView2 sender, CoreWebView2NewWindowRequestedEventArgs e)
             {
                 Uri url = new(e.Uri);
+                e.Handled = true;
+
+                // auth windows open in the system browser, like ASWebAuthenticationSession on
+                // Apple and Custom Tabs on Android (identity providers refuse embedded
+                // webviews); the page answers on fullstacked-auth://, see postAuthResult
                 if (url.Query.Contains("auth")) {
+                    string query = url.Query.TrimStart('?');
+                    if (!query.Contains("native=")) query += "&native=1";
+                    if (!query.Contains("callback_scheme=")) query += "&callback_scheme=fullstacked-auth";
+                    var native = new UriBuilder(url) { Query = query };
+                    _ = Windows.System.Launcher.LaunchUriAsync(native.Uri);
                     return;
                 }
 
-                e.Handled = true;
                 _ = Windows.System.Launcher.LaunchUriAsync(url);
             };
 

@@ -20,6 +20,10 @@ The sign-in page ends the flow with `window.opener.postMessage(result, "*")`. Pi
 const session = await auth.authenticate("https://accounts.example.com/sign-in");
 ```
 
+## In the native apps
+
+Identity providers refuse sign-in inside embedded webviews, so the apps open the page in the system browser instead of a popup: `ASWebAuthenticationSession` on iOS and macOS, Custom Tabs on Android, the default browser on Windows. They add `native=1` and `callback_scheme=fullstacked-auth` to the query. The sign-in page then ends the flow by redirecting to `fullstacked-auth://auth?<result as query parameters>`, and the app delivers those parameters, as an object, as the `message` the promise resolves with. There is no `window.opener` in this mode.
+
 Inside the runtime, closing the popup without posting doesn't reject the promise. The closed-window check only runs outside FullStacked. Give your UI a way to cancel.
 
 The module only uses `window`, so it is for pages, not workers or `--file` scripts.

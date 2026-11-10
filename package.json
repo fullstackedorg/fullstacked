@@ -3,6 +3,7 @@
     "scripts": {
         "generate-types": "node generate-types.ts",
         "build": "node build.ts",
+        "build:shell:release": "node build-shell.ts",
         "start": "node index.ts",
         "fmt": "sh ./fmt.sh",
         "typecheck": "tsc --noEmit",

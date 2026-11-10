@@ -59,7 +59,7 @@ A call is one binary payload:
 
 ### Call ids
 
-Ids are one byte. Id 0 is never used, so at most **255 calls** can be in flight per runtime (a page, or each worker for its sync calls). `acquireId()` hands ids out round-robin. While an id is free and nobody is waiting, it returns synchronously, so the call is posted in the same tick and calls go out in the order they were made. When all 255 are taken, async calls wait for an id in FIFO order. A sync call can't wait, so it throws `too many bridge calls in flight`. The id is released as soon as the response arrives.
+Ids are one byte. Id 0 is never used, so at most **255 calls** can be in flight per runtime (a page and every bundle it loads, or each worker for its sync calls). `acquireId()` hands ids out round-robin. While an id is free and nobody is waiting, it returns synchronously, so the call is posted in the same tick and calls go out in the order they were made. When all 255 are taken, async calls wait for an id in FIFO order. A sync call can't wait, so it throws `too many bridge calls in flight`. The id is released as soon as the response arrives.
 
 ### Modules and functions
 
@@ -248,6 +248,16 @@ Workers (`new Worker(…)` or [`worker_threads`](node/workers.md#worker_threads)
 - **Terminating a worker** drops its stream mappings.
 
 `DOMParser`, `XMLSerializer` and the DOM node classes are installed in workers, which have no DOM (see [Globals](node/index.md#globals)).
+
+## Several bundles in a page
+
+Every bundle starts with `import "fullstacked"` and carries its own copy of the lib, and a page can `import()` another bundle (one built with [`bundleFile`](api/bundle.md#bundlefile), for example). A page still has a single bridge (`lib/bridge/shared.ts`):
+
+- **The first bundle installs it** on `globalThis.fullstacked.__bridge`: the platform bridge (transport, frame stream, `open`, `exit` and clipboard handlers), the [call ids](#call-ids), the [responses put on the frame stream](#message-channels) and the [streams](#streams). A bundle that loads later, even while the first one is still starting, waits for that bridge and uses it instead of setting up its own.
+- **Calls and streams are the page's.** The calls of every bundle take their ids from the same allocator, so at most 255 are in flight across the bundles. Stream data is dispatched by stream id to the duplex that waits for it, whichever bundle opened it. The lib modules (`fs`, `git`, the Node built-ins…) stay duplicated: they only call the bridge.
+- **Versions.** The shared bridge carries a version (`BRIDGE_VERSION`). A bundle built with another version, or loaded after a lib from before the shared bridge, throws when it loads, so its `import()` rejects and the page keeps working. Bundle the code a page loads with the same version of FullStacked.
+
+Workers have their own global scope, so their own bridge.
 
 ## The Node host
 

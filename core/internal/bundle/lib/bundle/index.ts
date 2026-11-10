@@ -15,14 +15,26 @@ export function esbuildVersion(): Promise<string> {
     });
 }
 
-export function bundle(entryPoint?: string): Promise<EsbuildResult> {
+export type BundleOptions = {
+    /**
+     * Production bundle (`fullstacked --build`): `process.env.NODE_ENV` is
+     * `"production"`, so React and React DOM take their production build, and the
+     * output is minified.
+     */
+    production?: boolean;
+};
+
+export function bundle(
+    entryPoint?: string,
+    opts?: BundleOptions
+): Promise<EsbuildResult> {
     const resolved = path.resolve(entryPoint ?? ".");
     return new Promise(async (resolve) => {
         const ee = (
             (await globalThis.fullstacked.bridge({
                 mod: Bundle,
                 fn: BundleDir,
-                data: [resolved]
+                data: [resolved, !!opts?.production]
             })) as Duplex
         ).eventEmitter() as any;
 

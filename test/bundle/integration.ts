@@ -51,6 +51,36 @@ suite("bundle - integration", () => {
     after(() => browsers.forEach((b) => b.end()));
 });
 
+suite("bundle - production (fullstacked --build)", () => {
+    before(cleanup);
+    afterEach(cleanup);
+
+    const out = "test/bundle/samples/production/out/index.ts.js";
+    const sample = "test/bundle/samples/production/index.ts";
+
+    test("development by default: NODE_ENV is development, not minified", async () => {
+        const result = await bundle.bundle(sample);
+        assert.deepEqual(result.Errors ?? [], []);
+        const js = fs.readFileSync(out, "utf-8");
+        assert.ok(
+            js.includes(
+                "function describeTheCurrentBuildMode() {\n  if (false)"
+            )
+        );
+        assert.ok(js.includes("development build"));
+    });
+
+    test("production: NODE_ENV defined, dead branch dropped, minified", async () => {
+        const result = await bundle.bundle(sample, { production: true });
+        assert.deepEqual(result.Errors ?? [], []);
+        const js = fs.readFileSync(out, "utf-8");
+        assert.ok(!js.includes("process.env.NODE_ENV"));
+        assert.ok(!js.includes("describeTheCurrentBuildMode"));
+        assert.ok(js.includes("production build"));
+        assert.ok(!js.includes("development build"));
+    });
+});
+
 suite("bundle - browser-only", () => {
     before(cleanup);
     afterEach(cleanup);

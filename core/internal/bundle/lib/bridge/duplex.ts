@@ -3,6 +3,7 @@ import { type SerializableData, Stream } from "../@types/index.ts";
 import { Close, Open, Write, WriteEvent } from "../@types/stream.ts";
 import { concatUint8Arrays, mergeUint8Arrays } from "./serialization.ts";
 import { createEventEmitter } from "./eventEmitter.ts";
+import { shared } from "./shared.ts";
 
 type DuplexItem = {
     opening: Promise<void> | null;
@@ -35,6 +36,10 @@ type DuplexItem = {
 const FLAG_DRAIN = 4;
 const FLAG_CONNECTED = 5;
 
+// The streams of this copy of the lib. Only the copy that installed the
+// page's bridge keeps any: the others create theirs with its functions
+// (see shared.ts and the exports below), so the frames of a stream reach its
+// duplex whichever bundle opened it.
 const activeDuplexes = new Map<number, DuplexItem[]>();
 
 // A host that exits once nothing runs (Node, fullstacked --file) keeps
@@ -53,18 +58,18 @@ function release(duplex: DuplexItem) {
 }
 
 // payload: [flags u8][data], base64 when evaluated by the host
-function onStreamData(id: number, payload: ArrayBuffer | string) {
+function receiveStreamData(id: number, payload: ArrayBuffer | string) {
     const chunk =
         typeof payload === "string"
             ? toByteArray(payload)
             : new Uint8Array(payload);
     // a copy: consumers may use the whole underlying buffer
-    onStreamFrame(id, chunk[0], chunk.slice(1));
+    receiveStreamFrame(id, chunk[0], chunk.slice(1));
 }
 
 // flags: 0 data, 1 end, 2 error (data is the message), 4 drain (the core
 // wrote the queued writes, see write)
-export function onStreamFrame(id: number, flags: number, data: Uint8Array) {
+function receiveStreamFrame(id: number, flags: number, data: Uint8Array) {
     const workerStreams = globalThis.fullstacked.workerStreams;
     if (workerStreams) {
         const worker = workerStreams.get(id);
@@ -218,7 +223,7 @@ export interface Duplex extends ReadableStream<Uint8Array<ArrayBuffer>> {
 
 const te = new TextEncoder();
 
-export function createDuplex(id: number): Duplex {
+function newDuplex(id: number): Duplex {
     const duplex: DuplexItem = {
         opening: null,
         open: false,
@@ -449,4 +454,12 @@ export function createDuplex(id: number): Duplex {
     return stream;
 }
 
-export default onStreamData;
+const streams = shared("streams", () => ({
+    onStreamData: receiveStreamData,
+    onStreamFrame: receiveStreamFrame,
+    createDuplex: newDuplex
+}));
+
+export const onStreamFrame = streams.onStreamFrame;
+export const createDuplex = streams.createDuplex;
+export default streams.onStreamData;

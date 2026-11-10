@@ -50,7 +50,7 @@ The sandbox applies to files. Network access (`net`, `fetch`, `dgram`) is unrest
 1. **Bundle.** [`bundle`](api/bundle.md) runs esbuild in the core on the project's entrypoint. Built-in imports resolve to the embedded lib, and npm imports to `node_modules`. The output goes to `out/`, with a generated `index.html`.
 2. **Run.** [`run`](api/run.md) creates a context with the project as its root.
 3. **Open.** The host opens a window on a URL of its own (`fs://localhost`, `http://localhost`, or `http://localhost:<port>` for the CLI) and binds it to the context.
-4. **Load.** The page fetches `out/index.html` and the bundle. The bundle's first import (`fullstacked`) initializes the bridge: it reads its context id from `GET /ctx`, detects the host's transports, attaches the frame stream, replaces `fetch` and `WebSocket`, installs `process`, `Buffer` and `setImmediate`, and restores the window size. Then the project's code runs.
+4. **Load.** The page fetches `out/index.html` and the bundle. The bundle's first import (`fullstacked`) initializes the bridge: it reads its context id from `GET /ctx`, detects the host's transports, attaches the frame stream, replaces `fetch` and `WebSocket`, installs `process`, `Buffer` and `setImmediate`, and restores the window size. Then the project's code runs. A bundle the page loads later uses the same bridge (see [Several bundles in a page](bridge.md#several-bundles-in-a-page)).
 5. **Run.** Each core-backed call crosses [the bridge](bridge.md): a sync call blocks the page like Node's sync APIs do, and an async call resolves when the core answers. Data that flows over time comes back as [streams](bridge.md#streams).
 6. **Exit.** Closing the window, or `process.exit()`, ends the context.
 
@@ -77,6 +77,6 @@ The native apps ship the shell, the project in `shell/` built to `shell/out`, as
 | `core/types/`, `types/` | Shared Go types and the generator of their TypeScript mirrors (`npm run generate-types`)                                                                                 |
 | `platform/`             | Hosts: `apple`, `android`, `windows`, `linux`, `node` (CLI and addon), `@fullstacked/*` (prebuilt core packages)                                                         |
 | `shell/`                | The app's terminal UI, itself a FullStacked project (git submodule)                                                                                                      |
-| `plugins/`              | The `@fullstacked/tailwindcss` and `@fullstacked/sass` build plugins (git submodules)                                                                                    |
+| `plugins/`              | The `@fullstacked/tailwindcss` and `@fullstacked/sass` build plugins, and the shell's onboarding (git submodules)                                                        |
 | `test/`                 | Node test runner suites: unit, end-to-end in Node, and integration in a real webview (Puppeteer)                                                                         |
 | `docs/`                 | This site                                                                                                                                                                |
