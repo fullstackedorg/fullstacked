@@ -107,6 +107,7 @@ class MainActivity : ComponentActivity() {
         }
 
         this.fileChooserResultLauncher = this.createFileChooserResultLauncher()
+        this.webPermissions = WebPermissions(this)
 
         if (providedCtxId != null && providedCtxId >= 0) {
             // Bind to provided ctxId (multi-window intent response)
@@ -590,6 +591,7 @@ class MainActivity : ComponentActivity() {
         return super.dispatchKeyEvent(event)
     }
 
+    lateinit var webPermissions: WebPermissions
     lateinit var fileChooserResultLauncher: ActivityResultLauncher<Intent>
     var fileChooserValueCallback: ValueCallback<Array<Uri>>? = null
     private fun createFileChooserResultLauncher(): ActivityResultLauncher<Intent> {

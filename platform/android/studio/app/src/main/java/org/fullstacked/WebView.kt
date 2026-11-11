@@ -6,6 +6,8 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.view.ViewGroup
+import android.webkit.GeolocationPermissions
+import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -81,6 +83,18 @@ fun createWebView(delegate: FullStackedWebView): WebView {
     webView.setBackgroundColor(Color.BLACK)
     webView.webViewClient = delegate
     webView.webChromeClient = object : WebChromeClient() {
+        // Camera, microphone and location: Android's own dialog (WebPermissions.kt)
+        override fun onPermissionRequest(request: PermissionRequest?) {
+            request?.let { delegate.ctx.webPermissions.onPermissionRequest(it) }
+        }
+
+        override fun onGeolocationPermissionsShowPrompt(
+            origin: String?,
+            callback: GeolocationPermissions.Callback?
+        ) {
+            delegate.ctx.webPermissions.onGeolocation(origin, callback)
+        }
+
         override fun onShowFileChooser(
             webView: WebView?,
             filePathCallback: ValueCallback<Array<Uri>>?,

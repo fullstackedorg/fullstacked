@@ -44,10 +44,15 @@
 
   <!-- runFullTrust: required by a packaged WinUI 3 (Windows App SDK) desktop app.
        internetClient: the core's sockets, fetch and WebSocket, and WebView2.
+       webcam, microphone, location: a project's getUserMedia and navigator.geolocation;
+       Windows asks the user the first time.
        See docs/contributing/store-review.md#windows -->
   <Capabilities>
     <Capability Name="internetClient" />
     <rescap:Capability Name="runFullTrust" />
+    <DeviceCapability Name="webcam" />
+    <DeviceCapability Name="microphone" />
+    <DeviceCapability Name="location" />
   </Capabilities>
   <build:Metadata>
     <build:Item Name="MSStoreCLIAppId" Value="9PFHHQ64415S" />

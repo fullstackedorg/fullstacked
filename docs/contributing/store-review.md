@@ -66,26 +66,34 @@ Other keys that review looks at: `ITSAppUsesNonExemptEncryption` is `NO`. The co
 | `com.apple.security.network.client`                 | Outgoing connections: the core's `net`, `fetch`, `WebSocket`, DNS, git and npm, and the webview.                                                                |
 | `com.apple.security.network.server`                 | `dgram`: the core binds every UDP socket it opens (`net.ListenUDP`), even one that only sends and reads replies, and the sandbox refuses any `bind` without it. |
 | `com.apple.security.files.user-selected.read-write` | The open panel of `<input type="file">`. Reading would be enough for it.                                                                                        |
+| `com.apple.security.device.camera`                  | A project's `getUserMedia({ video })`. macOS asks the user with `NSCameraUsageDescription` the first time.                                                      |
+| `com.apple.security.device.audio-input`             | A project's `getUserMedia({ audio })`. macOS asks with `NSMicrophoneUsageDescription`.                                                                          |
+| `com.apple.security.personal-information.location`  | A project's `navigator.geolocation`. macOS asks with `NSLocationWhenInUseUsageDescription`.                                                                     |
 
 Not needed: JIT (`com.apple.security.cs.allow-jit`), since JavaScript runs in WebKit's own processes and the Go core is compiled ahead of time; any exception for spawning processes, since the core never spawns one.
 
 In the sandbox, the projects directory is the container's Documents: `~/Library/Containers/org.fullstacked/Data/Documents` (`NSSearchPathForDirectoriesInDomains(.documentDirectory)`). Downloads from a page go to its `downloads` folder. The core's temporary files (`os.MkdirTemp`) and its home directory (`~` in git config paths) are the container's too, so it never writes outside the container.
 
-Without `com.apple.security.device.camera`, `com.apple.security.device.audio-input` and `com.apple.security.personal-information.location`, the sandbox denies the camera, the microphone and the location to WKWebView on macOS: `getUserMedia` and `navigator.geolocation` fail with a permission error. Add them to give projects these features on the Mac, and say so in the review notes.
+Without the camera, audio-input and location entitlements, the sandbox denies these devices to WKWebView on macOS and `getUserMedia` and `navigator.geolocation` fail with a permission error. The review notes say that projects use them only when the page asks.
 
 ## Android
 
 `platform/android/studio/app/src/main/AndroidManifest.xml`:
 
-| Permission             | Why                                                                                                               |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `INTERNET`             | The core's sockets, DNS, `fetch`, `WebSocket`, git and npm, and the webview.                                      |
-| `ACCESS_NETWORK_STATE` | The webview's `navigator.onLine` and `online`/`offline` events.                                                   |
-| `REORDER_TASKS`        | `ActivityManager.moveTaskToFront`, which brings the project's window back after a sign-in redirect or a deeplink. |
+| Permission               | Why                                                                                                               |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `INTERNET`               | The core's sockets, DNS, `fetch`, `WebSocket`, git and npm, and the webview.                                      |
+| `ACCESS_NETWORK_STATE`   | The webview's `navigator.onLine` and `online`/`offline` events.                                                   |
+| `REORDER_TASKS`          | `ActivityManager.moveTaskToFront`, which brings the project's window back after a sign-in redirect or a deeplink. |
+| `CAMERA`                 | A project's `getUserMedia({ video })`. Runtime permission, asked only when the page asks.                         |
+| `RECORD_AUDIO`           | A project's `getUserMedia({ audio })`. Runtime permission, asked only when the page asks.                         |
+| `MODIFY_AUDIO_SETTINGS`  | The webview's WebRTC audio switches the audio mode while it captures. Normal permission, no dialog.               |
+| `ACCESS_FINE_LOCATION`   | A project's `navigator.geolocation`. Runtime permission, asked only when the page asks.                           |
+| `ACCESS_COARSE_LOCATION` | Requested with the fine one, as Android 12 requires, so the user can choose approximate.                          |
 
-The app has no dangerous permission. It doesn't read external storage (projects are in `filesDir/projects`), and it has no `QUERY_ALL_PACKAGES`, SMS, call log, contacts, camera, microphone or location permission.
+The camera, microphone and location features they imply are declared `required="false"`, so the app still installs on devices without them. The app doesn't read external storage (projects are in `filesDir/projects`), and it has no `QUERY_ALL_PACKAGES`, SMS, call log, contacts or background location permission.
 
-- **Webview permissions.** `WebChromeClient` doesn't override `onPermissionRequest` or `onGeolocationPermissionsShowPrompt`, so the webview denies camera, microphone and location requests without a prompt. Giving projects these features means overriding both, asking for the runtime permission (`CAMERA`, `RECORD_AUDIO`, `ACCESS_FINE_LOCATION`) when the page asks, and declaring the permission here.
+- **Webview permissions.** The webview never asks Android itself: it hands a page's request to `WebChromeClient`, and denies it when the app doesn't answer. `WebPermissions.kt` answers `onPermissionRequest` (`getUserMedia`) and `onGeolocationPermissionsShowPrompt` by asking Android for the matching runtime permission, so the user sees Android's own dialog, then grants the page what the user allowed. There's no prompt of the app's own, and no dialog once the permission is held. It's shared by every webview of the activity, so a project stacked over the shell gets the same.
 - **File input.** `onShowFileChooser` launches the system picker (`ACTION_GET_CONTENT`), which needs no permission.
 - **Cleartext traffic.** `usesCleartextTraffic` is `true`: the page is served on `http://localhost` (answered by `shouldInterceptRequest`, it never reaches the network), and projects load `http://` resources from devices and servers on the local network. Review tools flag it, so justify it as a developer tool.
 - **Exported activities.** `MainActivity` (launcher, `fullstacked-ctx://` to open a project's window), `DeepLinkActivity` (`fullstacked://`) and `AuthCallbackActivity` (`fullstacked-auth://`) are exported for their `VIEW` intent filters, and only take a URL.
@@ -99,7 +107,10 @@ The app has no dangerous permission. It doesn't read external storage (projects 
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `runFullTrust`   | Required: the app is a packaged WinUI 3 (Windows App SDK) desktop app, whose entry point is `Windows.FullTrustApplication`.         |
 | `internetClient` | The core's networking and WebView2. A full-trust process isn't limited by capabilities, so it's informative, for the Store listing. |
+| `webcam`         | A project's `getUserMedia({ video })`. Windows asks the user the first time.                                                        |
+| `microphone`     | A project's `getUserMedia({ audio })`. Windows asks the user the first time.                                                        |
+| `location`       | A project's `navigator.geolocation`. Windows asks the user the first time.                                                          |
 
 The projects directory is `%LOCALAPPDATA%\fullstacked`. In an MSIX package, Windows redirects it to the package's own data folder, which is removed with the app.
 
-WebView2 shows its own prompt for the camera, the microphone and the location (`WebView.cs` doesn't handle `PermissionRequested`). For a packaged app, Windows may also expect the matching device capabilities (`webcam`, `microphone`, `location`), which aren't declared: test on a device before adding them.
+WebView2 shows its own prompt for the camera, the microphone and the location (`WebView.cs` doesn't handle `PermissionRequested`), after the Windows one.
