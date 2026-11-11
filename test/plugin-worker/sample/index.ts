@@ -78,3 +78,5 @@ try {
 }
 document.body.innerText = JSON.stringify(results);
 document.body.classList.add("done");
+// for a run in an app's webview, where nothing reads the page
+fs.writeFileSync("results.json", JSON.stringify(results));

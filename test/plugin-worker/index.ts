@@ -12,8 +12,8 @@ suite("plugin worker - integration", () => {
     let browser: Browser;
 
     const clean = () => {
-        for (const dir of ["app/out", "out"]) {
-            fs.rmSync(`${sample}/${dir}`, { recursive: true, force: true });
+        for (const file of ["app/out", "out", "results.json"]) {
+            fs.rmSync(`${sample}/${file}`, { recursive: true, force: true });
         }
     };
 
