@@ -634,10 +634,7 @@ func addContextBuildPluginsToBuildOptions(
 	mu := &sync.Mutex{}
 	buildPlugins := map[*types.ContextPlugin]*PluginParams{}
 
-	for _, plugin := range ctx.Plugins {
-		if plugin.Type != types.PluginTypeBuild {
-			continue
-		}
+	for _, plugin := range plugin.GetPluginsOfTypes(ctx, types.PluginTypeBuild) {
 
 		pluginData := PluginBuildData{}
 		err := json.Unmarshal(plugin.Data.Data, &pluginData)

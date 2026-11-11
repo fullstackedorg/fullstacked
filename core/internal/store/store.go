@@ -85,6 +85,7 @@ func NewContextWithCtxId(
 		NextZlibId: 1,
 
 		PendingDeepLinksMutex: &sync.Mutex{},
+		PluginsMutex:          &sync.Mutex{},
 	}
 
 	ctxMutex.Lock()

@@ -16,9 +16,17 @@ import {
 import type { Duplex } from "../bridge/duplex.ts";
 import type { EventEmitter } from "../bridge/eventEmitter.ts";
 import type { PluginBuildData, PluginParams } from "../@types/bundle.ts";
+import { isWorker } from "../bridge/isWorker.ts";
 
 type CommonPluginData = {
     name?: string;
+    /**
+     * Where `load()` runs the plugin: `true` in a worker, `false` on the page.
+     * By default, build plugins run in a worker (their work doesn't stall the
+     * page) and the others on the page (they may show UI, like a git-auth
+     * prompt). `register()` always registers in the runtime that calls it.
+     */
+    worker?: boolean;
 };
 
 export type PluginRegistry = {
@@ -53,8 +61,7 @@ if (!globalThis.fullstacked) {
 if (!globalThis.fullstacked.plugins) {
     globalThis.fullstacked.plugins = new Map<number, JSPlugin>();
 }
-let duplexStream: Duplex | null = null;
-let eventEmitter: EventEmitter<{
+type PluginEvents = {
     // pluginId, requestId, ...data
     "plugin-call": [number, number, ...any[]];
 
@@ -62,27 +69,38 @@ let eventEmitter: EventEmitter<{
     "plugin-response": [number, number, string | null, ...any[]];
 
     ready: [];
-}> | null = null;
+};
 
-let connectionPromise: Promise<void> | null = null;
+type PluginConnection = {
+    duplex: Duplex;
+    emitter: EventEmitter<PluginEvents>;
+};
 
 const te = new TextEncoder();
 
-async function connect(): Promise<void> {
-    if (duplexStream) {
-        return;
+// One plugin stream per runtime (the page, or a worker), shared by the
+// bundles it loaded: the core replaces every plugin of the context when a
+// page opens a stream (a reload), so a second stream of the page would drop
+// the plugins of the first.
+function connection(): Promise<PluginConnection> {
+    if (!globalThis.fullstacked.pluginConnection) {
+        globalThis.fullstacked.pluginConnection = connect();
+        globalThis.fullstacked.pluginConnection.catch(() => {
+            globalThis.fullstacked.pluginConnection = null;
+        });
     }
+    return globalThis.fullstacked.pluginConnection;
+}
 
+async function connect(): Promise<PluginConnection> {
     const duplex = (await globalThis.fullstacked.bridge({
         mod: PluginModule,
-        fn: StartPluginStream
+        fn: StartPluginStream,
+        // a worker's stream keeps the plugins of the page and other workers
+        data: isWorker ? [true] : undefined
     })) as Duplex;
 
-    const emitter = duplex.eventEmitter() as EventEmitter<{
-        "plugin-call": [number, number, ...any[]];
-        "plugin-response": [number, number, string | null, ...any[]];
-        ready: [];
-    }>;
+    const emitter = duplex.eventEmitter() as EventEmitter<PluginEvents>;
 
     const readyPromise = new Promise<void>((resolve) => {
         emitter.on("ready", function onReady() {
@@ -95,10 +113,7 @@ async function connect(): Promise<void> {
 
     await readyPromise;
 
-    duplexStream = duplex;
-    eventEmitter = emitter;
-
-    eventEmitter.on(
+    emitter.on(
         "plugin-call",
         async (pluginId: number, requestId: number, ...args: any[]) => {
             let result: any = null;
@@ -137,7 +152,7 @@ async function connect(): Promise<void> {
             }
 
             if (Array.isArray(result)) {
-                eventEmitter!.writeEvent(
+                emitter.writeEvent(
                     "plugin-response",
                     pluginId,
                     requestId,
@@ -145,7 +160,7 @@ async function connect(): Promise<void> {
                     ...result
                 );
             } else {
-                eventEmitter!.writeEvent(
+                emitter.writeEvent(
                     "plugin-response",
                     pluginId,
                     requestId,
@@ -155,23 +170,22 @@ async function connect(): Promise<void> {
             }
         }
     );
+
+    return { duplex, emitter };
 }
 
 export async function register<T extends keyof PluginRegistry>(
     type: T,
     plugin: PluginRegistry[T]
 ) {
-    if (!connectionPromise) {
-        connectionPromise = connect();
-    }
-    await connectionPromise;
+    const { duplex } = await connection();
 
-    const { name, ...pluginData } = plugin.data || {};
+    const { name, worker: _, ...pluginData } = plugin.data || {};
 
     const id = await globalThis.fullstacked.bridge({
         mod: PluginModule,
         fn: Register,
-        data: [type, name || "plugin-" + type, pluginData]
+        data: [type, name || "plugin-" + type, pluginData, duplex.id]
     });
 
     globalThis.fullstacked.plugins.set(id, {
@@ -215,8 +229,13 @@ export async function deeplink(url: string, ctx?: number): Promise<number> {
     })) as number;
 }
 
+export { load, serveInWorker, PluginBundleError } from "./load.ts";
+export type { LoadedPlugin } from "./load.ts";
+import { load } from "./load.ts";
+
 const plugin = {
     register,
+    load,
     deeplink
 };
 

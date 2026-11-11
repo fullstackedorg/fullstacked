@@ -121,6 +121,9 @@ type PluginRequest struct {
 	Response      []DeserializedData
 	ResponseError *string
 	Wg            *sync.WaitGroup
+	// answered, or failed because its plugin went away: the request is done
+	// once (under the plugin's RequestsMutex)
+	Done bool
 }
 
 type ContextPlugin struct {
@@ -128,6 +131,9 @@ type ContextPlugin struct {
 	Name string
 	Type PluginType
 	Data DeserializedRawObject
+	// the plugin stream of the runtime that registered it (the page, or one
+	// of its workers): its calls go there, and it goes away with it
+	StreamId uint32
 
 	Requests      map[uint8]*PluginRequest
 	RequestsMutex *sync.Mutex
@@ -168,6 +174,10 @@ type Context struct {
 	ZlibMutex  *sync.Mutex
 	NextZlibId uint32
 
+	// the plugin streams open in this context, one per runtime (the page and
+	// each worker that registers plugins), and the last one opened, for the
+	// bundles that register without saying their stream
+	PluginStreams  map[uint32]bool
 	PluginStreamId uint32
 	Plugins        map[uint8]*ContextPlugin
 	PluginsMutex   *sync.Mutex

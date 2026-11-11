@@ -39,6 +39,8 @@ type FullStacked = {
     workerStreams: Map<number, any>;
 
     plugins: Map<number, JSPlugin>;
+    // the plugin stream of this runtime, shared by its bundles (see plugin)
+    pluginConnection?: Promise<any> | null;
 
     exit: () => void;
 

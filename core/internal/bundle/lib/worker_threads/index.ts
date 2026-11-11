@@ -4,6 +4,8 @@ import events from "events";
 import { deserializeNumber } from "../bridge/serialization.ts";
 import { isWorker } from "../bridge/isWorker.ts";
 import { acquireId, releaseId } from "../bridge/ids.ts";
+import { Stream } from "../@types/index.ts";
+import { Close } from "../@types/stream.ts";
 
 export let parentPort: any = null;
 
@@ -47,6 +49,13 @@ export class Worker extends events.EventEmitter {
                 this.emit("message", e);
             }
         };
+
+        // like Node, without crashing the page when nothing listens
+        this.w.onerror = (e) => {
+            if (this.listenerCount("error") === 0) return;
+            e.preventDefault();
+            this.emit("error", new Error(e.message || "worker error"));
+        };
     }
 
     // relays a bridge call of the worker to the platform bridge
@@ -87,23 +96,37 @@ export class Worker extends events.EventEmitter {
         this.w.postMessage(response.buffer, [response.buffer]);
     }
 
-    cleanup() {
+    // forgets the worker's streams and closes them in the core: nothing
+    // reads them anymore (a socket would stay open, a plugin would keep
+    // getting calls nobody answers)
+    cleanup(): Promise<void> {
         const workerStreams = globalThis.fullstacked.workerStreams;
+        const closing: Promise<unknown>[] = [];
         if (workerStreams) {
             for (const [streamId, worker] of workerStreams.entries()) {
                 if (worker === this.w) {
                     workerStreams.delete(streamId);
+                    closing.push(
+                        globalThis.fullstacked
+                            .bridge({
+                                mod: Stream,
+                                fn: Close,
+                                data: [streamId]
+                            })
+                            .catch(() => {})
+                    );
                 }
             }
         }
+        return Promise.all(closing).then(() => {});
     }
 
     postMessage(data: any) {
         this.w.postMessage(data);
     }
 
-    terminate() {
-        this.cleanup();
+    terminate(): Promise<void> {
         this.w.terminate();
+        return this.cleanup();
     }
 }

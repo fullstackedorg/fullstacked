@@ -245,7 +245,7 @@ Workers (`new Worker(…)` or [`worker_threads`](node/workers.md#worker_threads)
 - **Startup.** A worker waits for the first message from its parent (`{ cwd }`), then reads `GET /ctx` and `GET /bridge` like a page.
 - **Async calls are relayed through the main thread.** The worker posts the payload (transferred). The main thread swaps in an id from its own allocator, makes the call, and replies with `[worker id][response]`. When the response is a stream, the main thread records that the stream belongs to that worker and forwards its frames as `{ type: "on-stream-data" }` messages. Workers never read `/stream` themselves.
 - **Sync calls** are a sync `POST /sync` XHR from the worker. On hosts that read no bodies, the worker posts the payload to the main thread, which forwards it with `Send`, and the worker then blocks on `GET /sync/{id}`.
-- **Terminating a worker** drops its stream mappings.
+- **Terminating a worker** drops its stream mappings and closes its streams in the core: nothing reads them anymore (a socket would stay open, a [plugin](api/plugin.md#where-a-plugin-runs) would keep getting calls).
 
 `DOMParser`, `XMLSerializer` and the DOM node classes are installed in workers, which have no DOM (see [Globals](node/index.md#globals)).
 

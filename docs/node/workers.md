@@ -34,7 +34,8 @@ parentPort.on("message", (event) => {
 | `worker.postMessage(data)` | Structured clone, as with web workers                                                                                                                                              |
 | `worker.on("message", fn)` | `fn` receives the **`MessageEvent`**, not the data. Read `event.data`.                                                                                                             |
 | `worker.on("exit", fn)`    | Fires when the worker calls `process.exit()`                                                                                                                                       |
-| `worker.terminate()`       | Terminates the worker and drops its streams                                                                                                                                        |
+| `worker.on("error", fn)`   | An uncaught error in the worker, as an `Error`. Without a listener, the page logs it as before                                                                                     |
+| `worker.terminate()`       | Terminates the worker and closes its streams in the core. Resolves once they are closed                                                                                            |
 | `parentPort`               | In a worker, an `EventEmitter` whose `message` listeners receive the `MessageEvent`, plus `postMessage`. `null` on the main thread.                                                |
 
 **Not provided**: `isMainThread`, `workerData`, `threadId`, `MessageChannel`/`MessagePort` from the module (the global `MessageChannel` works), `SharedArrayBuffer` sharing options, `resourceLimits`, `receiveMessageOnPort`, and `BroadcastChannel` from the module. The module has **no default export**, so use named imports: `import { Worker, parentPort } from "worker_threads"`.

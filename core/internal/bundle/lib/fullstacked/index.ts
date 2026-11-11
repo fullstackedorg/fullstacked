@@ -1,7 +1,7 @@
 import "../bridge/index.ts";
 import { bundle, bundleFile } from "../bundle/index.ts";
 import run from "../run/index.ts";
-import plugin from "../plugin/index.ts";
+import plugin, { PluginBundleError } from "../plugin/index.ts";
 import packages from "../packages/index.ts";
 import path from "../path/index.ts";
 import fs from "../fs/index.ts";
@@ -262,12 +262,12 @@ interface BundleImportResult {
     cleanup: () => Promise<void>;
 }
 
-async function bundleAndImportFile(
+// a file, or a package (a plugin) resolved from startDir
+async function resolveFile(
     file: string,
     startDir: string,
-    writeErr: (msg: any) => void,
-    extraArgs?: string[]
-): Promise<BundleImportResult | null> {
+    writeErr: (msg: any) => void
+): Promise<string | null> {
     if (!file || file.trim() === "") {
         writeErr(formatMessage("Error: no file specified.", false));
         return null;
@@ -281,16 +281,23 @@ async function bundleAndImportFile(
     }
 
     const targetFilePath = path.resolve(resolvedPath);
-    let fileExists = false;
     try {
         await fs.promises.stat(targetFilePath);
-        fileExists = true;
-    } catch {}
-
-    if (!fileExists) {
+    } catch {
         writeErr(formatMessage(`Error: file not found: ${file}`, false));
         return null;
     }
+    return targetFilePath;
+}
+
+async function bundleAndImportFile(
+    file: string,
+    startDir: string,
+    writeErr: (msg: any) => void,
+    extraArgs?: string[]
+): Promise<BundleImportResult | null> {
+    const targetFilePath = await resolveFile(file, startDir, writeErr);
+    if (!targetFilePath) return null;
 
     const result = await bundleFile(targetFilePath);
     if (result.Errors?.length > 0) {
@@ -421,8 +428,9 @@ async function runDirectory(
 ): Promise<number> {
     const targetDirectory = path.resolve(positionals.at(-1) || ".");
 
+    // build plugins run in a worker unless they ask for the page (see
+    // plugin.load): their work doesn't stall the page that builds
     const buildPlugins: { unregister: () => Promise<void> }[] = [];
-    const tempPluginFiles: string[] = [];
 
     const cleanupPlugins = async () => {
         for (const bp of buildPlugins) {
@@ -430,43 +438,29 @@ async function runDirectory(
                 await bp.unregister();
             } catch {}
         }
-        for (const tempFile of tempPluginFiles) {
-            try {
-                await fs.promises.rm(tempFile).catch(() => {});
-            } catch {}
-        }
     };
 
     for (const pluginName of pluginsArgs) {
         if (!pluginName) continue;
-        const res = await bundleAndImportFile(
-            pluginName,
-            targetDirectory,
-            writeErr
-        );
-        if (!res) {
+        const file = await resolveFile(pluginName, targetDirectory, writeErr);
+        if (!file) {
             await cleanupPlugins();
             return 1;
         }
 
-        tempPluginFiles.push(res.outputFile);
-
         try {
-            const pluginModule = res.module.default || res.module;
-            const registeredPlugin = await plugin.register(
-                "build",
-                pluginModule
-            );
-            if (registeredPlugin) {
-                buildPlugins.push(registeredPlugin);
-            }
+            buildPlugins.push(await plugin.load("build", file));
         } catch (e: any) {
-            writeErr(
-                formatMessage(
-                    `Error loading plugin ${pluginName}: ${e.message}`,
-                    false
-                )
-            );
+            if (e instanceof PluginBundleError) {
+                e.errors.forEach((err) => writeErr(formatMessage(err, false)));
+            } else {
+                writeErr(
+                    formatMessage(
+                        `Error loading plugin ${pluginName}: ${e.message}`,
+                        false
+                    )
+                );
+            }
             await cleanupPlugins();
             return 1;
         }
