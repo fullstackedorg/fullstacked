@@ -54,7 +54,14 @@ A project asks for a device feature through the web API, and WebKit shows its ow
 
 Not needed: the photo library read permission (the file input uses the system photo picker, which needs none), Bluetooth, USB, serial and NFC (WKWebView doesn't expose Web Bluetooth, WebUSB, Web Serial or Web NFC), and multicast (the core doesn't join multicast groups). WKWebView has no public API to show web notifications, so none is declared.
 
-Other keys that review looks at: `ITSAppUsesNonExemptEncryption` is `NO`. The core has its own implementations of standard algorithms (TLS, SSH for git, `node:crypto`), so confirm the export compliance answers in App Store Connect when the crypto changes.
+Other keys that review looks at: `ITSAppUsesNonExemptEncryption` is `YES` (the `INFOPLIST_KEY_ITSAppUsesNonExemptEncryption` build setting of every configuration). The core has its own implementations of standard algorithms, used for more than the operating system's TLS: TLS and SSH for git, and `node:crypto` (hashes, AES and ChaCha20 ciphers, key exchange) offered to the projects it runs. No proprietary algorithm. The export compliance answers in App Store Connect:
+
+| Question                                                      | Answer                                                                                                                          |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| What type of encryption algorithms does your app implement?   | Standard encryption algorithms instead of, or in addition to, using or accessing the encryption within Apple's operating system |
+| Is your app going to be available on the App Store in France? | Yes, with the French encryption declaration, or No and France removed from the app's availability                               |
+
+Revisit them when the crypto changes. Once App Store Connect gives an export compliance code, `ITSEncryptionExportComplianceCode` in the build settings skips the questions for later builds.
 
 ### Mac App Sandbox
 
