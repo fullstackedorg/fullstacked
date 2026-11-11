@@ -182,7 +182,14 @@ struct FullStackedApp: App {
             UUID()
         }
         #if os(macOS)
-            .defaultSize(width: 700, height: 550)
+            // sized from the screen it opens on: most of a laptop's, a
+            // comfortable part of a large display, never past the screen
+            .defaultWindowPlacement { _, context in
+                let visible = context.defaultDisplay.visibleRect
+                let width = min(max(visible.width * 0.8, 900), 1440, visible.width)
+                let height = min(max(visible.height * 0.85, 640), 960, visible.height)
+                return WindowPlacement(size: CGSize(width: width, height: height))
+            }
             .restorationBehavior(.disabled)
         #endif
         .commands {

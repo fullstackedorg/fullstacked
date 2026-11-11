@@ -228,6 +228,7 @@ namespace FullStacked
                 var coreWebView2 = this.coreWebView2 = this.controller.CoreWebView2;
 
             this.bridge.Attach(coreWebView2, this.environment);
+            this.StartTitleBarSync(coreWebView2);
             coreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
             coreWebView2.WebResourceRequested += async delegate (CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs args)
             {
