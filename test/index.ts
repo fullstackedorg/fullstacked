@@ -27,6 +27,7 @@ let tests = [
     "./packages/index.ts",
     "./worker/index.ts",
     "./plugin-worker/index.ts",
+    "./android-bridge/index.ts",
     "./multi-bundle/index.ts",
     "./readline/index.ts",
     "./config/index.ts",

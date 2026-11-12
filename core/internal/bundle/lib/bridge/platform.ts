@@ -30,6 +30,10 @@ export interface PlatformBridge {
     // uses it for the sync calls of workers which read their response
     // themselves
     Send?: (payload: ArrayBuffer) => void;
+    // posts the sync call of a worker, whose response the host keeps for
+    // GET /sync/{key}: the key is unique to the worker and its call (see
+    // worker_threads), its id alone is not (Android)
+    RelaySync?: (key: number, payload: ArrayBuffer) => void;
     GetResponseSync?: (id: number) => ArrayBuffer;
 }
 
@@ -43,7 +47,14 @@ declare global {
     // Android (platform/android Bridge.kt): a JavascriptInterface and a web
     // message listener whose replies carry the responses as [id][response]
     var fullstackedCore: {
+        // a sync call, its response also kept for GET /sync/{id} (the
+        // relayed sync calls of workers of the bundles from before
+        // callSync and relaySync)
         coreCall(payloadBase64: string): string;
+        // a sync call of the page, answered at once and kept nowhere
+        callSync?(payloadBase64: string): string;
+        // a sync call of a worker, its response kept for GET /sync/{key}
+        relaySync?(key: number, payloadBase64: string): void;
         callAsync(batchBase64: string): void;
         setOption(name: string, value: string): void;
     };
@@ -111,10 +122,18 @@ export function postSync(payload: ArrayBuffer): ArrayBuffer {
     return bytes.buffer;
 }
 
+// The key base of the sync calls of this worker relayed by the page, in the
+// name of the worker (see worker_threads): 0 when the page relays them by id
+function workerSyncKeyBase() {
+    const match = /^fullstacked-sync:(\d+)$/.exec(self.name ?? "");
+    return match ? Number(match[1]) : 0;
+}
+
 // the response of a sync call sent as a message, kept by the host in base64
-function readSyncResponse(id: number): ArrayBuffer {
+// under its id, or the key it was relayed with
+function readSyncResponse(key: number): ArrayBuffer {
     const xhr = new XMLHttpRequest();
-    xhr.open("GET", `/sync/${id}`, false);
+    xhr.open("GET", `/sync/${key}`, false);
     xhr.send();
     return toByteArray(xhr.responseText).buffer;
 }
@@ -162,6 +181,8 @@ type Channel = {
     sync?: (payload: ArrayBuffer) => ArrayBuffer;
     // posts a payload without waiting for its response
     send?: (payload: ArrayBuffer) => void;
+    // posts the sync call of a worker, read with GET /sync/{key}
+    relaySync?: (key: number, payload: ArrayBuffer) => void;
     // stream frames the host hands over in a ring (WebView2)
     frameRing?: FrameRing;
 };
@@ -466,6 +487,11 @@ async function webView2Channel(webview: any): Promise<Channel> {
 // an ArrayBuffer when large. The host runs them in order and batches the
 // replies the same way, [id u8][length u32 BE][response]..., a length of 0
 // when the response went on the frame stream. Sync calls are answered at once.
+// The sync calls of workers come relayed by the page with a key of their
+// own (relaySync) and the host keeps their response for GET /sync/{key}, it
+// keeps none of the page's (callSync): a worker reading by id took the
+// response of the page's last sync call with that id when it read before the
+// page relayed its call (the page's ids and a worker's are two allocators).
 async function androidChannel(
     bridge: typeof globalThis.fullstackedBridge,
     core: typeof globalThis.fullstackedCore
@@ -535,10 +561,19 @@ async function androidChannel(
                     queueMicrotask(flush);
                 }
             }),
-        sync: (payload) => toByteArray(core.coreCall(b64(payload))).buffer,
+        // coreCall on a host from before callSync
+        sync: (payload) =>
+            toByteArray(
+                core.callSync
+                    ? core.callSync(b64(payload))
+                    : core.coreCall(b64(payload))
+            ).buffer,
         send: (payload) => {
             core.coreCall(b64(payload));
-        }
+        },
+        relaySync: core.relaySync
+            ? (key, payload) => core.relaySync(key, b64(payload))
+            : undefined
     };
 }
 
@@ -633,7 +668,7 @@ async function init(): Promise<PlatformBridge> {
                       const id = new Uint8Array(payload)[1];
                       // transfer, the payload is not used after
                       globalThis.postMessage(payload, { transfer: [payload] });
-                      return readSyncResponse(id);
+                      return readSyncResponse(workerSyncKeyBase() + id);
                   }
         };
     }
@@ -669,7 +704,8 @@ async function init(): Promise<PlatformBridge> {
                       channel.send(payload);
                       return readSyncResponse(new Uint8Array(payload)[1]);
                   }),
-        Send: channel?.send
+        Send: channel?.send,
+        RelaySync: channel?.relaySync
     };
 }
 

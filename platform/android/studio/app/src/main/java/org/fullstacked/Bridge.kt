@@ -15,12 +15,14 @@ import java.io.InputStream
 import java.io.PipedInputStream
 import java.io.PipedOutputStream
 import java.util.Base64
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
+import kotlin.concurrent.thread
 
 // The bridge between a page and the core (see core/internal/bundle/lib/bridge
 // and improvements/perfs/porting.md). The page reaches it as `fullstackedCore`:
-// - sync calls: coreCall(base64) returns the response in base64
+// - sync calls: callSync(base64) returns the response in base64; the sync
+//   calls of workers come relayed by the page, relaySync(key, base64), and
+//   the worker reads the response with GET /sync/{key}
 // - async calls come batched, [length u32 BE][payload]... : small batches as
 //   callAsync(base64), large ones posted to the `fullstackedBridge` web message
 //   listener as an ArrayBuffer. They run in order on one thread and the replies
@@ -147,33 +149,71 @@ class Bridge(private val ctxId: Int, private val webView: () -> WebView) {
         }
     }
 
-    // sync calls of workers read their response with GET /sync/{id}
-    private val syncAwaiters = ConcurrentHashMap<Int, (String) -> Unit>()
-    private val syncResponses = ConcurrentHashMap<Int, String>()
+    // sync calls of workers read their response with GET /sync/{key}: the
+    // response waits for its reader, or the reader for its response (the
+    // worker reads as soon as it posted the call to the page, which relays it
+    // when its thread is free)
+    private val syncLock = Any()
+    private val syncAwaiters = HashMap<Int, (String) -> Unit>()
+    private val syncResponses = HashMap<Int, String>()
 
-    // Sync calls (the page waits) and the sync calls of workers relayed by the
-    // page, which read their response with GET /sync/{id}
+    private fun call(payload: ByteArray): String =
+        Base64.getEncoder().encodeToString(Core.coreCall(payload))
+
+    private fun resolveSync(key: Int, response: String) {
+        val awaiter = synchronized(syncLock) {
+            syncAwaiters.remove(key).also { if (it == null) syncResponses[key] = response }
+        }
+        awaiter?.invoke(response)
+    }
+
+    // A sync call of the page: answered, and kept nowhere. Kept for GET
+    // /sync/{id}, a worker reading the same id before the page relayed its
+    // call took it for its own response (another file's bytes): the page's
+    // ids and a worker's come from two allocators.
+    @JavascriptInterface
+    fun callSync(payloadBase64: String): String =
+        call(Base64.getDecoder().decode(payloadBase64))
+
+    // A sync call of a worker relayed by the page, read with GET /sync/{key}
+    // (the key is unique to the worker and the call, see worker_threads)
+    @JavascriptInterface
+    fun relaySync(key: Int, payloadBase64: String) {
+        resolveSync(key, call(Base64.getDecoder().decode(payloadBase64)))
+    }
+
+    // The bundles from before callSync and relaySync: their page's sync calls
+    // and their workers' relayed calls, read with GET /sync/{id}
     @JavascriptInterface
     fun coreCall(payloadBase64: String): String {
         val payload = Base64.getDecoder().decode(payloadBase64)
-        val response = Base64.getEncoder().encodeToString(Core.coreCall(payload))
-        val id = payload[1].toInt() and 0xFF
-        val awaiter = syncAwaiters.remove(id)
-        if (awaiter != null) awaiter(response) else syncResponses[id] = response
+        val response = call(payload)
+        resolveSync(payload[1].toInt() and 0xFF, response)
         return response
     }
 
-    private fun syncResponse(id: Int): WebResourceResponse {
+    // A response already there is the body. Otherwise the body is a pipe
+    // written once the response comes, from a thread of its own: a write
+    // waits for the WebView to read past the pipe's buffer (writing before
+    // returning the body, or from the page's call, would never end).
+    private fun syncResponse(key: Int): WebResourceResponse {
         val output = PipedOutputStream()
-        val input = PipedInputStream(output)
+        val input = PipedInputStream(output, 64 * 1024)
         val send: (String) -> Unit = { response ->
-            try {
-                output.write(response.toByteArray())
-                output.close()
-            } catch (_: Exception) { }
+            thread(name = "FullStacked sync response") {
+                try {
+                    output.write(response.toByteArray())
+                } catch (_: Exception) {
+                } finally {
+                    try { output.close() } catch (_: Exception) { }
+                }
+            }
         }
-        syncResponses.remove(id)?.let(send) ?: run { syncAwaiters[id] = send }
-        return WebResourceResponse("text/plain", "UTF-8", input)
+        val response = synchronized(syncLock) {
+            syncResponses.remove(key).also { if (it == null) syncAwaiters[key] = send }
+        }
+        val body = response?.let { ByteArrayInputStream(it.toByteArray()) } ?: input
+        return WebResourceResponse("text/plain", "UTF-8", body)
     }
 
     // stream chunks when the page reads no frames, evaluated once per main looper

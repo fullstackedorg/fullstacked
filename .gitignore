@@ -17,6 +17,7 @@ test/**/_index.ts.tailwind.css
 test/**/output.css
 test/**/test
 test/worker/sample/worker.ts.js
+test/android-bridge/sample/worker.ts.js
 test/multi-bundle/sample/*.ts.js
 test/multi-bundle/sample/tmp
 platform/@fullstacked
