@@ -86,6 +86,8 @@ func NewContextWithCtxId(
 
 		PendingDeepLinksMutex: &sync.Mutex{},
 		PluginsMutex:          &sync.Mutex{},
+
+		FirstPaint: &types.FirstPaint{},
 	}
 
 	ctxMutex.Lock()

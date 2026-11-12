@@ -4,6 +4,7 @@
 #include <QBuffer>
 #include <QCoreApplication>
 #include <QPointer>
+#include <QThreadPool>
 #include <QWebChannel>
 #include <limits>
 #include <thread>
@@ -105,7 +106,20 @@ void QtBridge::request(QWebEngineUrlRequestJob *job, const QString &path) {
         job->fail(QWebEngineUrlRequestJob::UrlNotFound);
 #endif
     } else {
-        reply(job, Core::request(ctx, path.toStdString(), {}));
+        // on a worker, never the UI thread: a page's script waits for the
+        // page's first paint (core/internal/router/first-paint.go)
+        QPointer<QWebEngineUrlRequestJob> target(job);
+        QThreadPool::globalInstance()->start(
+            [ctx = ctx, path = path.toStdString(), target]() {
+                auto response = Core::request(ctx, path, {});
+                QMetaObject::invokeMethod(
+                    qApp,
+                    [target, response = std::move(response)]() {
+                        // the request may be cancelled meanwhile
+                        if (target) reply(target, response);
+                    },
+                    Qt::QueuedConnection);
+            });
     }
 }
 

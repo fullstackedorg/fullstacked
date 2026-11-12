@@ -40,6 +40,15 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKDownloadDelegate, Codabl
     public let requestHandler: RequestHandler
     
     public var isSafe = false
+
+    // transparent until the page's first frame (or its load): it then
+    // reports no page colour in underPageBackgroundColor
+    private var transparent = false
+    #if os(iOS)
+    // the webview's own backgrounds, back once it is opaque
+    private var opaqueBackgrounds: (UIColor?, UIColor?)?
+    #endif
+    private var backgroundObservation: NSKeyValueObservation?
     
     // responses and stream chunks received between two main thread ticks are
     // evaluated in one script
@@ -89,6 +98,23 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKDownloadDelegate, Codabl
         
         self.isInspectable = true
         self.navigationDelegate = self
+        // transparent until the page paints: the window's system background
+        // shows instead of a white webview (systemBackground)
+        self.transparent = true
+        #if os(iOS)
+        self.opaqueBackgrounds = (self.backgroundColor, self.scrollView.backgroundColor)
+        self.isOpaque = false
+        self.backgroundColor = .clear
+        self.scrollView.backgroundColor = .clear
+        #else
+        self.setValue(false, forKey: "drawsBackground")
+        #endif
+        // the window (status bar, title bar) takes the page's colour as soon as
+        // the page shows it: its first frame, then each change
+        self.requestHandler.onFirstPaint = { [weak self] in self?.becomeOpaque() }
+        self.backgroundObservation = self.observe(\.underPageBackgroundColor) { [weak self] _, _ in
+            DispatchQueue.main.async { self?.publishMeta() }
+        }
         userContentController.addScriptMessageHandler(CallHandler(self.requestHandler), contentWorld: .page, name: "call")
         // the UI endpoints of the page, see bridge/platform.ts
         self.requestHandler.ui = { [weak self] path, query in
@@ -219,11 +245,41 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKDownloadDelegate, Codabl
     }
     
     func webView(_ webView: WKWebView, didFinish didFinishNavigation: WKNavigation) {
-        var title = webView.title
-        if(title == nil || title!.isEmpty) {
-            title = "FullStacked"
+        // a page that never asked for its first paint (it runs as built)
+        self.becomeOpaque()
+        self.publishMeta()
+    }
+
+    // The page painted: opaque again (a transparent webview reports no page
+    // colour), the window takes the page's colour from now on
+    private func becomeOpaque() {
+        guard self.transparent else { return }
+        self.transparent = false
+        #if os(iOS)
+        if let (background, scrollBackground) = self.opaqueBackgrounds {
+            self.opaqueBackgrounds = nil
+            self.isOpaque = true
+            self.backgroundColor = background
+            self.scrollView.backgroundColor = scrollBackground
         }
-        WebViewStore.getInstance().webViewsMeta[self.id] = (title!, self.getBackgroundColor())
+        #else
+        self.setValue(true, forKey: "drawsBackground")
+        #endif
+        self.publishMeta()
+    }
+
+    // The page's title and colour for its window, nil while the webview is
+    // transparent (the window keeps the system's background)
+    func pageMeta() -> (String, Color)? {
+        if self.transparent { return nil }
+        let title = self.title.flatMap { $0.isEmpty ? nil : $0 } ?? "FullStacked"
+        return (title, self.getBackgroundColor())
+    }
+
+    func publishMeta() {
+        if let meta = self.pageMeta() {
+            WebViewStore.getInstance().webViewsMeta[self.id] = meta
+        }
     }
     
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {

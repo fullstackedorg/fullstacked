@@ -122,7 +122,16 @@ Each project is served on its own origin by the host (a custom scheme on Apple a
 3. a directory resolves to its `index.html`;
 4. otherwise 404.
 
-The `Content-Type` comes from the file's extension, and defaults to `text/plain`. A few paths are reserved for the bridge: `/ctx`, `/bridge`, `/call`, `/sync`, `/stream`, `/platform`, `/version`, `/open`, `/exit` and `/resize` (see [Requests](bridge.md#requests)).
+The `Content-Type` comes from the file's extension, and defaults to `text/plain`. A few paths are reserved for the bridge: `/ctx`, `/bridge`, `/call`, `/sync`, `/stream`, `/platform`, `/version`, `/first-paint`, `/open`, `/exit` and `/resize` (see [Requests](bridge.md#requests)).
+
+### First paint
+
+In the apps (iOS, macOS, Android, Windows, Linux), a page shows its HTML and CSS before its JavaScript runs, so an animation that starts with the page's JavaScript starts on a page that is on the screen, and the page never flashes white:
+
+- Until the page paints, the window shows the system's background (light or dark, as the device is set) instead of a white webview.
+- The first time a context serves its page, the core adds a small script at the top of the HTML it answers (the file in `out/` is unchanged, it runs anywhere as built). Once the page is parsed and has painted a frame, the script requests `/first-paint`. Until then, 1.5 s at most, the page's scripts are held.
+
+So give the page its colours in CSS, not from JavaScript: `html, body { background: … }` in a stylesheet is on the first frame. A page with a classic `<script src>` that blocks parsing, or with a Content Security Policy, runs as before. The CLI (`fullstacked` in a browser) doesn't hold scripts.
 
 So **every file of the project is reachable by URL**, and the build output wins when both exist:
 

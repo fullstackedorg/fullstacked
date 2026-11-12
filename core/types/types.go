@@ -190,7 +190,20 @@ type Context struct {
 	PendingDeepLinks      []PendingDeepLink
 	PendingDeepLinksMutex *sync.Mutex
 
+	// the page's scripts wait for its first paint, see router/first-paint.go
+	FirstPaint *FirstPaint
+
 	Exited bool
+}
+
+// The first paint of a context's page: Open is made when the page's HTML is
+// answered with the first-paint script, and closed (Released) once the page
+// painted its first frame or after router.FirstPaintTimeout.
+type FirstPaint struct {
+	Mutex    sync.Mutex
+	Served   bool // the context answered its first page
+	Open     chan struct{}
+	Released bool
 }
 
 type PendingDeepLink struct {

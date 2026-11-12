@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="blue">#007AFF</color>
+    <!-- behind a page until it paints: the system's background, light here,
+         dark in values-night (the core holds a page's scripts until it paints,
+         core/internal/router/first-paint.go) -->
+    <color name="system_background">#FFFFFF</color>
 </resources>

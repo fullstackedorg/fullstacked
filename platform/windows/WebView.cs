@@ -94,10 +94,19 @@ namespace FullStacked
                 this.coreWebView2 = null;
             };
 
+            // behind the page until it paints: the system's background
+            this.Content = new Grid { Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(SystemBackground()) };
+
             this.InitWebView();
 
             this.Activate();
         }
+
+        // Until a page paints, its window and webview show the system's background
+        // (light or dark, as Windows is set), never a white page: the core holds the
+        // page's scripts until its first frame (core/internal/router/first-paint.go)
+        private static Windows.UI.Color SystemBackground() =>
+            new Windows.UI.ViewManagement.UISettings().GetColorValue(Windows.UI.ViewManagement.UIColorType.Background);
 
         private const uint SWP_NOSIZE = 0x0001;
         private const uint SWP_NOMOVE = 0x0002;
@@ -200,6 +209,7 @@ namespace FullStacked
                 }
 
                 this.controller.BoundsMode = CoreWebView2BoundsMode.UseRawPixels;
+                this.controller.DefaultBackgroundColor = SystemBackground();
                 this.UpdateBounds();
                 this.controller.IsVisible = true;
                 this.EnsureChildOnTop();

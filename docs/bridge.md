@@ -137,6 +137,7 @@ Every host serves the page's origin and answers these requests:
 | `GET /stream/detach` | Gives up frames and goes back to [evaluated chunks](#evaluated-chunks)                                                               |
 | `GET /platform`      | The host's name. Informational only.                                                                                                 |
 | `GET /version`       | `{ major, minor, patch, build, branch, hash }` of the core. Stable, so pages built for older runtimes can read it.                   |
+| `GET /first-paint`   | Sent by the core's [first-paint](project-structure.md#first-paint) script once the page painted: its scripts go                      |
 | `GET /open?ctx=N`    | The host opens a window for context `N` (see [`run`](api/run.md))                                                                    |
 | `GET /exit`          | The host closes the window                                                                                                           |
 | `GET /resize`        | `?size=w:h:x:y`, `kiosk` or `fullscreen` sets the window; no query returns the current size. Only exists where the host answers 200. |

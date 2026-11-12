@@ -347,7 +347,40 @@ void WebkitGTKWindow::closeAuthWindow(bool canceled) {
     }
 }
 
+// The system's light or dark setting (GNOME's, which the other desktops and
+// the settings portal follow); light when there is none
+static bool systemPrefersDark() {
+    GSettingsSchemaSource *source = g_settings_schema_source_get_default();
+    if (!source) {
+        return false;
+    }
+    GSettingsSchema *schema = g_settings_schema_source_lookup(
+        source, "org.gnome.desktop.interface", TRUE);
+    if (!schema) {
+        return false;
+    }
+    bool hasKey = g_settings_schema_has_key(schema, "color-scheme");
+    g_settings_schema_unref(schema);
+    if (!hasKey) {
+        return false;
+    }
+    GSettings *settings = g_settings_new("org.gnome.desktop.interface");
+    gchar *scheme = g_settings_get_string(settings, "color-scheme");
+    bool dark = g_strcmp0(scheme, "prefer-dark") == 0;
+    g_free(scheme);
+    g_object_unref(settings);
+    return dark;
+}
+
 void WebkitGTKWindow::initWindow() {
+    // Until the page paints, the window and the webview show the system's
+    // background (light or dark), never a white page: the core holds the
+    // page's scripts until its first frame
+    // (core/internal/router/first-paint.go)
+    bool dark = systemPrefersDark();
+    g_object_set(gtk_settings_get_default(),
+                 "gtk-application-prefer-dark-theme", dark, nullptr);
+
     windowGTK = new Gtk::Window();
     windowGTK->set_title("FullStacked");
     windowGTK->set_default_size(800, 600);
@@ -365,6 +398,8 @@ void WebkitGTKWindow::initWindow() {
     GtkWidget *webviewWidget = webkit_web_view_new();
     webview = WEBKIT_WEB_VIEW(webviewWidget);
     g_object_set_data(G_OBJECT(webview), "fullstacked_window", this);
+    GdkRGBA background = dark ? GdkRGBA{0, 0, 0, 1} : GdkRGBA{1, 1, 1, 1};
+    webkit_web_view_set_background_color(webview, &background);
 
     Gtk::Widget *widget = Glib::wrap(webviewWidget, false);
     windowGTK->set_child(*widget);

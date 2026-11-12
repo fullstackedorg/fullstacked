@@ -33,13 +33,13 @@ The existing bridges are the reference:
 
 **Requests and calls**
 
-| Export                                                                                    | Use                                                                                                                                                                                                                 |
-| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `void* handleRequest(uint8 ctx, char* path, void* body, int len, int* status, int* size)` | Answers a request of the page with `"<mime type>\n<body>"`. It serves `/platform`, `/ctx`, `/version`, `/bridge`, `POST /call`, `POST /sync`, `/stream/detach` and the project's static files (404 when not found). |
-| `void* callMessage(void* buf, int len, int* size)`                                        | A call received on the message channel. The reply is the response. Or `*size` is -1 and the reply is empty when the core put a large response (16 KiB and up) on the frame stream.                                  |
-| `void* callChannel(void* buf, int len, int* size)`                                        | Like `callMessage`, but the response is never framed (for shared-memory channels)                                                                                                                                   |
-| `void* callWithResponse(void* buf, int len, int* size)`                                   | A plain call and its response, for calls the host makes itself                                                                                                                                                      |
-| `int call(void* buf, int len)` + `getCorePayload(ctx, 1, id, ptr, size)`                  | A call whose response the core keeps under its call id until read (the Node addon)                                                                                                                                  |
+| Export                                                                                    | Use                                                                                                                                                                                                                                 |
+| ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `void* handleRequest(uint8 ctx, char* path, void* body, int len, int* status, int* size)` | Answers a request of the page with `"<mime type>\n<body>"`. It serves `/platform`, `/ctx`, `/version`, `/bridge`, `POST /call`, `POST /sync`, `/stream/detach`, `/first-paint` and the project's static files (404 when not found). |
+| `void* callMessage(void* buf, int len, int* size)`                                        | A call received on the message channel. The reply is the response. Or `*size` is -1 and the reply is empty when the core put a large response (16 KiB and up) on the frame stream.                                                  |
+| `void* callChannel(void* buf, int len, int* size)`                                        | Like `callMessage`, but the response is never framed (for shared-memory channels)                                                                                                                                                   |
+| `void* callWithResponse(void* buf, int len, int* size)`                                   | A plain call and its response, for calls the host makes itself                                                                                                                                                                      |
+| `int call(void* buf, int len)` + `getCorePayload(ctx, 1, id, ptr, size)`                  | A call whose response the core keeps under its call id until read (the Node addon)                                                                                                                                                  |
 
 **Streams**
 
@@ -62,6 +62,8 @@ Intercept every request of the page's origin (a custom scheme, a `WebResourceReq
 | Everything else                  | `handleRequest`                                                              | Any thread (a concurrent pool)       |
 
 - The calls of one page run in order. Keep one serial queue per webview for `/call`, `/sync` and the message channel, off the UI thread. Static files can run concurrently.
+- Never answer static files on the UI thread: for the hosts named `apple`, `android`, `windows` and `linux`, the core holds the page's scripts until the page's first paint ([First paint](../project-structure.md#first-paint)), and `/first-paint` must get through meanwhile. A new host that answers static files concurrently joins that list in `core/internal/router/first-paint.go`.
+- Until the page paints, show the system's background (light or dark) behind a transparent webview, or as the webview's own background: never white.
 - Finish each response on the thread the webview expects (usually the main thread).
 - `POST /sync` is a synchronous XHR of the page. Answer it like any other request: the page waits.
 - The page sends `X-Body-Size` with the body length, for hosts whose body stream reports no size (Qt).

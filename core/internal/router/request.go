@@ -6,6 +6,7 @@ import (
 	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/types"
 	"strconv"
+	"strings"
 )
 
 // Set once by the host with setPlatform: its name for GET /platform, and
@@ -16,7 +17,7 @@ var BinaryCalls = true
 // HandleRequest answers a request of the page of context ctxId, so hosts
 // only forward them: GET /platform, /ctx, /bridge and /version, POST /call and /sync
 // (the body is the payload, the response the core response), GET
-// /stream/detach and static files. GET /stream, the message channels and the
+// /stream/detach, /first-paint (first-paint.go) and static files. GET /stream, the message channels and the
 // UI endpoints of a host stay with the host.
 func HandleRequest(ctxId uint8, path string, body []byte) (status int, mimeType string, data []byte) {
 	switch path {
@@ -53,6 +54,11 @@ func HandleRequest(ctxId uint8, path string, body []byte) (status int, mimeType 
 		return 404, "text/plain", []byte("Not Found")
 	}
 
+	if path == FirstPaintPath {
+		firstPainted(ctx)
+		return 200, "text/plain", nil
+	}
+
 	if path == "/stream/detach" {
 		// the page did not get the hello frame, it keeps the evaluated chunks
 		ctx.Frames.Detach(0)
@@ -62,6 +68,11 @@ func HandleRequest(ctxId uint8, path string, body []byte) (status int, mimeType 
 	mimeType, contents, found := resolveStaticFile(ctx, path)
 	if !found {
 		return 404, "text/plain", []byte("Not Found")
+	}
+	if strings.HasPrefix(mimeType, "text/html") {
+		contents = firstPaintPage(ctx, contents)
+	} else if isScript(mimeType) {
+		waitFirstPaint(ctx)
 	}
 	return 200, mimeType, contents
 }

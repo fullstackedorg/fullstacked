@@ -25,6 +25,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
@@ -35,6 +36,11 @@ import androidx.core.content.edit
 
 const val EXTRA_CTX_ID = "ctxId"
 const val EXTRA_DEEPLINK = "deeplink"
+
+private const val PAGE_BACKGROUND_SCRIPT = "(() => {" +
+    "const bg = (el) => { if (!el) return ''; const c = getComputedStyle(el).backgroundColor;" +
+    " return c && c !== 'transparent' && !/^rgba\\(.*,\\s*0\\)$/.test(c) ? c : ''; };" +
+    "return bg(document.documentElement) || bg(document.body); })()"
 
 class MainActivity : ComponentActivity() {
     companion object {
@@ -49,6 +55,10 @@ class MainActivity : ComponentActivity() {
     }
 
     val stackedWebViews = CopyOnWriteArrayList<FullStackedWebView>()
+
+    // the window follows the front page's background (syncPageBackground)
+    private val pageBackgroundHandler = Handler(Looper.getMainLooper())
+    private var pageBackgroundSync: Runnable? = null
     private var activeAuthWebView: FullStackedWebView? = null
 
     lateinit var root: String
@@ -253,6 +263,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        pageBackgroundSync?.let { pageBackgroundHandler.removeCallbacks(it) }
         activeActivities.remove(this)
         AuthManager.unregisterActivity(this)
         try {
@@ -331,6 +342,68 @@ class MainActivity : ComponentActivity() {
         return outDir.absolutePath
     }
 
+    // The page's background: its html's, else its body's (Windows reads it the
+    // same way for its title bar), null when it has none
+    private fun readPageBackground(webView: FullStackedWebView, done: (Int?) -> Unit) {
+        webView.webView.evaluateJavascript(PAGE_BACKGROUND_SCRIPT) { result ->
+            val match = Regex("""rgba?\((\d+),\s*(\d+),\s*(\d+)""").find(result ?: "")
+            done(match?.destructured?.let { (r, g, b) -> Color.rgb(r.toInt(), g.toInt(), b.toInt()) })
+        }
+    }
+
+    // The window in the front page's background, as on iOS: the status and
+    // navigation bars, the space behind them and the stacked top bar, with the
+    // close button and the bars' icons readable on it (the same contrast rule
+    // as iOS). The system's background until the page has painted its first
+    // frame; then read at once, and again as the page changes it.
+    private fun syncPageBackground(webView: FullStackedWebView, rootLayout: ViewGroup, topBar: FrameLayout?) {
+        pageBackgroundSync?.let { pageBackgroundHandler.removeCallbacks(it) }
+        val insetsController = WindowInsetsControllerCompat(window, window.decorView)
+        val closeButton = topBar?.getChildAt(0) as? TextView
+        var applied: Int? = null
+        val apply = { color: Int ->
+            if (color != applied) {
+                applied = color
+                rootLayout.setBackgroundColor(color)
+                topBar?.setBackgroundColor(color)
+                // where the app is not drawn behind the bars (before Android 15)
+                @Suppress("DEPRECATION")
+                window.statusBarColor = color
+                @Suppress("DEPRECATION")
+                window.navigationBarColor = color
+                val light = (Color.red(color) * 299 + Color.green(color) * 587 + Color.blue(color) * 114) / 1000 >= 180
+                closeButton?.setTextColor(if (light) Color.BLACK else Color.WHITE)
+                insetsController.isAppearanceLightStatusBars = light
+                insetsController.isAppearanceLightNavigationBars = light
+            }
+        }
+        apply(getColor(R.color.system_background))
+        val sync = object : Runnable {
+            // reads soon after a first paint or a load (the page's script
+            // sets its colours then), every second otherwise
+            var quickReads = 0
+            override fun run() {
+                pageBackgroundHandler.removeCallbacks(this)
+                if (webView.painted) {
+                    readPageBackground(webView) { color ->
+                        if (pageBackgroundSync !== this) return@readPageBackground
+                        apply(color ?: getColor(R.color.system_background))
+                    }
+                }
+                val delay = if (quickReads > 0) { quickReads--; 150L } else 1000L
+                pageBackgroundHandler.postDelayed(this, delay)
+            }
+        }
+        webView.onPainted = {
+            if (pageBackgroundSync === sync) {
+                sync.quickReads = 10
+                sync.run()
+            }
+        }
+        pageBackgroundSync = sync
+        sync.run()
+    }
+
     fun updateActiveContentView() {
         val currentWebView = stackedWebViews.lastOrNull()
         if (currentWebView == null) {
@@ -340,7 +413,8 @@ class MainActivity : ComponentActivity() {
 
         val rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.BLACK)
+            // behind the page until it paints: the system's background
+            setBackgroundColor(getColor(R.color.system_background))
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
@@ -354,7 +428,7 @@ class MainActivity : ComponentActivity() {
             val density = resources.displayMetrics.density
 
             topBar = FrameLayout(this).apply {
-                setBackgroundColor(Color.BLACK)
+                setBackgroundColor(getColor(R.color.system_background))
                 layoutParams = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
@@ -384,6 +458,7 @@ class MainActivity : ComponentActivity() {
             topBar.addView(closeButton, btnParams)
             rootLayout.addView(topBar)
         }
+        syncPageBackground(currentWebView, rootLayout, topBar)
 
         val webViewParams = LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,

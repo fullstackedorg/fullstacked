@@ -102,6 +102,9 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
     // the UI endpoints of the page (/open, /exit, /resize), answered by the
     // window on the main thread with a text, nil leaves them to the core (404)
     var ui: ((_ path: String, _ query: [String: String]) -> String?)?
+    // the page painted its first frame (its first-paint request, then
+    // answered by the core, see core/internal/router/first-paint.go)
+    var onFirstPaint: (() -> Void)?
     // main thread only. The tasks not answered nor stopped yet, retained so
     // their address (the key) cannot go to a new task while they are here: a
     // stopped task must not be answered (WebKit throws), a new one always.
@@ -138,6 +141,9 @@ class RequestHandler: NSObject, WKURLSchemeHandler {
         let url = task.request.url!
         let path = URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedPath ?? url.path
         activeTasks[ObjectIdentifier(task as AnyObject)] = task
+        if path == "/first-paint" {
+            onFirstPaint?()
+        }
         if path == "/stream" {
             startFrameStream(task, url)
             return

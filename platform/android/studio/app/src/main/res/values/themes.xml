@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.FullStackedEditor" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">#000000</item>
+        <item name="android:windowBackground">@color/system_background</item>
+        <item name="android:isLightTheme">@bool/light_theme</item>
     </style>
 </resources>

@@ -16,6 +16,16 @@ let isSimulator = false
 
 let EditorColor = 0x1E293B
 
+// Until a page has painted, its window shows the system's background (light
+// or dark, as the system is set) and never a white webview: the webview is
+// transparent (WebView.init) and the page's first frame is in its own colours
+// (the core holds its scripts until then, core/internal/router/first-paint.go)
+#if os(iOS)
+let systemBackground = Color(UIColor.systemBackground)
+#else
+let systemBackground = Color(NSColor.windowBackgroundColor)
+#endif
+
 // source: https://github.com/scottcorgan/contrast/blob/master/index.js
 func getBestSuitedColorScheme(color: Color?) -> ColorScheme? {
     if color == nil {
@@ -73,7 +83,7 @@ struct FullStackedApp: App {
             let isFull = true
             #endif
             
-            (self.webViewStore.webViewsMeta[webView.id]?.1 ?? Color(hex: 0))
+            (self.webViewStore.webViewsMeta[webView.id]?.1 ?? systemBackground)
                 .ignoresSafeArea()
                 .navigationTitle(self.webViewStore.webViewsMeta[webView.id]?.0 ?? "FullStacked")
             
@@ -95,7 +105,7 @@ struct FullStackedApp: App {
                 .overlay {
                     NavigationStack {
                         ZStack {
-                            (self.webViewStore.webViewsMeta[webView.id]?.1 ?? Color(hex: 0))
+                            (self.webViewStore.webViewsMeta[webView.id]?.1 ?? systemBackground)
                                 .ignoresSafeArea()
                             
                             if self.supportsMultipleWindows {
@@ -119,7 +129,7 @@ struct FullStackedApp: App {
                                     .toolbar(
                                         isIPadOS && !isFull ? .visible : .hidden,
                                         for: .navigationBar)
-                                    .toolbarBackground(self.webViewStore.webViewsMeta[webView.id]?.1 ?? Color(hex: 0), for: .navigationBar)
+                                    .toolbarBackground(self.webViewStore.webViewsMeta[webView.id]?.1 ?? systemBackground, for: .navigationBar)
                                     .navigationBarTitleDisplayMode(.inline)
                                 #endif
                             } else {
@@ -150,7 +160,7 @@ struct FullStackedApp: App {
                                             .ignoresSafeArea()
                                             #endif
                                     }
-                                    .background(self.webViewStore.webViewsMeta[wv.id]?.1 ?? Color(.black))
+                                    .background(self.webViewStore.webViewsMeta[wv.id]?.1 ?? systemBackground)
                                     .preferredColorScheme(getBestSuitedColorScheme(color: self.webViewStore.webViewsMeta[wv.id]?.1))
                                 }
                             }
@@ -217,13 +227,9 @@ class WebViewStore: ObservableObject {
         Timer.scheduledTimer(withTimeInterval: 1, repeats: true, block: { [weak self] _ in
             guard let self = self else { return }
             self.webViews.forEach { webView in
-                var title = webView.title
-                if(title == nil || title!.isEmpty) {
-                    title = "FullStacked"
+                if let meta = webView.pageMeta() {
+                    self.webViewsMeta[webView.id] = meta
                 }
-                
-                self.webViewsMeta[webView.id] =
-                    (title!, webView.getBackgroundColor())
             }
         })
     }
@@ -458,7 +464,7 @@ class WebViewStore: ObservableObject {
         // 4. Retain only target in store
         self.webViews = [target]
         self.webViewsPublished = [target]
-        self.webViewsMeta[target.id] = ("FullStacked", target.getBackgroundColor())
+        self.webViewsMeta[target.id] = ("FullStacked", target.pageMeta()?.1 ?? systemBackground)
         
         // 5. Smoothly switch target to safe mode
         target.switchToSafeMode()

@@ -12,9 +12,12 @@
 #include <QIcon>
 #include <QKeyEvent>
 #include <QKeySequence>
+#include <QPalette>
+#include <QProcess>
 #include <QPointer>
 #include <QScreen>
 #include <QShortcut>
+#include <QStyleHints>
 #include <QUrl>
 #include <QUrlQuery>
 #include <QWebEnginePage>
@@ -65,6 +68,25 @@ void SchemeHandler::requestStarted(QWebEngineUrlRequestJob *job) {
     } else {
         job->fail(QWebEngineUrlRequestJob::UrlNotFound);
     }
+}
+
+// The system's light or dark setting: Qt's, else GNOME's (Qt without a
+// desktop platform theme reports none); light when there is none
+static bool systemPrefersDark() {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    Qt::ColorScheme scheme = QGuiApplication::styleHints()->colorScheme();
+    if (scheme != Qt::ColorScheme::Unknown) {
+        return scheme == Qt::ColorScheme::Dark;
+    }
+#endif
+    QProcess gsettings;
+    gsettings.start("gsettings",
+                    {"get", "org.gnome.desktop.interface", "color-scheme"});
+    if (!gsettings.waitForFinished(500)) {
+        gsettings.kill();
+        return false;
+    }
+    return gsettings.readAllStandardOutput().contains("prefer-dark");
 }
 
 QtWebEnginePage::QtWebEnginePage(QWebEngineProfile *profile, QObject *parent,
@@ -442,7 +464,7 @@ static const char *s_qwebchannel_js =
     "{\n"
     "                "
     "window.bridge.postMessage.apply(window.bridge, "
-                "window._pendingBridge.shift());\n"
+    "window._pendingBridge.shift());\n"
     "            }\n"
     "        });\n"
     "    } else {\n"
@@ -528,7 +550,19 @@ void QtWindow::init() {
     script.setRunsOnSubFrames(true);
     profile->scripts()->insert(script);
 
+    // Until the page paints, the window and the webview show the system's
+    // background (light or dark), never a white page: the core holds the
+    // page's scripts until its first frame
+    // (core/internal/router/first-paint.go)
+    bool dark = systemPrefersDark();
+    QColor background = dark ? QColor(Qt::black) : QColor(Qt::white);
+    QPalette palette = windowQt->palette();
+    palette.setColor(QPalette::Window, background);
+    windowQt->setPalette(palette);
+    windowQt->setAutoFillBackground(true);
+
     auto *page = new QtWebEnginePage(profile, webEngineView, this);
+    page->setBackgroundColor(background);
     page->settings()->setAttribute(
         QWebEngineSettings::LocalContentCanAccessRemoteUrls, true);
     page->settings()->setAttribute(

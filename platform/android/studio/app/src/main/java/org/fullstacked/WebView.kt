@@ -32,6 +32,24 @@ class FullStackedWebView(
 
     val webView: WebView = createWebView(this)
 
+    // the page has painted its first frame (its /first-paint request, else
+    // its load): the window can take its background
+    var painted = false
+        private set
+    var onPainted: (() -> Unit)? = null
+
+    private fun painted() {
+        Handler(Looper.getMainLooper()).post {
+            painted = true
+            onPainted?.invoke()
+        }
+    }
+
+    override fun onPageFinished(view: WebView?, url: String?) {
+        super.onPageFinished(view, url)
+        painted()
+    }
+
     fun destroyView() {
         bridge.destroy()
         AuthManager.clearAuthSession(ctx, this)
@@ -67,6 +85,8 @@ class FullStackedWebView(
                 Handler(Looper.getMainLooper()).post { ctx.removeStackedProject(this) }
                 return emptyResponse()
             }
+            // forwarded too: the core releases the page's scripts on it
+            "/first-paint" -> painted()
         }
         return bridge.request(path)
     }
@@ -80,7 +100,9 @@ fun createWebView(delegate: FullStackedWebView): WebView {
     WebView.setWebContentsDebuggingEnabled(true)
     val webView = WebView(delegate.ctx)
 
-    webView.setBackgroundColor(Color.BLACK)
+    // transparent until the page paints: the activity's system background
+    // shows instead of a white page (R.color.system_background)
+    webView.setBackgroundColor(Color.TRANSPARENT)
     webView.webViewClient = delegate
     webView.webChromeClient = object : WebChromeClient() {
         // Camera, microphone and location: Android's own dialog (WebPermissions.kt)

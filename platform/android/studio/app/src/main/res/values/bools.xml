@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- the theme's light or dark, as the system's: the WebView gives pages
+         this as prefers-color-scheme -->
+    <bool name="light_theme">true</bool>
+</resources>
