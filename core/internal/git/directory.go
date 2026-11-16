@@ -272,7 +272,7 @@ func (r *GitDirectory) LsRemote(ctx *types.Context, remoteName string) ([]*plumb
 
 	refs, err := remote.List(&options)
 
-	if errIsAuthenticationRequired(err) {
+	if errNeedsFreshAuth(err) {
 		clientOpts, err = r.getClientOptions(ctx, urlStr, true)
 		if err == nil {
 			options.ClientOptions = clientOpts
@@ -280,7 +280,7 @@ func (r *GitDirectory) LsRemote(ctx *types.Context, remoteName string) ([]*plumb
 		}
 	}
 
-	if errIsAuthenticationRequired(err) {
+	if errNeedsFreshAuth(err) {
 		invalidateAuth(ctx, urlStr)
 	}
 
@@ -460,7 +460,7 @@ func (r *GitDirectory) Fetch(progress *GitStream, refSpecs ...config.RefSpec) er
 
 	err = remote.Fetch(&options)
 
-	if errIsAuthenticationRequired(err) {
+	if errNeedsFreshAuth(err) {
 		clientOpts, err = r.getClientOptions(progress.ctx, urlStr, true)
 		if err == nil {
 			options.ClientOptions = clientOpts
@@ -468,7 +468,7 @@ func (r *GitDirectory) Fetch(progress *GitStream, refSpecs ...config.RefSpec) er
 		}
 	}
 
-	if errIsAuthenticationRequired(err) {
+	if errNeedsFreshAuth(err) {
 		invalidateAuth(progress.ctx, urlStr)
 	}
 

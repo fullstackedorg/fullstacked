@@ -723,7 +723,7 @@ func clone(
 			if cloneErr != nil {
 				processErr(ctx, streamId, cloneErr, false)
 
-				if errIsAuthenticationRequired(cloneErr) {
+				if errNeedsFreshAuth(cloneErr) {
 					clientOpts, err = tempDir.getClientOptions(ctx, urlStr, true)
 					if err == nil {
 						options.ClientOptions = clientOpts
@@ -741,7 +741,7 @@ func clone(
 					}
 				}
 
-				if errIsAuthenticationRequired(cloneErr) {
+				if errNeedsFreshAuth(cloneErr) {
 					invalidateAuth(ctx, urlStr)
 				}
 				if cloneErr != nil {
@@ -827,7 +827,7 @@ func CloneRepo(ctx *types.Context, urlStr string, directory string, progress io.
 	if cloneErr != nil {
 		processErr(cloneErr)
 
-		if errIsAuthenticationRequired(cloneErr) {
+		if errNeedsFreshAuth(cloneErr) {
 			clientOpts, err = tempDir.getClientOptions(ctx, urlStr, true)
 			if err == nil {
 				options.ClientOptions = clientOpts
@@ -842,7 +842,7 @@ func CloneRepo(ctx *types.Context, urlStr string, directory string, progress io.
 			}
 		}
 
-		if errIsAuthenticationRequired(cloneErr) {
+		if errNeedsFreshAuth(cloneErr) {
 			invalidateAuth(ctx, urlStr)
 		}
 		processErr(cloneErr)
@@ -915,7 +915,7 @@ func pull(directory string, tunnel string) (*types.ResponseStream, error) {
 
 			err = worktree.Pull(&options)
 
-			if errIsAuthenticationRequired(err) {
+			if errNeedsFreshAuth(err) {
 				clientOpts, err = dir.getClientOptions(ctx, urlStr, true)
 				if err == nil {
 					options.ClientOptions = clientOpts
@@ -923,7 +923,7 @@ func pull(directory string, tunnel string) (*types.ResponseStream, error) {
 				}
 			}
 
-			if errIsAuthenticationRequired(err) {
+			if errNeedsFreshAuth(err) {
 				invalidateAuth(ctx, urlStr)
 			}
 
@@ -1023,7 +1023,7 @@ func push(directory string, tunnel string) (*types.ResponseStream, error) {
 
 			err = repository.Push(&options)
 
-			if errIsAuthenticationRequired(err) {
+			if errNeedsFreshAuth(err) {
 				clientOpts, err = dir.getClientOptions(ctx, urlStr, true)
 				if err == nil {
 					options.ClientOptions = clientOpts
@@ -1031,7 +1031,7 @@ func push(directory string, tunnel string) (*types.ResponseStream, error) {
 				}
 			}
 
-			if errIsAuthenticationRequired(err) {
+			if errNeedsFreshAuth(err) {
 				invalidateAuth(ctx, urlStr)
 			}
 
@@ -1355,11 +1355,17 @@ func merge(directory string, branchName string) error {
 	})
 }
 
-func errIsAuthenticationRequired(err error) bool {
+// errNeedsFreshAuth reports whether the cached credentials of a host were refused: 401 (none or
+// invalid) or 403 (valid, but not allowed). A 403 must re-ask the git-auth plugin too, as the
+// app may have switched to another identity since the credentials were cached (a client
+// switching accounts would otherwise keep pulling with the previous account's token).
+func errNeedsFreshAuth(err error) bool {
 	if err == nil {
 		return false
 	}
-	return strings.Contains(err.Error(), transport.ErrAuthenticationRequired.Error())
+	msg := err.Error()
+	return strings.Contains(msg, transport.ErrAuthenticationRequired.Error()) ||
+		strings.Contains(msg, transport.ErrAuthorizationFailed.Error())
 }
 
 func invalidateAuth(ctx *types.Context, urlStr string) {
