@@ -88,6 +88,9 @@ class WebView: WebViewExtended, WKNavigationDelegate, WKDownloadDelegate, Codabl
         #if os(iOS)
         // honor <video playsinline>: iPhone defaults to false, which forces every video into the native fullscreen player
         wkWebViewConfig.allowsInlineMediaPlayback = true
+        #else
+        // the Fullscreen API (and a <video>'s fullscreen button) is off by default on macOS
+        wkWebViewConfig.preferences.isElementFullscreenEnabled = true
         #endif
         
         let userContentController = WKUserContentController()
