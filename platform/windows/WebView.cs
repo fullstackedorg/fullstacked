@@ -190,6 +190,29 @@ namespace FullStacked
             }
         }
 
+        // A page's fullscreen element (a <video>'s fullscreen button, requestFullscreen())
+        // takes the whole screen, as in a browser: WebView2 only fills its own bounds.
+        // Leaving it gives back the window as it was, unless it was already in kiosk.
+        private void FollowFullScreenElement(CoreWebView2 coreWebView2)
+        {
+            Microsoft.UI.Windowing.AppWindowPresenter presenterBefore = null;
+            coreWebView2.ContainsFullScreenElementChanged += (sender, _) =>
+            {
+                if (this.isClosed) return;
+                if (sender.ContainsFullScreenElement)
+                {
+                    if (this.AppWindow.Presenter.Kind == Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen) return;
+                    presenterBefore = this.AppWindow.Presenter;
+                    this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen);
+                }
+                else if (presenterBefore != null)
+                {
+                    this.AppWindow.SetPresenter(presenterBefore);
+                    presenterBefore = null;
+                }
+            };
+        }
+
         async public void InitWebView()
         {
             try
@@ -239,6 +262,7 @@ namespace FullStacked
 
             this.bridge.Attach(coreWebView2, this.environment);
             this.StartTitleBarSync(coreWebView2);
+            this.FollowFullScreenElement(coreWebView2);
             coreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
             coreWebView2.WebResourceRequested += async delegate (CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs args)
             {

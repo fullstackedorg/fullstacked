@@ -15,6 +15,7 @@
 #include <QWebEngineUrlSchemeHandler>
 #include <QWebEngineView>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -80,6 +81,9 @@ class QtWindow : public Window {
         // calls, stream frames and requests of the page (bridge.cpp),
         // deleted with the page
         QtBridge *bridge = nullptr;
+        // the window's state before a page's element went fullscreen, given
+        // back when it leaves (none when the window was already in kiosk)
+        std::optional<Qt::WindowStates> stateBeforeElementFullscreen;
 
         void init();
 

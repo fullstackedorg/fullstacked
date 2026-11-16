@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.GeolocationPermissions
 import android.webkit.PermissionRequest
@@ -115,6 +116,17 @@ fun createWebView(delegate: FullStackedWebView): WebView {
             callback: GeolocationPermissions.Callback?
         ) {
             delegate.ctx.webPermissions.onGeolocation(origin, callback)
+        }
+
+        // A page's fullscreen element (a <video>'s fullscreen button,
+        // requestFullscreen()): WebView hands over a view for the app to show
+        override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
+            if (view == null || callback == null) return
+            delegate.ctx.showFullscreenView(view, callback)
+        }
+
+        override fun onHideCustomView() {
+            delegate.ctx.hideFullscreenView()
         }
 
         override fun onShowFileChooser(

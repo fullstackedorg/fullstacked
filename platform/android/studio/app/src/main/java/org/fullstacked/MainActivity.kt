@@ -13,8 +13,10 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.ValueCallback
+import android.webkit.WebChromeClient
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -136,8 +138,46 @@ class MainActivity : ComponentActivity() {
         this.handleIntent(intent)
 
         this.onBackPressedDispatcher.addCallback {
+            // back leaves a fullscreen element first, as in a browser
+            if (fullscreenView != null) {
+                fullscreenCallback?.onCustomViewHidden()
+                hideFullscreenView()
+                return@addCallback
+            }
             stackedWebViews.lastOrNull()?.webView?.evaluateJavascript("globalThis.back?.()", null)
         }.isEnabled = true
+    }
+
+    // A page's fullscreen element (a <video>'s fullscreen button,
+    // requestFullscreen()), from WebView's onShowCustomView: over the whole
+    // window, system bars hidden (a swipe shows them for a moment)
+    private var fullscreenView: View? = null
+    private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
+
+    fun showFullscreenView(view: View, callback: WebChromeClient.CustomViewCallback) {
+        if (fullscreenView != null) {
+            callback.onCustomViewHidden()
+            return
+        }
+        fullscreenView = view
+        fullscreenCallback = callback
+        view.setBackgroundColor(Color.BLACK)
+        (window.decorView as ViewGroup).addView(
+            view,
+            FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        )
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
+    fun hideFullscreenView() {
+        val view = fullscreenView ?: return
+        fullscreenView = null
+        fullscreenCallback = null
+        (window.decorView as ViewGroup).removeView(view)
+        WindowInsetsControllerCompat(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())

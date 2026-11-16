@@ -20,6 +20,7 @@
 #include <QStyleHints>
 #include <QUrl>
 #include <QUrlQuery>
+#include <QWebEngineFullScreenRequest>
 #include <QWebEnginePage>
 #include <QWebEngineProfile>
 #include <QWebEngineScript>
@@ -573,6 +574,24 @@ void QtWindow::init() {
     page->settings()->setAttribute(QWebEngineSettings::WebGLEnabled, true);
     page->settings()->setAttribute(
         QWebEngineSettings::Accelerated2dCanvasEnabled, true);
+    // A page's fullscreen element (a <video>'s fullscreen button,
+    // requestFullscreen()) takes the whole screen, as in a browser: off by
+    // default in Qt WebEngine, and the window has to follow it
+    page->settings()->setAttribute(QWebEngineSettings::FullScreenSupportEnabled,
+                                   true);
+    QObject::connect(
+        page, &QWebEnginePage::fullScreenRequested, windowQt,
+        [this](QWebEngineFullScreenRequest request) {
+            request.accept();
+            if (request.toggleOn()) {
+                if (windowQt->isFullScreen()) return;
+                stateBeforeElementFullscreen = windowQt->windowState();
+                windowQt->showFullScreen();
+            } else if (stateBeforeElementFullscreen) {
+                windowQt->setWindowState(*stateBeforeElementFullscreen);
+                stateBeforeElementFullscreen.reset();
+            }
+        });
     webEngineView->setPage(page);
 
     bridge = new QtBridge(ctx, page);
