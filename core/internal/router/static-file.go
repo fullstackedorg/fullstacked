@@ -56,7 +56,13 @@ func resolveStaticFile(ctx *types.Context, pathname string) (string, []byte, boo
 		return "", nil, false
 	}
 
-	for _, dir := range []string{ctx.Directories.Build, ctx.Directories.Root} {
+	dirs := []string{ctx.Directories.Build, ctx.Directories.Root}
+	if ctx.Transform {
+		// out/ is a bundle's: in transform mode it may be stale
+		dirs = []string{ctx.Directories.Root}
+	}
+
+	for _, dir := range dirs {
 		file, inside := joinInside(dir, pathname)
 		if !inside {
 			continue

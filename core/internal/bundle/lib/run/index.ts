@@ -6,6 +6,15 @@ type RunOptions = {
     directory?: string;
     env?: Record<string, string>;
     safe?: boolean;
+    /**
+     * `"bundle"` (the default) serves the page from `out/`, built by `bundle`.
+     * `"transform"` serves it from the project's sources: each module is
+     * transformed when the page asks for it, and the npm dependencies are
+     * pre-bundled once and cached (call `prepare` from `fullstacked/bundle`
+     * first to report errors before the page opens). A project without
+     * sources (shipped pre-built) runs in bundle mode either way.
+     */
+    mode?: "bundle" | "transform";
 };
 
 /**
@@ -28,13 +37,20 @@ export async function run(
         typeof directoryOrOptions === "object"
             ? directoryOrOptions.safe
             : undefined;
+    const mode =
+        typeof directoryOrOptions === "object"
+            ? directoryOrOptions.mode
+            : undefined;
 
     const resolved = path.resolve(directory ?? ".");
 
     const newCtx = (await globalThis.fullstacked.bridge({
         mod: Core,
         fn: Run,
-        data: [resolved, env, safe]
+        data:
+            mode === "transform"
+                ? [resolved, env ?? {}, !!safe, mode]
+                : [resolved, env, safe]
     })) as number;
 
     return newCtx;

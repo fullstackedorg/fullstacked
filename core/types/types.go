@@ -193,6 +193,11 @@ type Context struct {
 	// the page's scripts wait for its first paint, see router/first-paint.go
 	FirstPaint *FirstPaint
 
+	// Transform mode: the page is served from the project's sources, each
+	// module transformed when the page asks for it, instead of from out/
+	// (see bundle/transform.go). Chosen at run(), bundle mode otherwise.
+	Transform bool
+
 	Exited bool
 }
 

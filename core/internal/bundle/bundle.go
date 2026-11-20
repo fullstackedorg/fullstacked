@@ -95,6 +95,7 @@ const (
 	BundleFile         BundleFn = 2
 	BuilderTailwindCSS BundleFn = 3
 	BuilderSASS        BundleFn = 4
+	PrepareTransform   BundleFn = 5
 )
 
 func Switch(
@@ -135,6 +136,20 @@ func Switch(
 		result := BundleFileFn(ctx, entryPoint)
 		response.Type = types.CoreResponseData
 		response.Data = result
+		return nil
+	case PrepareTransform:
+		entryPoint := ctx.Directories.Root
+		if len(data) >= 1 {
+			entryPoint = fspath.ResolveWithContext(ctx, data[0].Data.(string))
+		}
+
+		response.Type = types.CoreResponseStream
+		response.Stream = &types.ResponseStream{
+			Open: func(ctx *types.Context, streamId uint32) {
+				result := PrepareTransformFn(ctx, entryPoint)
+				store.StreamEvent(ctx, streamId, "result", []types.SerializableData{result}, true)
+			},
+		}
 		return nil
 	}
 

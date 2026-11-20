@@ -65,6 +65,23 @@ func HandleRequest(ctxId uint8, path string, body []byte) (status int, mimeType 
 		return 200, "text/plain", nil
 	}
 
+	if ctx.Transform {
+		if mimeType, contents, handled := bundle.ServeTransform(ctx, path); handled {
+			if contents == nil {
+				return 404, "text/plain", []byte("Not Found")
+			}
+			if strings.HasPrefix(mimeType, "text/html") {
+				contents = firstPaintPage(ctx, contents)
+			} else if path == bundle.TransformEntryPath {
+				// only the entry waits: the page's other modules are asked
+				// for once it runs, a held request each would take every
+				// request thread of a host and starve /first-paint
+				waitFirstPaint(ctx)
+			}
+			return 200, mimeType, contents
+		}
+	}
+
 	mimeType, contents, found := resolveStaticFile(ctx, path)
 	if !found {
 		return 404, "text/plain", []byte("Not Found")

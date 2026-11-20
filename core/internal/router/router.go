@@ -220,6 +220,16 @@ func Switch(
 		id := store.NewContext(root, root, safe)
 		response.Data = id
 
+		// transform mode: the page is served from the sources (bundle/transform.go).
+		// A project without sources (shipped pre-built) runs from out/.
+		if len(data) > 3 && data[3].Type == types.STRING && data[3].Data.(string) == "transform" {
+			if newCtx, ok := store.GetContext(id); ok {
+				if _, _, err := bundle.TransformRoot(newCtx.Directories.Root); err == nil {
+					newCtx.Transform = true
+				}
+			}
+		}
+
 		if len(data) > 1 && data[1].Type == types.OBJECT {
 			env := (map[string]string)(nil)
 			err := json.Unmarshal(data[1].Data.(types.DeserializedRawObject).Data, &env)

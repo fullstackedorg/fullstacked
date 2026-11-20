@@ -1,5 +1,5 @@
 import "../bridge/index.ts";
-import { bundle, bundleFile } from "../bundle/index.ts";
+import { bundle, bundleFile, prepare } from "../bundle/index.ts";
 import run from "../run/index.ts";
 import plugin, { PluginBundleError } from "../plugin/index.ts";
 import packages from "../packages/index.ts";
@@ -156,7 +156,8 @@ function getPositionalArgs(args: string[]): string[] {
         ["-o", "--open"],
         ["-n", "--no-open"],
         ["-b", "--build"],
-        ["-s", "--safe"]
+        ["-s", "--safe"],
+        ["--transform"]
     ];
 
     for (let i = 0; i < args.length; i++) {
@@ -415,10 +416,16 @@ async function runFile(
     }
 }
 
+// The build plugins of the last transform-mode run: they stay registered
+// while it runs, to build again when the page reloads after an edit, until
+// the next run replaces them.
+let transformPlugins: { unregister: () => Promise<void> }[] = [];
+
 async function runDirectory(
     positionals: string[],
     pluginsArgs: string[],
     buildOnly: boolean,
+    transform: boolean,
     noOpen: boolean,
     env: Record<string, string>,
     safe: boolean,
@@ -466,7 +473,9 @@ async function runDirectory(
         }
     }
 
-    const result = await bundle(targetDirectory, { production: buildOnly });
+    const result = transform
+        ? await prepare(targetDirectory)
+        : await bundle(targetDirectory, { production: buildOnly });
     if (result.Warnings?.length) {
         result.Warnings.forEach((w: any) => writeErr(formatMessage(w, true)));
     }
@@ -482,8 +491,23 @@ async function runDirectory(
         return 0;
     }
 
-    const newCtx = await run({ directory: targetDirectory, env, safe });
-    await cleanupPlugins();
+    const newCtx = await run({
+        directory: targetDirectory,
+        env,
+        safe,
+        mode: transform ? "transform" : undefined
+    });
+    if (transform) {
+        const previous = transformPlugins;
+        transformPlugins = buildPlugins;
+        for (const bp of previous) {
+            try {
+                await bp.unregister();
+            } catch {}
+        }
+    } else {
+        await cleanupPlugins();
+    }
     if (!noOpen && typeof newCtx === "number") {
         globalThis.fullstacked.open?.(newCtx);
     }
@@ -580,6 +604,9 @@ Options:
   -n, --no-open Don't open a window (Node: serve without opening the browser)
   -b, --build   Only bundle the project, for production (React's production
                 build, minified), don't run it afterward
+  --transform   Run without bundling first (beta): each module is transformed
+                when the page asks for it, npm dependencies are pre-bundled
+                once and cached in node_modules/.fullstacked
   -f, --file    Bundle and execute a single script file; every argument after
                 the file is passed to the script as is (put options before -f)
   -s, --safe    Skip the initialDirectory config check
@@ -595,6 +622,7 @@ Directory:
     const fileFlags = findArgValues(["-f", "--file"], args);
     const file = fileFlags.length > 0 ? fileFlags[0] : undefined;
     const buildOnly = hasArgFlag(["-b", "--build"], args);
+    const transform = !buildOnly && hasArgFlag(["--transform"], args);
     const noOpen = hasArgFlag(["-n", "--no-open"], args);
     const envArgs = findArgValues(["-e", "--env"], args);
     const pluginsArgs = findArgValues(["-p", "--plugin"], args);
@@ -638,6 +666,7 @@ Directory:
         positionals,
         pluginsArgs,
         buildOnly,
+        transform,
         noOpen,
         env,
         safe,
