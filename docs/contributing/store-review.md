@@ -63,6 +63,8 @@ Other keys that review looks at: `ITSAppUsesNonExemptEncryption` is `YES` (the `
 
 Revisit them when the crypto changes. Once App Store Connect gives an export compliance code, `ITSEncryptionExportComplianceCode` in the build settings skips the questions for later builds.
 
+Since November 2026 France is removed from the app's availability, and every build answers No for France. The French encryption declaration filed on November 11, 2026 (App Information, App Encryption Documentation) was still in review when France was removed. To bring France back: check that both documents are approved, set their key value as `ITSEncryptionExportComplianceCode` in the 4 build configurations, then add France again in Pricing and Availability.
+
 ### Mac App Sandbox
 
 `FullStacked.entitlements` (iOS ignores these keys):
