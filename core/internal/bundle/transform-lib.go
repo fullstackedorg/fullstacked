@@ -2,8 +2,11 @@ package bundle
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fullstackedorg/fullstacked/internal/fs"
+	iofs "io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -16,10 +19,14 @@ import (
 	"golang.org/x/net/html"
 )
 
-// The runtime lib as ES modules, built once per core: one entry per lib
-// module, split so the code they share (the bridge, events, buffer...) is one
-// chunk, loaded once per page. A page's modules, its dependencies and the
-// lib's own modules all import the same /@lib/ URLs: one bridge per page.
+// The runtime lib as ES modules, built once per core. Every page loads the
+// lib's prelude (the fullstacked module: the bridge, process, Buffer...):
+// it is one file, /@lib/fullstacked/index.js, which also exports a namespace
+// of each lib file it holds. A lib module among them (fs, path, events...) is
+// a facade over that namespace; the other modules (crypto, zlib, git...) are
+// built split, and what they share with the prelude is read from it through
+// the proxies a project's modules use. A page's modules, its dependencies
+// and the lib's own modules import the same /@lib/ URLs: one bridge per page.
 type libBuild struct {
 	urls   map[string]string // module name (fs, fs/promises...) → page path
 	files  map[string][]byte // page path → contents
@@ -29,12 +36,19 @@ type libBuild struct {
 }
 
 type metafile struct {
+	Inputs map[string]struct {
+		Imports []struct {
+			Path string `json:"path"`
+			Kind string `json:"kind"`
+		} `json:"imports"`
+	} `json:"inputs"`
 	Outputs map[string]struct {
 		Imports []struct {
 			Path     string `json:"path"`
 			Kind     string `json:"kind"`
 			External bool   `json:"external"`
 		} `json:"imports"`
+		Exports []string `json:"exports"`
 	} `json:"outputs"`
 }
 
@@ -76,62 +90,372 @@ func staticImports(meta string, workingDir string, outdir string, prefix string)
 	return imports
 }
 
-var transformLib = sync.OnceValue(buildTransformLib)
+// The lib, from the cache of this lib (the user's cache folder) when it
+// has it: a build takes a few esbuild runs, at every start of a process.
+var transformLib = sync.OnceValue(func() *libBuild {
+	key := libKey()
+	if cached := readLibCache(key); cached != nil {
+		return cached
+	}
+	build := buildTransformLib()
+	if len(build.errors) == 0 {
+		writeLibCache(key, build)
+	}
+	return build
+})
+
+// the embedded lib's files and esbuild: what the lib's build is made of
+func libKey() string {
+	hash := sha256.New()
+	hash.Write([]byte(EsbuildVersionFn()))
+	iofs.WalkDir(lib, "lib", func(file string, entry iofs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return nil
+		}
+		contents, _ := lib.ReadFile(file)
+		hash.Write([]byte(file))
+		hash.Write(contents)
+		return nil
+	})
+	return hex.EncodeToString(hash.Sum(nil))[:24]
+}
+
+type libManifest struct {
+	Urls    map[string]string   `json:"urls"`
+	Imports map[string][]string `json:"imports"`
+	Files   []string            `json:"files"`
+}
+
+func libCacheDir(key string) (string, bool) {
+	dir, err := os.UserCacheDir()
+	if err != nil || dir == "" {
+		return "", false
+	}
+	return filepath.Join(dir, "fullstacked", "transform-lib", key), true
+}
+
+func readLibCache(key string) *libBuild {
+	dir, ok := libCacheDir(key)
+	if !ok {
+		return nil
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
+	if err != nil {
+		return nil
+	}
+	manifest := libManifest{}
+	if json.Unmarshal(data, &manifest) != nil {
+		return nil
+	}
+	build := &libBuild{urls: manifest.Urls, imports: manifest.Imports, files: map[string][]byte{}}
+	for _, pagePath := range manifest.Files {
+		file, ok := insideRoot(dir, strings.TrimPrefix(pagePath, transformLibPrefix))
+		if !ok {
+			return nil
+		}
+		contents, err := os.ReadFile(file)
+		if err != nil {
+			return nil
+		}
+		build.files[pagePath] = contents
+	}
+	return build
+}
+
+// best effort: without a cache folder, each process builds the lib
+func writeLibCache(key string, build *libBuild) {
+	dir, ok := libCacheDir(key)
+	if !ok {
+		return
+	}
+	// another process may write it at the same time: written aside, then moved
+	tmp := dir + ".tmp-" + itoa(os.Getpid())
+	os.RemoveAll(tmp)
+	manifest := libManifest{Urls: build.urls, Imports: build.imports}
+	for pagePath, contents := range build.files {
+		file, ok := insideRoot(tmp, strings.TrimPrefix(pagePath, transformLibPrefix))
+		if !ok {
+			continue
+		}
+		if os.MkdirAll(filepath.Dir(file), 0755) != nil || os.WriteFile(file, contents, 0644) != nil {
+			os.RemoveAll(tmp)
+			return
+		}
+		manifest.Files = append(manifest.Files, pagePath)
+	}
+	sort.Strings(manifest.Files)
+	data, _ := json.Marshal(manifest)
+	if os.WriteFile(filepath.Join(tmp, "manifest.json"), data, 0644) != nil {
+		os.RemoveAll(tmp)
+		return
+	}
+	if os.Rename(tmp, dir) != nil {
+		os.RemoveAll(tmp)
+		return
+	}
+	// the builds of other libs (an older core) are not kept
+	parent := filepath.Dir(dir)
+	if entries, err := os.ReadDir(parent); err == nil {
+		for _, entry := range entries {
+			if entry.Name() != key && !strings.Contains(entry.Name(), ".tmp-") {
+				os.RemoveAll(filepath.Join(parent, entry.Name()))
+			}
+		}
+	}
+}
+
+const (
+	libFilePrefix  = "fullstacked-lib-file:"
+	libPreludeName = "fullstacked-lib-prelude"
+)
+
+// a lib file of the prelude, as a bundle's lib plugin names it
+func libFileOf(args esbuild.OnResolveArgs, pwd string) (string, bool) {
+	if args.Namespace == "lib-require" || args.Kind == esbuild.ResolveEntryPoint {
+		return "", false
+	}
+	if name, ok := libModuleName(args.Path); ok {
+		return libModules[name], true
+	}
+	if args.Namespace != "lib" {
+		return "", false
+	}
+	resolveDir := args.ResolveDir
+	if !strings.HasPrefix(resolveDir, "/") {
+		dir, _ := filepath.Rel(pwd, resolveDir)
+		resolveDir = "/" + filepath.ToSlash(dir)
+	}
+	return path.Join(resolveDir, args.Path), true
+}
 
 func buildTransformLib() *libBuild {
+	build := &libBuild{
+		urls:    map[string]string{},
+		files:   map[string][]byte{},
+		imports: map[string][]string{},
+	}
+	outdir := filepath.Join(os.TempDir(), "fullstacked-transform", "lib")
+	cwd, _ := os.Getwd()
+
 	// one entry per file: several names share one (unavailable/index.ts)
 	namesByFile := map[string][]string{}
 	for name, file := range libModules {
 		namesByFile[file] = append(namesByFile[file], name)
 	}
-
-	entries := []esbuild.EntryPoint{}
 	outputOf := map[string]string{}
+	allEntries := []esbuild.EntryPoint{}
 	for file, names := range namesByFile {
 		sort.Strings(names)
 		output := strings.TrimSuffix(strings.TrimPrefix(file, "/lib/"), path.Ext(file))
 		outputOf[file] = output
-		entries = append(entries, esbuild.EntryPoint{InputPath: names[0], OutputPath: output})
+		allEntries = append(allEntries, esbuild.EntryPoint{InputPath: names[0], OutputPath: output})
 	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].OutputPath < entries[j].OutputPath })
+	sort.Slice(allEntries, func(i, j int) bool { return allEntries[i].OutputPath < allEntries[j].OutputPath })
 
-	outdir := filepath.Join(os.TempDir(), "fullstacked-transform", "lib")
-	result := esbuild.Build(esbuild.BuildOptions{
-		EntryPointsAdvanced: entries,
+	// the export names of each module: a split build of them all
+	split := esbuild.Build(esbuild.BuildOptions{
+		EntryPointsAdvanced: allEntries,
 		Bundle:              true,
 		Splitting:           true,
 		Format:              esbuild.FormatESModule,
 		Write:               false,
 		Outdir:              outdir,
-		ChunkNames:          "_chunks/[name]-[hash]",
 		Plugins:             esbuildPluginsLib,
 		Metafile:            true,
 	})
-
-	cwd, _ := os.Getwd()
-	build := &libBuild{
-		urls:    map[string]string{},
-		files:   map[string][]byte{},
-		errors:  result.Errors,
-		imports: staticImports(result.Metafile, cwd, outdir, transformLibPrefix),
-	}
-	if len(result.Errors) > 0 {
+	if len(split.Errors) > 0 {
+		build.errors = split.Errors
 		return build
 	}
+	splitMeta := metafile{}
+	json.Unmarshal([]byte(split.Metafile), &splitMeta)
+	exportsOf := map[string][]string{}
+	for output, info := range splitMeta.Outputs {
+		abs := output
+		if !filepath.IsAbs(abs) {
+			abs = filepath.Join(cwd, abs)
+		}
+		if rel, err := filepath.Rel(outdir, abs); err == nil {
+			exportsOf[strings.TrimSuffix(filepath.ToSlash(rel), ".js")] = info.Exports
+		}
+	}
 
-	for _, file := range result.OutputFiles {
-		rel, err := filepath.Rel(outdir, file.Path)
-		if err != nil {
+	// its files: what the bridge's init imports dynamically (platform,
+	// timers, buffer, process) is loaded by every page and goes in the
+	// prelude; the DOMParser of workers stays in chunks of its own
+	static := map[string]bool{}
+	var reach func(input string)
+	reach = func(input string) {
+		if static[input] || strings.HasPrefix(input, "lib:/lib/DOMParser/") {
+			return
+		}
+		static[input] = true
+		for _, imp := range splitMeta.Inputs[input].Imports {
+			if imp.Kind == "import-statement" || imp.Kind == "dynamic-import" {
+				reach(imp.Path)
+			}
+		}
+	}
+	reach("lib:" + libModules["fullstacked"])
+	preludeFiles := []string{}
+	for input := range static {
+		if strings.HasPrefix(input, "lib:") {
+			preludeFiles = append(preludeFiles, strings.TrimPrefix(input, "lib:"))
+		}
+	}
+	sort.Strings(preludeFiles)
+	exportOfFile := map[string]string{}
+	for i, file := range preludeFiles {
+		exportOfFile[file] = "__lib" + itoa(i)
+	}
+
+	// the prelude: the fullstacked module, and a namespace of each of its files
+	preludeOutput := outputOf[libModules["fullstacked"]]
+	preludeURL := transformLibPrefix + preludeOutput + ".js"
+	preludeSource := "export * from \"fullstacked\";\nexport { default } from \"fullstacked\";\n"
+	for _, file := range preludeFiles {
+		preludeSource += "export * as " + exportOfFile[file] + " from " + jsString(libFilePrefix+file) + ";\n"
+	}
+	preludePlugin := esbuild.Plugin{
+		Name: "fullstacked-lib-prelude",
+		Setup: func(b esbuild.PluginBuild) {
+			b.OnResolve(esbuild.OnResolveOptions{Filter: "^" + libPreludeName + "$"}, func(args esbuild.OnResolveArgs) (esbuild.OnResolveResult, error) {
+				return esbuild.OnResolveResult{Path: libPreludeName, Namespace: libPreludeName}, nil
+			})
+			b.OnLoad(esbuild.OnLoadOptions{Filter: ".*", Namespace: libPreludeName}, func(args esbuild.OnLoadArgs) (esbuild.OnLoadResult, error) {
+				return esbuild.OnLoadResult{Contents: &preludeSource, Loader: esbuild.LoaderJS, ResolveDir: "/lib"}, nil
+			})
+			b.OnResolve(esbuild.OnResolveOptions{Filter: "^" + libFilePrefix}, func(args esbuild.OnResolveArgs) (esbuild.OnResolveResult, error) {
+				return esbuild.OnResolveResult{Path: strings.TrimPrefix(args.Path, libFilePrefix), Namespace: "lib"}, nil
+			})
+		},
+	}
+	// one file: the DOMParser of workers is the only import it leaves out
+	domParserURL := transformLibPrefix + "_prelude/DOMParser.js"
+	domParserExternal := esbuild.Plugin{
+		Name: "fullstacked-lib-domparser",
+		Setup: func(b esbuild.PluginBuild) {
+			b.OnResolve(esbuild.OnResolveOptions{Filter: "DOMParser", Namespace: "lib"}, func(args esbuild.OnResolveArgs) (esbuild.OnResolveResult, error) {
+				if args.Kind != esbuild.ResolveJSDynamicImport {
+					return esbuild.OnResolveResult{}, nil
+				}
+				return esbuild.OnResolveResult{Path: domParserURL, External: true}, nil
+			})
+		},
+	}
+	prelude := esbuild.Build(esbuild.BuildOptions{
+		EntryPointsAdvanced: []esbuild.EntryPoint{{InputPath: libPreludeName, OutputPath: preludeOutput}},
+		Bundle:              true,
+		Format:              esbuild.FormatESModule,
+		Write:               false,
+		Outdir:              outdir,
+		Plugins:             append([]esbuild.Plugin{domParserExternal, preludePlugin}, esbuildPluginsLib...),
+		Metafile:            true,
+	})
+	if len(prelude.Errors) > 0 {
+		build.errors = prelude.Errors
+		return build
+	}
+	for _, file := range prelude.OutputFiles {
+		if rel, err := filepath.Rel(outdir, file.Path); err == nil {
+			build.files[transformLibPrefix+filepath.ToSlash(rel)] = file.Contents
+		}
+	}
+	for from, imports := range staticImports(prelude.Metafile, cwd, outdir, transformLibPrefix) {
+		build.imports[from] = append(build.imports[from], imports...)
+	}
+
+	// the modules among the prelude's files: facades over its namespaces
+	inPrelude := map[string]bool{}
+	for _, file := range preludeFiles {
+		inPrelude[file] = true
+	}
+	restEntries := []esbuild.EntryPoint{{InputPath: libFilePrefix + "/lib/DOMParser/index.ts", OutputPath: "_prelude/DOMParser"}}
+	for _, entry := range allEntries {
+		file := libModules[entry.InputPath]
+		if !inPrelude[file] {
+			restEntries = append(restEntries, entry)
 			continue
 		}
-		build.files[transformLibPrefix+filepath.ToSlash(rel)] = file.Contents
+		if file == libModules["fullstacked"] {
+			continue
+		}
+		pagePath := transformLibPrefix + entry.OutputPath + ".js"
+		build.files[pagePath] = libFacade(preludeURL, exportOfFile[file], exportsOf[entry.OutputPath])
+		build.imports[pagePath] = []string{preludeURL}
 	}
+
+	// the other modules, split; the prelude's files are read from it
+	pwd, _ := os.Getwd()
+	preludeProxies := esbuild.Plugin{
+		Name: "fullstacked-lib-from-prelude",
+		Setup: func(b esbuild.PluginBuild) {
+			b.OnResolve(esbuild.OnResolveOptions{Filter: "^" + libFilePrefix}, func(args esbuild.OnResolveArgs) (esbuild.OnResolveResult, error) {
+				return esbuild.OnResolveResult{Path: strings.TrimPrefix(args.Path, libFilePrefix), Namespace: "lib"}, nil
+			})
+			b.OnResolve(esbuild.OnResolveOptions{Filter: ".*"}, func(args esbuild.OnResolveArgs) (esbuild.OnResolveResult, error) {
+				if args.Namespace == proxyCJSNamespace || args.Namespace == proxyESMNamespace {
+					return esbuild.OnResolveResult{}, nil
+				}
+				file, ok := libFileOf(args, pwd)
+				if !ok || !inPrelude[file] {
+					return esbuild.OnResolveResult{}, nil
+				}
+				return proxyResult("lib-file:"+file, proxyTarget{url: preludeURL, export: exportOfFile[file]}), nil
+			})
+			addProxies(b)
+		},
+	}
+	{
+		rest := esbuild.Build(esbuild.BuildOptions{
+			EntryPointsAdvanced: restEntries,
+			Bundle:              true,
+			Splitting:           true,
+			Format:              esbuild.FormatESModule,
+			Write:               false,
+			Outdir:              outdir,
+			ChunkNames:          "_chunks/[name]-[hash]",
+			Plugins:             append([]esbuild.Plugin{preludeProxies}, esbuildPluginsLib...),
+			Metafile:            true,
+		})
+		if len(rest.Errors) > 0 {
+			build.errors = rest.Errors
+			return build
+		}
+		for _, file := range rest.OutputFiles {
+			rel, err := filepath.Rel(outdir, file.Path)
+			if err != nil {
+				continue
+			}
+			build.files[transformLibPrefix+filepath.ToSlash(rel)] = file.Contents
+		}
+		for from, imports := range staticImports(rest.Metafile, cwd, outdir, transformLibPrefix) {
+			build.imports[from] = append(build.imports[from], imports...)
+		}
+	}
+
 	for file, names := range namesByFile {
 		for _, name := range names {
 			build.urls[name] = transformLibPrefix + outputOf[file] + ".js"
 		}
 	}
 	return build
+}
+
+// A lib module of the prelude: its exports, read from the prelude's
+// namespace of its file (the names come from a build of the module).
+func libFacade(preludeURL string, namespace string, exports []string) []byte {
+	out := "import { " + namespace + " as ns } from " + jsString(preludeURL) + ";\n"
+	for i, name := range exports {
+		local := "__e" + itoa(i)
+		out += "const " + local + " = ns[" + jsString(name) + "];\n"
+		if name == "default" {
+			out += "export default " + local + ";\n"
+		} else {
+			out += "export { " + local + " as " + name + " };\n"
+		}
+	}
+	return []byte(out)
 }
 
 // The lib module a specifier names (fs, node:fs, fullstacked/git...), as the
@@ -258,6 +582,8 @@ const (
 type proxyTarget struct {
 	url string
 	lib bool
+	// a namespace the module at url exports (a lib file of the prelude)
+	export string
 }
 
 func addProxies(build esbuild.PluginBuild) {
@@ -271,7 +597,10 @@ func addProxies(build esbuild.PluginBuild) {
 	build.OnLoad(esbuild.OnLoadOptions{Filter: ".*", Namespace: proxyESMNamespace}, func(args esbuild.OnLoadArgs) (esbuild.OnLoadResult, error) {
 		target, _ := args.PluginData.(proxyTarget)
 		contents := ""
-		if target.lib {
+		if target.export != "" {
+			contents = "import { " + target.export + " as ns } from " + jsString(target.url) + ";\n" +
+				namespaceFacade("ns") + "export default target;\n"
+		} else if target.lib {
 			contents = "import * as m from " + jsString(target.url) + ";\n" +
 				"export default m && m[\"module.exports\"] !== undefined ? m[\"module.exports\"] : m;\n"
 		} else {

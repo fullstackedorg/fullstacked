@@ -371,15 +371,18 @@ func buildDeps(root string, specs []string, key string) (*depsBuild, []esbuild.M
 // read its properties, a default import gets its "default" (module.exports
 // for a CommonJS package), a namespace import gets it whole.
 func depFacade(spec string) string {
-	return "import * as ns from " + jsString(spec) + ";\n" +
-		"const target = Object.create(Object.getPrototypeOf(ns));\n" +
-		"for (const key of Object.getOwnPropertyNames(ns)) {\n" +
+	return "import * as ns from " + jsString(spec) + ";\n" + namespaceFacade("ns") + "export default target;\n"
+}
+
+// target: the namespace ns read live, marked __esModule
+func namespaceFacade(ns string) string {
+	return "const target = Object.create(Object.getPrototypeOf(" + ns + "));\n" +
+		"for (const key of Object.getOwnPropertyNames(" + ns + ")) {\n" +
 		"  if (key === \"__esModule\") continue;\n" +
-		"  const desc = Object.getOwnPropertyDescriptor(ns, key);\n" +
-		"  Object.defineProperty(target, key, { get: () => ns[key], enumerable: !desc || desc.enumerable });\n" +
+		"  const desc = Object.getOwnPropertyDescriptor(" + ns + ", key);\n" +
+		"  Object.defineProperty(target, key, { get: () => " + ns + "[key], enumerable: !desc || desc.enumerable });\n" +
 		"}\n" +
-		"Object.defineProperty(target, \"__esModule\", { value: true });\n" +
-		"export default target;\n"
+		"Object.defineProperty(target, \"__esModule\", { value: true });\n"
 }
 
 func readDepsCache(root string, key string) *depsBuild {

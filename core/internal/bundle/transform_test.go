@@ -4,6 +4,7 @@ import (
 	"fullstackedorg/fullstacked/types"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -65,6 +66,8 @@ func prepareOK(t *testing.T, root string) {
 	}
 }
 
+var bridgeInit = regexp.MustCompile(`await shared\w*\("init", init\w*\)`)
+
 func TestTransformLibBuild(t *testing.T) {
 	lib := transformLib()
 	if len(lib.errors) > 0 {
@@ -83,7 +86,7 @@ func TestTransformLibBuild(t *testing.T) {
 	// lib module imports it from there
 	defining := 0
 	for _, contents := range lib.files {
-		if strings.Contains(string(contents), `await shared("init", init)`) {
+		if bridgeInit.Match(contents) {
 			defining++
 		}
 	}
