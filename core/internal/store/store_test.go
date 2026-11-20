@@ -113,3 +113,34 @@ func TestStreamIdsExhausted(t *testing.T) {
 		t.Fatalf("freed id: %v %v", payload, err)
 	}
 }
+
+// a context opened in safe mode has SAFE=1 in its environment, also after a
+// run sets its own; a normal context has no SAFE
+func TestSafeModeEnv(t *testing.T) {
+	root := t.TempDir()
+
+	safe := NewContext(root, root, true)
+	defer EndContext(safe)
+	ctx, _ := GetContext(safe)
+	if ctx.Env[SafeEnv] != "1" {
+		t.Fatalf("safe context: SAFE = %q, want 1", ctx.Env[SafeEnv])
+	}
+
+	SetEnvironmentData(safe, map[string]string{"FOO": "bar"})
+	ctx, _ = GetContext(safe)
+	if ctx.Env[SafeEnv] != "1" || ctx.Env["FOO"] != "bar" {
+		t.Fatalf("safe context after SetEnvironmentData: %v", ctx.Env)
+	}
+
+	normal := NewContext(root, root, false)
+	defer EndContext(normal)
+	ctx, _ = GetContext(normal)
+	if _, ok := ctx.Env[SafeEnv]; ok {
+		t.Fatalf("normal context has SAFE: %v", ctx.Env)
+	}
+	SetEnvironmentData(normal, map[string]string{"FOO": "bar"})
+	ctx, _ = GetContext(normal)
+	if _, ok := ctx.Env[SafeEnv]; ok {
+		t.Fatalf("normal context after SetEnvironmentData has SAFE: %v", ctx.Env)
+	}
+}

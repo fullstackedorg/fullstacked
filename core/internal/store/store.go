@@ -26,6 +26,10 @@ var nextCtxId uint8 = 0
 var Contexts = map[uint8]*types.Context{}
 var ctxMutex = sync.Mutex{}
 
+// SafeEnv is set to "1" in the environment of a context opened in safe mode
+// (startSafe, or run with safe): process.env.SAFE in its pages
+const SafeEnv = "SAFE"
+
 func NewContext(root string, build string, safe bool) uint8 {
 	ctxMutex.Lock()
 
@@ -88,6 +92,12 @@ func NewContextWithCtxId(
 		PluginsMutex:          &sync.Mutex{},
 
 		FirstPaint: &types.FirstPaint{},
+	}
+
+	// a page knows it runs in safe mode from process.env.SAFE: the shell
+	// then opens its terminal and skips its startup plugins
+	if safe {
+		ctx.Env = map[string]string{SafeEnv: "1"}
 	}
 
 	ctxMutex.Lock()
@@ -192,6 +202,15 @@ func SetEnvironmentData(ctxId uint8, data map[string]string) {
 		return
 	}
 
+	// a context opened in safe mode stays in safe mode
+	if ctx.Env[SafeEnv] != "" {
+		merged := map[string]string{}
+		for k, v := range data {
+			merged[k] = v
+		}
+		merged[SafeEnv] = ctx.Env[SafeEnv]
+		data = merged
+	}
 	ctx.Env = data
 }
 

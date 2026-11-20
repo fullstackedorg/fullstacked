@@ -26,7 +26,7 @@ npm install -g fullstacked
 
 ### Safe mode
 
-If a project takes over the app and you can't get back to the shell, restart in _safe mode_. It closes the open projects and reopens the shell, ignoring the [`initialDirectory`](api/config.md#initialdirectory) setting.
+If a project takes over the app and you can't get back to the shell, restart in _safe mode_. It closes the open projects and reopens the shell on its terminal, ignoring the [`initialDirectory`](api/config.md#initialdirectory) setting and any startup screen (the onboarding, or a store build's own views). A context opened in safe mode has `process.env.SAFE` set to `"1"`.
 
 | Platform          | Keyboard                                        | Touch                                     |
 | ----------------- | ----------------------------------------------- | ----------------------------------------- |
