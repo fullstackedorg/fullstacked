@@ -178,8 +178,16 @@ console.log(b, fn, a, esm, named, sub, browser, x, fs, join, data, logo);
 		t.Errorf("events is not imported from the lib")
 	}
 
-	if css := serve(t, root, "/@import/style.css"); !strings.Contains(css, `link.href = "/@css/style.css"`) {
+	// the stylesheets a module imports are the page's style.css, linked in
+	// its head as a bundle's index.css: the module is only their URL
+	if css := serve(t, root, "/@import/style.css"); css != "export default \"/style.css\";\n" {
 		t.Errorf("css module: %s", css)
+	}
+	if !strings.Contains(html, `<link rel="stylesheet" href="`+TransformStylePath+`"/>`) {
+		t.Errorf("style.css is not linked: %s", html)
+	}
+	if style := serve(t, root, TransformStylePath); !strings.Contains(style, "color: blue") {
+		t.Errorf("style.css: %s", style)
 	}
 	if css := serve(t, root, "/@css/style.css"); !strings.Contains(css, "color: blue") {
 		t.Errorf("css: %s", css)

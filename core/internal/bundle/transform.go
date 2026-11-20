@@ -40,6 +40,9 @@ import (
 // the module the generated page loads: the lib's prelude, then the entry
 const TransformEntryPath = "/@fullstacked/entry.js"
 
+// the project's stylesheets, bundled in import order: a bundle's index.css
+const TransformStylePath = "/@fullstacked/style.css"
+
 // a worker of a page in transform mode (worker_threads): the lib's
 // prelude, then the worker's module, /@fullstacked/worker/<path>
 const TransformWorkerPrefix = "/@fullstacked/worker/"
@@ -84,6 +87,10 @@ type transformState struct {
 
 	// the modules the page will load, preloaded by its HTML
 	preloads []string
+
+	// the project's stylesheets (scanResult.style), linked by the page
+	style      []byte
+	cssSources map[string]bool
 
 	modulesMu sync.Mutex
 	modules   map[string]*transformedModule
@@ -215,6 +222,8 @@ func (state *transformState) prepare(pluginCtx *types.Context, entry string) Esb
 		return state.result
 	}
 	state.sources = scan.sources
+	state.style = scan.style
+	state.cssSources = scan.cssSources
 
 	deps, depsErrors := ensureDeps(state.root, scan.specs, state.deps)
 	if len(depsErrors) > 0 {
@@ -333,6 +342,11 @@ func ServeTransform(ctx *types.Context, pathname string) (mimeType string, conte
 		return "text/html", state.html(), true
 	case TransformEntryPath:
 		return "text/javascript", state.entryModule(), true
+	case TransformStylePath:
+		state.mu.Lock()
+		style := state.style
+		state.mu.Unlock()
+		return "text/css", append([]byte{}, style...), true
 	}
 
 	if strings.HasPrefix(pathname, TransformWorkerPrefix) {
@@ -383,6 +397,14 @@ func ServeTransform(ctx *types.Context, pathname string) (mimeType string, conte
 		file, ok := insideRoot(root, strings.TrimPrefix(pathname, transformImportPrefix))
 		if !ok || !fs.ExistsFn(file) {
 			return "", nil, false
+		}
+		// a stylesheet the scan bundled is already in the page's style.css
+		state.mu.Lock()
+		pageURL, _ := urlOf(root, file)
+		inStyle := state.cssSources[pageURL]
+		state.mu.Unlock()
+		if inStyle {
+			return "text/javascript", []byte("export default " + jsString(pageURL) + ";\n"), true
 		}
 		return "text/javascript", importedFileModule(root, file), true
 	}
@@ -492,6 +514,7 @@ func (state *transformState) html() []byte {
 	deps := state.deps
 	pluginAssets := state.pluginAssets
 	preloads := state.preloads
+	style := state.style
 	state.mu.Unlock()
 
 	if len(result.Errors) > 0 {
@@ -501,6 +524,9 @@ func (state *transformState) html() []byte {
 	assets := []string{}
 	if deps != nil {
 		assets = append(assets, deps.css...)
+	}
+	if len(style) > 0 {
+		assets = append(assets, TransformStylePath)
 	}
 	assets = append(assets, TransformEntryPath)
 

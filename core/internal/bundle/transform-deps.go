@@ -32,6 +32,11 @@ type scanResult struct {
 
 	plugins       map[*types.ContextPlugin]*PluginParams
 	pluginFilters []pluginFilter
+
+	// the project's stylesheets, bundled in import order as a bundle's
+	// index.css (/@fullstacked/style.css), and the CSS files in it
+	style      []byte
+	cssSources map[string]bool
 }
 
 func (state *transformState) scan(pluginCtx *types.Context) scanResult {
@@ -47,7 +52,8 @@ func (state *transformState) scan(pluginCtx *types.Context) scanResult {
 		Loader:        transformLoaders(),
 	}
 
-	// the build plugins resolve first, as in a bundle
+	// the build plugins resolve first, as in a bundle; scanning again
+	// without them (they are gone), their imports stay empty
 	if pluginCtx != nil {
 		plugins, err := addContextBuildPluginsToBuildOptions(pluginCtx, &options)
 		if err != nil {
@@ -56,6 +62,8 @@ func (state *transformState) scan(pluginCtx *types.Context) scanResult {
 		}
 		result.plugins = plugins
 		result.pluginFilters = pluginFiltersOf(pluginCtx)
+	} else {
+		options.Plugins = append(options.Plugins, buildPluginFilters(state.pluginFilters)...)
 	}
 
 	mu := sync.Mutex{}
@@ -72,6 +80,11 @@ func (state *transformState) scan(pluginCtx *types.Context) scanResult {
 				imp, errs := classifyImport(build, args, state.root)
 				if len(errs) > 0 {
 					return esbuild.OnResolveResult{Errors: errs}, nil
+				}
+				// a url() of a stylesheet: the file's page path
+				if args.Kind == esbuild.ResolveCSSURLToken && (imp.kind == importFile || imp.kind == importModule) {
+					pageURL, _ := urlOf(state.root, imp.result.Path)
+					return esbuild.OnResolveResult{Path: pageURL, External: true}, nil
 				}
 				switch imp.kind {
 				case importDep:
@@ -105,9 +118,20 @@ func (state *transformState) scan(pluginCtx *types.Context) scanResult {
 	built := esbuild.Build(options)
 	result.errors = built.Errors
 	result.warnings = built.Warnings
+	for _, output := range built.OutputFiles {
+		if strings.HasSuffix(output.Path, ".css") {
+			result.style = output.Contents
+		}
+	}
+	result.cssSources = map[string]bool{}
 
 	sort.Strings(sources)
 	for _, source := range sources {
+		if path.Ext(source) == ".css" {
+			if pageURL, ok := urlOf(state.root, source); ok {
+				result.cssSources[pageURL] = true
+			}
+		}
 		if stamp, ok := stampOf(source); ok {
 			result.sources[source] = stamp
 		}
