@@ -13,6 +13,7 @@ import { launchBrowser } from "../../browser.ts";
 import {
     FIXTURES,
     RENDER_PROBE,
+    failedChecks,
     pluginsOf,
     type Fixture
 } from "../../../shell/cli/bench/cold-start-fixtures.ts";
@@ -55,9 +56,19 @@ function setUp(fixture: Fixture) {
             }
         }
         const entry = path.join(fixtureDir, fixture.entry);
-        fs.writeFileSync(entry, fs.readFileSync(entry, "utf-8") + RENDER_PROBE);
+        // the modules fixture writes its own probe, with its checks
+        if (fixture.name !== "modules") {
+            fs.writeFileSync(
+                entry,
+                fs.readFileSync(entry, "utf-8") + RENDER_PROBE
+            );
+        }
     }
-    if (!fs.existsSync(path.join(fixtureDir, "node_modules"))) {
+    const packageJson = JSON.parse(
+        fs.readFileSync(path.join(fixtureDir, "package.json"), "utf-8")
+    );
+    const hasPackages = Object.keys(packageJson.dependencies ?? {}).length > 0;
+    if (hasPackages && !fs.existsSync(path.join(fixtureDir, "node_modules"))) {
         execSync("npm install --no-audit --no-fund", {
             cwd: fixtureDir,
             stdio: "ignore"
@@ -118,6 +129,16 @@ async function measure(
         await page.goto(`http://localhost:${port}/`);
         await page.waitForSelector(fixture.selector, { timeout: 60000 });
         const render = performance.now();
+        const checks = await page.evaluate(() => {
+            const el = document.querySelector("#app");
+            try {
+                return JSON.parse(el?.textContent ?? "");
+            } catch {
+                return undefined;
+            }
+        });
+        const failed = failedChecks(checks);
+        if (failed.length) throw new Error(failed.join(", "));
         const requests = await page.evaluate(
             () => performance.getEntriesByType("resource").length
         );
@@ -178,7 +199,9 @@ const results: Result[] = [];
 for (const name of fixtures) {
     const fixture = FIXTURES.find((f) => f.name === name);
     const fixtureDir = setUp(fixture);
-    for (const mode of modes) {
+    for (const mode of modes.filter(
+        (m) => !fixture.modes || fixture.modes.includes(m as any)
+    )) {
         for (let i = 0; i <= warmRuns; i++) {
             const r = await measure(
                 fixture,
