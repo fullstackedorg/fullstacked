@@ -48,6 +48,14 @@ type FullStacked = {
     // -1 once it ended (see bridge/duplex)
     keepAlive?: (delta: 1 | -1) => void;
 
+    // Node: import() loads the bundles the core keeps in memory
+    // (fullstacked --file), see platform/node/src/index.ts
+    memoryImports?: boolean;
+
+    // the page runs in transform mode (run({ mode: "transform" })): its
+    // modules are served from its sources, see worker_threads
+    transform?: boolean;
+
     clipboard: {
         copy?: (text: string) => void;
         paste?: () => string | Promise<string>;

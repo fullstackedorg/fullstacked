@@ -8,6 +8,7 @@ import (
 	"fullstackedorg/fullstacked/internal/plugin"
 	"fullstackedorg/fullstacked/types"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -83,6 +84,11 @@ func (state *transformState) scan(pluginCtx *types.Context) scanResult {
 				case importModule:
 					return esbuild.OnResolveResult{Path: imp.result.Path}, nil
 				case importFile:
+					// CSS is read: the build plugins see what it imports
+					// (@import "tailwindcss"), as in a bundle
+					if path.Ext(imp.result.Path) == ".css" {
+						return esbuild.OnResolveResult{Path: imp.result.Path}, nil
+					}
 					return esbuild.OnResolveResult{Path: imp.value, External: true}, nil
 				}
 				return imp.result, nil

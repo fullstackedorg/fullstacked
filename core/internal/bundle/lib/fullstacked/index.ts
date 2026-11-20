@@ -145,7 +145,7 @@ function getPositionalArgs(args: string[]): string[] {
     const positionals: string[] = [];
     const valueFlags = [
         ["-e", "--env"],
-        ["-p", "--port"],
+        ["--port"],
         ["-p", "--plugin"],
         ["-f", "--file"],
         ["-l", "--deeplink"]
@@ -300,7 +300,13 @@ async function bundleAndImportFile(
     const targetFilePath = await resolveFile(file, startDir, writeErr);
     if (!targetFilePath) return null;
 
-    const result = await bundleFile(targetFilePath);
+    // in memory unless the host can't import it from there (Node without
+    // module.registerHooks, see platform/node/src/index.ts): nothing is
+    // written next to the script
+    const inMemory =
+        typeof document !== "undefined" ||
+        !!globalThis.fullstacked?.memoryImports;
+    const result = await bundleFile(targetFilePath, { inMemory });
     if (result.Errors?.length > 0) {
         result.Errors.forEach((e: any) => writeErr(formatMessage(e, false)));
         return null;
@@ -327,7 +333,9 @@ async function bundleAndImportFile(
                 ? absoluteOutputFile.slice(2)
                 : absoluteOutputFile;
     }
-    const cleanup = () => fs.promises.rm(outputFile);
+    const cleanup = inMemory
+        ? async () => {}
+        : () => fs.promises.rm(outputFile);
 
     const searchParams = new URLSearchParams();
     searchParams.set("t", Date.now().toString());

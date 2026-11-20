@@ -1,6 +1,7 @@
 package router
 
 import (
+	"fullstackedorg/fullstacked/internal/bundle"
 	"fullstackedorg/fullstacked/internal/fs"
 	"fullstackedorg/fullstacked/internal/serialization"
 	"fullstackedorg/fullstacked/types"
@@ -60,6 +61,13 @@ func resolveStaticFile(ctx *types.Context, pathname string) (string, []byte, boo
 	if ctx.Transform {
 		// out/ is a bundle's: in transform mode it may be stale
 		dirs = []string{ctx.Directories.Root}
+	}
+
+	// a script bundled in memory (fullstacked --file), next to its file
+	if file, inside := joinInside(ctx.Directories.Root, pathname); inside {
+		if contents, ok := bundle.TakeMemoryFile(file); ok {
+			return "text/javascript", contents, true
+		}
 	}
 
 	for _, dir := range dirs {

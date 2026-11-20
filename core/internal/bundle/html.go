@@ -79,10 +79,26 @@ func newDoc() (DocumentHTML, error) {
 }
 
 func generateIndexHTML(files []string) ([]byte, error) {
-	doc, err := newDoc()
+	doc, err := htmlWithAssets(files)
+	if err != nil {
+		return nil, err
+	}
+
+	HTML := bytes.Buffer{}
+	err = html.Render(&HTML, doc.root)
 
 	if err != nil {
 		return nil, err
+	}
+
+	return HTML.Bytes(), nil
+}
+
+func htmlWithAssets(files []string) (DocumentHTML, error) {
+	doc, err := newDoc()
+
+	if err != nil {
+		return doc, err
 	}
 
 	for _, file := range files {
@@ -96,12 +112,5 @@ func generateIndexHTML(files []string) ([]byte, error) {
 		}
 	}
 
-	HTML := bytes.Buffer{}
-	err = html.Render(&HTML, doc.root)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return HTML.Bytes(), nil
+	return doc, nil
 }

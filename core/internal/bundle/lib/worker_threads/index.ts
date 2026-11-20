@@ -47,6 +47,21 @@ if (isWorker) {
     parentPort = new ParentPortWrapper();
 }
 
+// In transform mode a worker's module is a module of the project, served
+// transformed: the core wraps it so the lib's prelude runs first, as a
+// bundle's would (see core/internal/bundle/transform.go)
+const transformModule = /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;
+function transformWorkerURL(path: string | URL) {
+    if (!globalThis.fullstacked?.transform || typeof location === "undefined") {
+        return path;
+    }
+    const url = new URL(path, location.href);
+    if (url.origin !== location.origin || !transformModule.test(url.pathname)) {
+        return path;
+    }
+    return "/@fullstacked/worker" + url.pathname + url.search;
+}
+
 export class Worker extends events.EventEmitter {
     w: globalThis.Worker = null;
     // the key base of this worker's relayed sync calls, 0 when the host
@@ -61,7 +76,7 @@ export class Worker extends events.EventEmitter {
         if (globalThis.fullstacked.platformBridge?.bridge?.RelaySync) {
             this.syncKeyBase = workerSyncKeys.next();
         }
-        this.w = new globalThis.Worker(path, {
+        this.w = new globalThis.Worker(transformWorkerURL(path), {
             type: "module",
             name: this.syncKeyBase
                 ? `fullstacked-sync:${this.syncKeyBase}`

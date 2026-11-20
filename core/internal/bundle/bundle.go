@@ -133,7 +133,16 @@ func Switch(
 			entryPoint = fspath.ResolveWithContext(ctx, data[0].Data.(string))
 		}
 
-		result := BundleFileFn(ctx, entryPoint)
+		// in memory: served once at a path next to the file, nothing written
+		// (fullstacked --file, see memory-file.go)
+		inMemory := len(data) >= 2 && data[1].Type == types.BOOLEAN && data[1].Data.(bool)
+
+		var result EsbuildResult
+		if inMemory {
+			result = BundleFileInMemoryFn(ctx, entryPoint)
+		} else {
+			result = BundleFileFn(ctx, entryPoint)
+		}
 		response.Type = types.CoreResponseData
 		response.Data = result
 		return nil

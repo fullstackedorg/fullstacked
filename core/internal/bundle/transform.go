@@ -18,6 +18,7 @@ package bundle
 
 import (
 	"errors"
+	"fmt"
 	"fullstackedorg/fullstacked/internal/fs"
 	"fullstackedorg/fullstacked/internal/plugin"
 	"fullstackedorg/fullstacked/internal/store"
@@ -39,11 +40,16 @@ import (
 // the module the generated page loads: the lib's prelude, then the entry
 const TransformEntryPath = "/@fullstacked/entry.js"
 
+// a worker of a page in transform mode (worker_threads): the lib's
+// prelude, then the worker's module, /@fullstacked/worker/<path>
+const TransformWorkerPrefix = "/@fullstacked/worker/"
+
 const (
 	transformLibPrefix    = "/@lib/"
 	transformDepsPrefix   = "/@deps/"
 	transformPluginPrefix = "/@plugin/"
 	transformImportPrefix = "/@import/"
+	transformCSSPrefix    = "/@css/"
 )
 
 // the extensions of the files served as modules
@@ -95,7 +101,19 @@ var (
 	transformStates   = map[string]*transformState{}
 )
 
+// The real path of a project directory: esbuild resolves imports to real
+// paths (/tmp is /private/tmp on macOS), the containment checks compare
+// them with it.
+func canonicalRoot(root string) string {
+	real, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return filepath.Clean(root)
+	}
+	return real
+}
+
 func transformStateFor(root string) *transformState {
+	root = canonicalRoot(root)
 	transformStatesMu.Lock()
 	defer transformStatesMu.Unlock()
 	state, ok := transformStates[root]
@@ -133,9 +151,11 @@ func TransformRoot(entryPoint string) (root string, entry string, err error) {
 		if err != nil {
 			return "", "", err
 		}
-		return filepath.Clean(entryPoint), entry, nil
+		root := canonicalRoot(entryPoint)
+		return root, filepath.Join(root, filepath.Base(entry)), nil
 	}
-	return filepath.Dir(entryPoint), entryPoint, nil
+	root = canonicalRoot(filepath.Dir(entryPoint))
+	return root, filepath.Join(root, filepath.Base(entryPoint)), nil
 }
 
 // PrepareTransformFn scans the project of entryPoint, builds its
@@ -158,18 +178,32 @@ func PrepareTransformFn(ctx *types.Context, entryPoint string) EsbuildResult {
 	return state.prepare(pluginCtx, entry)
 }
 
+// FULLSTACKED_TRANSFORM_TRACE=1 prints how long each step of a prepare took
+var transformTrace = os.Getenv("FULLSTACKED_TRANSFORM_TRACE") != ""
+
+func traceStep(name string, start time.Time) time.Time {
+	now := time.Now()
+	if transformTrace {
+		fmt.Fprintf(os.Stderr, "[transform] %s %.1fms\n", name, float64(now.Sub(start).Microseconds())/1000)
+	}
+	return now
+}
+
 // state.mu is held
 func (state *transformState) prepare(pluginCtx *types.Context, entry string) EsbuildResult {
 	state.entry = entry
 	state.prepared = true
 
+	step := time.Now()
 	lib := transformLib()
+	step = traceStep("lib", step)
 	if len(lib.errors) > 0 {
 		state.result = EsbuildResult{Errors: lib.errors}
 		return state.result
 	}
 
 	scan := state.scan(pluginCtx)
+	step = traceStep("scan", step)
 	state.result = EsbuildResult{Errors: scan.errors, Warnings: scan.warnings, OutputFiles: []string{}}
 	if len(scan.errors) > 0 {
 		return state.result
@@ -182,6 +216,7 @@ func (state *transformState) prepare(pluginCtx *types.Context, entry string) Esb
 		return state.result
 	}
 	state.deps = deps
+	step = traceStep("deps", step)
 
 	if pluginCtx != nil {
 		state.pluginCtx = pluginCtx.Id
@@ -195,7 +230,9 @@ func (state *transformState) prepare(pluginCtx *types.Context, entry string) Esb
 		state.pluginAssets = assets
 	}
 
+	step = traceStep("plugins", step)
 	state.transformAll()
+	traceStep("modules", step)
 	return state.result
 }
 
@@ -271,8 +308,8 @@ func (state *transformState) transformAll() {
 // the path is not one of transform mode's: the router serves it as a static
 // file of the project.
 func ServeTransform(ctx *types.Context, pathname string) (mimeType string, contents []byte, handled bool) {
-	root := ctx.Directories.Root
-	state := transformStateFor(root)
+	state := transformStateFor(ctx.Directories.Root)
+	root := state.root
 
 	switch pathname {
 	case "/", "/index.html":
@@ -289,6 +326,16 @@ func ServeTransform(ctx *types.Context, pathname string) (mimeType string, conte
 		return "text/html", state.html(), true
 	case TransformEntryPath:
 		return "text/javascript", state.entryModule(), true
+	}
+
+	if strings.HasPrefix(pathname, TransformWorkerPrefix) {
+		modulePath := "/" + strings.TrimPrefix(pathname, TransformWorkerPrefix)
+		file, ok := insideRoot(root, modulePath)
+		if !ok || !fs.ExistsFn(file) {
+			return "", nil, false
+		}
+		moduleURL, _ := urlOf(root, file)
+		return "text/javascript", preludeModule(moduleURL), true
 	}
 
 	if strings.HasPrefix(pathname, transformLibPrefix) {
@@ -312,6 +359,17 @@ func ServeTransform(ctx *types.Context, pathname string) (mimeType string, conte
 		contents, ok := state.pluginOutputs[pathname]
 		state.mu.Unlock()
 		return mimeOf(pathname), contents, ok
+	}
+
+	if strings.HasPrefix(pathname, transformCSSPrefix) {
+		file, ok := insideRoot(root, strings.TrimPrefix(pathname, transformCSSPrefix))
+		if !ok || !fs.ExistsFn(file) {
+			return "", nil, false
+		}
+		state.mu.Lock()
+		filters := state.pluginFilters
+		state.mu.Unlock()
+		return "text/css", cssBundle(root, file, filters), true
 	}
 
 	if strings.HasPrefix(pathname, transformImportPrefix) {
@@ -383,9 +441,17 @@ func urlOf(root string, file string) (string, bool) {
 // import would run before it finished. A module runs once its imports did,
 // so the project's entry is imported from the body.
 func (state *transformState) entryModule() []byte {
-	lib := transformLib()
 	entryURL, _ := urlOf(state.root, state.entry)
-	return []byte("import " + jsString(lib.urls["fullstacked"]) + ";\nawait import(" + jsString(entryURL) + ");\n")
+	return preludeModule(entryURL)
+}
+
+// globalThis.fullstacked.transform tells the lib the page runs in transform
+// mode (worker_threads then wraps its workers' modules the same way)
+func preludeModule(moduleURL string) []byte {
+	lib := transformLib()
+	return []byte("import " + jsString(lib.urls["fullstacked"]) + ";\n" +
+		"globalThis.fullstacked.transform = true;\n" +
+		"await import(" + jsString(moduleURL) + ");\n")
 }
 
 func (state *transformState) html() []byte {
@@ -404,10 +470,22 @@ func (state *transformState) html() []byte {
 		assets = append(assets, deps.css...)
 	}
 	assets = append(assets, TransformEntryPath)
-	assets = append(assets, pluginAssets...)
 
-	html, _ := generateIndexHTML(assets)
-	return html
+	doc, err := htmlWithAssets(assets)
+	if err != nil {
+		return nil
+	}
+	// the plugins' outputs come after the project's stylesheets, as in a
+	// bundle's index.html: a stylesheet a module imports goes before them
+	for _, asset := range pluginAssets {
+		switch path.Ext(asset) {
+		case ".css":
+			doc.addInHead(`<link rel="stylesheet" href="` + asset + `" data-fullstacked-plugin="" />`)
+		case ".js":
+			doc.addInBody(`<script src="` + asset + `" type="module"></script>`)
+		}
+	}
+	return renderDoc(doc)
 }
 
 // what a page shows when the project could not be prepared

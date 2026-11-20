@@ -321,16 +321,22 @@ assert.strictEqual(process.env.TEST_CLI_ONLY, "from_cli");`
             if (createdCtx !== null) {
                 const oldCtx = globalThis.fullstacked.platformBridge.bridge.ctx;
                 globalThis.fullstacked.platformBridge.bridge.ctx = createdCtx;
-                const envInCtx = globalThis.fullstacked.bridge(
-                    { mod: 0, fn: 4 },
-                    true
-                );
+                let envInCtx: Record<string, string>;
+                try {
+                    envInCtx = globalThis.fullstacked.bridge(
+                        { mod: 0, fn: 4 },
+                        true
+                    );
+                } finally {
+                    globalThis.fullstacked.platformBridge.bridge.ctx = oldCtx;
+                }
+                // -s: safe mode reaches the page as process.env.SAFE
                 assert.deepStrictEqual(envInCtx, {
                     CLI_ONLY: "from_cli_only",
                     DIR_VAR: "dir_val",
-                    OVERRIDE_VAR: "from_cli"
+                    OVERRIDE_VAR: "from_cli",
+                    SAFE: "1"
                 });
-                globalThis.fullstacked.platformBridge.bridge.ctx = oldCtx;
             }
         } finally {
             globalThis.fullstacked.bridge = origBridge;

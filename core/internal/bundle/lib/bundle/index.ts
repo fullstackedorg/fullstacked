@@ -65,13 +65,24 @@ export function prepare(entryPoint?: string): Promise<EsbuildResult> {
     });
 }
 
-export function bundleFile(entryPoint: string): Promise<EsbuildResult> {
+export type BundleFileOptions = {
+    /**
+     * Nothing is written: the bundle is served once at the path in
+     * `OutputFiles` (next to the file), for `import()` (`fullstacked --file`).
+     */
+    inMemory?: boolean;
+};
+
+export function bundleFile(
+    entryPoint: string,
+    opts?: BundleFileOptions
+): Promise<EsbuildResult> {
     const resolved = path.resolve(entryPoint);
 
     return globalThis.fullstacked.bridge({
         mod: Bundle,
         fn: BundleFile,
-        data: [resolved]
+        data: opts?.inMemory ? [resolved, true] : [resolved]
     });
 }
 

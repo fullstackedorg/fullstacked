@@ -1,4 +1,7 @@
 import "../../../core/internal/bundle/lib/fullstacked/index.ts";
+import module from "node:module";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { load } from "./core.ts";
 import {
     type CreateWebViewOpts,
@@ -70,6 +73,52 @@ export function staticFileResolve(ctx: number, pathname: string) {
 }
 
 globalThis.fullstacked.open = createWebView;
+
+// fullstacked --file: the core bundles the script in memory and serves it
+// once at <file>.fullstacked-<id>.js, next to it (see
+// core/internal/bundle/memory-file.go). Node imports it from there through
+// these hooks (Node 22.15 and later); without them the bundle is written.
+const memoryBundle = /\.fullstacked-[0-9a-f]{16}\.js$/;
+if (typeof module.registerHooks === "function") {
+    module.registerHooks({
+        resolve(specifier, context, nextResolve) {
+            const url = new URL(
+                specifier,
+                context.parentURL ?? pathToFileURL(process.cwd() + "/")
+            );
+            if (url.protocol === "file:" && memoryBundle.test(url.pathname)) {
+                return { url: url.href, format: "module", shortCircuit: true };
+            }
+            return nextResolve(specifier, context);
+        },
+        load(url, context, nextLoad) {
+            const parsed = new URL(url);
+            if (
+                parsed.protocol !== "file:" ||
+                !memoryBundle.test(parsed.pathname)
+            ) {
+                return nextLoad(url, context);
+            }
+            const relative = path
+                .relative(process.cwd(), fileURLToPath(parsed))
+                .split(path.sep)
+                .join("/");
+            const [status, , data] = core.request(
+                globalThis.bridge.ctxId,
+                "/" + relative
+            );
+            if (status !== 200) {
+                throw new Error(`Cannot find the bundle of ${url}`);
+            }
+            return {
+                format: "module",
+                source: new TextDecoder().decode(data),
+                shortCircuit: true
+            };
+        }
+    });
+    globalThis.fullstacked.memoryImports = true;
+}
 
 // the dev server (fullstacked [directory]) runs until stopped, whether a
 // page is open or not

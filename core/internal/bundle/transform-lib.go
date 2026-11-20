@@ -269,11 +269,15 @@ func importedFileModule(root string, file string) []byte {
 	pageURL, _ := urlOf(root, file)
 	switch path.Ext(file) {
 	case ".css":
+		// the stylesheet bundled (/@css/), before the plugins' outputs
+		cssURL := transformCSSPrefix + strings.TrimPrefix(pageURL, "/")
 		return []byte("const link = document.createElement(\"link\");\n" +
 			"link.rel = \"stylesheet\";\n" +
-			"link.href = " + jsString(pageURL) + ";\n" +
-			"document.head.append(link);\n" +
-			"export default " + jsString(pageURL) + ";\n")
+			"link.href = " + jsString(cssURL) + ";\n" +
+			"if (typeof document !== \"undefined\") {\n" +
+			"  document.head.insertBefore(link, document.head.querySelector(\"link[data-fullstacked-plugin]\"));\n" +
+			"}\n" +
+			"export default " + jsString(cssURL) + ";\n")
 	case ".json":
 		contents, err := fs.ReadFileFn(file)
 		if err != nil || !json.Valid(contents) {

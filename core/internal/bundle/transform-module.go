@@ -251,3 +251,59 @@ if (typeof document !== "undefined") {
 }
 throw new Error(errors[0] ? errors[0].text : "Transform failed");
 `
+
+// A stylesheet of the project, bundled: its @imports inline, the imports a
+// build plugin takes empty (the plugin's output is linked in the page), and
+// its url()s left to the page, at the files' page paths.
+func cssBundle(root string, file string, filters []pluginFilter) []byte {
+	options := esbuild.BuildOptions{
+		EntryPoints:   []string{file},
+		Bundle:        true,
+		Write:         false,
+		AbsWorkingDir: root,
+		Outdir:        filepath.Join(root, "out"),
+		Plugins:       buildPluginFilters(filters),
+	}
+	options.Plugins = append(options.Plugins, esbuild.Plugin{
+		Name: "fullstacked-css",
+		Setup: func(build esbuild.PluginBuild) {
+			build.OnResolve(esbuild.OnResolveOptions{Filter: ".*"}, func(args esbuild.OnResolveArgs) (esbuild.OnResolveResult, error) {
+				if args.Kind != esbuild.ResolveCSSURLToken || isGuarded(args) || args.Namespace != "file" {
+					return esbuild.OnResolveResult{}, nil
+				}
+				if strings.HasPrefix(args.Path, "data:") || strings.HasPrefix(args.Path, "#") || strings.Contains(args.Path, "://") {
+					return esbuild.OnResolveResult{Path: args.Path, External: true}, nil
+				}
+				resolved := build.Resolve(args.Path, esbuild.ResolveOptions{
+					Importer:   args.Importer,
+					ResolveDir: args.ResolveDir,
+					Kind:       args.Kind,
+					PluginData: guard,
+				})
+				if len(resolved.Errors) > 0 {
+					return esbuild.OnResolveResult{Errors: resolved.Errors}, nil
+				}
+				pageURL, inside := urlOf(root, resolved.Path)
+				if !inside {
+					return esbuild.OnResolveResult{Errors: []esbuild.Message{{Text: "Could not resolve \"" + args.Path + "\": it is outside of the project"}}}, nil
+				}
+				return esbuild.OnResolveResult{Path: pageURL, External: true}, nil
+			})
+		},
+	})
+
+	result := esbuild.Build(options)
+	if len(result.Errors) > 0 {
+		text := ""
+		for _, msg := range result.Errors {
+			text += formatMessage(msg) + "\n"
+		}
+		return []byte("/* " + strings.ReplaceAll(text, "*/", "* /") + " */\n")
+	}
+	for _, output := range result.OutputFiles {
+		if strings.HasSuffix(output.Path, ".css") {
+			return output.Contents
+		}
+	}
+	return []byte{}
+}

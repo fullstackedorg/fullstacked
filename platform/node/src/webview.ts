@@ -5,7 +5,8 @@ import type { Core } from "./core.ts";
 import { createBridge } from "./bridge.ts";
 
 const args = process.argv;
-const portIndex = args.findIndex((arg) => arg === "-p" || arg === "--port");
+// --port has no shorthand: -p is --plugin
+const portIndex = args.findIndex((arg) => arg === "--port");
 let mainPort = 9000;
 if (portIndex !== -1 && args[portIndex + 1]) {
     mainPort = parseInt(args[portIndex + 1]);
