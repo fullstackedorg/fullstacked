@@ -37,6 +37,146 @@ type scanResult struct {
 	// index.css (/@fullstacked/style.css), and the CSS files in it
 	style      []byte
 	cssSources map[string]bool
+
+	// what the project imports from each dependency
+	usage depUsage
+}
+
+// The names a project imports from each dependency: its facade imports
+// only these, so esbuild tree-shakes the package as in a bundle. "*": the
+// whole package (a namespace import, import(), export *, require()).
+type depUsage map[string][]string
+
+const allExports = "*"
+
+var (
+	externalImportOrExport = regexp.MustCompile(`(?s)(?:^|\n)\s*(import|export)\s+([^;"]*?)\s+from\s*"([^"]+)"`)
+	externalSideEffect     = regexp.MustCompile(`(?:^|\n)\s*import\s*"([^"]+)"`)
+	externalDynamic        = regexp.MustCompile(`(?:\bimport|__require)\(\s*"([^"]+)"\s*\)`)
+)
+
+var lineComments = regexp.MustCompile(`(?m)^\s*//.*$|(?s)(?:^|\n)\s*/\*.*?\*/`)
+
+// The names read from a namespace import in output (ns.name), false when it
+// is used otherwise: passed along, spread, read with a computed key.
+func namespaceMembers(output []byte, namespace string) ([]string, bool) {
+	if !identifierName.MatchString(namespace) {
+		return nil, false
+	}
+	// esbuild keeps comments on lines of their own: not code
+	output = lineComments.ReplaceAll(output, nil)
+	quoted := regexp.QuoteMeta(namespace)
+	uses := regexp.MustCompile(`(?:^|[^\w$.])`+quoted+`(?:[^\w$]|$)`).FindAllIndex(output, -1)
+	accesses := regexp.MustCompile(`(?:^|[^\w$.])`+quoted+`\.([A-Za-z_$][\w$]*)`).FindAllSubmatch(output, -1)
+	// the import statement is the one use that is not an access
+	if len(uses) != len(accesses)+1 {
+		return nil, false
+	}
+	set := map[string]bool{}
+	for _, access := range accesses {
+		set[string(access[1])] = true
+	}
+	members := []string{}
+	for member := range set {
+		members = append(members, member)
+	}
+	sort.Strings(members)
+	return members, true
+}
+
+// What the scan's output imports from each dependency: esbuild writes the
+// imports of a bundle's externals with the names its modules use.
+func parseDepUsage(output []byte, specs []string) depUsage {
+	isSpec := map[string]bool{}
+	for _, spec := range specs {
+		isSpec[spec] = true
+	}
+	names := map[string]map[string]bool{}
+	add := func(spec string, name string) {
+		if !isSpec[spec] {
+			return
+		}
+		if names[spec] == nil {
+			names[spec] = map[string]bool{}
+		}
+		names[spec][name] = true
+	}
+	for _, match := range externalImportOrExport.FindAllSubmatch(output, -1) {
+		keyword, clause, spec := string(match[1]), strings.TrimSpace(string(match[2])), string(match[3])
+		if strings.HasPrefix(clause, "*") && keyword == "export" {
+			add(spec, allExports)
+			continue
+		}
+		if at := strings.Index(clause, "* as "); at >= 0 {
+			if at > 0 {
+				add(spec, "default") // import d, * as ns from
+			}
+			// a namespace only read as ns.name imports those names, as
+			// esbuild tree-shakes it in a bundle
+			namespace := strings.TrimSpace(clause[at+len("* as "):])
+			members, ok := namespaceMembers(output, namespace)
+			if !ok {
+				add(spec, allExports)
+				continue
+			}
+			if len(members) == 0 && names[spec] == nil && isSpec[spec] {
+				names[spec] = map[string]bool{}
+			}
+			for _, member := range members {
+				add(spec, member)
+			}
+			continue
+		}
+		if open := strings.Index(clause, "{"); open >= 0 {
+			if open > 0 && keyword == "import" {
+				add(spec, "default") // import d, { a } from
+			}
+			inner := strings.TrimSuffix(strings.TrimSpace(clause[open+1:]), "}")
+			for _, item := range strings.Split(inner, ",") {
+				item = strings.TrimSpace(item)
+				if item == "" {
+					continue
+				}
+				imported := strings.Trim(strings.Fields(item)[0], `"'`)
+				add(spec, imported)
+			}
+			continue
+		}
+		if keyword == "import" && clause != "" {
+			add(spec, "default")
+			continue
+		}
+		add(spec, allExports)
+	}
+	for _, match := range externalSideEffect.FindAllSubmatch(output, -1) {
+		if spec := string(match[1]); isSpec[spec] && names[spec] == nil {
+			names[spec] = map[string]bool{}
+		}
+	}
+	for _, match := range externalDynamic.FindAllSubmatch(output, -1) {
+		add(string(match[1]), allExports)
+	}
+
+	usage := depUsage{}
+	for _, spec := range specs {
+		set, ok := names[spec]
+		if !ok {
+			// imported in a way the output does not show: the whole package
+			usage[spec] = []string{allExports}
+			continue
+		}
+		if set[allExports] {
+			usage[spec] = []string{allExports}
+			continue
+		}
+		list := []string{}
+		for name := range set {
+			list = append(list, name)
+		}
+		sort.Strings(list)
+		usage[spec] = list
+	}
+	return usage
 }
 
 func (state *transformState) scan(pluginCtx *types.Context) scanResult {
@@ -118,9 +258,12 @@ func (state *transformState) scan(pluginCtx *types.Context) scanResult {
 	built := esbuild.Build(options)
 	result.errors = built.Errors
 	result.warnings = built.Warnings
+	var script []byte
 	for _, output := range built.OutputFiles {
 		if strings.HasSuffix(output.Path, ".css") {
 			result.style = output.Contents
+		} else if strings.HasSuffix(output.Path, ".js") {
+			script = output.Contents
 		}
 	}
 	result.cssSources = map[string]bool{}
@@ -145,6 +288,7 @@ func (state *transformState) scan(pluginCtx *types.Context) scanResult {
 		result.specs = append(result.specs, spec)
 	}
 	sort.Strings(result.specs)
+	result.usage = parseDepUsage(script, result.specs)
 	return result
 }
 
@@ -183,6 +327,7 @@ type depsBuild struct {
 	css   []string          // the stylesheets the packages import, linked in the page
 	// the lib modules the packages import (/@lib/...), preloaded
 	libImports []string
+	usage      depUsage
 }
 
 type depsManifest struct {
@@ -192,6 +337,7 @@ type depsManifest struct {
 	Files      []string          `json:"files"`
 	Css        []string          `json:"css"`
 	LibImports []string          `json:"libImports"`
+	Usage      depUsage          `json:"usage"`
 }
 
 const depsFacadeNamespace = "fullstacked-dep"
@@ -201,8 +347,8 @@ func depsCacheDir(root string) string {
 }
 
 // What the dependencies are built from: the packages installed, this core
-// (its lib) and esbuild, and the specifiers.
-func depsKey(root string, specs []string) string {
+// (its lib) and esbuild, the specifiers and the names imported from them.
+func depsKey(root string, specs []string, usage depUsage) string {
 	hash := sha256.New()
 	version, _ := json.Marshal(FullStackedVersion())
 	hash.Write(version)
@@ -225,18 +371,30 @@ func depsKey(root string, specs []string) string {
 	for _, spec := range specs {
 		hash.Write([]byte{0})
 		hash.Write([]byte(spec))
+		for _, name := range usageOf(usage, spec) {
+			hash.Write([]byte{1})
+			hash.Write([]byte(name))
+		}
 	}
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
 // the dependencies for specs: the current build when it has them, else the
 // cache on disk, else a new build (written to the cache)
-func ensureDeps(root string, specs []string, current *depsBuild) (*depsBuild, []esbuild.Message) {
+// the names imported from spec: all of it when unknown
+func usageOf(usage depUsage, spec string) []string {
+	if names, ok := usage[spec]; ok {
+		return names
+	}
+	return []string{allExports}
+}
+
+func ensureDeps(root string, specs []string, usage depUsage, current *depsBuild) (*depsBuild, []esbuild.Message) {
 	if len(specs) == 0 {
-		return &depsBuild{urls: map[string]string{}, files: map[string][]byte{}}, nil
+		return &depsBuild{urls: map[string]string{}, files: map[string][]byte{}, usage: depUsage{}}, nil
 	}
 
-	key := depsKey(root, specs)
+	key := depsKey(root, specs, usage)
 	if current != nil && current.key == key {
 		return current, nil
 	}
@@ -245,7 +403,7 @@ func ensureDeps(root string, specs []string, current *depsBuild) (*depsBuild, []
 		return cached, nil
 	}
 
-	build, errs := buildDeps(root, specs, key)
+	build, errs := buildDeps(root, specs, usage, key)
 	if len(errs) > 0 {
 		return nil, errs
 	}
@@ -275,7 +433,7 @@ func depOutputName(spec string, taken map[string]bool) string {
 	return unique
 }
 
-func buildDeps(root string, specs []string, key string) (*depsBuild, []esbuild.Message) {
+func buildDeps(root string, specs []string, usage depUsage, key string) (*depsBuild, []esbuild.Message) {
 	taken := map[string]bool{}
 	entries := []esbuild.EntryPoint{}
 	outputs := map[string]string{}
@@ -306,7 +464,7 @@ func buildDeps(root string, specs []string, key string) (*depsBuild, []esbuild.M
 					return esbuild.OnResolveResult{Path: strings.TrimPrefix(args.Path, depsFacadeNamespace+":"), Namespace: depsFacadeNamespace}, nil
 				})
 				build.OnLoad(esbuild.OnLoadOptions{Filter: ".*", Namespace: depsFacadeNamespace}, func(args esbuild.OnLoadArgs) (esbuild.OnLoadResult, error) {
-					contents := depFacade(args.Path)
+					contents := depFacade(args.Path, usageOf(usage, args.Path))
 					return esbuild.OnLoadResult{Contents: &contents, ResolveDir: root, Loader: esbuild.LoaderJS}, nil
 				})
 				// the lib modules the packages import stay the page's
@@ -335,6 +493,10 @@ func buildDeps(root string, specs []string, key string) (*depsBuild, []esbuild.M
 		specs: specs,
 		urls:  map[string]string{},
 		files: map[string][]byte{},
+		usage: depUsage{},
+	}
+	for _, spec := range specs {
+		build.usage[spec] = usageOf(usage, spec)
 	}
 	for spec, output := range outputs {
 		build.urls[spec] = transformDepsPrefix + output + ".js"
@@ -370,8 +532,30 @@ func buildDeps(root string, specs []string, key string) (*depsBuild, []esbuild.M
 // it, marked __esModule so the importer's interop keeps it: named imports
 // read its properties, a default import gets its "default" (module.exports
 // for a CommonJS package), a namespace import gets it whole.
-func depFacade(spec string) string {
-	return "import * as ns from " + jsString(spec) + ";\n" + namespaceFacade("ns") + "export default target;\n"
+//
+// With the names the project imports, the facade imports only these: the
+// package is tree-shaken as in a bundle (a large ESM package such as three
+// keeps what the project uses).
+func depFacade(spec string, names []string) string {
+	if len(names) == 1 && names[0] == allExports {
+		return "import * as ns from " + jsString(spec) + ";\n" + namespaceFacade("ns") + "export default target;\n"
+	}
+	out := ""
+	if len(names) > 0 {
+		specifiers := []string{}
+		for i, name := range names {
+			specifiers = append(specifiers, jsString(name)+" as __n"+itoa(i))
+		}
+		out += "import { " + strings.Join(specifiers, ", ") + " } from " + jsString(spec) + ";\n"
+	} else {
+		out += "import " + jsString(spec) + ";\n"
+	}
+	out += "const target = {};\n"
+	for i, name := range names {
+		out += "Object.defineProperty(target, " + jsString(name) + ", { get: () => __n" + itoa(i) + ", enumerable: true });\n"
+	}
+	out += "Object.defineProperty(target, \"__esModule\", { value: true });\nexport default target;\n"
+	return out
 }
 
 // target: the namespace ns read live, marked __esModule
@@ -402,6 +586,7 @@ func readDepsCache(root string, key string) *depsBuild {
 		files:      map[string][]byte{},
 		css:        manifest.Css,
 		libImports: manifest.LibImports,
+		usage:      manifest.Usage,
 	}
 	for _, pagePath := range manifest.Files {
 		file, ok := insideRoot(dir, strings.TrimPrefix(pagePath, transformDepsPrefix))
@@ -430,6 +615,7 @@ func writeDepsCache(root string, build *depsBuild) {
 		Urls:       build.urls,
 		Css:        build.css,
 		LibImports: build.libImports,
+		Usage:      build.usage,
 	}
 	for pagePath, contents := range build.files {
 		file, ok := insideRoot(dir, strings.TrimPrefix(pagePath, transformDepsPrefix))

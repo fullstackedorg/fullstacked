@@ -87,12 +87,17 @@ func (state *transformState) transform(file string) []byte {
 		// a package no module imported until now (a file edited since the
 		// scan): the dependencies are built again with it
 		state.mu.Lock()
+		// what the scan saw of the others stays, the new ones are whole
 		specs := append([]string{}, missing...)
+		usage := depUsage{}
 		if state.deps != nil {
 			specs = append(specs, state.deps.specs...)
+			for spec, names := range state.deps.usage {
+				usage[spec] = names
+			}
 		}
 		specs = uniqueSorted(specs)
-		rebuilt, depsErrs := ensureDeps(state.root, specs, state.deps)
+		rebuilt, depsErrs := ensureDeps(state.root, specs, usage, state.deps)
 		if len(depsErrs) == 0 {
 			state.deps = rebuilt
 		}

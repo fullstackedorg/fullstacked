@@ -225,7 +225,7 @@ func (state *transformState) prepare(pluginCtx *types.Context, entry string) Esb
 	state.style = scan.style
 	state.cssSources = scan.cssSources
 
-	deps, depsErrors := ensureDeps(state.root, scan.specs, state.deps)
+	deps, depsErrors := ensureDeps(state.root, scan.specs, scan.usage, state.deps)
 	if len(depsErrors) > 0 {
 		state.result.Errors = depsErrors
 		return state.result

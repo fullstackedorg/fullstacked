@@ -265,7 +265,7 @@ func TestTransformDepsCache(t *testing.T) {
 	root := writeProject(t, map[string]string{
 		"index.ts": `import fn from "cjs-fn"; console.log(fn);`,
 	})
-	deps, errs := ensureDeps(root, []string{"cjs-fn"}, nil)
+	deps, errs := ensureDeps(root, []string{"cjs-fn"}, nil, nil)
 	if len(errs) > 0 {
 		t.Fatal(errs)
 	}
@@ -281,7 +281,7 @@ func TestTransformDepsCache(t *testing.T) {
 
 	// a lockfile change is another key
 	os.WriteFile(filepath.Join(root, "package-lock.json"), []byte(`{"lockfileVersion":3}`), 0644)
-	if depsKey(root, []string{"cjs-fn"}) == deps.key {
+	if depsKey(root, []string{"cjs-fn"}, nil) == deps.key {
 		t.Fatal("the lockfile is not part of the key")
 	}
 }
@@ -326,5 +326,48 @@ func TestDepOutputName(t *testing.T) {
 	}
 	if got := depOutputName("react", taken); got != "react-2" {
 		t.Errorf("a taken name gets a suffix: %s", got)
+	}
+}
+
+func TestParseDepUsage(t *testing.T) {
+	output := []byte(`import React, { useState as useState2, useEffect } from "react";
+import * as R from "react-dom";
+import * as THREE from "three-ns";
+import * as Passed from "passed";
+// a comment naming THREE is not a use
+/* nor is
+   THREE in a block */
+const mesh = new THREE.Mesh(THREE.BoxGeometry);
+console.log(Passed);
+import "side-effect";
+import {
+  Mesh,
+  Scene
+} from "three";
+export { a } from "reexported";
+export * from "star";
+const lazy = import("lazy");
+const old = __require("required");
+`)
+	specs := []string{"react", "react-dom", "side-effect", "three", "three-ns", "passed", "reexported", "star", "lazy", "required", "unseen"}
+	usage := parseDepUsage(output, specs)
+	want := map[string][]string{
+		"react":       {"default", "useEffect", "useState"},
+		"react-dom":   {},
+		"three-ns":    {"BoxGeometry", "Mesh"},
+		"passed":      {"*"},
+		"side-effect": {},
+		"three":       {"Mesh", "Scene"},
+		"reexported":  {"a"},
+		"star":        {"*"},
+		"lazy":        {"*"},
+		"required":    {"*"},
+		"unseen":      {"*"},
+	}
+	for spec, names := range want {
+		got := usage[spec]
+		if strings.Join(got, ",") != strings.Join(names, ",") {
+			t.Errorf("%s: %v, want %v", spec, got, names)
+		}
 	}
 }
