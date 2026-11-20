@@ -124,6 +124,12 @@ console.log(b, fn, a, esm, named, sub, browser, x, fs, join, data, logo);
 		t.Fatalf("the css of with-css is not linked: %s", html)
 	}
 
+	for _, preload := range []string{"/@lib/fullstacked/index.js", "/@lib/fs/index.js", "/@deps/cjs-fn.js", "/index.ts", "/src/b.ts"} {
+		if !strings.Contains(html, `<link rel="modulepreload" href="`+preload+`"/>`) {
+			t.Errorf("%s is not preloaded", preload)
+		}
+	}
+
 	entry := serve(t, root, TransformEntryPath)
 	if !strings.Contains(entry, `import "/@lib/fullstacked/index.js"`) || !strings.Contains(entry, `await import("/index.ts")`) {
 		t.Fatalf("entry: %s", entry)

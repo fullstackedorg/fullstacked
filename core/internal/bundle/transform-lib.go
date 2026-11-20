@@ -24,6 +24,56 @@ type libBuild struct {
 	urls   map[string]string // module name (fs, fs/promises...) → page path
 	files  map[string][]byte // page path → contents
 	errors []esbuild.Message
+	// page path → the page paths it imports statically (its chunks)
+	imports map[string][]string
+}
+
+type metafile struct {
+	Outputs map[string]struct {
+		Imports []struct {
+			Path     string `json:"path"`
+			Kind     string `json:"kind"`
+			External bool   `json:"external"`
+		} `json:"imports"`
+	} `json:"outputs"`
+}
+
+// The static imports of each output of a build, by page path: from its
+// metafile (output paths relative to workingDir), the outputs under prefix,
+// external imports as they are (/@lib/...).
+func staticImports(meta string, workingDir string, outdir string, prefix string) map[string][]string {
+	parsed := metafile{}
+	imports := map[string][]string{}
+	if json.Unmarshal([]byte(meta), &parsed) != nil {
+		return imports
+	}
+	pagePath := func(output string) (string, bool) {
+		if !filepath.IsAbs(output) {
+			output = filepath.Join(workingDir, output)
+		}
+		rel, err := filepath.Rel(outdir, output)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			return "", false
+		}
+		return prefix + filepath.ToSlash(rel), true
+	}
+	for output, info := range parsed.Outputs {
+		from, ok := pagePath(output)
+		if !ok {
+			continue
+		}
+		for _, imp := range info.Imports {
+			if imp.Kind != "import-statement" {
+				continue
+			}
+			if imp.External {
+				imports[from] = append(imports[from], imp.Path)
+			} else if to, ok := pagePath(imp.Path); ok {
+				imports[from] = append(imports[from], to)
+			}
+		}
+	}
+	return imports
 }
 
 var transformLib = sync.OnceValue(buildTransformLib)
@@ -55,12 +105,15 @@ func buildTransformLib() *libBuild {
 		Outdir:              outdir,
 		ChunkNames:          "_chunks/[name]-[hash]",
 		Plugins:             esbuildPluginsLib,
+		Metafile:            true,
 	})
 
+	cwd, _ := os.Getwd()
 	build := &libBuild{
-		urls:   map[string]string{},
-		files:  map[string][]byte{},
-		errors: result.Errors,
+		urls:    map[string]string{},
+		files:   map[string][]byte{},
+		errors:  result.Errors,
+		imports: staticImports(result.Metafile, cwd, outdir, transformLibPrefix),
 	}
 	if len(result.Errors) > 0 {
 		return build

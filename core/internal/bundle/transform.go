@@ -82,6 +82,9 @@ type transformState struct {
 	pluginOutputs map[string][]byte // /@plugin/<name>/<file>
 	pluginAssets  []string          // in the order a bundle's index.html links them
 
+	// the modules the page will load, preloaded by its HTML
+	preloads []string
+
 	modulesMu sync.Mutex
 	modules   map[string]*transformedModule
 }
@@ -235,6 +238,7 @@ func (state *transformState) prepare(pluginCtx *types.Context, entry string) Esb
 
 	step = traceStep("plugins", step)
 	state.transformAll()
+	state.preloads = state.modulePreloads()
 	traceStep("modules", step)
 	return state.result
 }
@@ -487,6 +491,7 @@ func (state *transformState) html() []byte {
 	result := state.result
 	deps := state.deps
 	pluginAssets := state.pluginAssets
+	preloads := state.preloads
 	state.mu.Unlock()
 
 	if len(result.Errors) > 0 {
@@ -502,6 +507,11 @@ func (state *transformState) html() []byte {
 	doc, err := htmlWithAssets(assets)
 	if err != nil {
 		return nil
+	}
+	// every module the page will import, asked for at once instead of
+	// one level of imports after the other
+	for _, preload := range preloads {
+		doc.addInHead(`<link rel="modulepreload" href="` + preload + `" />`)
 	}
 	// the plugins' outputs come after the project's stylesheets, as in a
 	// bundle's index.html: a stylesheet a module imports goes before them

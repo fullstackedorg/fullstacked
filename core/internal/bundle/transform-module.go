@@ -2,7 +2,9 @@ package bundle
 
 import (
 	"encoding/json"
+	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -315,4 +317,71 @@ func cssBundle(root string, file string, filters []pluginFilter) []byte {
 		}
 	}
 	return []byte{}
+}
+
+// the lib modules a module of the project imports
+var libSpecifier = regexp.MustCompile(`"(` + transformLibPrefix + `[^"]+\.js)"`)
+
+// The modules a page of the project loads: the lib's prelude, the lib
+// modules (and their chunks) its modules and dependencies import, every file
+// of the dependencies and every module of the project, by page path.
+// state.mu held.
+func (state *transformState) modulePreloads() []string {
+	lib := transformLib()
+	seen := map[string]bool{}
+	preloads := []string{}
+
+	var addLib func(pagePath string)
+	addLib = func(pagePath string) {
+		if seen[pagePath] {
+			return
+		}
+		if _, ok := lib.files[pagePath]; !ok {
+			return
+		}
+		seen[pagePath] = true
+		preloads = append(preloads, pagePath)
+		for _, imp := range lib.imports[pagePath] {
+			addLib(imp)
+		}
+	}
+
+	addLib(lib.urls["fullstacked"])
+	if state.deps != nil {
+		for _, imp := range state.deps.libImports {
+			addLib(imp)
+		}
+		paths := []string{}
+		for pagePath := range state.deps.files {
+			if strings.HasSuffix(pagePath, ".js") {
+				paths = append(paths, pagePath)
+			}
+		}
+		sort.Strings(paths)
+		preloads = append(preloads, paths...)
+	}
+
+	files := []string{}
+	for file := range state.sources {
+		if transformModuleExtensions[path.Ext(file)] {
+			files = append(files, file)
+		}
+	}
+	sort.Strings(files)
+	for _, file := range files {
+		pageURL, ok := urlOf(state.root, file)
+		if !ok {
+			continue
+		}
+		stamp, _ := stampOf(file)
+		module := state.cached(file, stamp)
+		if module == nil {
+			continue
+		}
+		preloads = append(preloads, pageURL)
+		for _, match := range libSpecifier.FindAllSubmatch(module.contents, -1) {
+			addLib(string(match[1]))
+		}
+	}
+	return preloads
 }

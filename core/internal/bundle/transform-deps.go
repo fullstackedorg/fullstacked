@@ -157,14 +157,17 @@ type depsBuild struct {
 	urls  map[string]string // specifier → page path
 	files map[string][]byte // page path → contents
 	css   []string          // the stylesheets the packages import, linked in the page
+	// the lib modules the packages import (/@lib/...), preloaded
+	libImports []string
 }
 
 type depsManifest struct {
 	Key   string            `json:"key"`
 	Specs []string          `json:"specs"`
 	Urls  map[string]string `json:"urls"`
-	Files []string          `json:"files"`
-	Css   []string          `json:"css"`
+	Files      []string          `json:"files"`
+	Css        []string          `json:"css"`
+	LibImports []string          `json:"libImports"`
 }
 
 const depsFacadeNamespace = "fullstacked-dep"
@@ -271,6 +274,7 @@ func buildDeps(root string, specs []string, key string) (*depsBuild, []esbuild.M
 		AssetNames:          "_assets/[name]-[hash]",
 		PublicPath:          strings.TrimSuffix(transformDepsPrefix, "/"),
 		Loader:              transformLoaders(),
+		Metafile:            true,
 		Plugins: []esbuild.Plugin{{
 			Name: "fullstacked-deps",
 			Setup: func(build esbuild.PluginBuild) {
@@ -323,6 +327,18 @@ func buildDeps(root string, specs []string, key string) (*depsBuild, []esbuild.M
 		}
 	}
 	sort.Strings(build.css)
+	libImports := map[string]bool{}
+	for _, imports := range staticImports(result.Metafile, root, outdir, transformDepsPrefix) {
+		for _, imp := range imports {
+			if strings.HasPrefix(imp, transformLibPrefix) {
+				libImports[imp] = true
+			}
+		}
+	}
+	for imp := range libImports {
+		build.libImports = append(build.libImports, imp)
+	}
+	sort.Strings(build.libImports)
 	return build, nil
 }
 
@@ -356,8 +372,9 @@ func readDepsCache(root string, key string) *depsBuild {
 		key:   key,
 		specs: manifest.Specs,
 		urls:  manifest.Urls,
-		files: map[string][]byte{},
-		css:   manifest.Css,
+		files:      map[string][]byte{},
+		css:        manifest.Css,
+		libImports: manifest.LibImports,
 	}
 	for _, pagePath := range manifest.Files {
 		file, ok := insideRoot(dir, strings.TrimPrefix(pagePath, transformDepsPrefix))
@@ -383,8 +400,9 @@ func writeDepsCache(root string, build *depsBuild) {
 	manifest := depsManifest{
 		Key:   build.key,
 		Specs: build.specs,
-		Urls:  build.urls,
-		Css:   build.css,
+		Urls:       build.urls,
+		Css:        build.css,
+		LibImports: build.libImports,
 	}
 	for pagePath, contents := range build.files {
 		file, ok := insideRoot(dir, strings.TrimPrefix(pagePath, transformDepsPrefix))
