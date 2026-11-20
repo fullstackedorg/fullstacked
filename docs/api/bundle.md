@@ -2,7 +2,7 @@
 
 ```ts
 import bundle from "fullstacked/bundle";
-// or: import { bundle, bundleFile, esbuildVersion } from "fullstacked/bundle";
+// or: import { bundle, bundleFile, prepare, esbuildVersion } from "fullstacked/bundle";
 ```
 
 Bundles TypeScript and JavaScript with [esbuild](https://esbuild.github.io), which runs inside the Go core, so no Node or npm is needed on the device. This is what the CLI and the app run before opening a project. [Project structure](../project-structure.md) explains what goes in and what comes out.
@@ -29,13 +29,25 @@ On a successful build, `out/` is **deleted and recreated**. Don't keep files the
 
 Build plugins registered in the calling context run as part of the build (see [plugin](plugin.md#build-plugins)).
 
+## prepare
+
+```ts
+prepare(entryPoint?: string): Promise<EsbuildResult>
+```
+
+_Beta._ Prepares a project to run in [transform mode](../architecture.md#transform-mode) ([`run({ mode: "transform" })`](run.md#mode)), instead of bundling it: scans it from its entry point, pre-bundles its npm dependencies (cached in `node_modules/.fullstacked/deps`, built again when the lockfile, the imports or the core change), runs the build plugins registered in the calling context and transforms its modules. Nothing is written to `out/`.
+
+`entryPoint` is a directory or a file, as for `bundle`. The result's `Errors` and `Warnings` are the ones a bundle of the project would report; `OutputFiles` is empty.
+
 ## bundleFile
 
 ```ts
-bundleFile(entryPoint: string): Promise<EsbuildResult>
+bundleFile(entryPoint: string, opts?: { inMemory?: boolean }): Promise<EsbuildResult>
 ```
 
-Builds **one file** into `<file>.js` next to it (`worker.ts` → `worker.ts.js`). There is no `out/`, no `index.html`, no image loaders and no build plugins. Use it for [workers](../project-structure.md#workers), scripts run with `fullstacked --file`, and plugins. `OutputFiles` are relative to the current working directory.
+Builds **one file** into `<file>.js` next to it (`worker.ts` → `worker.ts.js`). There is no `out/`, no `index.html`, no image loaders and no build plugins. Use it for [workers](../project-structure.md#workers) and plugins. `OutputFiles` are relative to the current working directory.
+
+With `inMemory`, nothing is written: the bundle is served once at the path in `OutputFiles` (`<file>.fullstacked-<id>.js`, next to the file), for an `import()` of it. This is how `fullstacked --file` runs scripts.
 
 ## esbuildVersion
 

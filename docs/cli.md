@@ -30,7 +30,7 @@ The CLI starts the core with the **current directory as its root**, which is the
 | `-v`, `--version`                  | Print the version: `FullStacked v1.0.0 (build N), branch B, hash H`                                                                                           |
 | `-h`, `--help`                     | Print the help                                                                                                                                                |
 | `-b`, `--build`                    | Bundle only, for production: `NODE_ENV` is `"production"` and the output is minified ([details](api/bundle.md#build-options)). Exits with 1 on a build error. |
-| `--transform`                      | Run without bundling first, in [transform mode](#transform-mode-beta) (beta). Ignored with `--build`.                                                          |
+| `--transform`                      | Run without bundling first, in [transform mode](#transform-mode-beta) (beta). Ignored with `--build`.                                                         |
 | `-e`, `--env KEY=VALUE`            | Set an environment variable, over `.env`. Repeatable.                                                                                                         |
 | `-p`, `--plugin <package or file>` | Load a [build plugin](api/plugin.md#build-plugins) before bundling. Repeatable.                                                                               |
 | `--port <n>`                       | First port to serve on (default 9000). Each opened project takes the next free port.                                                                          |

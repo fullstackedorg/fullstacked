@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"path"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -25,10 +24,40 @@ type transformedModule struct {
 // the module of file, transformed again when it changed since
 func (state *transformState) module(file string) *transformedModule {
 	stamp, _ := stampOf(file)
-	if cached := state.cached(file, stamp); cached != nil {
-		return cached
+	for {
+		if cached := state.cached(file, stamp); cached != nil {
+			return cached
+		}
+		done, mine := state.claim(file)
+		if !mine {
+			<-done // transformed by prepare in the background
+			continue
+		}
+		module := state.store(file, stamp, state.transform(file))
+		state.release(file, done)
+		return module
 	}
-	return state.store(file, stamp, state.transform(file))
+}
+
+// file's transform: done closes when it ends; mine when this caller does it
+func (state *transformState) claim(file string) (done chan struct{}, mine bool) {
+	key := state.moduleKey(file)
+	state.modulesMu.Lock()
+	defer state.modulesMu.Unlock()
+	if done, ok := state.inflight[key]; ok {
+		return done, false
+	}
+	done = make(chan struct{})
+	state.inflight[key] = done
+	return done, true
+}
+
+func (state *transformState) release(file string, done chan struct{}) {
+	key := state.moduleKey(file)
+	state.modulesMu.Lock()
+	delete(state.inflight, key)
+	state.modulesMu.Unlock()
+	close(done)
 }
 
 // prepare transforms the modules it found ahead of the page, state.mu held:
@@ -38,6 +67,11 @@ func (state *transformState) pretransform(file string, deps *depsBuild, filters 
 	if state.cached(file, stamp) != nil {
 		return
 	}
+	done, mine := state.claim(file)
+	if !mine {
+		return
+	}
+	defer state.release(file, done)
 	contents, missing, errs := state.transformWith(file, deps, filters)
 	if len(missing) > 0 {
 		// left to the page's request, which builds the dependencies again
@@ -324,9 +358,6 @@ func cssBundle(root string, file string, filters []pluginFilter) []byte {
 	return []byte{}
 }
 
-// the lib modules a module of the project imports
-var libSpecifier = regexp.MustCompile(`"(` + transformLibPrefix + `[^"]+\.js)"`)
-
 // The modules a page of the project loads: the lib's prelude, the lib
 // modules (and their chunks) its modules and dependencies import, every file
 // of the dependencies and every module of the project, by page path.
@@ -366,6 +397,10 @@ func (state *transformState) modulePreloads() []string {
 		preloads = append(preloads, paths...)
 	}
 
+	for _, name := range state.libImports {
+		addLib(lib.urls[name])
+	}
+
 	files := []string{}
 	for file := range state.sources {
 		if transformModuleExtensions[path.Ext(file)] {
@@ -374,18 +409,8 @@ func (state *transformState) modulePreloads() []string {
 	}
 	sort.Strings(files)
 	for _, file := range files {
-		pageURL, ok := urlOf(state.root, file)
-		if !ok {
-			continue
-		}
-		stamp, _ := stampOf(file)
-		module := state.cached(file, stamp)
-		if module == nil {
-			continue
-		}
-		preloads = append(preloads, pageURL)
-		for _, match := range libSpecifier.FindAllSubmatch(module.contents, -1) {
-			addLib(string(match[1]))
+		if pageURL, ok := urlOf(state.root, file); ok {
+			preloads = append(preloads, pageURL)
 		}
 	}
 	return preloads

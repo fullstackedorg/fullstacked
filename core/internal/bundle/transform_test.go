@@ -371,3 +371,35 @@ const old = __require("required");
 		}
 	}
 }
+
+func TestTransformInBackground(t *testing.T) {
+	PretransformBeforePage = false
+	defer func() { PretransformBeforePage = true }()
+
+	files := map[string]string{"index.ts": ""}
+	for i := 0; i < 40; i++ {
+		name := "m" + itoa(i) + ".ts"
+		files[name] = "export const v: number = " + itoa(i) + ";"
+		files["index.ts"] += "import { v as v" + itoa(i) + " } from \"./" + name + "\";\nconsole.log(v" + itoa(i) + ");\n"
+	}
+	root := writeProject(t, files)
+	prepareOK(t, root)
+
+	// the page asks while prepare's goroutines transform: each module once,
+	// whoever starts it, and every request gets it
+	done := make(chan string, 40)
+	for i := 0; i < 40; i++ {
+		go func(i int) {
+			_, contents, _ := ServeTransform(transformCtx(root), "/m"+itoa(i)+".ts")
+			done <- string(contents)
+		}(i)
+	}
+	for i := 0; i < 40; i++ {
+		if contents := <-done; !strings.Contains(contents, "var v = ") {
+			t.Fatalf("module: %s", contents)
+		}
+	}
+	if html := serve(t, root, "/"); !strings.Contains(html, `href="/m39.ts"`) {
+		t.Fatal("the modules are preloaded")
+	}
+}

@@ -94,7 +94,19 @@ type transformState struct {
 
 	modulesMu sync.Mutex
 	modules   map[string]*transformedModule
+	// the modules being transformed: a request for one waits for it
+	inflight map[string]chan struct{}
+
+	// the lib modules the scan saw imported, preloaded
+	libImports []string
 }
+
+// Whether prepare transforms the project's modules before it returns (the
+// page opens after). The Node host answers the page's requests on its event
+// loop, where a request should only read memory; the apps answer them on
+// threads: the modules are transformed while the window opens, a request
+// for one waits for it. Unknown hosts: before.
+var PretransformBeforePage = true
 
 type fileStamp struct {
 	modTime time.Time
@@ -134,8 +146,9 @@ func transformStateFor(root string) *transformState {
 	state, ok := transformStates[key]
 	if !ok {
 		state = &transformState{
-			root:    root,
-			modules: map[string]*transformedModule{},
+			root:     root,
+			modules:  map[string]*transformedModule{},
+			inflight: map[string]chan struct{}{},
 		}
 		transformStates[key] = state
 	}
@@ -222,6 +235,7 @@ func (state *transformState) prepare(pluginCtx *types.Context, entry string) Esb
 		return state.result
 	}
 	state.sources = scan.sources
+	state.libImports = scan.libs
 	state.style = scan.style
 	state.cssSources = scan.cssSources
 
@@ -246,8 +260,12 @@ func (state *transformState) prepare(pluginCtx *types.Context, entry string) Esb
 	}
 
 	step = traceStep("plugins", step)
-	state.transformAll()
 	state.preloads = state.modulePreloads()
+	if PretransformBeforePage {
+		state.transformAll(state.deps, state.pluginFilters)
+	} else {
+		go state.transformAll(state.deps, state.pluginFilters)
+	}
 	traceStep("modules", step)
 	return state.result
 }
@@ -294,7 +312,7 @@ func (state *transformState) changed() bool {
 
 // transforms every module the scan found, in parallel, so the page's
 // requests are memory reads
-func (state *transformState) transformAll() {
+func (state *transformState) transformAll(deps *depsBuild, filters []pluginFilter) {
 	files := []string{}
 	for file := range state.sources {
 		if transformModuleExtensions[path.Ext(file)] {
@@ -309,7 +327,7 @@ func (state *transformState) transformAll() {
 		go func() {
 			defer wg.Done()
 			for file := range work {
-				state.pretransform(file, state.deps, state.pluginFilters)
+				state.pretransform(file, deps, filters)
 			}
 		}()
 	}

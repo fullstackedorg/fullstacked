@@ -47,12 +47,53 @@ The sandbox applies to files. Network access (`net`, `fetch`, `dgram`) is unrest
 
 ## A project's lifecycle
 
-1. **Bundle.** [`bundle`](api/bundle.md) runs esbuild in the core on the project's entrypoint. Built-in imports resolve to the embedded lib, and npm imports to `node_modules`. The output goes to `out/`, with a generated `index.html`.
+1. **Bundle.** [`bundle`](api/bundle.md) runs esbuild in the core on the project's entrypoint. Built-in imports resolve to the embedded lib, and npm imports to `node_modules`. The output goes to `out/`, with a generated `index.html`. In [transform mode](#transform-mode) (beta), [`prepare`](api/bundle.md#prepare) takes this step's place and nothing is written to `out/`.
 2. **Run.** [`run`](api/run.md) creates a context with the project as its root.
 3. **Open.** The host opens a window on a URL of its own (`fs://localhost`, `http://localhost`, or `http://localhost:<port>` for the CLI) and binds it to the context.
 4. **Load.** The page fetches `out/index.html` and the bundle. The bundle's first import (`fullstacked`) initializes the bridge: it reads its context id from `GET /ctx`, detects the host's transports, attaches the frame stream, replaces `fetch` and `WebSocket`, installs `process`, `Buffer` and `setImmediate`, and restores the window size. Then the project's code runs. A bundle the page loads later uses the same bridge (see [Several bundles in a page](bridge.md#several-bundles-in-a-page)).
 5. **Run.** Each core-backed call crosses [the bridge](bridge.md): a sync call blocks the page like Node's sync APIs do, and an async call resolves when the core answers. Data that flows over time comes back as [streams](bridge.md#streams).
 6. **Exit.** Closing the window, or `process.exit()`, ends the context.
+
+## Transform mode
+
+_Beta._ Bundle mode builds the whole project, its npm packages included, before the page opens: every start pays for bundling packages that never changed. **Transform mode** serves the project from its sources instead. The page asks for each module, the core builds that file on its own, and the npm dependencies are built once and cached. A context runs in one mode, chosen at [`run`](api/run.md#mode). Bundle mode stays the default, and [`bundle`](api/bundle.md#bundle) and `fullstacked --build` are unchanged.
+
+```mermaid
+flowchart LR
+    Page["Page"] -->|"GET /"| HTML["Generated index.html<br/>modulepreload of every module"]
+    Page -->|"GET /@fullstacked/entry.js"| Entry["The lib's prelude,<br/>then the project's entry"]
+    Page -->|"GET /index.tsx, /src/App.tsx"| T["esbuild, one file at a time<br/>cached by mtime and size"]
+    Page -->|"GET /@lib/fs/index.js"| L["The lib: one prelude file<br/>and facades, cached per lib"]
+    Page -->|"GET /@deps/react.js"| D["Dependencies, bundled once<br/>node_modules/.fullstacked/deps"]
+    Page -->|"GET /@fullstacked/style.css"| C["The project's stylesheets,<br/>bundled in import order"]
+```
+
+**Prepare.** [`prepare`](api/bundle.md#prepare) (the CLI's `--transform`, the app's `run --transform`) runs before the page opens:
+
+1. **The lib.** The runtime lib as ES modules, built once per lib and kept in the user's cache folder. Every page loads the lib's prelude (the `fullstacked` module: the bridge, `process`, `Buffer`, timers…). It is one file, `/@lib/fullstacked/index.js`, which also exports a namespace of each lib file it holds. A lib module among them (`fs`, `path`, `events`…) is a facade over that namespace. The other modules (`crypto`, `zlib`, `git`…) are built split, and read what they share with the prelude from it. Every importer gets the same URLs, so there's one bridge per page.
+2. **The scan.** One esbuild build of the project from its entry, with every package, lib module and file left external. It lists the project's modules and the packages it imports, with the names it imports from each. Its errors are the ones a bundle would report, with the same messages. It also reads the project's stylesheets (so build plugins see what CSS imports, like `@import "tailwindcss"`), and its CSS output is a bundle's `index.css`.
+3. **The dependencies.** One esbuild build with an entry per package specifier the project imports, split so that packages share chunks and each package loads once per page. Each entry is a facade that imports only the names the project uses, so esbuild tree-shakes the package as in a bundle. A namespace import used other than as `ns.name`, `import()`, `export *` or `require()` keeps the whole package. The output is cached in `node_modules/.fullstacked/deps`, keyed by `package.json`, the lockfile (or npm's `node_modules/.package-lock.json`), the core, esbuild, the specifiers and the names. A warm start does no dependency build.
+4. **The build plugins** run with the scan's files, and their outputs are linked in the page.
+5. **The modules.** Every module the scan found is transformed in parallel, so the page's requests are memory reads. On the Node CLI, where requests are answered on Node's event loop, nothing is built while the page loads.
+
+**A module** is built by esbuild alone, with bundling on and every import left external, rewritten to its page path. esbuild resolves imports exactly as in a bundle (extensions, index files, `tsconfig.json` `paths`, `exports` and `browser` fields) and applies the project's `tsconfig.json`. Each import goes to:
+
+| Import                         | Page path                                                                         |
+| ------------------------------ | --------------------------------------------------------------------------------- |
+| A module of the project        | `/src/App.tsx`, transformed                                                       |
+| A lib module (`fs`, `node:fs`) | `/@lib/fs/index.js`                                                               |
+| An npm package                 | `/@deps/<specifier>.js`, through a CommonJS proxy                                 |
+| CSS                            | Already in `/@fullstacked/style.css`. The import's value is the file's URL.       |
+| JSON                           | `/@import/data.json`: `export default` its value                                  |
+| An image or another file       | `/@import/logo.png`: `export default "/logo.png"`, as the file loader of a bundle |
+
+**CommonJS packages** keep a bundle's interop. Each dependency facade's default export is the package as a bundle's interop sees it, marked `__esModule`. A module of the project reaches it through a tiny CommonJS proxy (`module.exports = require(<esm proxy>).default`), so esbuild writes the same interop code it writes in a bundle: `import { useState } from "react"`, `import cx from "classnames"` (`module.exports = fn`), `import * as R`, `import()` and `require()` all get what they get in a bundle. No `require` runs in the page.
+
+**The page** is a generated `index.html`. It links the dependencies' and the project's stylesheets, then the plugins' outputs. It preloads (`modulepreload`) every module it will load, so the browser asks for them at once instead of one level of imports after the other. Then it loads `/@fullstacked/entry.js`, which imports the lib's prelude, waits for it (the bridge initializes with a top-level await), then imports the project's entry. Only the entry waits for the [first paint](project-structure.md#first-paint). A worker created with `worker_threads` loads `/@fullstacked/worker/<path>`, the same prelude around its module.
+
+**Edits.** A request transforms a module again when its file changed. Reloading the page scans the project again if one of its files changed: an import of a package or name not seen yet rebuilds the dependencies, and the build plugins run again while the context that registered them runs. A module that fails to build is served as a module that logs its errors and shows them over the page, instead of a blank page.
+
+**Differences with bundle mode.** The entry's code is run like every other module, so `tsconfig.json` applies to it too: a bundle reads its entry through esbuild's stdin, which ignores `tsconfig.json` (`jsx`, decorators, `paths`). Error lines in the entry are exact, where a bundle's are one line off (it prepends `import "fullstacked"`). A project file that is CommonJS (`module.exports` in a `.js`) is served with a default export only.
 
 ## Platforms
 

@@ -16,6 +16,7 @@ import "C"
 
 import (
 	"fmt"
+	"fullstackedorg/fullstacked/internal/bundle"
 	"fullstackedorg/fullstacked/internal/router"
 	"fullstackedorg/fullstacked/internal/store"
 	"fullstackedorg/fullstacked/types"
@@ -157,6 +158,9 @@ func callWithResponse(buffer unsafe.Pointer, length C.int, size *C.int) unsafe.P
 func setPlatform(name *C.char, binaryCalls C.int) {
 	router.Platform = C.GoString(name)
 	router.BinaryCalls = binaryCalls != 0
+	// the Node host answers the page's requests on its event loop: transform
+	// mode transforms a project's modules before its page opens there
+	bundle.PretransformBeforePage = router.Platform == "node"
 }
 
 // handleRequest answers a request of the page of the context (see

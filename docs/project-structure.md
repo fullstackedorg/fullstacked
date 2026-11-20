@@ -111,6 +111,8 @@ A matching `tsconfig.json`:
 
 `out/` is deleted and recreated on every successful build. Add it to `.gitignore`. The page's `<body>` starts empty, and your code builds the UI.
 
+In [transform mode](architecture.md#transform-mode) (beta: `fullstacked --transform`, `run --transform` in the app, Settings → Faster start in FullStacked Cloud), nothing is written to `out/`: the page is served from the sources, and the npm dependencies are cached in `node_modules/.fullstacked/deps` (inside `node_modules`, so already ignored).
+
 There's no watch mode. Rebuild by running the project again.
 
 ## Static files

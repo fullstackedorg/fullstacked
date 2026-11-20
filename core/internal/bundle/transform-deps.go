@@ -40,6 +40,8 @@ type scanResult struct {
 
 	// what the project imports from each dependency
 	usage depUsage
+	// the lib modules it imports
+	libs []string
 }
 
 // The names a project imports from each dependency: its facade imports
@@ -208,6 +210,7 @@ func (state *transformState) scan(pluginCtx *types.Context) scanResult {
 
 	mu := sync.Mutex{}
 	specs := map[string]bool{}
+	libs := map[string]bool{}
 	sources := []string{}
 
 	options.Plugins = append(options.Plugins, esbuild.Plugin{
@@ -233,6 +236,9 @@ func (state *transformState) scan(pluginCtx *types.Context) scanResult {
 					mu.Unlock()
 					return esbuild.OnResolveResult{Path: imp.value, External: true}, nil
 				case importLib:
+					mu.Lock()
+					libs[imp.value] = true
+					mu.Unlock()
 					return esbuild.OnResolveResult{Path: args.Path, External: true}, nil
 				case importModule:
 					return esbuild.OnResolveResult{Path: imp.result.Path}, nil
@@ -289,6 +295,10 @@ func (state *transformState) scan(pluginCtx *types.Context) scanResult {
 	}
 	sort.Strings(result.specs)
 	result.usage = parseDepUsage(script, result.specs)
+	for lib := range libs {
+		result.libs = append(result.libs, lib)
+	}
+	sort.Strings(result.libs)
 	return result
 }
 
