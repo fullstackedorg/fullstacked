@@ -30,7 +30,8 @@ export async function launchBrowser(options?: LaunchOptions) {
 
 export async function createBrowser(
     directory: string,
-    env?: Record<string, string>
+    env?: Record<string, string>,
+    mode?: "bundle" | "transform"
 ) {
     // this assures user he can import platform/node build before this tries to load the core
     if (!createWebView) {
@@ -38,7 +39,7 @@ export async function createBrowser(
             .createWebView;
     }
 
-    const ctx = await run({ directory, env });
+    const ctx = await run({ directory, env, mode });
     const webview = await createWebView(ctx, { quiet: true });
 
     const showBrowser =

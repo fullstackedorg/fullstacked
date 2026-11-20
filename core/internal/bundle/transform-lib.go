@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -442,6 +443,8 @@ func buildTransformLib() *libBuild {
 	return build
 }
 
+var identifierName = regexp.MustCompile(`^[A-Za-z_$][A-Za-z0-9_$]*$`)
+
 // A lib module of the prelude: its exports, read from the prelude's
 // namespace of its file (the names come from a build of the module).
 func libFacade(preludeURL string, namespace string, exports []string) []byte {
@@ -449,10 +452,14 @@ func libFacade(preludeURL string, namespace string, exports []string) []byte {
 	for i, name := range exports {
 		local := "__e" + itoa(i)
 		out += "const " + local + " = ns[" + jsString(name) + "];\n"
-		if name == "default" {
+		switch {
+		case name == "default":
 			out += "export default " + local + ";\n"
-		} else {
+		case identifierName.MatchString(name):
 			out += "export { " + local + " as " + name + " };\n"
+		default:
+			// a name that is not an identifier ("module.exports")
+			out += "export { " + local + " as " + jsString(name) + " };\n"
 		}
 	}
 	return []byte(out)

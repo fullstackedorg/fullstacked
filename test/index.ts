@@ -36,6 +36,7 @@ let tests = [
     "./shim/index.ts",
     "./dompurify/index.ts",
     "./node/index.ts",
+    "./transform/index.ts",
     ...pluginTests()
 ];
 
