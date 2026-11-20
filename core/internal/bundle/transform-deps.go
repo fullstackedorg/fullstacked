@@ -162,9 +162,9 @@ type depsBuild struct {
 }
 
 type depsManifest struct {
-	Key   string            `json:"key"`
-	Specs []string          `json:"specs"`
-	Urls  map[string]string `json:"urls"`
+	Key        string            `json:"key"`
+	Specs      []string          `json:"specs"`
+	Urls       map[string]string `json:"urls"`
 	Files      []string          `json:"files"`
 	Css        []string          `json:"css"`
 	LibImports []string          `json:"libImports"`
@@ -369,9 +369,9 @@ func readDepsCache(root string, key string) *depsBuild {
 		return nil
 	}
 	build := &depsBuild{
-		key:   key,
-		specs: manifest.Specs,
-		urls:  manifest.Urls,
+		key:        key,
+		specs:      manifest.Specs,
+		urls:       manifest.Urls,
 		files:      map[string][]byte{},
 		css:        manifest.Css,
 		libImports: manifest.LibImports,
@@ -398,8 +398,8 @@ func writeDepsCache(root string, build *depsBuild) {
 	}
 	os.RemoveAll(dir)
 	manifest := depsManifest{
-		Key:   build.key,
-		Specs: build.specs,
+		Key:        build.key,
+		Specs:      build.specs,
 		Urls:       build.urls,
 		Css:        build.css,
 		LibImports: build.libImports,
