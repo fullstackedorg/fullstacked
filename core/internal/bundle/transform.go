@@ -112,17 +112,22 @@ func canonicalRoot(root string) string {
 	return real
 }
 
+// One state per project: keyed by its real path, so a context that names
+// it through a symlink (/data/data is /data/user/0 on Android) finds it. Its
+// root stays the path it was first given, as a bundle uses it: the paths
+// build plugins get are the ones they would get from a bundle.
 func transformStateFor(root string) *transformState {
-	root = canonicalRoot(root)
+	root = filepath.Clean(root)
+	key := canonicalRoot(root)
 	transformStatesMu.Lock()
 	defer transformStatesMu.Unlock()
-	state, ok := transformStates[root]
+	state, ok := transformStates[key]
 	if !ok {
 		state = &transformState{
 			root:    root,
 			modules: map[string]*transformedModule{},
 		}
-		transformStates[root] = state
+		transformStates[key] = state
 	}
 	return state
 }
@@ -151,11 +156,9 @@ func TransformRoot(entryPoint string) (root string, entry string, err error) {
 		if err != nil {
 			return "", "", err
 		}
-		root := canonicalRoot(entryPoint)
-		return root, filepath.Join(root, filepath.Base(entry)), nil
+		return filepath.Clean(entryPoint), entry, nil
 	}
-	root = canonicalRoot(filepath.Dir(entryPoint))
-	return root, filepath.Join(root, filepath.Base(entryPoint)), nil
+	return filepath.Dir(entryPoint), entryPoint, nil
 }
 
 // PrepareTransformFn scans the project of entryPoint, builds its
@@ -428,13 +431,38 @@ func insideRoot(root string, pathname string) (string, bool) {
 	return joined, true
 }
 
-// the page path of a file of the project, escaped for an import specifier
+// the page path of a file of the project, escaped for an import specifier.
+// esbuild resolves files to their real path: a root reached through a
+// symlink (/tmp on macOS) is also compared by its real path.
 func urlOf(root string, file string) (string, bool) {
+	rel, ok := relInside(root, file)
+	if !ok {
+		rel, ok = relInside(cachedCanonicalRoot(root), file)
+	}
+	if !ok {
+		return "", false
+	}
+	return (&url.URL{Path: "/" + filepath.ToSlash(rel)}).EscapedPath(), true
+}
+
+func relInside(root string, file string) (string, bool) {
 	rel, err := filepath.Rel(root, file)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return "", false
 	}
-	return (&url.URL{Path: "/" + filepath.ToSlash(rel)}).EscapedPath(), true
+	return rel, true
+}
+
+var canonicalRoots sync.Map
+
+// canonicalRoot, cached: urlOf asks for every import outside the root
+func cachedCanonicalRoot(root string) string {
+	if real, ok := canonicalRoots.Load(root); ok {
+		return real.(string)
+	}
+	real := canonicalRoot(root)
+	canonicalRoots.Store(root, real)
+	return real
 }
 
 // The lib's prelude initializes the bridge with a top-level await: a sibling

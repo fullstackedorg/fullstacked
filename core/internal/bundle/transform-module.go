@@ -47,10 +47,19 @@ func (state *transformState) pretransform(file string, deps *depsBuild, filters 
 	state.store(file, stamp, contents)
 }
 
+// modules are cached by page path: the page asks for a file through the
+// root it was given, the scan found it through its real path (a symlink)
+func (state *transformState) moduleKey(file string) string {
+	if pageURL, ok := urlOf(state.root, file); ok {
+		return pageURL
+	}
+	return file
+}
+
 func (state *transformState) cached(file string, stamp fileStamp) *transformedModule {
 	state.modulesMu.Lock()
 	defer state.modulesMu.Unlock()
-	cached, ok := state.modules[file]
+	cached, ok := state.modules[state.moduleKey(file)]
 	if ok && cached.stamp == stamp {
 		return cached
 	}
@@ -60,7 +69,7 @@ func (state *transformState) cached(file string, stamp fileStamp) *transformedMo
 func (state *transformState) store(file string, stamp fileStamp, contents []byte) *transformedModule {
 	module := &transformedModule{stamp: stamp, contents: contents}
 	state.modulesMu.Lock()
-	state.modules[file] = module
+	state.modules[state.moduleKey(file)] = module
 	state.modulesMu.Unlock()
 	return module
 }
