@@ -100,6 +100,15 @@ The demo, one warm run per app launch (three each): bundle 3770, 3945 and 4239, 
 | heavy   |          328 |          356 |             331 |             201 | −44% |
 | modules |              |              |             297 |             240 |      |
 
-Not measured yet: the macOS app (its screen locked during the run). iOS shares the macOS app's host code.
+**macOS app** (Apple silicon, WKWebView), commit `c165349e`:
+
+| Fixture | Bundle, cold | Bundle, warm | Transform, cold | Transform, warm | Warm |
+| ------- | -----------: | -----------: | --------------: | --------------: | ---: |
+| small   |          139 |          162 |             166 |             140 | −14% |
+| demo    |          338 |          269 |             255 |             232 | −14% |
+| heavy   |          346 |          334 |             335 |             204 | −39% |
+| modules |              |              |             191 |             152 |      |
+
+iOS shares the macOS app's host code and wasn't measured on its own.
 
 The demo's build is mostly its Tailwind CSS plugin, which both modes run: with little bundling to save, transform mode is level with bundle mode there. A first run in transform mode (no cached dependencies) builds the dependencies and is slower for small projects.
