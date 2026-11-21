@@ -310,6 +310,50 @@ func TestTransformContainment(t *testing.T) {
 	}
 }
 
+// an npm workspace: the packages are hoisted to the node_modules of a
+// folder above the project, which imports their JS and CSS
+func TestTransformHoistedPackages(t *testing.T) {
+	workspace := t.TempDir()
+	for name, contents := range map[string]string{
+		"node_modules/hoisted/package.json": `{"name":"hoisted","main":"index.js"}`,
+		"node_modules/hoisted/index.js":     `export const h = "hoisted";`,
+		"node_modules/hoisted/css/h.css":    `.h { background: url("../font.woff2"); }`,
+		"node_modules/hoisted/font.woff2":   "font",
+		"node_modules/secret/index.js":      `export const s = 1;`,
+		"app/package.json":                  `{"name":"app","private":true}`,
+		"app/index.ts": `import "hoisted/css/h.css";
+import { h } from "hoisted";
+console.log(h);
+`,
+	} {
+		file := filepath.Join(workspace, filepath.FromSlash(name))
+		os.MkdirAll(filepath.Dir(file), 0755)
+		if err := os.WriteFile(file, []byte(contents), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	root := filepath.Join(workspace, "app")
+	prepareOK(t, root)
+
+	index := serve(t, root, "/index.ts")
+	if !strings.Contains(index, `"/@import/node_modules/hoisted/css/h.css"`) || !strings.Contains(index, `from "/@deps/hoisted.js"`) {
+		t.Fatalf("index.ts: %s", index)
+	}
+	serve(t, root, "/@import/node_modules/hoisted/css/h.css")
+	if style := serve(t, root, TransformStylePath); !strings.Contains(style, ".h") || !strings.Contains(style, "url(/node_modules/hoisted/font.woff2)") {
+		t.Fatalf("style.css: %s", style)
+	}
+	if font := serve(t, root, "/node_modules/hoisted/font.woff2"); font != "font" {
+		t.Fatalf("font: %q", font)
+	}
+	// still nothing above the project but node_modules
+	for _, pathname := range []string{"/../node_modules/secret/index.js", "/node_modules/../../node_modules/secret/index.js"} {
+		if _, contents, handled := ServeTransform(transformCtx(root), pathname); handled && contents != nil {
+			t.Errorf("%s is served", pathname)
+		}
+	}
+}
+
 func TestDepOutputName(t *testing.T) {
 	taken := map[string]bool{}
 	for spec, want := range map[string]string{

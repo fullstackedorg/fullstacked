@@ -369,7 +369,7 @@ func ServeTransform(ctx *types.Context, pathname string) (mimeType string, conte
 
 	if strings.HasPrefix(pathname, TransformWorkerPrefix) {
 		modulePath := "/" + strings.TrimPrefix(pathname, TransformWorkerPrefix)
-		file, ok := insideRoot(root, modulePath)
+		file, ok := projectFile(root, modulePath)
 		if !ok || !fs.ExistsFn(file) {
 			return "", nil, false
 		}
@@ -401,7 +401,7 @@ func ServeTransform(ctx *types.Context, pathname string) (mimeType string, conte
 	}
 
 	if strings.HasPrefix(pathname, transformCSSPrefix) {
-		file, ok := insideRoot(root, strings.TrimPrefix(pathname, transformCSSPrefix))
+		file, ok := projectFile(root, strings.TrimPrefix(pathname, transformCSSPrefix))
 		if !ok || !fs.ExistsFn(file) {
 			return "", nil, false
 		}
@@ -412,7 +412,7 @@ func ServeTransform(ctx *types.Context, pathname string) (mimeType string, conte
 	}
 
 	if strings.HasPrefix(pathname, transformImportPrefix) {
-		file, ok := insideRoot(root, strings.TrimPrefix(pathname, transformImportPrefix))
+		file, ok := projectFile(root, strings.TrimPrefix(pathname, transformImportPrefix))
 		if !ok || !fs.ExistsFn(file) {
 			return "", nil, false
 		}
@@ -428,7 +428,7 @@ func ServeTransform(ctx *types.Context, pathname string) (mimeType string, conte
 	}
 
 	if transformModuleExtensions[path.Ext(pathname)] {
-		file, ok := insideRoot(root, pathname)
+		file, ok := projectFile(root, pathname)
 		if !ok {
 			return "", nil, false
 		}
@@ -437,6 +437,20 @@ func ServeTransform(ctx *types.Context, pathname string) (mimeType string, conte
 			return "", nil, false
 		}
 		return "text/javascript", state.module(file).contents, true
+	}
+
+	// a file of a hoisted package (a font or an image its CSS points to):
+	// the router serves the project's own files only
+	if strings.HasPrefix(pathname, "/node_modules/") {
+		file, ok := projectFile(root, pathname)
+		if _, inside := relInside(root, file); !ok || inside {
+			return "", nil, false
+		}
+		contents, err := fs.ReadFileFn(file)
+		if err != nil {
+			return "", nil, false
+		}
+		return mimeOf(pathname), contents, true
 	}
 
 	return "", nil, false
@@ -475,18 +489,65 @@ func insideRoot(root string, pathname string) (string, bool) {
 	return joined, true
 }
 
+// the file of a page path of the project: a file of root, or, for
+// /node_modules/<path> the project doesn't have, the same path in the
+// node_modules of the closest folder above root that has it: a package an
+// npm workspace hoisted, found where Node's resolution finds it
+func projectFile(root string, pathname string) (string, bool) {
+	file, ok := insideRoot(root, pathname)
+	if !ok {
+		return "", false
+	}
+	rel, _ := filepath.Rel(root, file)
+	if !strings.HasPrefix(rel, "node_modules"+string(filepath.Separator)) || fs.ExistsFn(file) {
+		return file, true
+	}
+	for dir := filepath.Dir(root); ; dir = filepath.Dir(dir) {
+		if hoisted := filepath.Join(dir, rel); fs.ExistsFn(hoisted) {
+			return hoisted, true
+		}
+		if filepath.Dir(dir) == dir {
+			return file, true
+		}
+	}
+}
+
 // the page path of a file of the project, escaped for an import specifier.
 // esbuild resolves files to their real path: a root reached through a
-// symlink (/tmp on macOS) is also compared by its real path.
+// symlink (/tmp on macOS) is also compared by its real path. A file of a
+// hoisted package (projectFile) is under /node_modules/ too.
 func urlOf(root string, file string) (string, bool) {
 	rel, ok := relInside(root, file)
 	if !ok {
 		rel, ok = relInside(cachedCanonicalRoot(root), file)
 	}
 	if !ok {
-		return "", false
+		if pageURL, ok := hoistedURLOf(root, file); ok {
+			return pageURL, true
+		}
+		return hoistedURLOf(cachedCanonicalRoot(root), file)
 	}
 	return (&url.URL{Path: "/" + filepath.ToSlash(rel)}).EscapedPath(), true
+}
+
+// /node_modules/<path> for a file in the node_modules of a folder above
+// root, when that page path leads back to it
+func hoistedURLOf(root string, file string) (string, bool) {
+	sep := string(filepath.Separator)
+	i := strings.LastIndex(file, sep+"node_modules"+sep)
+	for i != -1 {
+		rel := file[i+1:]
+		if dir := file[:i]; dir != "" && !strings.HasPrefix(root+sep, dir+sep) {
+			i = strings.LastIndex(file[:i], sep+"node_modules"+sep)
+			continue
+		}
+		pageURL := (&url.URL{Path: "/" + filepath.ToSlash(rel)}).EscapedPath()
+		if found, ok := projectFile(root, pageURL); ok && found == file {
+			return pageURL, true
+		}
+		i = strings.LastIndex(file[:i], sep+"node_modules"+sep)
+	}
+	return "", false
 }
 
 func relInside(root string, file string) (string, bool) {
