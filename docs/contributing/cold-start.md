@@ -82,6 +82,24 @@ Medians in milliseconds from the command to the first render, bundle mode (the b
 
 The demo, one warm run per app launch (three each): bundle 3770, 3945 and 4239, transform 3908, 4146 and 4117 (medians 3945 and 4117, +4%). Transform mode's page loads as fast; its prepare takes about 150 ms more than the bundle, most of both being the Tailwind CSS plugin.
 
-Not measured yet: the macOS app and Linux GTK and Qt (their screens were locked). iOS shares the macOS app's host code.
+**Linux arm64 app**, WebKitGTK (GNOME on Wayland, in a VM without 3D acceleration), commit `c165349e`:
+
+| Fixture | Bundle, cold | Bundle, warm | Transform, cold | Transform, warm | Warm |
+| ------- | -----------: | -----------: | --------------: | --------------: | ---: |
+| small   |          437 |          231 |             278 |             198 | −14% |
+| demo    |         1564 |          503 |             530 |             512 |  +2% |
+| heavy   |         1511 |          463 |             398 |             260 | −44% |
+| modules |              |              |             246 |             194 |      |
+
+**Linux arm64 app**, QtWebEngine (same machine), commit `c165349e`:
+
+| Fixture | Bundle, cold | Bundle, warm | Transform, cold | Transform, warm | Warm |
+| ------- | -----------: | -----------: | --------------: | --------------: | ---: |
+| small   |          163 |          167 |             216 |             131 | −22% |
+| demo    |          521 |          513 |             477 |             453 | −12% |
+| heavy   |          328 |          356 |             331 |             201 | −44% |
+| modules |              |              |             297 |             240 |      |
+
+Not measured yet: the macOS app (its screen locked during the run). iOS shares the macOS app's host code.
 
 The demo's build is mostly its Tailwind CSS plugin, which both modes run: with little bundling to save, transform mode is level with bundle mode there. A first run in transform mode (no cached dependencies) builds the dependencies and is slower for small projects.
