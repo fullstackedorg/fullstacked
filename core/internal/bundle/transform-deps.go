@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	esbuild "github.com/evanw/esbuild/pkg/api"
 )
@@ -381,6 +382,12 @@ func depsKey(root string, specs []string, usage depUsage) string {
 	for _, spec := range specs {
 		hash.Write([]byte{0})
 		hash.Write([]byte(spec))
+		// a module outside of the project is source, not a package: its edits build again
+		if filepath.IsAbs(spec) {
+			if info, err := os.Stat(spec); err == nil {
+				hash.Write([]byte(info.ModTime().String() + "/" + itoa(int(info.Size()))))
+			}
+		}
 		for _, name := range usageOf(usage, spec) {
 			hash.Write([]byte{1})
 			hash.Write([]byte(name))
@@ -615,8 +622,16 @@ func readDepsCache(root string, key string) *depsBuild {
 // best effort: a project that can't write its node_modules builds again
 func writeDepsCache(root string, build *depsBuild) {
 	dir := depsCacheDir(root)
-	if _, err := os.Stat(filepath.Dir(filepath.Dir(dir))); err != nil {
+	nodeModules := filepath.Dir(filepath.Dir(dir))
+	nodeModulesInfo, err := os.Stat(nodeModules)
+	if err != nil {
 		return
+	}
+	// creating node_modules/.fullstacked makes node_modules newer than its hidden lockfile:
+	// the next install would no longer trust what is installed and download every package
+	// again (packages/reify.go loadHiddenLockfile), so node_modules keeps its time
+	if _, err := os.Stat(filepath.Dir(dir)); err != nil {
+		defer os.Chtimes(nodeModules, time.Time{}, nodeModulesInfo.ModTime())
 	}
 	os.RemoveAll(dir)
 	manifest := depsManifest{

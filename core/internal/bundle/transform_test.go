@@ -313,6 +313,28 @@ func TestTransformDepsCache(t *testing.T) {
 	}
 }
 
+// an install trusts what is installed only when node_modules is not newer than its hidden
+// lockfile: writing the cache must not make it newer, or the next install downloads every
+// package again
+func TestTransformDepsCacheKeepsNodeModulesTime(t *testing.T) {
+	root := writeProject(t, map[string]string{
+		"index.ts": `import fn from "cjs-fn"; console.log(fn);`,
+	})
+	nodeModules := filepath.Join(root, "node_modules")
+	installed := time.Now().Add(-time.Hour).Truncate(time.Second)
+	os.Chtimes(nodeModules, installed, installed)
+	if _, errs := ensureDeps(root, []string{"cjs-fn"}, nil, nil); len(errs) > 0 {
+		t.Fatal(errs)
+	}
+	if _, err := os.Stat(depsCacheDir(root)); err != nil {
+		t.Fatal("no cache written")
+	}
+	info, _ := os.Stat(nodeModules)
+	if !info.ModTime().Equal(installed) {
+		t.Fatalf("node_modules modified at %v, want %v", info.ModTime(), installed)
+	}
+}
+
 func TestTransformContainment(t *testing.T) {
 	root := writeProject(t, map[string]string{
 		"index.ts": `console.log(1);`,
@@ -329,11 +351,47 @@ func TestTransformContainment(t *testing.T) {
 		}
 	}
 
-	root = writeProject(t, map[string]string{
-		"index.ts": `import "../outside";`,
-	})
-	if result := PrepareTransformFn(nil, root); len(result.Errors) == 0 {
-		t.Error("an import outside of the project is an error")
+}
+
+// a module outside of the project (../shared/x.ts) is in a bundle: transform mode builds it
+// with the dependencies, and builds them again when it is edited
+func TestTransformModuleOutsideTheProject(t *testing.T) {
+	workspace := t.TempDir()
+	shared := filepath.Join(workspace, "shared", "greet.ts")
+	os.MkdirAll(filepath.Dir(shared), 0755)
+	os.WriteFile(shared, []byte(`export const greet = "from outside";`), 0644)
+	root := filepath.Join(workspace, "app")
+	os.MkdirAll(root, 0755)
+	os.WriteFile(filepath.Join(root, "package.json"), []byte(`{"name":"app","private":true}`), 0644)
+	os.WriteFile(filepath.Join(root, "index.ts"), []byte(`import { greet } from "../shared/greet"; console.log(greet);`), 0644)
+
+	prepareOK(t, root)
+	state := transformStateFor(root)
+	if state.deps == nil || len(state.deps.urls) != 1 {
+		t.Fatalf("not built with the dependencies: %+v", state.deps)
+	}
+	var depURL string
+	for _, u := range state.deps.urls {
+		depURL = u
+	}
+	if !strings.Contains(serve(t, root, depURL), "from outside") {
+		t.Fatalf("%s does not hold the module", depURL)
+	}
+	if _, contents, handled := ServeTransform(transformCtx(root), "/../shared/greet.ts"); handled && contents != nil {
+		t.Error("the file itself is served")
+	}
+
+	// an edit is another key
+	key := state.deps.key
+	later := time.Now().Add(time.Minute)
+	os.WriteFile(shared, []byte(`export const greet = "edited";`), 0644)
+	os.Chtimes(shared, later, later)
+	specs := []string{}
+	for spec := range state.deps.urls {
+		specs = append(specs, spec)
+	}
+	if depsKey(root, specs, state.deps.usage) == key {
+		t.Fatal("an edit of the module outside is not part of the key")
 	}
 }
 

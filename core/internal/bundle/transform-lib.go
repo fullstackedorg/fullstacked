@@ -563,10 +563,13 @@ func classifyImport(build esbuild.PluginBuild, args esbuild.OnResolveArgs, root 
 	if isModule && (inNodeModules(file) || !inside) {
 		specifier := args.Path
 		if !isBareSpecifier(specifier) {
-			if !inside {
-				return resolvedImport{}, []esbuild.Message{{Text: "Could not resolve \"" + args.Path + "\": it is outside of the project"}}
+			if inside {
+				specifier = "." + pageURL
+			} else {
+				// a module outside of the project (../shared/x.ts): a bundle includes it, so
+				// it is built with the dependencies, by its path (depsKey watches it)
+				specifier = file
 			}
-			specifier = "." + pageURL
 		}
 		return resolvedImport{kind: importDep, value: specifier}, nil
 	}
