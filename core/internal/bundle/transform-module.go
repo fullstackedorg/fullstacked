@@ -202,7 +202,7 @@ func (state *transformState) transformWith(file string, deps *depsBuild, filters
 						missingMu.Unlock()
 						return esbuild.OnResolveResult{Path: imp.value, External: true}, nil
 					}
-					return proxyResult("dep:"+imp.value, proxyTarget{url: url}), nil
+					return depImportResult(imp.value, url, deps, args.Kind), nil
 				case importModule, importFile:
 					return esbuild.OnResolveResult{Path: imp.value, External: true}, nil
 				}

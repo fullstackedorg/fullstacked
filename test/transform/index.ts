@@ -215,6 +215,65 @@ suite("transform mode - parity with bundle mode", () => {
         assert.ok(Object.values(bundled.lib).every(Boolean));
     });
 
+    // "type": "module": esbuild gives a default import of CommonJS the whole
+    // module.exports (Node's rule), which the dependency proxies must not
+    // turn into their facade (pg's ESM wrapper: new pg.Pool() was undefined)
+    test("the same page in a \"type\": \"module\" project", async () => {
+        const dir = writeFixture("type-module", {
+            ...packages,
+            "node_modules/esm-wrapper/package.json": `{"name":"esm-wrapper","main":"lib/index.js","exports":{".":{"import":"./esm/index.mjs","require":"./lib/index.js"}}}`,
+            "node_modules/esm-wrapper/lib/index.js": `function Pool(n) { this.n = n; } module.exports = { Pool, Client: function Client() {}, version: "wrapped" };`,
+            "node_modules/esm-wrapper/esm/index.mjs": `import lib from "../lib/index.js";\nexport const Pool = lib.Pool;\nexport default lib;\n`,
+            "package.json": `{"name":"type-module","private":true,"type":"module"}`,
+            "node_modules/esm-default-fn/package.json": `{"name":"esm-default-fn","type":"module","exports":{".":"./index.js"}}`,
+            "node_modules/esm-default-fn/index.js": `export default function greet() { return "hi"; }\nexport const named = "n";\n`,
+            // not in the entry: a bundle reads its entry through esbuild's
+            // stdin, which ignores "type": "module"
+            "other.ts": `import { Pool } from "esm-wrapper";\nimport * as greetNs from "esm-default-fn";\nimport transpiled, { named as transpiledNamed } from "cjs-esmodule";\nexport const namedPool = typeof Pool;\nexport const nsKeys = Object.keys(greetNs).sort().join(",");\nexport const transpiledDefault = JSON.stringify(transpiled);\nexport { transpiledNamed };\n`,
+            "index.ts": `import wrapper from "esm-wrapper";
+import fn from "cjs-fn";
+import { a } from "cjs-obj";
+import esmDefault, { named } from "esm-only";
+import greet from "esm-default-fn";
+import { namedPool, nsKeys, transpiledDefault, transpiledNamed } from "./other.ts";
+
+const lazy = await import("esm-only");
+const lazyFn = await import("cjs-fn");
+const report = {
+    defaultPool: new wrapper.Pool(2).n,
+    defaultClient: typeof wrapper.Client,
+    defaultVersion: wrapper.version,
+    namedPool,
+    cjsDefault: fn(),
+    cjsDefaultProperty: (fn as any).extra,
+    cjsNamed: a,
+    esmDefault,
+    named,
+    dynamicDefault: lazy.default,
+    dynamicNamed: lazy.named,
+    dynamicCjs: lazyFn.default(),
+    transpiledDefault,
+    transpiledNamed,
+    greet: greet(),
+    nsKeys
+};
+const pre = document.createElement("pre");
+pre.id = "report";
+pre.textContent = JSON.stringify(report, null, 2);
+document.body.append(pre);
+`
+        });
+        const bundled = await report(dir, "bundle");
+        fs.rmSync(path.join(dir, "out"), { recursive: true, force: true });
+        const transformed = await report(dir, "transform");
+        assert.deepEqual(transformed, bundled);
+        assert.equal(bundled.defaultPool, 2);
+        assert.equal(bundled.defaultClient, "function");
+        assert.equal(bundled.cjsDefault, "fn");
+        assert.equal(bundled.greet, "hi");
+        assert.equal(bundled.dynamicCjs, "fn");
+    });
+
     test("the same syntax error", async () => {
         const dir = writeFixture("syntax-error", {
             "index.ts": `import { b } from "./b";\nconsole.log(b);\n`,

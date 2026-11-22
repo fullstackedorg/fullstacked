@@ -339,6 +339,11 @@ type depsBuild struct {
 	// the lib modules the packages import (/@lib/...), preloaded
 	libImports []string
 	usage      depUsage
+	// the names an ES module package exports, for the specifiers imported
+	// whole (allExports)
+	exports map[string][]string
+	// the specifiers of CommonJS packages: their facade holds module.exports
+	commonJS map[string]bool
 }
 
 type depsManifest struct {
@@ -349,9 +354,14 @@ type depsManifest struct {
 	Css        []string          `json:"css"`
 	LibImports []string          `json:"libImports"`
 	Usage      depUsage          `json:"usage"`
+	Exports    map[string][]string `json:"exports"`
+	CommonJS   map[string]bool     `json:"commonJS"`
 }
 
 const depsFacadeNamespace = "fullstacked-dep"
+
+// what the facades are (depFacade): another format builds the cache again
+const depsFacadeFormat = "facade-3"
 
 func depsCacheDir(root string) string {
 	return filepath.Join(root, "node_modules", ".fullstacked", "deps")
@@ -364,6 +374,7 @@ func depsKey(root string, specs []string, usage depUsage) string {
 	version, _ := json.Marshal(FullStackedVersion())
 	hash.Write(version)
 	hash.Write([]byte(EsbuildVersionFn()))
+	hash.Write([]byte(depsFacadeFormat))
 	for _, file := range []string{
 		"package.json",
 		"package-lock.json",
@@ -460,6 +471,8 @@ func buildDeps(root string, specs []string, usage depUsage, key string) (*depsBu
 		entries = append(entries, esbuild.EntryPoint{InputPath: depsFacadeNamespace + ":" + spec, OutputPath: output})
 	}
 
+	commonJSSpecs := map[string]bool{}
+	commonJSMu := sync.Mutex{}
 	outdir := filepath.Join(os.TempDir(), "fullstacked-transform", "deps")
 	result := esbuild.Build(esbuild.BuildOptions{
 		EntryPointsAdvanced: entries,
@@ -481,7 +494,14 @@ func buildDeps(root string, specs []string, usage depUsage, key string) (*depsBu
 					return esbuild.OnResolveResult{Path: strings.TrimPrefix(args.Path, depsFacadeNamespace+":"), Namespace: depsFacadeNamespace}, nil
 				})
 				build.OnLoad(esbuild.OnLoadOptions{Filter: ".*", Namespace: depsFacadeNamespace}, func(args esbuild.OnLoadArgs) (esbuild.OnLoadResult, error) {
-					contents := depFacade(args.Path, usageOf(usage, args.Path))
+					resolved := build.Resolve(args.Path, esbuild.ResolveOptions{ResolveDir: root, Kind: esbuild.ResolveJSImportStatement, Namespace: "file"})
+					commonJS := len(resolved.Errors) == 0 && isCommonJS(resolved.Path)
+					if commonJS {
+						commonJSMu.Lock()
+						commonJSSpecs[args.Path] = true
+						commonJSMu.Unlock()
+					}
+					contents := depFacade(args.Path, usageOf(usage, args.Path), commonJS)
 					return esbuild.OnLoadResult{Contents: &contents, ResolveDir: root, Loader: esbuild.LoaderJS}, nil
 				})
 				// the lib modules the packages import stay the page's
@@ -518,6 +538,8 @@ func buildDeps(root string, specs []string, usage depUsage, key string) (*depsBu
 	for spec, output := range outputs {
 		build.urls[spec] = transformDepsPrefix + output + ".js"
 	}
+	build.exports = wholeExports(result.Metafile, root, outdir, outputs, build.usage)
+	build.commonJS = commonJSSpecs
 	for _, file := range result.OutputFiles {
 		rel, err := filepath.Rel(outdir, file.Path)
 		if err != nil {
@@ -545,6 +567,68 @@ func buildDeps(root string, specs []string, usage depUsage, key string) (*depsBu
 	return build, nil
 }
 
+var esmSyntax = regexp.MustCompile(`(?m)^[ \t]*(?:import[ \t]*[\w{*"'$]|export[ \t{*])`)
+
+// Whether esbuild reads file as CommonJS: by its extension, its package's
+// "type", else its syntax (no import or export statement).
+func isCommonJS(file string) bool {
+	switch path.Ext(file) {
+	case ".cjs", ".cts":
+		return true
+	case ".mjs", ".mts", ".json", ".css":
+		return false
+	}
+	for dir := filepath.Dir(file); ; dir = filepath.Dir(dir) {
+		if contents, err := os.ReadFile(filepath.Join(dir, "package.json")); err == nil {
+			pkg := struct {
+				Type string `json:"type"`
+			}{}
+			if json.Unmarshal(contents, &pkg) == nil && pkg.Type == "module" {
+				return false
+			}
+			break
+		}
+		if filepath.Dir(dir) == dir {
+			break
+		}
+	}
+	contents, err := os.ReadFile(file)
+	if err != nil {
+		return false
+	}
+	return !esmSyntax.Match(lineComments.ReplaceAll(contents, nil))
+}
+
+// The names exported by the packages imported whole, from the metafile of
+// their build (output paths relative to root): what their facade re-exports
+// besides its default, none for a CommonJS package.
+func wholeExports(meta string, root string, outdir string, outputs map[string]string, usage depUsage) map[string][]string {
+	parsed := metafile{}
+	json.Unmarshal([]byte(meta), &parsed)
+	byFile := map[string][]string{}
+	for output, info := range parsed.Outputs {
+		if !filepath.IsAbs(output) {
+			output = filepath.Join(root, output)
+		}
+		byFile[filepath.Clean(output)] = info.Exports
+	}
+	exports := map[string][]string{}
+	for spec, output := range outputs {
+		if names := usageOf(usage, spec); len(names) != 1 || names[0] != allExports {
+			continue
+		}
+		named := []string{}
+		for _, name := range byFile[filepath.Join(outdir, output+".js")] {
+			if name != "default" {
+				named = append(named, name)
+			}
+		}
+		sort.Strings(named)
+		exports[spec] = named
+	}
+	return exports
+}
+
 // The default export of a facade is the package as a bundle's interop sees
 // it, marked __esModule so the importer's interop keeps it: named imports
 // read its properties, a default import gets its "default" (module.exports
@@ -553,9 +637,22 @@ func buildDeps(root string, specs []string, usage depUsage, key string) (*depsBu
 // With the names the project imports, the facade imports only these: the
 // package is tree-shaken as in a bundle (a large ESM package such as three
 // keeps what the project uses).
-func depFacade(spec string, names []string) string {
+//
+// A CommonJS package is whole (it can't be tree-shaken), and its facade also
+// holds its "module.exports", the value a page's interop starts from as a
+// bundle's does (transform-lib.go depImportResult). An ES module package
+// imported whole re-exports its names: the build's metafile lists them.
+func depFacade(spec string, names []string, commonJS bool) string {
+	if commonJS {
+		return "import * as ns from " + jsString(spec) + ";\n" + namespaceFacade("ns") +
+			// esbuild's namespace of a CommonJS module is its module.exports
+			// when marked __esModule, else module.exports is its default
+			"Object.defineProperty(target, \"module.exports\", { value: ns.__esModule ? target : ns.default });\n" +
+			"export default target;\n"
+	}
 	if len(names) == 1 && names[0] == allExports {
-		return "import * as ns from " + jsString(spec) + ";\n" + namespaceFacade("ns") + "export default target;\n"
+		return "import * as ns from " + jsString(spec) + ";\nexport * from " + jsString(spec) + ";\n" +
+			namespaceFacade("ns") + "export default target;\n"
 	}
 	out := ""
 	if len(names) > 0 {
@@ -604,6 +701,8 @@ func readDepsCache(root string, key string) *depsBuild {
 		css:        manifest.Css,
 		libImports: manifest.LibImports,
 		usage:      manifest.Usage,
+		exports:    manifest.Exports,
+		commonJS:   manifest.CommonJS,
 	}
 	for _, pagePath := range manifest.Files {
 		file, ok := insideRoot(dir, strings.TrimPrefix(pagePath, transformDepsPrefix))
@@ -641,6 +740,8 @@ func writeDepsCache(root string, build *depsBuild) {
 		Css:        build.css,
 		LibImports: build.libImports,
 		Usage:      build.usage,
+		Exports:    build.exports,
+		CommonJS:   build.commonJS,
 	}
 	for pagePath, contents := range build.files {
 		file, ok := insideRoot(dir, strings.TrimPrefix(pagePath, transformDepsPrefix))

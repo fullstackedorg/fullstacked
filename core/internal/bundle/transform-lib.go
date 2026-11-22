@@ -602,6 +602,12 @@ type proxyTarget struct {
 	lib bool
 	// a namespace the module at url exports (a lib file of the prelude)
 	export string
+	// a dependency imported by import or import(): the names the project
+	// imports from it, exported as such (see depImportResult)
+	names []string
+	// a dependency required: what require() gets, its facade's
+	// "module.exports" when it has one (see depImportResult)
+	required bool
 }
 
 func addProxies(build esbuild.PluginBuild) {
@@ -618,6 +624,17 @@ func addProxies(build esbuild.PluginBuild) {
 		if target.export != "" {
 			contents = "import { " + target.export + " as ns } from " + jsString(target.url) + ";\n" +
 				namespaceFacade("ns") + "export default target;\n"
+		} else if len(target.names) > 0 {
+			contents = "import m from " + jsString(target.url) + ";\n"
+			exports := []string{}
+			for i, name := range target.names {
+				contents += "const __n" + itoa(i) + " = m[" + jsString(name) + "];\n"
+				exports = append(exports, "__n"+itoa(i)+" as "+jsString(name))
+			}
+			contents += "export { " + strings.Join(exports, ", ") + " };\n"
+		} else if target.required {
+			contents = "import m from " + jsString(target.url) + ";\n" +
+				"export default m && m[\"module.exports\"] !== undefined ? m[\"module.exports\"] : m;\n"
 		} else if target.lib {
 			contents = "import * as m from " + jsString(target.url) + ";\n" +
 				"export default m && m[\"module.exports\"] !== undefined ? m[\"module.exports\"] : m;\n"
@@ -629,6 +646,28 @@ func addProxies(build esbuild.PluginBuild) {
 	build.OnResolve(esbuild.OnResolveOptions{Filter: ".*", Namespace: proxyESMNamespace}, func(args esbuild.OnResolveArgs) (esbuild.OnResolveResult, error) {
 		return esbuild.OnResolveResult{Path: args.Path, External: true}, nil
 	})
+}
+
+// A dependency (its facade at url) as a module imports it. A CommonJS
+// package: the CommonJS proxy of its module.exports, read through esbuild's
+// interop as in a bundle (in a "type": "module" package a default import gets
+// the whole of it, Node's rule). An ES module package by import or import():
+// a module that exports the names the project imports (all those the package
+// exports when it is imported whole), so a default import gets its default
+// export whatever the importer's module type; required, its facade.
+func depImportResult(spec string, url string, deps *depsBuild, kind esbuild.ResolveKind) esbuild.OnResolveResult {
+	if deps.commonJS[spec] {
+		return proxyResult("dep:"+spec, proxyTarget{url: url, required: true})
+	}
+	names := usageOf(deps.usage, spec)
+	if len(names) == 1 && names[0] == allExports {
+		names = append([]string{"default"}, deps.exports[spec]...)
+	}
+	byImport := kind == esbuild.ResolveJSImportStatement || kind == esbuild.ResolveJSDynamicImport
+	if byImport && len(names) > 0 {
+		return esbuild.OnResolveResult{Path: "dep-import:" + spec, Namespace: proxyESMNamespace, PluginData: proxyTarget{url: url, names: names}}
+	}
+	return proxyResult("dep:"+spec, proxyTarget{url: url})
 }
 
 func proxyResult(key string, target proxyTarget) esbuild.OnResolveResult {
