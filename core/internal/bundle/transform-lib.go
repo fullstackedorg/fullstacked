@@ -210,6 +210,14 @@ const (
 	libPreludeName = "fullstacked-lib-prelude"
 )
 
+// esbuild reads an entry point named like a file of the working directory
+// from that file, matching names regardless of case: the iOS app's working
+// directory holds its executable, FullStacked. node: keeps the entry a module
+// name (the lib plugin drops it)
+func libEntryOf(name string) string {
+	return "node:" + name
+}
+
 // a lib file of the prelude, as a bundle's lib plugin names it
 func libFileOf(args esbuild.OnResolveArgs, pwd string) (string, bool) {
 	if args.Namespace == "lib-require" || args.Kind == esbuild.ResolveEntryPoint {
@@ -249,7 +257,7 @@ func buildTransformLib() *libBuild {
 		sort.Strings(names)
 		output := strings.TrimSuffix(strings.TrimPrefix(file, "/lib/"), path.Ext(file))
 		outputOf[file] = output
-		allEntries = append(allEntries, esbuild.EntryPoint{InputPath: names[0], OutputPath: output})
+		allEntries = append(allEntries, esbuild.EntryPoint{InputPath: libEntryOf(names[0]), OutputPath: output})
 	}
 	sort.Slice(allEntries, func(i, j int) bool { return allEntries[i].OutputPath < allEntries[j].OutputPath })
 
@@ -373,7 +381,7 @@ func buildTransformLib() *libBuild {
 	}
 	restEntries := []esbuild.EntryPoint{{InputPath: libFilePrefix + "/lib/DOMParser/index.ts", OutputPath: "_prelude/DOMParser"}}
 	for _, entry := range allEntries {
-		file := libModules[entry.InputPath]
+		file := libModules[strings.TrimPrefix(entry.InputPath, "node:")]
 		if !inPrelude[file] {
 			restEntries = append(restEntries, entry)
 			continue

@@ -95,6 +95,33 @@ func TestTransformLibBuild(t *testing.T) {
 	}
 }
 
+// the lib's entries are module names: a file of the working directory with
+// one of them (the iOS app's executable FullStacked, matched ignoring case,
+// is in its working directory) is not read in its place
+func TestTransformLibBuildBesideSameNamedFiles(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"FullStacked", "fs", "path"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("not the lib"), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Chdir(dir)
+	lib := buildTransformLib()
+	if len(lib.errors) > 0 {
+		t.Fatalf("%+v", lib.errors)
+	}
+	for _, name := range []string{"fullstacked", "fs", "path"} {
+		if _, ok := lib.files[lib.urls[name]]; !ok {
+			t.Fatalf("no file for %s", name)
+		}
+	}
+	for url, contents := range lib.files {
+		if strings.Contains(string(contents), "not the lib") {
+			t.Fatalf("%s is a file of the working directory", url)
+		}
+	}
+}
+
 func TestTransformPrepareAndServe(t *testing.T) {
 	root := writeProject(t, map[string]string{
 		"index.ts": `import { b } from "./src/b";
