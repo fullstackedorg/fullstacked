@@ -1,12 +1,16 @@
 [submodule "app/shell"]
 	path = shell
 	url = https://github.com/fullstackedorg/shell.git
+	branch = main
 [submodule "plugins/tailwindcss"]
 	path = plugins/tailwindcss
 	url = https://github.com/fullstackedorg/tailwindcss.git
+	branch = main
 [submodule "plugins/sass"]
 	path = plugins/sass
 	url = https://github.com/fullstackedorg/sass.git
+	branch = main
 [submodule "plugins/onboarding"]
 	path = plugins/onboarding
 	url = https://github.com/fullstackedorg/onboarding.git
+	branch = main
