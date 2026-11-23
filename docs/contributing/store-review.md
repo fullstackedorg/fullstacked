@@ -59,11 +59,9 @@ Other keys that review looks at: `ITSAppUsesNonExemptEncryption` is `YES` (the `
 | Question                                                      | Answer                                                                                                                          |
 | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | What type of encryption algorithms does your app implement?   | Standard encryption algorithms instead of, or in addition to, using or accessing the encryption within Apple's operating system |
-| Is your app going to be available on the App Store in France? | Yes, with the French encryption declaration, or No and France removed from the app's availability                               |
+| Is your app going to be available on the App Store in France? | Yes, with the French encryption declaration                                                                                     |
 
-Revisit them when the crypto changes. Once App Store Connect gives an export compliance code, `ITSEncryptionExportComplianceCode` in the build settings skips the questions for later builds.
-
-Since November 2026 France is removed from the app's availability, and every build answers No for France. The French encryption declaration filed on November 11, 2026 (App Information, App Encryption Documentation) was still in review when France was removed. To bring France back: check that both documents are approved, set their key value as `ITSEncryptionExportComplianceCode` in the 4 build configurations, then add France again in Pricing and Availability.
+Revisit them when the crypto changes. The French encryption declaration (App Information, App Encryption Documentation, filed November 11, 2026) was approved in November 2026, and its key is `INFOPLIST_KEY_ITSEncryptionExportComplianceCode` in the 4 build configurations, so builds skip the questions. France was off the app's availability while the declaration was in review and is available again since build 1918. A new declaration (changed crypto) gives a new key: replace the value in the 4 configurations.
 
 ### Mac App Sandbox
 
