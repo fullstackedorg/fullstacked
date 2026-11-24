@@ -42,7 +42,7 @@ Your UI and your logic run in the same JavaScript context, bridged to a native c
 
 ## Get started
 
-From `npm install` to your phone: build locally, push to Git, run anywhere.
+From `npm install` to your phone: build locally, push to Git, run it everywhere.
 
 **1. Install.** Add FullStacked to any JavaScript or TypeScript project.
 
@@ -82,7 +82,7 @@ git commit -am "first version"
 git push
 ```
 
-**5. Run it anywhere.** Open the FullStacked app on any device, pull and run.
+**5. Run it everywhere.** Open the FullStacked app on any device, pull and run.
 
 ```sh
 git clone https://github.com/you/my-project
