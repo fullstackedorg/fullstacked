@@ -11,7 +11,7 @@ run(directory?: string): Promise<number>
 run(options?: { directory?: string; env?: Record<string, string>; safe?: boolean; mode?: "bundle" | "transform" }): Promise<number>
 ```
 
-- `directory`: the project, relative to the caller's project (default `"."`). The new context's root is `<caller root>/<directory>` and its build directory is `<root>/out`.
+- `directory`: the project, relative to the caller's project (default `"."`). The new context's root is `<caller root>/<directory>` and its build directory is `<root>/out`. It must be the caller's root or a directory under it: `run` resolves `..` at the root, and the core refuses any directory outside it ("outside the context's root").
 - `env`: the new project's `process.env`.
 - `safe`: ignore the project's `initialDirectory` [config](config.md#initialdirectory).
 - `mode`: how the page is served, see [mode](#mode). `"bundle"` when left out.

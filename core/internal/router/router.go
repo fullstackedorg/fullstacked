@@ -210,7 +210,12 @@ func Switch(
 		return nil
 	case Run:
 		response.Type = types.CoreResponseData
-		root := filepath.Join(ctx.Directories.Root, data[0].Data.(string))
+		// a context only starts contexts in its own root or a directory under it
+		directory, _ := data[0].Data.(string)
+		root, ok := path.JoinUnderRoot(ctx.Directories.Root, directory)
+		if !ok {
+			return errors.New("run: " + directory + " is outside the context's root")
+		}
 
 		safe := false
 		if len(data) > 2 && data[2].Type == types.BOOLEAN {

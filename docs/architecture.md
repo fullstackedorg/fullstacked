@@ -41,7 +41,7 @@ A context ends when its window closes, or a second after it calls `process.exit(
 
 ### The sandbox
 
-Every path a project passes to the core is resolved inside its context's root: `/` is the project directory, and a path that climbs above it is clamped to it. A project can read and write its own files and nothing else on the device through `fs`, `git`, `packages` or `bundle`. The app's shell is the context whose root is the app's projects directory, which is how it manages every project.
+Every path a project passes to the core is resolved inside its context's root: `/` is the project directory, and a path that climbs above it is clamped to it. A project can read and write its own files and nothing else on the device through `fs`, `git`, `packages` or `bundle`. [`run`](api/run.md) follows the same rule without clamping: a context only starts contexts in its root or a directory under it, and the core refuses any other directory. The app's shell is the context whose root is the app's projects directory, which is how it manages every project.
 
 The sandbox applies to files. Network access (`net`, `fetch`, `dgram`) is unrestricted.
 

@@ -130,6 +130,20 @@ func ResolveWithContext(ctx *types.Context, paths ...string) string {
 	return resolved
 }
 
+// JoinUnderRoot joins p (relative, or absolute in the context's virtual
+// filesystem) onto root, and reports whether the result is root or a directory
+// under it. Unlike ResolveWithContext it doesn't clamp: a caller that must not
+// leave its root (core Run) refuses the path instead.
+func JoinUnderRoot(root string, p string) (string, bool) {
+	root = filepath.Clean(root)
+	resolved := filepath.Clean(filepath.Join(root, p))
+	rel, err := filepath.Rel(root, resolved)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || strings.HasPrefix(rel, "../") {
+		return "", false
+	}
+	return resolved, true
+}
+
 func DataToStringSlice(data ...types.DeserializedData) []string {
 	strSlice := []string{}
 	for _, p := range data {
