@@ -114,6 +114,20 @@ Every platform starts in _safe mode_ on request, which ignores `initialDirectory
 
 The native apps ship the shell, the project in `shell/` built to `shell/out`, as their main page. The shell is a terminal (xterm.js) with commands for git, npm, bundling and running projects, all of it written in TypeScript over the runtime API.
 
+### Back navigation
+
+On Android and ChromeOS, the system back button and back gesture call `globalThis.back()` in the window on top. A project binds back by defining it:
+
+```ts
+globalThis.back = () => {
+    // close a dialog, go up a view…
+};
+```
+
+- A fullscreen element (a `<video>`'s fullscreen, `requestFullscreen()`) is left first, and `back` is not called for that press.
+- Without `back`, the press does nothing: it doesn't go back in the page's history, close the window or leave the app. To follow the history, define `globalThis.back = () => history.back()`.
+- The other platforms never call `back`.
+
 ## Repository layout
 
 | Path                    | Contents                                                                                                                                                                 |

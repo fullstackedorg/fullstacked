@@ -22,6 +22,9 @@ import type { JSPlugin } from "../plugin/index.ts";
 declare global {
     var fullstacked: Partial<FullStacked>;
     var __dirname: string;
+    // set by a project: the system back action calls it (Android), see
+    // docs/architecture.md#back-navigation
+    var back: (() => void) | undefined;
 }
 
 type FullStacked = {

@@ -69,6 +69,7 @@ Intercept every request of the page's origin (a custom scheme, a `WebResourceReq
 - The page sends `X-Body-Size` with the body length, for hosts whose body stream reports no size (Qt).
 - Without the hello frame of `/stream` (see 4), the page calls `GET /stream/detach`. Forward it to `handleRequest`, and the core goes back to the per-chunk callback.
 - `/open?ctx=N` opens a window on context `N`. `/exit` closes the page's window. `/resize` sets (`?size=w:h:x:y`, `fullscreen`, `kiosk`) or returns the window size. Answer 404 for `/resize` if the host can't size windows.
+- A host with a system back action (Android's back button and gesture) leaves a fullscreen element first, otherwise evaluates `globalThis.back?.()` in the window on top, and doesn't go back or close anything itself ([Back navigation](../architecture.md#back-navigation)).
 
 ## 3. The message channel (small async calls)
 
