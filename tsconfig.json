@@ -18,6 +18,7 @@
     "exclude": [
         "out",
         "core/typescript-go",
+        "plugins/*/vendor",
         "platform/android",
         "platform/apple",
         "platform/docker",

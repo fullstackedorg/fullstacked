@@ -27,7 +27,7 @@ export async function startAndroidHost(webviewPort: number) {
     const call = async (payload: Buffer, path = "/sync") => {
         const response = await fetch(`http://localhost:${webviewPort}${path}`, {
             method: "POST",
-            body: payload
+            body: new Uint8Array(payload)
         });
         return Buffer.from(await response.arrayBuffer());
     };

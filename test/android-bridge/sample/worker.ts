@@ -22,7 +22,7 @@ parentPort.on("message", (event: MessageEvent) => {
             fill: data[data.byteLength - 1]
         };
     } catch (e) {
-        result = { file, error: e.message };
+        result = { file, error: (e as Error).message };
     }
     parentPort.postMessage(result);
 });
